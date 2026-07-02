@@ -1,26 +1,417 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Deligro Design System — Warm Minimalism
+   Neutrals do the structural work; the orange is reserved for
+   one job: the primary action and the live moment.
+   ============================================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Light — energizing theme by day */
+  --bg: #fcfbf9;
+  --surface: #ffffff;
+  --surface-2: #f7f4ef;
+  --ink: #171512;
+  --muted: #726b62;
+  --accent: #e8552d;
+  --accent-soft: #fbe9e2;
+  --green: #2e7d5b;
+  --green-soft: #e3f1ea;
+  --blue: #2b5f8c;
+  --line: #e7e1d8;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(23, 21, 18, 0.04);
+  --shadow-md: 0 6px 24px -8px rgba(23, 21, 18, 0.12);
+  --shadow-lg: 0 20px 48px -16px rgba(23, 21, 18, 0.22);
+  --glow-accent: 0 12px 40px -8px rgba(232, 85, 45, 0.35);
+
+  /* Glass */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="dark"] {
+  /* Deep, glare-free dark for late-night cravings */
+  --bg: #14110d;
+  --surface: #1e1a15;
+  --surface-2: #262019;
+  --ink: #f4efe7;
+  --muted: #a89e8f;
+  --accent: #f2683f;
+  --accent-soft: rgba(58, 32, 22, 0.85);
+  --green: #4fb083;
+  --green-soft: rgba(22, 51, 37, 0.85);
+  --blue: #5b96c9;
+  --line: #2f2820;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 6px 24px -8px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 20px 48px -16px rgba(0, 0, 0, 0.7);
+  --glow-accent: 0 12px 40px -8px rgba(242, 104, 63, 0.4);
+
+  --glass-bg: rgba(30, 26, 21, 0.68);
+  --glass-border: rgba(255, 255, 255, 0.08);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-green: var(--green);
+  --color-green-soft: var(--green-soft);
+  --color-blue: var(--blue);
+  --color-line: var(--line);
+
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-fraunces);
+  --font-mono: var(--font-mono-jb);
+
+  --radius-block: 1.25rem;
+  --radius-sheet: 1.75rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--line);
+}
+
+html {
+  color-scheme: light dark;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.5s ease, color 0.5s ease;
+}
+
+/* ---------- Type scale ---------- */
+.text-display {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: clamp(2rem, 6vw, 2.35rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  font-weight: 500;
+}
+.text-heading {
+  font-size: 1.3125rem; /* 21px */
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.text-body {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.text-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+}
+.text-data {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.875rem;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- Surfaces ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-block);
+  box-shadow: var(--shadow-sm);
+}
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid var(--glass-border);
+}
+
+/* ---------- App shell (mobile-first, centered on desktop) ----------
+   Fixed-height frame: only the inner content scrolls, so the tab bar
+   and glass cart stay pinned like a native app. */
+.app-shell {
+  width: 100%;
+  max-width: 440px;
+  margin-inline: auto;
+  height: 100dvh;
+  position: relative;
+  background: var(--bg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.app-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+/* ---------- Phone frame ----------
+   On phones the app is edge-to-edge. On wider screens we wrap the shell in a
+   simple dark bezel so it reads as a phone preview. */
+.device {
+  display: contents; /* mobile: no frame — the shell fills the viewport */
+}
+
+@media (min-width: 480px) {
+  body {
+    display: grid;
+    place-items: center;
+    min-height: 100dvh;
+    padding: 24px;
+    background: var(--surface-2);
+  }
+
+  .device {
+    display: block;
+    padding: 12px;
+    border-radius: 44px;
+    background: #121212;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Screen — explicit width because every child is absolutely positioned,
+     so the shell has no intrinsic width to shrink-wrap the bezel around. */
+  .app-shell {
+    width: min(390px, calc(100vw - 72px));
+    max-width: none;
+    height: min(844px, calc(100dvh - 72px));
+    margin-inline: 0;
+    border-radius: 32px;
+    border: none;
+  }
+}
+
+/* ---------- Interactions ---------- */
+.press {
+  transition: transform 0.12s ease, box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+.press:active {
+  transform: scale(0.97);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ---------- Animations ---------- */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--ink) 6%, transparent),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.pulse-ring {
+  animation: pulse-ring 2s infinite;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-slide-up {
+  animation: slide-up 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.animate-sheet-in {
+  animation: sheet-in 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-fade-in {
+  animation: fade-in 0.25s ease both;
+}
+
+/* ---------- Splash ----------
+   Brand moment on cold start. Uses the theme tokens directly so it inherits
+   whatever the pre-paint bootstrap set — no flash, correct in light and dark.
+   No logo image: the serif wordmark + a single accent detail carry it. */
+.splash {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  transition: opacity 0.55s ease;
+}
+.splash[data-hiding="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+.splash-glow {
+  position: absolute;
+  width: min(360px, 82%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 22%, transparent),
+    transparent 62%
+  );
+  filter: blur(8px);
+  opacity: 0;
+  animation: splash-glow-in 0.9s 0.1s ease forwards;
+}
+.splash-inner {
+  position: relative;
+  text-align: center;
+}
+.splash-word {
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 500;
+  font-size: clamp(2.75rem, 15vw, 3.5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  opacity: 0;
+  animation: splash-rise 0.7s 0.15s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.splash-rule {
+  height: 2px;
+  width: 64px;
+  margin: 18px auto 0;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.9;
+  transform: scaleX(0);
+  transform-origin: center;
+  animation: splash-rule 0.6s 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.splash-tag {
+  margin-top: 16px;
+  opacity: 0;
+  animation: splash-fade 0.6s 0.85s ease forwards;
+}
+.splash-loader {
+  position: absolute;
+  bottom: 11%;
+  left: 50%;
+  width: 120px;
+  height: 3px;
+  border-radius: 3px;
+  overflow: hidden;
+  transform: translateX(-50%);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  opacity: 0;
+  animation: splash-fade 0.5s 1s ease forwards;
+}
+.splash-loader::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 42%;
+  border-radius: 3px;
+  background: var(--accent);
+  animation: splash-load 1.15s 1.05s ease-in-out infinite;
+}
+@keyframes splash-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes splash-rule {
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes splash-fade {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes splash-glow-in {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes splash-load {
+  0% {
+    transform: translateX(-130%);
+  }
+  100% {
+    transform: translateX(360%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::after,
+  *::before {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }
