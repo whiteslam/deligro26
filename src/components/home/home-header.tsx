@@ -33,13 +33,13 @@ export function HomeHeader() {
 
   return (
     <div className="glass sticky top-0 z-20 px-4 pb-3 pt-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <button
           onClick={onTap}
-          className="press flex items-center gap-2 text-left"
+          className="press flex min-w-0 flex-1 items-center gap-2 text-left"
           aria-label="Change delivery location"
         >
-          <span className="grid size-9 place-items-center rounded-full bg-accent-soft text-accent">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
             {detecting ? (
               <LoaderCircle className="size-[18px] animate-spin" />
             ) : detected ? (
@@ -48,12 +48,12 @@ export function HomeHeader() {
               <MapPin className="size-[18px]" />
             )}
           </span>
-          <span className="min-w-0">
+          <span className="flex min-w-0 flex-col">
             <span className="text-label !normal-case !tracking-normal !text-[11px]">
               {detecting ? "Locating you…" : "Deliver to"}
             </span>
-            <span className="flex items-center gap-1 text-[15px] font-bold leading-tight">
-              <span className="max-w-[62vw] truncate">
+            <span className="flex min-w-0 items-center gap-1 text-[15px] font-bold leading-tight">
+              <span className="min-w-0 truncate">
                 {primary}
                 {secondary ? (
                   <span className="font-medium text-muted"> · {secondary}</span>
@@ -63,7 +63,7 @@ export function HomeHeader() {
             </span>
           </span>
         </button>
-        <ThemeToggle />
+        <ThemeToggle className="shrink-0" />
       </div>
 
       <Link
