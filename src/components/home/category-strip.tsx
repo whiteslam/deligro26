@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CATEGORIES } from "@/lib/data";
+import { CategoryIcon } from "./category-icon";
 
 export function CategoryStrip() {
   return (
@@ -10,8 +11,8 @@ export function CategoryStrip() {
           href={`/search?category=${c.id}`}
           className="press flex w-[68px] shrink-0 flex-col items-center gap-1.5"
         >
-          <span className="grid size-[68px] place-items-center rounded-2xl border border-line bg-surface text-3xl shadow-[var(--shadow-sm)]">
-            {c.emoji}
+          <span className="grid size-[68px] place-items-center">
+            <CategoryIcon id={c.id} emoji={c.emoji} label={c.label} />
           </span>
           <span className="text-xs font-medium text-muted">{c.label}</span>
         </Link>

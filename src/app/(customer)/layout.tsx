@@ -1,6 +1,7 @@
 import { TabBar } from "@/components/layout/tab-bar";
 import { GlassCart } from "@/components/glass/glass-cart";
 import { SplashScreen } from "@/components/shared/splash-screen";
+import { Onboarding } from "@/components/shared/onboarding";
 import { LocationPermissionSheet } from "@/components/location/location-permission-sheet";
 
 export default function CustomerLayout({
@@ -16,6 +17,7 @@ export default function CustomerLayout({
         <TabBar />
         <LocationPermissionSheet />
         <SplashScreen />
+        <Onboarding />
       </div>
     </div>
   );

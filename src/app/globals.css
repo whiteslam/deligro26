@@ -407,6 +407,94 @@ body {
   }
 }
 
+/* ---------- Onboarding ----------
+   First-run carousel over the app shell. Hero art carries the top; the panel
+   below uses the app's serif display + tokens so it reads as one product. */
+.onboarding {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  transition: opacity 0.4s ease;
+}
+.onboarding[data-leaving="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+.onboarding-skip {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top));
+  right: 16px;
+  z-index: 2;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.onboarding-art {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+.onboarding-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* Feather the art into the panel so the crop edge never reads as a seam. */
+.onboarding-art::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 72px;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+  pointer-events: none;
+}
+.onboarding-panel {
+  flex: 0 0 auto;
+  padding: 4px 28px calc(28px + env(safe-area-inset-bottom));
+  text-align: center;
+}
+.onboarding-title {
+  color: var(--ink);
+}
+.onboarding-body {
+  margin: 12px auto 0;
+  max-width: 34ch;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+.onboarding-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 22px 0 24px;
+}
+.onboarding-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 16%, transparent);
+  transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s;
+}
+.onboarding-dot.is-active {
+  width: 22px;
+  background: var(--accent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::after,
