@@ -503,3 +503,60 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ============================================================
+   Role dashboards — Driver / Restaurant / Admin
+   These portals live in the SAME Next.js app as the customer PWA
+   (role-based routing: /driver /restaurant /admin) but render
+   OUTSIDE the phone-frame shell as a responsive web layout.
+   The customer shell centers the body into a phone bezel on wide
+   screens; scope an escape hatch to when a dashboard is mounted so
+   the customer app (which uses .device) is never affected.
+   ============================================================ */
+body:has(.dashboard-shell) {
+  display: block;
+  place-items: initial;
+  padding: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+}
+.dashboard-shell {
+  min-height: 100dvh;
+  width: 100%;
+}
+.dashboard-main {
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding: 20px 16px 96px;
+}
+@media (min-width: 768px) {
+  .dashboard-main {
+    padding: 28px 28px 56px;
+  }
+}
+
+/* Small status/labelling pill used across the role portals. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.pill-accent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.pill-green {
+  background: var(--green-soft);
+  color: var(--green);
+}
+.pill-muted {
+  background: var(--surface-2);
+  color: var(--muted);
+}

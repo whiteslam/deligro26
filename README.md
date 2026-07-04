@@ -51,6 +51,42 @@ src/
 └─ types/           # domain types
 ```
 
+## Role portals — one app, role-based routing
+
+The Driver, Restaurant, and Admin surfaces live in **this same Next.js app** (single
+codebase, one login system, one API layer, one deploy — the budget-friendly path).
+They render outside the customer phone-frame as responsive, mobile-first web dashboards
+and reuse the same design tokens, `Button`, `cn`, `formatINR`, and domain types.
+
+| Route | Surface |
+|---|---|
+| `/` | Customer app (browse, cart, checkout, tracking) |
+| `/portals` | Launcher — links to all four surfaces (handy for demo/QA) |
+| `/driver` | Driver — online toggle, available orders → **Accept** → pickup → **Mark delivered**, today's earnings |
+| `/restaurant` | Restaurant — live orders board: **Accept/Reject** → **Food ready**; today's counts |
+| `/restaurant/menu` | Restaurant — menu with live availability toggles |
+| `/restaurant/earnings` | Restaurant — weekly revenue + payouts |
+| `/admin` | Admin — KPIs, alerts (coupon abuse, failed-login spike), pending approvals |
+| `/admin/orders` | Admin — all-orders table (audited) |
+| `/admin/refunds` | Admin — refund queue with flagging + approve/deny |
+
+> The vendor dashboard lives at `/vendor` (kept separate from the customer's
+> `/restaurant/[slug]` browse pages so auth gating stays clean).
+
+### Backend & authorization (Supabase)
+
+Auth and the authorization model are wired to **Supabase** — see
+[`SECURITY.md`](SECURITY.md). Role-based routing is only a UI convenience; the
+real boundary is **server-side** and, above all, **Row Level Security** in the
+database, so a forgotten check in app code still can't leak another user's data
+(the IDOR class). The three checks — authenticated → role allowed → owns the
+record — are enforced in `src/proxy.ts`, `requireRole()` in each portal layout,
+and the RLS policies in `supabase/migrations/0001_init.sql`.
+
+Without Supabase keys the app runs as a **static demo** (enforcement off). Add
+keys to `.env.local` and run the migration to switch it on — steps in
+[`SECURITY.md`](SECURITY.md).
+
 ## Not in this phase
 
 Backend/Supabase, real auth (Hostinger OTP), live payments, real maps, and the AI
