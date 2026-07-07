@@ -6,6 +6,7 @@ import { Phone, Check, MessageCircle, CircleHelp, Star } from "lucide-react";
 import type { Order } from "@/types";
 import { PageHeader } from "@/components/layout/page-header";
 import { TRACKING_STEPS, statusIndex } from "@/lib/utils/order-status";
+import { shortOrderId } from "@/lib/utils/order-map";
 import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
@@ -35,7 +36,10 @@ export function TrackingView({ order }: { order: Order }) {
         </div>
       ) : null}
 
-      <PageHeader title={`Order ${order.id}`} subtitle={order.restaurantName} />
+      <PageHeader
+        title={`Order ${shortOrderId(order.id)}`}
+        subtitle={order.restaurantName}
+      />
 
       {/* Map area — live rider on the way */}
       <div className="relative h-56 overflow-hidden">

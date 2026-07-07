@@ -1,12 +1,15 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { ACTIVE_ORDER, PAST_ORDERS } from "@/lib/data";
+import { getOrderForTracking } from "@/lib/orders-ui";
 import { TrackingView } from "@/components/orders/tracking-view";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-const ALL_ORDERS = [ACTIVE_ORDER, ...PAST_ORDERS];
+const MOCK_ORDERS = [ACTIVE_ORDER, ...PAST_ORDERS];
 
-export function generateStaticParams() {
-  return ALL_ORDERS.map((o) => ({ id: o.id }));
+export async function generateStaticParams() {
+  if (isSupabaseConfigured) return [];
+  return MOCK_ORDERS.map((o) => ({ id: o.id }));
 }
 
 export default async function OrderTrackingPage({
@@ -15,7 +18,7 @@ export default async function OrderTrackingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const order = ALL_ORDERS.find((o) => o.id === id);
+  const order = await getOrderForTracking(id);
   if (!order) notFound();
 
   return (

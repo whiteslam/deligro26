@@ -8,21 +8,30 @@ import { AIAssistantBlock } from "@/components/home/ai-assistant-block";
 import { BentoGrid, BentoBlock } from "@/components/bento/bento";
 import { RestaurantCard } from "@/components/shared/restaurant-card";
 import { PhotoTile } from "@/components/shared/photo-tile";
-import { RESTAURANTS, PAST_ORDERS, getRestaurant } from "@/lib/data";
+import { listRestaurants } from "@/lib/catalog";
+import { getOrdersPageData } from "@/lib/orders-ui";
 import { formatEta } from "@/lib/utils/format";
 
-export default function HomePage() {
-  const hero = getRestaurant("burger-republic")!;
-  const nearby = [...RESTAURANTS].sort((a, b) => a.etaMin - b.etaMin);
+export default async function HomePage() {
+  const [restaurants, orders] = await Promise.all([
+    listRestaurants(),
+    getOrdersPageData(),
+  ]);
+
+  const hero =
+    restaurants.find((r) => r.promoted && r.open) ??
+    restaurants.find((r) => r.open) ??
+    restaurants[0]!;
+  const nearby = [...restaurants].sort((a, b) => a.etaMin - b.etaMin);
+  const reorderA = orders.past[0];
+  const reorderB = orders.past[2] ?? orders.past[1];
 
   return (
     <>
       <HomeHeader />
 
       <div className="space-y-6 px-4 pt-4">
-        {/* Bento discovery */}
         <BentoGrid>
-          {/* Hero promo — the largest tile is the day's promo */}
           <BentoBlock href={`/restaurant/${hero.slug}`} span={2} className="p-0">
             <PhotoTile
               tint={hero.accentTint}
@@ -31,9 +40,11 @@ export default function HomePage() {
               className="h-48 w-full"
             >
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent p-4 pt-10">
-                <span className="text-label !text-white/90">
-                  Today · {hero.offer}
-                </span>
+                {hero.offer ? (
+                  <span className="text-label !text-white/90">
+                    Today · {hero.offer}
+                  </span>
+                ) : null}
                 <h2 className="mt-0.5 font-serif text-2xl font-medium text-white">
                   {hero.name}
                 </h2>
@@ -47,24 +58,23 @@ export default function HomePage() {
             </PhotoTile>
           </BentoBlock>
 
-          {/* Active order — live moment, top of the grid */}
-          <ActiveOrderStrip />
+          <ActiveOrderStrip order={orders.active} />
 
-          {/* Habitual reorders */}
-          <ReorderBlock order={PAST_ORDERS[0]} title="The usual" />
-          <ReorderBlock order={PAST_ORDERS[2]} title="Friday biryani" />
+          {reorderA ? (
+            <ReorderBlock order={reorderA} title="The usual" />
+          ) : null}
+          {reorderB ? (
+            <ReorderBlock order={reorderB} title="Friday biryani" />
+          ) : null}
 
-          {/* AI assistant */}
           <AIAssistantBlock />
         </BentoGrid>
 
-        {/* Categories */}
         <section className="space-y-3">
           <h2 className="text-heading">What are you craving?</h2>
           <CategoryStrip />
         </section>
 
-        {/* Nearby, sorted by ETA */}
         <section className="space-y-3">
           <div className="flex items-end justify-between">
             <div>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Search, X, MapPinOff, SlidersHorizontal } from "lucide-react";
-import { RESTAURANTS } from "@/lib/data";
+import type { Restaurant } from "@/types";
 import { RestaurantCard } from "@/components/shared/restaurant-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,13 @@ const CUISINES = [
   "Desserts",
 ] as const;
 
-export function SearchView({ initialCategory }: { initialCategory?: string }) {
+export function SearchView({
+  initialCategory,
+  restaurants,
+}: {
+  initialCategory?: string;
+  restaurants: Restaurant[];
+}) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("eta");
   const [filters, setFilters] = useState<Set<string>>(new Set());
@@ -44,7 +50,7 @@ export function SearchView({ initialCategory }: { initialCategory?: string }) {
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = RESTAURANTS.filter((r) => {
+    let list = restaurants.filter((r) => {
       const matchesQuery =
         !q ||
         r.name.toLowerCase().includes(q) ||
@@ -70,7 +76,7 @@ export function SearchView({ initialCategory }: { initialCategory?: string }) {
       sort === "eta" ? a.etaMin - b.etaMin : b.rating - a.rating
     );
     return list;
-  }, [query, cuisine, filters, sort]);
+  }, [query, cuisine, filters, sort, restaurants]);
 
   const clearAll = () => {
     setFilters(new Set());

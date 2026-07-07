@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/stores/cart-store";
 import { ADDRESSES, ACTIVE_ORDER } from "@/lib/data";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ type CheckoutStatus = "ready" | "processing" | "placed";
 export function CheckoutView() {
   const router = useRouter();
   const lines = useCart((s) => s.lines);
+  const restaurantSlug = useCart((s) => s.restaurantSlug);
   const restaurantName = useCart((s) => s.restaurantName);
   const subtotal = useCart((s) => s.subtotal());
   const deliveryFee = useCart((s) => s.deliveryFee());
@@ -41,6 +43,7 @@ export function CheckoutView() {
   );
   const [timing, setTiming] = useState<Timing>("now");
   const [status, setStatus] = useState<CheckoutStatus>("ready");
+  const [error, setError] = useState<string | null>(null);
 
   if (lines.length === 0 && status !== "placed") {
     return (
@@ -61,9 +64,63 @@ export function CheckoutView() {
     );
   }
 
-  const placeOrder = () => {
+  const selectedAddress =
+    ADDRESSES.find((a) => a.id === addressId) ?? ADDRESSES[0];
+
+  const placeOrder = async () => {
+    setError(null);
     setStatus("processing");
-    // Simulated placement — no double-charge possible while disabled.
+
+    if (isSupabaseConfigured) {
+      if (!restaurantSlug) {
+        setError("Missing restaurant — go back and add items again.");
+        setStatus("ready");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            restaurantSlug,
+            lines: lines.map((l) => ({ itemId: l.itemId, qty: l.qty })),
+            address: {
+              label: selectedAddress.label,
+              line: selectedAddress.line,
+            },
+          }),
+        });
+
+        if (res.status === 401) {
+          router.push("/login?next=/checkout");
+          setStatus("ready");
+          return;
+        }
+
+        const data = (await res.json()) as { order?: { id: string }; error?: string };
+        if (!res.ok || !data.order?.id) {
+          setError(
+            data.error === "invalid_items"
+              ? "Something in your cart is no longer available."
+              : "Could not place the order. Try again."
+          );
+          setStatus("ready");
+          return;
+        }
+
+        setStatus("placed");
+        clear();
+        router.push(`/orders/${data.order.id}?placed=1`);
+        return;
+      } catch {
+        setError("Network error — check your connection and try again.");
+        setStatus("ready");
+        return;
+      }
+    }
+
+    // Demo mode — simulated placement.
     window.setTimeout(() => {
       setStatus("placed");
       clear();
@@ -206,6 +263,9 @@ export function CheckoutView() {
           By placing this order you agree to pay {formatINR(total)} in cash on
           delivery.
         </p>
+        {error ? (
+          <p className="pb-2 text-center text-sm text-red-600">{error}</p>
+        ) : null}
       </div>
 
       {/* Sticky place-order CTA */}

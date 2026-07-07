@@ -20,6 +20,11 @@ export function OrderCard({ order }: { order: Order }) {
   const meta = STATUS_META[order.status];
   const live = order.status === "ON_THE_WAY" || order.status === "KITCHEN";
   const restaurant = getRestaurant(order.restaurantSlug);
+  const tint =
+    order.restaurantAccent ??
+    restaurant?.accentTint ??
+    "linear-gradient(135deg,#f6c453,#e8552d)";
+  const image = order.restaurantImage ?? restaurant?.image;
   const itemsLabel = order.lines
     .map((l) => `${l.qty}× ${l.name}`)
     .join(", ");
@@ -36,8 +41,8 @@ export function OrderCard({ order }: { order: Order }) {
     <div className={cn("card overflow-hidden", live && "border-accent/40")}>
       <div className="flex items-center gap-3 p-3.5">
         <PhotoTile
-          tint={restaurant?.accentTint ?? "linear-gradient(135deg,#f6c453,#e8552d)"}
-          src={restaurant?.image}
+          tint={tint}
+          src={image}
           alt={order.restaurantName}
           className="size-14 shrink-0 rounded-xl"
         />

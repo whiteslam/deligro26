@@ -73,6 +73,7 @@ replace `'unsafe-inline'` with `'nonce-…'` in `script-src`.
    ```
 5. Restart `npm run dev`. Auth + enforcement are now live; without keys the app
    runs as a static demo (enforcement off).
+6. Run `0002_catalog_display.sql`, then `npm run db:seed` to load restaurants.
 
 ## Test it yourself (do this before launch)
 

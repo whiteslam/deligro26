@@ -1,0 +1,182 @@
+/**
+ * Seed restaurants + menu from the Phase 1 mock catalog.
+ *
+ * Run after 0001_init.sql and 0002_catalog_display.sql:
+ *   npm run db:seed
+ */
+import { createClient } from "@supabase/supabase-js";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { RESTAURANTS } from "../src/lib/data";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function loadEnv() {
+  const envPath = join(__dirname, "..", ".env.local");
+  try {
+    const raw = readFileSync(envPath, "utf8");
+    for (const line of raw.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq === -1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      const value = trimmed.slice(eq + 1).trim();
+      if (!process.env[key]) process.env[key] = value;
+    }
+  } catch {
+    // .env.local optional if vars already exported
+  }
+}
+
+loadEnv();
+
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const serviceKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  process.env.SUPABASE_SECRET_KEY ??
+  "";
+
+if (!url.startsWith("http") || serviceKey.length < 20) {
+  console.error(
+    "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in deligro/.env.local"
+  );
+  process.exit(1);
+}
+
+const admin = createClient(url, serviceKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+const VENDOR_EMAIL = "vendor@deligro.demo";
+const VENDOR_PASSWORD = "DeligroDemo1!";
+
+async function ensureVendor() {
+  const { data: list } = await admin.auth.admin.listUsers({ perPage: 200 });
+  let userId = list?.users.find((u) => u.email === VENDOR_EMAIL)?.id;
+
+  if (!userId) {
+    const { data, error } = await admin.auth.admin.createUser({
+      email: VENDOR_EMAIL,
+      password: VENDOR_PASSWORD,
+      email_confirm: true,
+      user_metadata: { full_name: "Demo Vendor" },
+    });
+    if (error) throw error;
+    userId = data.user.id;
+    console.log(`Created vendor user ${VENDOR_EMAIL}`);
+  } else {
+    console.log(`Vendor user exists: ${VENDOR_EMAIL}`);
+  }
+
+  const { error: roleErr } = await admin
+    .from("profiles")
+    .update({ role: "restaurant", full_name: "Demo Vendor" })
+    .eq("id", userId);
+  if (roleErr) {
+    console.warn(
+      "Could not set vendor role (run 0003_lock_role_service_bypass.sql in Supabase).",
+      roleErr.message
+    );
+  }
+
+  return userId!;
+}
+
+async function seedCatalog(ownerId: string) {
+  for (const r of RESTAURANTS) {
+    const { data: existing } = await admin
+      .from("restaurants")
+      .select("id")
+      .eq("slug", r.slug)
+      .maybeSingle();
+
+    const row = {
+      owner_id: ownerId,
+      slug: r.slug,
+      name: r.name,
+      tagline: r.tagline,
+      is_open: r.open,
+      approved: true,
+      image_url: r.image,
+      accent_tint: r.accentTint,
+      cuisines: r.cuisines,
+      rating: r.rating,
+      rating_count: r.ratingCount,
+      eta_min: r.etaMin,
+      eta_max: r.etaMax,
+      price_tier: r.priceTier,
+      cost_for_two: r.costForTwo,
+      distance_km: r.distanceKm,
+      offer: r.offer ?? null,
+      promoted: r.promoted ?? false,
+    };
+
+    let restaurantId: string;
+    if (existing?.id) {
+      const { error } = await admin
+        .from("restaurants")
+        .update(row)
+        .eq("id", existing.id);
+      if (error) throw error;
+      restaurantId = existing.id;
+      console.log(`Updated restaurant: ${r.name}`);
+    } else {
+      const { data, error } = await admin
+        .from("restaurants")
+        .insert(row)
+        .select("id")
+        .single();
+      if (error) throw error;
+      restaurantId = data.id;
+      console.log(`Inserted restaurant: ${r.name}`);
+    }
+
+    for (const item of r.menu) {
+      const menuRow = {
+        restaurant_id: restaurantId,
+        external_id: item.id,
+        name: item.name,
+        description: item.description,
+        price: item.price,
+        veg: item.veg,
+        available: !item.soldOut,
+        category: item.category,
+        image_url: item.image ?? null,
+        popular: item.popular ?? false,
+        bestseller: item.bestseller ?? false,
+      };
+
+      const { data: existingItem } = await admin
+        .from("menu_items")
+        .select("id")
+        .eq("restaurant_id", restaurantId)
+        .eq("external_id", item.id)
+        .maybeSingle();
+
+      if (existingItem?.id) {
+        const { error } = await admin
+          .from("menu_items")
+          .update(menuRow)
+          .eq("id", existingItem.id);
+        if (error) throw error;
+      } else {
+        const { error } = await admin.from("menu_items").insert(menuRow);
+        if (error) throw error;
+      }
+    }
+  }
+}
+
+async function main() {
+  const ownerId = await ensureVendor();
+  await seedCatalog(ownerId);
+  console.log("\nSeed complete.");
+  console.log(`Vendor login: ${VENDOR_EMAIL} / ${VENDOR_PASSWORD}`);
+}
+
+main().catch((err) => {
+  console.error("Seed failed:", err);
+  process.exit(1);
+});

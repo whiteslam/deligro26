@@ -1,13 +1,16 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Clock, MapPin, BadgePercent } from "lucide-react";
-import { getRestaurant, RESTAURANTS } from "@/lib/data";
+import { getRestaurant } from "@/lib/catalog";
+import { RESTAURANTS } from "@/lib/data";
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { RatingPill } from "@/components/shared/rating";
 import { RestaurantMenu } from "@/components/restaurant/restaurant-menu";
 import { formatEta } from "@/lib/utils/format";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-export function generateStaticParams() {
+export async function generateStaticParams() {
+  if (isSupabaseConfigured) return [];
   return RESTAURANTS.map((r) => ({ slug: r.slug }));
 }
 
@@ -17,12 +20,11 @@ export default async function RestaurantPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const r = getRestaurant(slug);
+  const r = await getRestaurant(slug);
   if (!r) notFound();
 
   return (
     <div>
-      {/* Hero */}
       <div className="relative">
         <PhotoTile
           tint={r.accentTint}
@@ -39,7 +41,6 @@ export default async function RestaurantPage({
         </Link>
       </div>
 
-      {/* Info card floats over the hero edge */}
       <div className="relative -mt-6 rounded-t-[var(--radius-sheet)] bg-bg px-4 pt-5">
         <h1 className="text-[26px] font-bold leading-tight">{r.name}</h1>
         <p className="mt-0.5 text-sm text-muted">{r.tagline}</p>
@@ -66,6 +67,12 @@ export default async function RestaurantPage({
             <BadgePercent className="size-5 text-accent" />
             <span className="text-sm font-bold text-accent">{r.offer}</span>
           </div>
+        ) : null}
+
+        {!r.open ? (
+          <p className="mt-4 rounded-2xl bg-surface-2 px-4 py-3 text-center text-sm font-medium text-muted">
+            Closed right now — check back later.
+          </p>
         ) : null}
 
         <div className="mt-5">

@@ -70,6 +70,9 @@ export interface Order {
   id: string;
   restaurantSlug: string;
   restaurantName: string;
+  /** Populated from DB for order cards when mock getRestaurant() isn't available. */
+  restaurantImage?: string;
+  restaurantAccent?: string;
   status: OrderStatus;
   placedAt: string; // human label e.g. "Today, 8:24 PM"
   etaMinutes?: number;
