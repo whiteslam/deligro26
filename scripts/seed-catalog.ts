@@ -8,13 +8,17 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import WebSocket from "ws";
+import { createRequire } from "node:module";
 import { RESTAURANTS } from "../src/lib/data";
 
-// supabase-js needs a global WebSocket (native only on Node 22+); we only make
-// REST calls, but the client constructor requires it. Polyfill for Node 20.
-// @ts-expect-error — Node global doesn't type WebSocket on 20.
-globalThis.WebSocket ??= WebSocket;
+// Node < 22 has no global WebSocket, which supabase-js needs to construct its
+// client (we only make REST calls). Load `ws` lazily via require, only when the
+// global is missing — so it's not a hard build/type dependency, and Node 22+
+// skips it entirely.
+const g = globalThis as { WebSocket?: unknown };
+if (typeof g.WebSocket === "undefined") {
+  g.WebSocket = createRequire(import.meta.url)("ws");
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
