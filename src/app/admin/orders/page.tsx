@@ -1,6 +1,8 @@
 import { SectionTitle } from "@/components/roles/role-ui";
 import { formatINR } from "@/lib/utils/format";
 import { ADMIN_ORDERS, type AdminOrderRow } from "@/lib/roles-data";
+import { listAllOrders } from "@/lib/data-access/admin-orders";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const STATUS: Record<
   AdminOrderRow["status"],
@@ -13,7 +15,20 @@ const STATUS: Record<
   CANCELLED: { label: "Cancelled", cls: "pill-muted" },
 };
 
-export default function AdminOrdersPage() {
+export default async function AdminOrdersPage() {
+  let ADMIN_ORDERS_DATA = ADMIN_ORDERS;
+  if (isSupabaseConfigured) {
+    try {
+      const live = await listAllOrders();
+      if (live.length > 0) ADMIN_ORDERS_DATA = live;
+    } catch {
+      // fall back to demo rows
+    }
+  }
+  return renderOrders(ADMIN_ORDERS_DATA);
+}
+
+function renderOrders(ADMIN_ORDERS: AdminOrderRow[]) {
   return (
     <div className="space-y-5">
       <div>
