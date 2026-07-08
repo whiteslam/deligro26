@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 
 /**
- * First-run onboarding carousel. Three brand slides shown once per device,
- * gated on localStorage — returning users never see it.
+ * First-run onboarding carousel. Three brand slides shown once per device.
+ * Signed-in users skip it (server auth → `authed` prop); guests are gated on
+ * localStorage so returning visitors never see it again.
  *
  * The illustrations are the designed hero art (extracted from the source
  * splash SVGs, text/brand stripped) with light + dark variants so the flow

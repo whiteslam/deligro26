@@ -9,9 +9,12 @@ import type { NextConfig } from "next";
  * Upgrade path (documented in SECURITY.md): switch to a per-request nonce in
  * src/proxy.ts and drop 'unsafe-inline' from script-src for full XSS hardening.
  */
+const isDev = process.env.NODE_ENV === "development";
+
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  // React dev mode uses eval() for stack traces; production never needs it.
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://images.pexels.com https://*.supabase.co",
   "font-src 'self' data:",

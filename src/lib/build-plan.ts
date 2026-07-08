@@ -53,7 +53,7 @@ export const MILESTONES: Milestone[] = [
     title: "Guest browse + phone-OTP order gate",
     goal: "Anyone can explore without an account; login is demanded only at order — via phone OTP.",
     tasks: [
-      { title: "Skip onboarding for signed-in users", detail: "Gate the 3-slide carousel on auth, not just localStorage", status: "active" },
+      { title: "Skip onboarding for signed-in users", detail: "Gate the 3-slide carousel on auth, not just localStorage", status: "done" },
       { title: "Phone-number OTP login", detail: "Supabase phone auth (MSG91/Twilio provider); replace email+password form", status: "todo" },
       { title: "OTP verify screen", detail: "6-digit code entry, resend timer, rate-limited", status: "todo" },
       { title: "\"Order\" triggers auth", detail: "Guest hits checkout → OTP sheet → returns to checkout", status: "todo" },
