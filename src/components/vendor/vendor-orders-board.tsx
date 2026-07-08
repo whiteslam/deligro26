@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, X, ChefHat, Bell, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatCard, SectionTitle, Pill } from "@/components/roles/role-ui";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { formatINR } from "@/lib/utils/format";
 import type { KitchenOrder } from "@/lib/roles-data";
 
@@ -69,6 +70,15 @@ export function VendorOrdersBoard({
   const [readyCount, setReadyCount] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
 
+  // When auto-refresh pulls fresh server data, adopt it as the source of truth
+  // (new orders appear, accepted ones move) while keeping the local ready tally.
+  useEffect(() => {
+    if (live) {
+      setIncoming(initialIncoming);
+      setPreparing(initialPreparing);
+    }
+  }, [live, initialIncoming, initialPreparing]);
+
   async function patchStatus(
     order: KitchenOrder,
     status: "kitchen" | "ready" | "cancelled"
@@ -115,6 +125,7 @@ export function VendorOrdersBoard({
 
   return (
     <div className="space-y-6">
+      {live ? <AutoRefresh interval={4000} /> : null}
       <div>
         <h1 className="text-heading">Live orders</h1>
         <p className="text-sm text-muted">

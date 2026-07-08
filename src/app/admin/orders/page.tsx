@@ -1,4 +1,5 @@
 import { SectionTitle } from "@/components/roles/role-ui";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { formatINR } from "@/lib/utils/format";
 import { ADMIN_ORDERS, type AdminOrderRow } from "@/lib/roles-data";
 import { listAllOrders } from "@/lib/data-access/admin-orders";
@@ -31,6 +32,7 @@ export default async function AdminOrdersPage() {
 function renderOrders(ADMIN_ORDERS: AdminOrderRow[]) {
   return (
     <div className="space-y-5">
+      {isSupabaseConfigured ? <AutoRefresh interval={4000} /> : null}
       <div>
         <h1 className="text-heading">All orders</h1>
         <p className="text-sm text-muted">

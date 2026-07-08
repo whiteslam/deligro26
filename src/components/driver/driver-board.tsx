@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { StatCard, SectionTitle, Pill } from "@/components/roles/role-ui";
 import { EmptyState } from "@/components/shared/empty-state";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { formatINR } from "@/lib/utils/format";
 import type { DriverBoardData } from "@/lib/data-access/driver-orders";
 import { acceptDeliveryAction, advanceDeliveryAction } from "@/app/driver/actions";
@@ -59,6 +60,7 @@ export function DriverBoard({
 
   return (
     <div className="space-y-6">
+      {live && online ? <AutoRefresh interval={4000} /> : null}
       {/* Online toggle */}
       <div className="card flex items-center gap-3 p-4">
         <span
