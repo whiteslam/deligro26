@@ -8,7 +8,13 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import WebSocket from "ws";
 import { RESTAURANTS } from "../src/lib/data";
+
+// supabase-js needs a global WebSocket (native only on Node 22+); we only make
+// REST calls, but the client constructor requires it. Polyfill for Node 20.
+// @ts-expect-error — Node global doesn't type WebSocket on 20.
+globalThis.WebSocket ??= WebSocket;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

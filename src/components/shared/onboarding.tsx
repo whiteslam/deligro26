@@ -44,7 +44,7 @@ const SLIDES: Slide[] = [
   },
 ];
 
-export function Onboarding() {
+export function Onboarding({ authed = false }: { authed?: boolean }) {
   const theme = useUI((s) => s.theme);
   const initTheme = useUI((s) => s.initTheme);
 
@@ -56,10 +56,12 @@ export function Onboarding() {
   const finish = useOnboarding((s) => s.finish);
 
   // Runs once per app load — sync theme, then decide if this is a first run.
+  // Signed-in users skip the carousel entirely (and latch the flag so it never
+  // reappears if they later sign out on this device).
   useEffect(() => {
     initTheme();
-    maybeShow();
-  }, [initTheme, maybeShow]);
+    maybeShow(authed);
+  }, [initTheme, maybeShow, authed]);
 
   if (!open) return null;
 

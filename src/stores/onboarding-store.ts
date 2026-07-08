@@ -18,8 +18,8 @@ interface OnboardingState {
   leaving: boolean;
   slideCount: number;
 
-  /** Decide on app open whether this is a first run. */
-  maybeShow: () => void;
+  /** Decide on app open whether this is a first run. Signed-in users skip it. */
+  maybeShow: (authed?: boolean) => void;
   /** Advance to the next slide, or finish on the last one. */
   next: () => void;
   /** Dismiss for good (Skip or finish): latch the flag, then fade out. */
@@ -38,8 +38,14 @@ export const useOnboarding = create<OnboardingState>((set, get) => ({
   leaving: false,
   slideCount: 3,
 
-  maybeShow: () => {
+  maybeShow: (authed = false) => {
     if (typeof window === "undefined") return;
+    // A logged-in user has already been onboarded — never show the carousel,
+    // and latch the flag so a later sign-out on this device won't resurface it.
+    if (authed) {
+      markSeen();
+      return;
+    }
     let seen = false;
     try {
       seen = localStorage.getItem(SEEN_KEY) === "1";

@@ -3,12 +3,16 @@ import { GlassCart } from "@/components/glass/glass-cart";
 import { SplashScreen } from "@/components/shared/splash-screen";
 import { Onboarding } from "@/components/shared/onboarding";
 import { LocationPermissionSheet } from "@/components/location/location-permission-sheet";
+import { getProfile } from "@/lib/auth";
 
-export default function CustomerLayout({
+export default async function CustomerLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Signed-in users have already been welcomed — skip the first-run carousel.
+  const profile = await getProfile();
+
   return (
     <div className="device">
       <div className="app-shell">
@@ -17,7 +21,7 @@ export default function CustomerLayout({
         <TabBar />
         <LocationPermissionSheet />
         <SplashScreen />
-        <Onboarding />
+        <Onboarding authed={!!profile} />
       </div>
     </div>
   );
