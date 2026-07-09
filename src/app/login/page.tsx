@@ -2,11 +2,12 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LogIn, ShieldAlert } from "lucide-react";
+import { LogIn, ShieldAlert, Smartphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { OtpLogin } from "@/components/auth/otp-login";
 
 function LoginForm() {
   const router = useRouter();
@@ -14,10 +15,29 @@ function LoginForm() {
   const next = params.get("next") ?? "/portals";
   const denied = params.get("denied") === "1";
 
+  const [mode, setMode] = useState<"password" | "otp">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  if (mode === "otp") {
+    return (
+      <div className="flex w-full max-w-sm flex-col items-center gap-3">
+        <OtpLogin
+          next={next}
+          heading="Sign in with OTP"
+          sub="Enter the mobile number on your account."
+        />
+        <button
+          className="text-xs font-semibold text-muted hover:text-ink"
+          onClick={() => setMode("password")}
+        >
+          Use email &amp; password instead
+        </button>
+      </div>
+    );
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,6 +117,14 @@ function LoginForm() {
       <Button type="submit" size="lg" className="w-full" disabled={busy}>
         {busy ? "Signing in…" : "Sign in"}
       </Button>
+
+      <button
+        type="button"
+        onClick={() => { setMode("otp"); setError(null); }}
+        className="press flex w-full items-center justify-center gap-2 rounded-xl border border-line py-2.5 text-sm font-semibold text-muted hover:text-ink"
+      >
+        <Smartphone className="size-4" /> Login with OTP
+      </button>
 
       <p className="text-center text-xs text-muted">
         Restaurant &amp; admin accounts should enable MFA. OTP login is

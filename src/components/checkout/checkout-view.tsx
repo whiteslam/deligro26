@@ -93,7 +93,7 @@ export function CheckoutView() {
         });
 
         if (res.status === 401) {
-          router.push("/login?next=/checkout");
+          router.push("/signin?next=/checkout");
           setStatus("ready");
           return;
         }
