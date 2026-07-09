@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -13,9 +13,12 @@ import {
   Loader2,
   ShoppingBag,
   Tag,
+  Plus,
+  MapPin,
 } from "lucide-react";
 import { useCart } from "@/stores/cart-store";
 import { ADDRESSES, ACTIVE_ORDER } from "@/lib/data";
+import type { Address } from "@/types";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -38,12 +41,66 @@ export function CheckoutView() {
   const total = useCart((s) => s.total());
   const clear = useCart((s) => s.clear);
 
-  const [addressId, setAddressId] = useState(
-    ADDRESSES.find((a) => a.isDefault)?.id ?? ADDRESSES[0].id
+  // Addresses: live from the DB when signed in, mock in demo mode.
+  const [addresses, setAddresses] = useState<Address[]>(
+    isSupabaseConfigured ? [] : ADDRESSES
   );
+  const [addrLoading, setAddrLoading] = useState(isSupabaseConfigured);
+  const [addressId, setAddressId] = useState<string>(
+    isSupabaseConfigured ? "" : ADDRESSES.find((a) => a.isDefault)?.id ?? ADDRESSES[0].id
+  );
+  const [showAdd, setShowAdd] = useState(false);
+  const [newLabel, setNewLabel] = useState("Home");
+  const [newLine, setNewLine] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
+
   const [timing, setTiming] = useState<Timing>("now");
   const [status, setStatus] = useState<CheckoutStatus>("ready");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/addresses");
+        const data = await res.json();
+        if (cancelled) return;
+        const list: Address[] = data.addresses ?? [];
+        setAddresses(list);
+        setAddressId(list.find((a) => a.isDefault)?.id ?? list[0]?.id ?? "");
+        if (list.length === 0) setShowAdd(true);
+      } catch {
+        /* keep empty; user can add */
+      } finally {
+        if (!cancelled) setAddrLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function addAddress() {
+    if (newLine.trim().length < 6) return;
+    setAddBusy(true);
+    try {
+      const res = await fetch("/api/addresses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: newLabel, line: newLine.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.address) {
+        setAddresses((prev) => [...prev, data.address]);
+        setAddressId(data.address.id);
+        setShowAdd(false);
+        setNewLine("");
+      }
+    } finally {
+      setAddBusy(false);
+    }
+  }
 
   if (lines.length === 0 && status !== "placed") {
     return (
@@ -65,10 +122,16 @@ export function CheckoutView() {
   }
 
   const selectedAddress =
-    ADDRESSES.find((a) => a.id === addressId) ?? ADDRESSES[0];
+    addresses.find((a) => a.id === addressId) ?? addresses[0];
 
   const placeOrder = async () => {
     setError(null);
+
+    if (!selectedAddress) {
+      setError("Add a delivery address to continue.");
+      setShowAdd(true);
+      return;
+    }
     setStatus("processing");
 
     if (isSupabaseConfigured) {
@@ -136,50 +199,104 @@ export function CheckoutView() {
         {/* Delivery address */}
         <section className="card p-4">
           <h2 className="text-label mb-3">Deliver to</h2>
-          <div className="space-y-2">
-            {ADDRESSES.map((a) => {
-              const on = a.id === addressId;
-              return (
-                <button
-                  key={a.id}
-                  onClick={() => setAddressId(a.id)}
-                  className={cn(
-                    "press flex w-full items-start gap-3 rounded-xl border p-3 text-left",
-                    on ? "border-accent bg-accent-soft" : "border-line"
-                  )}
-                >
-                  <span
+
+          {addrLoading ? (
+            <p className="flex items-center gap-2 py-2 text-sm text-muted">
+              <Loader2 className="size-4 animate-spin" /> Loading your addresses…
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {addresses.map((a) => {
+                const on = a.id === addressId;
+                return (
+                  <button
+                    key={a.id}
+                    onClick={() => setAddressId(a.id)}
                     className={cn(
-                      "grid size-9 shrink-0 place-items-center rounded-lg",
-                      on ? "bg-accent text-white" : "bg-surface-2 text-muted"
+                      "press flex w-full items-start gap-3 rounded-xl border p-3 text-left",
+                      on ? "border-accent bg-accent-soft" : "border-line"
                     )}
                   >
-                    {a.label === "Work" ? (
-                      <Briefcase className="size-[18px]" />
-                    ) : (
-                      <Home className="size-[18px]" />
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2 text-[15px] font-semibold">
-                      {a.label}
-                      {a.isDefault ? (
-                        <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
-                          Default
-                        </span>
-                      ) : null}
+                    <span
+                      className={cn(
+                        "grid size-9 shrink-0 place-items-center rounded-lg",
+                        on ? "bg-accent text-white" : "bg-surface-2 text-muted"
+                      )}
+                    >
+                      {a.label === "Work" ? (
+                        <Briefcase className="size-[18px]" />
+                      ) : (
+                        <Home className="size-[18px]" />
+                      )}
                     </span>
-                    <span className="mt-0.5 block text-sm leading-snug text-muted">
-                      {a.line}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2 text-[15px] font-semibold">
+                        {a.label}
+                        {a.isDefault ? (
+                          <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+                            Default
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="mt-0.5 block text-sm leading-snug text-muted">
+                        {a.line}
+                      </span>
                     </span>
-                  </span>
-                  {on ? (
-                    <Check className="size-5 shrink-0 text-accent" />
-                  ) : null}
+                    {on ? <Check className="size-5 shrink-0 text-accent" /> : null}
+                  </button>
+                );
+              })}
+
+              {showAdd ? (
+                <div className="space-y-2 rounded-xl border border-line p-3">
+                  <div className="flex gap-2">
+                    {["Home", "Work", "Other"].map((l) => (
+                      <button
+                        key={l}
+                        onClick={() => setNewLabel(l)}
+                        className={cn(
+                          "press rounded-full border px-3 py-1 text-xs font-semibold",
+                          newLabel === l ? "border-accent bg-accent-soft text-accent" : "border-line text-muted"
+                        )}
+                      >
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    value={newLine}
+                    onChange={(e) => setNewLine(e.target.value)}
+                    rows={2}
+                    placeholder="Flat / house no, area, city, pincode"
+                    className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" disabled={addBusy || newLine.trim().length < 6} onClick={addAddress}>
+                      {addBusy ? <Loader2 className="size-4 animate-spin" /> : "Save address"}
+                    </Button>
+                    {addresses.length > 0 ? (
+                      <button className="text-sm font-semibold text-muted" onClick={() => setShowAdd(false)}>
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAdd(true)}
+                  className="press flex w-full items-center gap-2 rounded-xl border border-dashed border-line p-3 text-sm font-semibold text-accent"
+                >
+                  <Plus className="size-4" /> Add a new address
                 </button>
-              );
-            })}
-          </div>
+              )}
+
+              {addresses.length === 0 && !showAdd ? (
+                <p className="flex items-center gap-2 text-xs text-muted">
+                  <MapPin className="size-3.5" /> Add where we should deliver.
+                </p>
+              ) : null}
+            </div>
+          )}
         </section>
 
         {/* Timing */}

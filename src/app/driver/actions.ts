@@ -16,8 +16,9 @@ export async function acceptDeliveryAction(orderId: string) {
   revalidatePath("/driver");
 }
 
-export async function advanceDeliveryAction(orderId: string) {
+export async function advanceDeliveryAction(orderId: string, otp?: string) {
   const driverId = await requireDriverId();
-  await advanceDelivery(driverId, orderId);
+  const result = await advanceDelivery(driverId, orderId, otp);
   revalidatePath("/driver");
+  return result;
 }

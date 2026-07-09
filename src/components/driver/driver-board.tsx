@@ -33,6 +33,8 @@ export function DriverBoard({
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const { available, active, today } = initial;
+  const [otp, setOtp] = useState("");
+  const [otpError, setOtpError] = useState<string | null>(null);
 
   function accept(orderId: string) {
     setBusyId(orderId);
@@ -46,11 +48,17 @@ export function DriverBoard({
     });
   }
 
-  function advance(orderId: string) {
+  function advance(orderId: string, code?: string) {
     setBusyId(orderId);
+    setOtpError(null);
     startTransition(async () => {
       try {
-        await advanceDeliveryAction(orderId);
+        const result = await advanceDeliveryAction(orderId, code);
+        if (result && !result.ok) {
+          setOtpError(result.error === "bad_otp" ? "Wrong code — ask the customer again." : "Couldn't update. Try again.");
+          return;
+        }
+        setOtp("");
         router.refresh();
       } finally {
         setBusyId(null);
@@ -161,26 +169,46 @@ export function DriverBoard({
                 </Button>
               </div>
 
-              <Button
-                className="w-full"
-                size="lg"
-                disabled={pending}
-                onClick={() => advance(active.job.id)}
-              >
-                {pending && busyId === active.job.id ? (
-                  <>
-                    <Loader2 className="size-5 animate-spin" /> Updating…
-                  </>
-                ) : active.leg === "TO_PICKUP" ? (
-                  <>
-                    <Package className="size-5" /> Picked up — start delivery
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="size-5" /> Mark as delivered
-                  </>
-                )}
-              </Button>
+              {active.leg === "TO_CUSTOMER" ? (
+                <div className="space-y-2">
+                  <label className="text-label block">Ask the customer for their delivery code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-center text-2xl tracking-[0.4em] outline-none focus:border-accent"
+                    placeholder="••••"
+                  />
+                  {otpError ? <p className="text-sm text-accent">{otpError}</p> : null}
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    disabled={pending || otp.length !== 4}
+                    onClick={() => advance(active.job.id, otp)}
+                  >
+                    {pending && busyId === active.job.id ? (
+                      <><Loader2 className="size-5 animate-spin" /> Verifying…</>
+                    ) : (
+                      <><CheckCircle2 className="size-5" /> Confirm delivery</>
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  className="w-full"
+                  size="lg"
+                  disabled={pending}
+                  onClick={() => advance(active.job.id)}
+                >
+                  {pending && busyId === active.job.id ? (
+                    <><Loader2 className="size-5 animate-spin" /> Updating…</>
+                  ) : (
+                    <><Package className="size-5" /> Picked up — start delivery</>
+                  )}
+                </Button>
+              )}
               <p className="text-center text-xs text-muted">
                 Order {active.job.code} · payout {formatINR(active.job.payout)}
               </p>

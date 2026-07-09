@@ -150,8 +150,16 @@ export async function acceptDelivery(driverId: string, orderId: string): Promise
   if (error) throw error;
 }
 
-/** Advance the driver's active delivery: pickup → on the way → delivered. */
-export async function advanceDelivery(driverId: string, orderId: string): Promise<void> {
+/**
+ * Advance the driver's active delivery: pickup → on the way → delivered.
+ * Completing the delivery requires the customer's handover OTP (proves the food
+ * actually reached them) — verified against orders.delivery_otp.
+ */
+export async function advanceDelivery(
+  driverId: string,
+  orderId: string,
+  otp?: string
+): Promise<{ ok: boolean; error?: string }> {
   const supabase = createAdminClient();
 
   const { data: delivery, error: readErr } = await supabase
@@ -161,18 +169,33 @@ export async function advanceDelivery(driverId: string, orderId: string): Promis
     .eq("driver_id", driverId)
     .maybeSingle();
   if (readErr) throw readErr;
-  if (!delivery) throw new Error("not_found");
+  if (!delivery) return { ok: false, error: "not_found" };
 
   if (delivery.status === "assigned") {
     // Picked up → order is on the way.
     await supabase.from("deliveries").update({ status: "picked_up" }).eq("id", delivery.id);
     await supabase.from("orders").update({ status: "on_the_way" }).eq("id", orderId);
-  } else if (delivery.status === "picked_up") {
-    // Delivered.
+    return { ok: true };
+  }
+
+  if (delivery.status === "picked_up") {
+    // Verify the customer's delivery code before completing.
+    const { data: order } = await supabase
+      .from("orders")
+      .select("delivery_otp")
+      .eq("id", orderId)
+      .maybeSingle();
+    const expected = (order?.delivery_otp ?? "").replace(/\D/g, "");
+    if (!expected || (otp ?? "").replace(/\D/g, "") !== expected) {
+      return { ok: false, error: "bad_otp" };
+    }
     await supabase
       .from("deliveries")
       .update({ status: "delivered", delivered_at: new Date().toISOString() })
       .eq("id", delivery.id);
     await supabase.from("orders").update({ status: "delivered" }).eq("id", orderId);
+    return { ok: true };
   }
+
+  return { ok: false, error: "bad_state" };
 }

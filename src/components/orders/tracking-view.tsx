@@ -1,22 +1,39 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { Phone, Check, MessageCircle, CircleHelp, Star } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Phone, Check, MessageCircle, CircleHelp, Star, ShieldCheck, XCircle, Loader2 } from "lucide-react";
 import type { Order } from "@/types";
 import { PageHeader } from "@/components/layout/page-header";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { TRACKING_STEPS, statusIndex } from "@/lib/utils/order-status";
 import { shortOrderId } from "@/lib/utils/order-map";
 import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
-export function TrackingView({ order }: { order: Order }) {
+export function TrackingView({
+  order,
+  deliveryOtp,
+}: {
+  order: Order;
+  deliveryOtp?: string | null;
+}) {
+  const router = useRouter();
   const params = useSearchParams();
   const justPlaced = params.get("placed") === "1";
   const [toast, setToast] = useState(justPlaced);
 
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelMsg, setCancelMsg] = useState<string | null>(null);
+  const [rating, setRating] = useState(0);
+  const [rateBusy, setRateBusy] = useState(false);
+  const [rated, setRated] = useState(false);
+
   const current = statusIndex(order.status);
   const delivered = order.status === "DELIVERED";
+  const cancelled = order.status === "CANCELLED";
+  const canCancel = order.status === "PLACED" || order.status === "KITCHEN";
+  const isUuid = /^[0-9a-f-]{36}$/i.test(order.id);
 
   useEffect(() => {
     if (!justPlaced) return;
@@ -24,8 +41,42 @@ export function TrackingView({ order }: { order: Order }) {
     return () => window.clearTimeout(t);
   }, [justPlaced]);
 
+  async function cancelOrder() {
+    setCancelBusy(true);
+    setCancelMsg(null);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/cancel`, { method: "POST" });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setCancelMsg(data.error === "too_late" ? "The kitchen already started — can't cancel now." : "Could not cancel. Try again.");
+      }
+    } finally {
+      setCancelBusy(false);
+    }
+  }
+
+  async function submitRating(n: number) {
+    if (!isUuid) return; // mock order, nothing to persist
+    setRating(n);
+    setRateBusy(true);
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id, rating: n }),
+      });
+      if (res.ok) setRated(true);
+    } finally {
+      setRateBusy(false);
+    }
+  }
+
   return (
     <>
+      {isUuid && !delivered && !cancelled ? <AutoRefresh interval={5000} /> : null}
+
       {/* Placed toast */}
       {toast ? (
         <div className="animate-slide-up glass fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 shadow-[var(--shadow-md)]">
@@ -93,18 +144,34 @@ export function TrackingView({ order }: { order: Order }) {
             </div>
             <h2 className="text-heading text-green">Delivered</h2>
             <p className="text-sm text-muted">
-              Hope it was delicious. How was it?
+              {rated ? "Thanks for rating!" : "Hope it was delicious. How was it?"}
             </p>
             <div className="mt-3 flex justify-center gap-1.5">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
                   key={n}
-                  className="press grid size-10 place-items-center rounded-xl border border-line bg-surface"
+                  disabled={rateBusy || rated || !isUuid}
+                  onClick={() => submitRating(n)}
+                  aria-label={`Rate ${n} star${n > 1 ? "s" : ""}`}
+                  className="press grid size-10 place-items-center rounded-xl border border-line bg-surface disabled:opacity-100"
                 >
-                  <Star className="size-5 text-muted" />
+                  <Star
+                    className={cn(
+                      "size-5",
+                      n <= rating ? "fill-accent text-accent" : "text-muted"
+                    )}
+                  />
                 </button>
               ))}
             </div>
+          </div>
+        ) : cancelled ? (
+          <div className="card p-5 text-center">
+            <div className="mx-auto mb-2 grid size-12 place-items-center rounded-full bg-surface-2 text-muted">
+              <XCircle className="size-6" />
+            </div>
+            <h2 className="text-heading">Order cancelled</h2>
+            <p className="text-sm text-muted">This order was cancelled.</p>
           </div>
         ) : (
           <div className="card p-5">
@@ -166,6 +233,37 @@ export function TrackingView({ order }: { order: Order }) {
             </ol>
           </div>
         )}
+
+        {/* Delivery handover code */}
+        {deliveryOtp && !delivered && !cancelled ? (
+          <div className="card flex items-center gap-3 border-accent/30 bg-accent-soft p-4">
+            <span className="grid size-10 place-items-center rounded-xl bg-accent text-white">
+              <ShieldCheck className="size-5" />
+            </span>
+            <div className="flex-1">
+              <p className="text-label">Delivery code</p>
+              <p className="text-xs text-muted">Share with your rider at the door</p>
+            </div>
+            <span className="text-data text-2xl font-bold tracking-[0.3em] text-accent">
+              {deliveryOtp}
+            </span>
+          </div>
+        ) : null}
+
+        {/* Cancel (only before the kitchen starts) */}
+        {canCancel ? (
+          <div className="space-y-1">
+            <button
+              onClick={cancelOrder}
+              disabled={cancelBusy}
+              className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3 text-sm font-semibold text-muted disabled:opacity-60"
+            >
+              {cancelBusy ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
+              Cancel order
+            </button>
+            {cancelMsg ? <p className="text-center text-xs text-accent">{cancelMsg}</p> : null}
+          </div>
+        ) : null}
 
         {/* Rider card */}
         {order.rider && !delivered ? (
