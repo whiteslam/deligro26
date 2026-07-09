@@ -11,12 +11,27 @@ import { PhotoTile } from "@/components/shared/photo-tile";
 import { listRestaurants } from "@/lib/catalog";
 import { getOrdersPageData } from "@/lib/orders-ui";
 import { formatEta } from "@/lib/utils/format";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { listAddresses } from "@/lib/data-access/addresses";
+import { ADDRESSES } from "@/lib/data";
 
 export default async function HomePage() {
   const [restaurants, orders] = await Promise.all([
     listRestaurants(),
     getOrdersPageData(),
   ]);
+
+  // Saved default address — the delivery header's fallback when the user hasn't
+  // shared live location. Real data when signed in; mock in demo mode.
+  let savedAddress: { label: string; line: string } | null = null;
+  if (isSupabaseConfigured) {
+    const addrs = await listAddresses().catch(() => []);
+    const def = addrs.find((a) => a.isDefault) ?? addrs[0];
+    savedAddress = def ? { label: def.label, line: def.line } : null;
+  } else {
+    const def = ADDRESSES.find((a) => a.isDefault) ?? ADDRESSES[0];
+    savedAddress = def ? { label: def.label, line: def.line } : null;
+  }
 
   const hero =
     restaurants.find((r) => r.promoted && r.open) ??
@@ -28,7 +43,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <HomeHeader />
+      <HomeHeader savedAddress={savedAddress} />
 
       <div className="space-y-6 px-4 pt-4">
         <BentoGrid>

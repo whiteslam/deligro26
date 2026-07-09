@@ -4,11 +4,14 @@ import Link from "next/link";
 import { ChevronDown, LoaderCircle, MapPin, Navigation, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { useLocation } from "@/stores/location-store";
-import { ADDRESSES } from "@/lib/data";
 
-export function HomeHeader() {
-  const addr = ADDRESSES.find((a) => a.isDefault) ?? ADDRESSES[0];
+/** The user's saved default address, resolved server-side and passed in. */
+export interface SavedAddress {
+  label: string;
+  line: string;
+}
 
+export function HomeHeader({ savedAddress }: { savedAddress?: SavedAddress | null }) {
   const status = useLocation((s) => s.status);
   const label = useLocation((s) => s.label);
   const sublabel = useLocation((s) => s.sublabel);
@@ -18,11 +21,14 @@ export function HomeHeader() {
   const detecting = status === "loading";
   const detected = status === "granted" && !!label;
 
-  // Prefer a live fix; otherwise fall back to the saved default address.
-  const primary = detected ? label! : addr.label;
+  // Prefer a live GPS fix; otherwise the user's saved default address; and if
+  // they have neither, a prompt to set one (never a hardcoded stranger's address).
+  const primary = detected ? label! : savedAddress?.label ?? "Set your location";
   const secondary = detected
     ? sublabel ?? "Current location"
-    : addr.line.split(",").slice(-2).join(",").trim();
+    : savedAddress
+      ? savedAddress.line.split(",").slice(-2).join(",").trim()
+      : "Tap to detect";
 
   // Tapping opens the explainer first (native OS prompt only on Enable),
   // unless the user already denied — then retry detection directly.
