@@ -81,9 +81,25 @@ const ACCOUNTS: { email: string; role: Role; fullName: string }[] = [
   { email: "admin@deligro.demo", role: "admin", fullName: "Demo Admin" },
 ];
 
+/**
+ * Find a user by email, paging through ALL users. A single listUsers() call
+ * only returns one page (default/perPage cap), so once auth.users grows past
+ * that — e.g. after the legacy customer import — a bare lookup misses seeded
+ * accounts and createUser() then fails with "already registered".
+ */
+async function findUserId(email: string): Promise<string | undefined> {
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    const hit = data.users.find((u) => u.email === email);
+    if (hit) return hit.id;
+    if (data.users.length < 1000) break; // reached the last page
+  }
+  return undefined;
+}
+
 async function ensureAccount(email: string, role: Role, fullName: string) {
-  const { data: list } = await admin.auth.admin.listUsers({ perPage: 200 });
-  let userId = list?.users.find((u) => u.email === email)?.id;
+  let userId = await findUserId(email);
 
   if (!userId) {
     const { data, error } = await admin.auth.admin.createUser({
@@ -96,13 +112,21 @@ async function ensureAccount(email: string, role: Role, fullName: string) {
     userId = data.user.id;
     console.log(`Created ${role} user: ${email}`);
   } else {
-    console.log(`${role} user exists: ${email}`);
+    // Reset the password so a half-seeded account (unknown password) becomes
+    // usable again with the documented demo password.
+    const { error } = await admin.auth.admin.updateUserById(userId, {
+      password: PASSWORD,
+      email_confirm: true,
+    });
+    if (error) throw error;
+    console.log(`${role} user exists — password reset: ${email}`);
   }
 
+  // Upsert (not update): guarantees the role sticks even if the signup trigger
+  // hasn't created the profile row yet — a bare UPDATE would silently hit 0 rows.
   const { error: roleErr } = await admin
     .from("profiles")
-    .update({ role, full_name: fullName })
-    .eq("id", userId);
+    .upsert({ id: userId, role, full_name: fullName }, { onConflict: "id" });
   if (roleErr) {
     console.warn(
       `  ! could not set role for ${email} — run 0003_lock_role_service_bypass.sql. (${roleErr.message})`

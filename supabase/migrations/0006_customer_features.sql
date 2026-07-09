@@ -23,6 +23,7 @@ create table if not exists public.addresses (
 create index if not exists addresses_user_idx on public.addresses (user_id);
 
 alter table public.addresses enable row level security;
+drop policy if exists "addresses — owner all" on public.addresses;
 create policy "addresses — owner all" on public.addresses for all
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
@@ -65,7 +66,9 @@ create index if not exists reviews_restaurant_idx on public.reviews (restaurant_
 alter table public.reviews enable row level security;
 -- Anyone may read reviews (public restaurant ratings); a customer may write a
 -- review only for their own delivered order.
+drop policy if exists "reviews — read" on public.reviews;
 create policy "reviews — read" on public.reviews for select using (true);
+drop policy if exists "reviews — owner insert" on public.reviews;
 create policy "reviews — owner insert" on public.reviews for insert
   with check (
     user_id = auth.uid()
@@ -90,6 +93,7 @@ create table if not exists public.wallet_transactions (
 create index if not exists wallet_tx_user_idx on public.wallet_transactions (user_id, created_at desc);
 
 alter table public.wallet_transactions enable row level security;
+drop policy if exists "wallet — owner read" on public.wallet_transactions;
 create policy "wallet — owner read" on public.wallet_transactions for select
   using (user_id = auth.uid());
 -- Writes are server-only (service role) so a client can't credit itself.
@@ -107,6 +111,7 @@ create table if not exists public.coupons (
 );
 
 alter table public.coupons enable row level security;
+drop policy if exists "coupons — read active" on public.coupons;
 create policy "coupons — read active" on public.coupons for select
   using (active and (expires_at is null or expires_at > now()));
 -- Management is admin/service-role only.

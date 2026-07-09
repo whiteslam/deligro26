@@ -1,17 +1,26 @@
+import Link from "next/link";
 import type { Metadata } from "next";
-import { Check, Circle, Loader2, MinusCircle } from "lucide-react";
+import { Check, Circle, Database, ExternalLink, Loader2, MinusCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import {
-  MILESTONES,
+  BUILD_TABS,
   PROJECT,
   STATUS_META,
+  isBuildTab,
+  milestonesForTab,
   planProgress,
+  type BuildTab,
+  type Milestone,
   type TaskStatus,
 } from "@/lib/build-plan";
+import {
+  getBuildDbSnapshot,
+  type BuildDbSnapshot,
+} from "@/lib/data-access/build-stats";
 
 export const metadata: Metadata = {
   title: "Deligro · Build tracker",
-  description: "1-month delivery plan and live progress.",
+  description: "5-week delivery plan and live progress by role.",
 };
 
 const ICON: Record<TaskStatus, React.ComponentType<{ className?: string }>> = {
@@ -21,13 +30,206 @@ const ICON: Record<TaskStatus, React.ComponentType<{ className?: string }>> = {
   blocked: MinusCircle,
 };
 
-export default function BuildTrackerPage() {
-  const p = planProgress();
+interface DbRow {
+  label: string;
+  table: string;
+  value: number | string;
+}
+
+function dbRowsForTab(tab: BuildTab, db: BuildDbSnapshot): DbRow[] {
+  switch (tab) {
+    case "customer":
+      return [
+        { label: "Customer profiles", table: "profiles.role = customer", value: db.profiles_customer },
+        { label: "Saved addresses", table: "addresses", value: db.addresses },
+        { label: "Orders", table: "orders", value: db.orders },
+      ];
+    case "vendor":
+      return [
+        { label: "Restaurant profiles", table: "profiles.role = restaurant", value: db.profiles_restaurant },
+        { label: "Distinct owners", table: "restaurants.owner_id", value: db.distinct_restaurant_owners },
+        { label: "Restaurants (open)", table: "restaurants.is_open", value: `${db.restaurants_open} / ${db.restaurants}` },
+        { label: "Legacy shops", table: "restaurants.slug ~ '-[0-9]+$'", value: db.legacy_restaurants },
+        { label: "Menu items", table: "menu_items", value: db.menu_items },
+        { label: "Legacy menu items", table: "menu_items.external_id", value: db.legacy_menu_items },
+        { label: "Orders (all)", table: "orders", value: db.orders },
+      ];
+    case "driver":
+      return [
+        { label: "Driver profiles", table: "profiles.role = driver", value: db.profiles_driver },
+        { label: "Deliveries", table: "deliveries", value: db.deliveries },
+        { label: "Unassigned jobs", table: "deliveries.status = unassigned", value: db.deliveries_unassigned },
+        { label: "Orders (pipeline)", table: "orders", value: db.orders },
+      ];
+    case "admin":
+      return [
+        { label: "Admin profiles", table: "profiles.role = admin", value: db.profiles_admin },
+        { label: "All profiles", table: "profiles", value: db.profiles_customer + db.profiles_restaurant + db.profiles_driver + db.profiles_admin },
+        { label: "Restaurants (approved)", table: "restaurants.approved", value: `${db.restaurants_approved} / ${db.restaurants}` },
+        { label: "Orders", table: "orders", value: db.orders },
+        { label: "Refunds (pending)", table: "refunds.status = pending", value: `${db.refunds_pending} / ${db.refunds}` },
+        { label: "Addresses", table: "addresses", value: db.addresses },
+      ];
+  }
+}
+
+function DbPanel({ tab, snapshot }: { tab: BuildTab; snapshot: BuildDbSnapshot | null }) {
+  if (!snapshot) {
+    return (
+      <section className="card p-5">
+        <div className="flex items-center gap-2">
+          <Database className="size-4 text-muted" />
+          <p className="text-label">Database snapshot</p>
+        </div>
+        <p className="mt-2 text-sm text-muted">
+          Supabase not configured — set env keys to see live row counts.
+        </p>
+      </section>
+    );
+  }
+
+  const rows = dbRowsForTab(tab, snapshot);
+  return (
+    <section className="card p-5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Database className="size-4 text-accent" />
+          <p className="text-label">Live database · {BUILD_TABS.find((t) => t.id === tab)?.label}</p>
+        </div>
+        <span className="text-[11px] font-medium text-muted">Supabase Postgres</span>
+      </div>
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+        {rows.map((row) => (
+          <div
+            key={row.table}
+            className="flex items-center justify-between gap-3 rounded-xl bg-surface-2 px-3 py-2"
+          >
+            <div className="min-w-0">
+              <dt className="text-sm font-medium">{row.label}</dt>
+              <dd className="truncate font-mono text-[11px] text-muted">{row.table}</dd>
+            </div>
+            <span className="shrink-0 font-serif text-lg font-medium tabular-nums">
+              {row.value}
+            </span>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function MilestoneList({
+  milestones,
+  globalOffset,
+}: {
+  milestones: Milestone[];
+  globalOffset: number;
+}) {
+  let buildNo = globalOffset;
+  return (
+    <div className="space-y-4">
+      {milestones.map((m) => {
+        const doneCount = m.tasks.filter((t) => t.status === "done").length;
+        const startNo = buildNo + 1;
+        buildNo += m.tasks.length;
+        return (
+          <section key={`${m.week}-${m.title}`} className="card p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-label">
+                  {m.week === 0 ? "Foundation" : `Week ${m.week}`} · {m.range}
+                </p>
+                <h2 className="mt-0.5 font-serif text-xl font-medium">{m.title}</h2>
+                <p className="mt-1 text-sm text-muted">{m.goal}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-semibold text-muted">
+                {doneCount}/{m.tasks.length}
+              </span>
+            </div>
+
+            <ul className="mt-4 space-y-2.5">
+              {m.tasks.map((t, ti) => {
+                const meta = STATUS_META[t.status];
+                const Icon = ICON[t.status];
+                const no = startNo + ti;
+                return (
+                  <li key={t.title} className="flex items-start gap-3">
+                    <span
+                      className="text-data mt-0.5 w-8 shrink-0 text-right text-xs font-semibold text-muted"
+                      aria-label={`Build ${no}`}
+                    >
+                      #{no}
+                    </span>
+                    <span
+                      className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full"
+                      style={{ background: "var(--surface-2)", color: meta.tint }}
+                    >
+                      <Icon
+                        className={
+                          "size-3.5" + (t.status === "active" ? " animate-spin" : "")
+                        }
+                      />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className={
+                          "block text-[15px] font-medium" +
+                          (t.status === "done"
+                            ? " text-muted line-through decoration-1"
+                            : "")
+                        }
+                      >
+                        {t.title}
+                      </span>
+                      {t.detail ? (
+                        <span className="mt-0.5 block text-xs text-muted">{t.detail}</span>
+                      ) : null}
+                      {t.db ? (
+                        <span className="mt-1 inline-block rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-muted">
+                          {t.db}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span
+                      className="shrink-0 text-[11px] font-semibold uppercase tracking-wide"
+                      style={{ color: meta.tint }}
+                    >
+                      {meta.label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+export default async function BuildTrackerPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab: tabParam } = await searchParams;
+  const tab: BuildTab = isBuildTab(tabParam) ? tabParam : "customer";
+  const tabConfig = BUILD_TABS.find((t) => t.id === tab)!;
+  const milestones = milestonesForTab(tab);
+  const p = planProgress(milestones);
+  const dbSnapshot = await getBuildDbSnapshot();
+
+  const globalOffset =
+    tab === "customer"
+      ? 0
+      : BUILD_TABS.slice(0, BUILD_TABS.findIndex((t) => t.id === tab)).reduce(
+          (n, t) => n + milestonesForTab(t.id).flatMap((m) => m.tasks).length,
+          0
+        );
 
   return (
     <div className="dashboard-shell">
       <main className="dashboard-main max-w-[820px]">
-        {/* Header */}
         <div className="flex items-center justify-between py-4">
           <div>
             <p className="text-display">Build tracker</p>
@@ -38,21 +240,65 @@ export default function BuildTrackerPage() {
           <ThemeToggle />
         </div>
 
-        {/* Progress summary */}
-        <section className="card p-5">
-          <div className="flex items-end justify-between">
+        {/* Role tabs */}
+        <nav
+          className="card flex flex-wrap gap-1 p-1.5"
+          aria-label="Build tracker sections"
+        >
+          {BUILD_TABS.map((t) => {
+            const active = t.id === tab;
+            return (
+              <Link
+                key={t.id}
+                href={t.id === "customer" ? "/build" : `/build?tab=${t.id}`}
+                className={
+                  "flex min-w-[5.5rem] flex-1 flex-col items-center rounded-xl px-3 py-2 text-center transition-colors" +
+                  (active
+                    ? " bg-accent text-white"
+                    : " text-muted hover:bg-surface-2 hover:text-foreground")
+                }
+              >
+                <span className="text-sm font-semibold">{t.label}</span>
+                <span
+                  className={
+                    "mt-0.5 text-[10px] leading-tight" +
+                    (active ? " opacity-90" : " opacity-70")
+                  }
+                >
+                  {t.portal}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Tab header */}
+        <section className="card mt-4 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-label">Overall progress</p>
-              <p className="mt-1 font-serif text-3xl font-medium">
-                {p.pct}%
-              </p>
+              <p className="text-label">{tabConfig.label} portal</p>
+              <h2 className="mt-0.5 font-serif text-xl font-medium">{tabConfig.summary}</h2>
+            </div>
+            <Link
+              href={tabConfig.portal}
+              className="inline-flex items-center gap-1 text-sm font-medium text-accent"
+            >
+              Open portal
+              <ExternalLink className="size-3.5" />
+            </Link>
+          </div>
+
+          <div className="mt-4 flex items-end justify-between">
+            <div>
+              <p className="text-label">Section progress</p>
+              <p className="mt-1 font-serif text-3xl font-medium">{p.pct}%</p>
             </div>
             <p className="text-sm text-muted">
               <span className="font-semibold text-[color:var(--green)]">{p.done} done</span>
               {" · "}
               <span className="font-semibold text-accent">{p.active} active</span>
               {" · "}
-              {p.total} total
+              {p.total} tasks
             </p>
           </div>
           <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-surface-2">
@@ -63,93 +309,18 @@ export default function BuildTrackerPage() {
           </div>
         </section>
 
-        {/* Milestones — each task gets a global running "build number" so it can
-            be referenced as "build 2", "build 7", etc. */}
-        <div className="mt-4 space-y-4">
-          {MILESTONES.map((m, mi) => {
-            const doneCount = m.tasks.filter((t) => t.status === "done").length;
-            // Running count of tasks in all earlier milestones.
-            const startNo =
-              MILESTONES.slice(0, mi).reduce((n, x) => n + x.tasks.length, 0) + 1;
-            return (
-              <section key={`${m.week}-${m.title}`} className="card p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-label">
-                      {m.week === 0 ? "Foundation" : `Week ${m.week}`} · {m.range}
-                    </p>
-                    <h2 className="mt-0.5 font-serif text-xl font-medium">
-                      {m.title}
-                    </h2>
-                    <p className="mt-1 text-sm text-muted">{m.goal}</p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-semibold text-muted">
-                    {doneCount}/{m.tasks.length}
-                  </span>
-                </div>
+        <div className="mt-4">
+          <DbPanel tab={tab} snapshot={dbSnapshot} />
+        </div>
 
-                <ul className="mt-4 space-y-2.5">
-                  {m.tasks.map((t, ti) => {
-                    const meta = STATUS_META[t.status];
-                    const Icon = ICON[t.status];
-                    const buildNo = startNo + ti;
-                    return (
-                      <li key={t.title} className="flex items-start gap-3">
-                        <span
-                          className="text-data mt-0.5 w-8 shrink-0 text-right text-xs font-semibold text-muted"
-                          aria-label={`Build ${buildNo}`}
-                        >
-                          #{buildNo}
-                        </span>
-                        <span
-                          className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full"
-                          style={{
-                            background: "var(--surface-2)",
-                            color: meta.tint,
-                          }}
-                        >
-                          <Icon
-                            className={
-                              "size-3.5" +
-                              (t.status === "active" ? " animate-spin" : "")
-                            }
-                          />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span
-                            className={
-                              "block text-[15px] font-medium" +
-                              (t.status === "done"
-                                ? " text-muted line-through decoration-1"
-                                : "")
-                            }
-                          >
-                            {t.title}
-                          </span>
-                          {t.detail ? (
-                            <span className="mt-0.5 block text-xs text-muted">
-                              {t.detail}
-                            </span>
-                          ) : null}
-                        </span>
-                        <span
-                          className="shrink-0 text-[11px] font-semibold uppercase tracking-wide"
-                          style={{ color: meta.tint }}
-                        >
-                          {meta.label}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            );
-          })}
+        <div className="mt-4">
+          <MilestoneList milestones={milestones} globalOffset={globalOffset} />
         </div>
 
         <p className="mt-6 text-center text-xs text-muted">
-          Live from <code>src/lib/build-plan.ts</code> — flip a task&apos;s{" "}
-          <code>status</code> to update this board.
+          Live from <code>src/lib/build-plan.ts</code> +{" "}
+          <code>getBuildDbSnapshot()</code> — flip a task&apos;s <code>status</code>{" "}
+          to update this board.
         </p>
       </main>
     </div>

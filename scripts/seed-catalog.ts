@@ -62,9 +62,25 @@ const admin = createClient(url, serviceKey, {
 const VENDOR_EMAIL = "vendor@deligro.demo";
 const VENDOR_PASSWORD = "DeligroDemo1!";
 
+/**
+ * Find the vendor by email, paging through ALL users. A single listUsers()
+ * returns one page only, so once auth.users grows past it (e.g. after the
+ * legacy customer import) the lookup misses the vendor and createUser() then
+ * throws "email_exists".
+ */
+async function findUserId(email: string): Promise<string | undefined> {
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    const hit = data.users.find((u) => u.email === email);
+    if (hit) return hit.id;
+    if (data.users.length < 1000) break; // last page
+  }
+  return undefined;
+}
+
 async function ensureVendor() {
-  const { data: list } = await admin.auth.admin.listUsers({ perPage: 200 });
-  let userId = list?.users.find((u) => u.email === VENDOR_EMAIL)?.id;
+  let userId = await findUserId(VENDOR_EMAIL);
 
   if (!userId) {
     const { data, error } = await admin.auth.admin.createUser({
@@ -80,10 +96,10 @@ async function ensureVendor() {
     console.log(`Vendor user exists: ${VENDOR_EMAIL}`);
   }
 
+  // Upsert (not update): the role sticks even if the profile row isn't there yet.
   const { error: roleErr } = await admin
     .from("profiles")
-    .update({ role: "restaurant", full_name: "Demo Vendor" })
-    .eq("id", userId);
+    .upsert({ id: userId, role: "restaurant", full_name: "Demo Vendor" }, { onConflict: "id" });
   if (roleErr) {
     console.warn(
       "Could not set vendor role (run 0003_lock_role_service_bypass.sql in Supabase).",

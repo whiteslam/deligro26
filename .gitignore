@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+.local/
 
 # debug
 npm-debug.log*
@@ -36,6 +37,13 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# Legacy migration artifacts — contain live secrets + real customer PII.
+# NEVER commit to this public repo (live Razorpay keys, ~1.2k passwords,
+# ~10k phone numbers / ~3.5k emails). Run them locally against Supabase only.
+docs/LEGACY_DB_AUDIT.md
+docs/LEGACY_SEED_MAPPING.md
+supabase/seed/legacy_customers.sql
 
 # typescript
 *.tsbuildinfo

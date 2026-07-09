@@ -3,6 +3,7 @@ import { GlassCart } from "@/components/glass/glass-cart";
 import { SplashScreen } from "@/components/shared/splash-screen";
 import { Onboarding } from "@/components/shared/onboarding";
 import { LocationPermissionSheet } from "@/components/location/location-permission-sheet";
+import { OneSignalInit } from "@/components/notifications/onesignal-init";
 import { getProfile } from "@/lib/auth";
 
 // The customer app is per-request: it reads the auth cookie (getProfile, below)
@@ -28,6 +29,7 @@ export default async function CustomerLayout({
         <LocationPermissionSheet />
         <SplashScreen />
         <Onboarding authed={!!profile} />
+        {profile ? <OneSignalInit /> : null}
       </div>
     </div>
   );

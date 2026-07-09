@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { shortOrderId } from "@/lib/utils/order-map";
+import { notifyOnTheWay, notifyDelivered } from "@/lib/notifications/order-events";
 import type { DeliveryJob } from "@/lib/roles-data";
 
 /**
@@ -175,6 +176,7 @@ export async function advanceDelivery(
     // Picked up → order is on the way.
     await supabase.from("deliveries").update({ status: "picked_up" }).eq("id", delivery.id);
     await supabase.from("orders").update({ status: "on_the_way" }).eq("id", orderId);
+    await notifyOnTheWay(orderId);
     return { ok: true };
   }
 
@@ -194,6 +196,7 @@ export async function advanceDelivery(
       .update({ status: "delivered", delivered_at: new Date().toISOString() })
       .eq("id", delivery.id);
     await supabase.from("orders").update({ status: "delivered" }).eq("id", orderId);
+    await notifyDelivered(orderId);
     return { ok: true };
   }
 

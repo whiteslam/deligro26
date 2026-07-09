@@ -22,6 +22,7 @@ import type { Address } from "@/types";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
+import { MapPicker } from "@/components/location/map-picker";
 import { Button } from "@/components/ui/button";
 import { VegMark } from "@/components/shared/veg-mark";
 import { formatINR } from "@/lib/utils/format";
@@ -52,6 +53,7 @@ export function CheckoutView() {
   const [showAdd, setShowAdd] = useState(false);
   const [newLabel, setNewLabel] = useState("Home");
   const [newLine, setNewLine] = useState("");
+  const [newCoords, setNewCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [addBusy, setAddBusy] = useState(false);
 
   const [timing, setTiming] = useState<Timing>("now");
@@ -88,7 +90,12 @@ export function CheckoutView() {
       const res = await fetch("/api/addresses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label: newLabel, line: newLine.trim() }),
+        body: JSON.stringify({
+          label: newLabel,
+          line: newLine.trim(),
+          lat: newCoords?.lat ?? null,
+          lng: newCoords?.lng ?? null,
+        }),
       });
       const data = await res.json();
       if (res.ok && data.address) {
@@ -96,6 +103,7 @@ export function CheckoutView() {
         setAddressId(data.address.id);
         setShowAdd(false);
         setNewLine("");
+        setNewCoords(null);
       }
     } finally {
       setAddBusy(false);
@@ -249,6 +257,15 @@ export function CheckoutView() {
 
               {showAdd ? (
                 <div className="space-y-2 rounded-xl border border-line p-3">
+                  {/* Drop-a-pin location (Google Maps). Fills the line below and
+                      captures precise lat/lng; renders nothing without a key. */}
+                  <MapPicker
+                    initial={newCoords}
+                    onPick={({ lat, lng, address }) => {
+                      setNewCoords({ lat, lng });
+                      if (address) setNewLine(address);
+                    }}
+                  />
                   <div className="flex gap-2">
                     {["Home", "Work", "Other"].map((l) => (
                       <button
