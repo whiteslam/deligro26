@@ -32,7 +32,7 @@ export function LocationPermissionSheet() {
       <button
         aria-label="Dismiss"
         onClick={dismiss}
-        className="animate-fade-in absolute inset-0 bg-ink/30 backdrop-blur-[2px]"
+        className="animate-fade-in absolute inset-0 bg-ink/40"
       />
       <div
         role="dialog"
@@ -52,7 +52,7 @@ export function LocationPermissionSheet() {
           <Navigation className="size-7" />
         </div>
 
-        <h2 className="mt-4 font-serif text-2xl font-medium">
+        <h2 className="mt-4 text-2xl font-extrabold tracking-tight">
           Deliver to your doorstep
         </h2>
         <p className="mt-1.5 text-[15px] leading-relaxed text-muted">

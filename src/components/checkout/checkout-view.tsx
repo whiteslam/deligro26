@@ -7,14 +7,17 @@ import {
   Home,
   Briefcase,
   Check,
+  Bike,
+  PersonStanding,
+  CalendarClock,
   Wallet,
-  Clock,
   ChevronRight,
   Loader2,
   ShoppingBag,
   Tag,
   Plus,
   MapPin,
+  Info,
 } from "lucide-react";
 import { useCart } from "@/stores/cart-store";
 import { ADDRESSES, ACTIVE_ORDER } from "@/lib/data";
@@ -28,8 +31,11 @@ import { VegMark } from "@/components/shared/veg-mark";
 import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
-type Timing = "now" | "schedule";
+type Fulfilment = "delivery" | "pickup" | "schedule";
 type CheckoutStatus = "ready" | "processing" | "placed";
+
+// Tip presets — static for now; wired to payment later.
+const TIPS = [0, 20, 30, 50];
 
 export function CheckoutView() {
   const router = useRouter();
@@ -56,9 +62,13 @@ export function CheckoutView() {
   const [newCoords, setNewCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [addBusy, setAddBusy] = useState(false);
 
-  const [timing, setTiming] = useState<Timing>("now");
+  const [fulfilment, setFulfilment] = useState<Fulfilment>("delivery");
+  const [tip, setTip] = useState(0);
   const [status, setStatus] = useState<CheckoutStatus>("ready");
   const [error, setError] = useState<string | null>(null);
+
+  const eta = ACTIVE_ORDER.etaMinutes ?? 25;
+  const payTotal = total + tip;
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -203,10 +213,85 @@ export function CheckoutView() {
     <>
       <PageHeader title="Checkout" subtitle={restaurantName ?? undefined} />
 
-      <div className="space-y-4 px-4 pt-3">
+      <div className="space-y-3 px-4 pt-3">
+        {/* Delivery or pickup? */}
+        <section className="card overflow-hidden">
+          <h2 className="px-4 pb-1 pt-4 text-[17px] font-extrabold tracking-tight">
+            Delivery or pickup?
+          </h2>
+          <div className="divide-y divide-line">
+            <FulfilmentRow
+              on={fulfilment === "delivery"}
+              onClick={() => setFulfilment("delivery")}
+              icon={<Bike className="size-5" />}
+              title="Delivery"
+              sub={`${eta}–${eta + 8} min`}
+              trailing={
+                <span className="text-sm font-bold">
+                  {deliveryFee === 0 ? "Free" : formatINR(deliveryFee)}
+                </span>
+              }
+            />
+            <FulfilmentRow
+              on={fulfilment === "pickup"}
+              onClick={() => setFulfilment("pickup")}
+              icon={<PersonStanding className="size-5" />}
+              title="Pickup"
+              sub={`${Math.max(eta - 10, 5)}–${eta} min`}
+              trailing={<span className="text-sm font-bold">Free</span>}
+            />
+            <FulfilmentRow
+              on={fulfilment === "schedule"}
+              onClick={() => setFulfilment("schedule")}
+              icon={<CalendarClock className="size-5" />}
+              title="Schedule"
+              sub="Pick a time"
+            />
+          </div>
+        </section>
+
+        {/* Promo */}
+        <button className="press card flex w-full items-center gap-3 p-4 text-left">
+          <Tag className="size-5 text-accent-ink" />
+          <span className="flex-1 text-[15px] font-semibold">
+            Apply a coupon
+          </span>
+          <ChevronRight className="size-5 text-muted" />
+        </button>
+
+        {/* Order summary */}
+        <section className="card p-4">
+          <h2 className="mb-3 text-[17px] font-extrabold tracking-tight">
+            Order summary
+          </h2>
+          <ul className="space-y-2.5">
+            {lines.map((l) => (
+              <li key={l.itemId} className="flex items-center gap-2.5 text-sm">
+                <VegMark veg={l.veg} />
+                <span className="text-muted">{l.qty}×</span>
+                <span className="min-w-0 flex-1 truncate font-medium">
+                  {l.name}
+                </span>
+                <span className="text-data">{formatINR(l.price * l.qty)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 space-y-2 border-t border-line pt-3 text-[15px]">
+            <Row label="Subtotal" value={formatINR(subtotal)} muted />
+            <Row label="Delivery fee" value={formatINR(deliveryFee)} muted />
+            <Row label="Taxes & charges" value={formatINR(taxes)} muted />
+            <Row label="Tips" value={formatINR(tip)} muted />
+            <div className="border-t border-line pt-2">
+              <Row label="To pay (Cash)" value={formatINR(payTotal)} bold />
+            </div>
+          </div>
+        </section>
+
         {/* Delivery address */}
         <section className="card p-4">
-          <h2 className="text-label mb-3">Deliver to</h2>
+          <h2 className="mb-3 text-[17px] font-extrabold tracking-tight">
+            Delivery address
+          </h2>
 
           {addrLoading ? (
             <p className="flex items-center gap-2 py-2 text-sm text-muted">
@@ -273,7 +358,7 @@ export function CheckoutView() {
                         onClick={() => setNewLabel(l)}
                         className={cn(
                           "press rounded-full border px-3 py-1 text-xs font-semibold",
-                          newLabel === l ? "border-accent bg-accent-soft text-accent" : "border-line text-muted"
+                          newLabel === l ? "border-accent bg-accent-soft text-accent-ink" : "border-line text-muted"
                         )}
                       >
                         {l}
@@ -301,7 +386,7 @@ export function CheckoutView() {
               ) : (
                 <button
                   onClick={() => setShowAdd(true)}
-                  className="press flex w-full items-center gap-2 rounded-xl border border-dashed border-line p-3 text-sm font-semibold text-accent"
+                  className="press flex w-full items-center gap-2 rounded-xl border border-dashed border-line p-3 text-sm font-semibold text-accent-ink"
                 >
                   <Plus className="size-4" /> Add a new address
                 </button>
@@ -316,34 +401,39 @@ export function CheckoutView() {
           )}
         </section>
 
-        {/* Timing */}
+        {/* Tip the courier — static for now */}
         <section className="card p-4">
-          <h2 className="text-label mb-3">When</h2>
-          <div className="grid grid-cols-2 gap-2">
-            <TimingBtn
-              on={timing === "now"}
-              onClick={() => setTiming("now")}
-              title="Deliver now"
-              sub={`${ACTIVE_ORDER.etaMinutes ?? 25}–${
-                (ACTIVE_ORDER.etaMinutes ?? 25) + 8
-              } min`}
-              icon={<Clock className="size-[18px]" />}
-            />
-            <TimingBtn
-              on={timing === "schedule"}
-              onClick={() => setTiming("schedule")}
-              title="Schedule"
-              sub="Pick a time"
-              icon={<Clock className="size-[18px]" />}
-            />
+          <h2 className="text-[17px] font-extrabold tracking-tight">
+            Tip the courier?
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            The courier will get 100% of your tip.
+          </p>
+          <div className="mt-3 flex gap-2">
+            {TIPS.map((t) => (
+              <button
+                key={t}
+                onClick={() => setTip(t)}
+                className={cn(
+                  "press flex-1 rounded-full border py-2.5 text-sm font-bold",
+                  tip === t
+                    ? "border-accent bg-accent text-white"
+                    : "border-line bg-surface text-ink"
+                )}
+              >
+                {t === 0 ? "No tip" : formatINR(t)}
+              </button>
+            ))}
           </div>
         </section>
 
         {/* Payment — COD only in Phase 1 */}
         <section className="card p-4">
-          <h2 className="text-label mb-3">Payment</h2>
-          <div className="flex items-center gap-3 rounded-xl border border-accent bg-accent-soft p-3">
-            <span className="grid size-9 place-items-center rounded-lg bg-accent text-white">
+          <h2 className="mb-3 text-[17px] font-extrabold tracking-tight">
+            Payment
+          </h2>
+          <div className="flex items-center gap-3">
+            <span className="grid size-9 place-items-center rounded-lg bg-surface-2 text-ink">
               <Wallet className="size-[18px]" />
             </span>
             <span className="flex-1">
@@ -356,49 +446,18 @@ export function CheckoutView() {
             </span>
             <Check className="size-5 text-accent" />
           </div>
-          <p className="mt-2 text-xs text-muted">
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
+            <Info className="size-3.5" />
             Online payments (UPI · cards · wallets) arrive in a later phase.
           </p>
         </section>
 
-        {/* Promo */}
-        <button className="press card flex w-full items-center gap-3 p-4 text-left">
-          <Tag className="size-5 text-accent" />
-          <span className="flex-1 text-[15px] font-semibold">
-            Apply a coupon
-          </span>
-          <ChevronRight className="size-5 text-muted" />
-        </button>
-
-        {/* Bill */}
-        <section className="card p-4">
-          <h2 className="text-label mb-3">Order summary</h2>
-          <ul className="space-y-2.5">
-            {lines.map((l) => (
-              <li key={l.itemId} className="flex items-center gap-2.5 text-sm">
-                <VegMark veg={l.veg} />
-                <span className="text-muted">{l.qty}×</span>
-                <span className="min-w-0 flex-1 truncate font-medium">
-                  {l.name}
-                </span>
-                <span className="text-data">{formatINR(l.price * l.qty)}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-3 space-y-2 border-t border-dashed border-line pt-3 text-[15px]">
-            <Row label="Subtotal" value={formatINR(subtotal)} muted />
-            <Row label="Delivery fee" value={formatINR(deliveryFee)} muted />
-            <Row label="Taxes & charges" value={formatINR(taxes)} muted />
-            <Row label="To pay (Cash)" value={formatINR(total)} bold />
-          </div>
-        </section>
-
         <p className="pb-2 text-center text-xs text-muted">
-          By placing this order you agree to pay {formatINR(total)} in cash on
+          By placing this order you agree to pay {formatINR(payTotal)} in cash on
           delivery.
         </p>
         {error ? (
-          <p className="pb-2 text-center text-sm text-red-600">{error}</p>
+          <p className="pb-2 text-center text-sm text-deal">{error}</p>
         ) : null}
       </div>
 
@@ -407,14 +466,17 @@ export function CheckoutView() {
         <button
           onClick={placeOrder}
           disabled={status !== "ready"}
-          className="press flex h-14 w-full items-center justify-center gap-2 rounded-full bg-accent px-6 font-semibold text-white shadow-[var(--glow-accent)] disabled:opacity-70"
+          className="press flex h-14 w-full items-center justify-between rounded-full bg-accent px-6 text-[17px] font-bold text-white shadow-[var(--glow-accent)] disabled:opacity-70"
         >
           {status === "processing" ? (
-            <>
+            <span className="mx-auto flex items-center gap-2">
               <Loader2 className="size-5 animate-spin" /> Placing order…
-            </>
+            </span>
           ) : (
-            <>Place order · {formatINR(total)}</>
+            <>
+              <span>Place order</span>
+              <span>{formatINR(payTotal)}</span>
+            </>
           )}
         </button>
       </div>
@@ -422,38 +484,41 @@ export function CheckoutView() {
   );
 }
 
-function TimingBtn({
+function FulfilmentRow({
   on,
   onClick,
+  icon,
   title,
   sub,
-  icon,
+  trailing,
 }: {
   on: boolean;
   onClick: () => void;
+  icon: React.ReactNode;
   title: string;
   sub: string;
-  icon: React.ReactNode;
+  trailing?: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
-      className={cn(
-        "press flex items-center gap-2.5 rounded-xl border p-3 text-left",
-        on ? "border-accent bg-accent-soft" : "border-line"
-      )}
+      className="press flex w-full items-center gap-3 px-4 py-3.5 text-left"
     >
-      <span
-        className={cn(
-          "grid size-9 shrink-0 place-items-center rounded-lg",
-          on ? "bg-accent text-white" : "bg-surface-2 text-muted"
-        )}
-      >
+      <span className="grid size-9 shrink-0 place-items-center text-ink">
         {icon}
       </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold">{title}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-bold">{title}</span>
         <span className="block text-xs text-muted">{sub}</span>
+      </span>
+      {trailing}
+      <span
+        className={cn(
+          "grid size-5 shrink-0 place-items-center rounded-full border-2",
+          on ? "border-accent" : "border-line"
+        )}
+      >
+        {on ? <span className="size-2.5 rounded-full bg-accent" /> : null}
       </span>
     </button>
   );
@@ -472,14 +537,14 @@ function Row({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className={cn(muted && "text-muted", bold && "font-bold")}>
+      <span className={cn(muted && "text-muted", bold && "font-extrabold")}>
         {label}
       </span>
       <span
         className={cn(
           "text-data",
           muted && "text-muted",
-          bold && "text-base font-bold"
+          bold && "text-base font-extrabold"
         )}
       >
         {value}

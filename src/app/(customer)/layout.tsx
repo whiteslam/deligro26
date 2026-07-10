@@ -1,7 +1,7 @@
 import { TabBar } from "@/components/layout/tab-bar";
 import { GlassCart } from "@/components/glass/glass-cart";
+import { ItemSheet } from "@/components/restaurant/item-sheet";
 import { SplashScreen } from "@/components/shared/splash-screen";
-import { Onboarding } from "@/components/shared/onboarding";
 import { LocationPermissionSheet } from "@/components/location/location-permission-sheet";
 import { OneSignalInit } from "@/components/notifications/onesignal-init";
 import { getProfile } from "@/lib/auth";
@@ -17,18 +17,19 @@ export default async function CustomerLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Signed-in users have already been welcomed — skip the first-run carousel.
+  // Auth cookie gates per-user extras (push). Onboarding now lives entirely in
+  // the /welcome entry flow — no first-run carousel over the feed.
   const profile = await getProfile();
 
   return (
     <div className="device">
       <div className="app-shell">
         <div className="app-scroll no-scrollbar pb-[92px]">{children}</div>
+        <ItemSheet />
         <GlassCart />
         <TabBar />
         <LocationPermissionSheet />
         <SplashScreen />
-        <Onboarding authed={!!profile} />
         {profile ? <OneSignalInit /> : null}
       </div>
     </div>

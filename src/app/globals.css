@@ -1,57 +1,70 @@
 @import "tailwindcss";
 
 /* ============================================================
-   Deligro Design System — Warm Minimalism
-   Neutrals do the structural work; the orange is reserved for
-   one job: the primary action and the live moment.
+   Deligro Design System — Bolt-inspired Bold Delivery
+   Clean white canvas, heavy grotesque type, and ONE vivid orange
+   (the Deligro brand mark) carrying every action. Green stays only
+   for live/delivered states. Red flags a deal, amber flags a favourite.
+   Flat surfaces, thin lines, whisper shadows — energy comes from
+   type weight and colour, not chrome.
    ============================================================ */
 
 :root {
-  /* Light — energizing theme by day */
-  --bg: #fcfbf9;
+  /* Light — bright, high-contrast, appetite-forward */
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-2: #f7f4ef;
-  --ink: #171512;
-  --muted: #726b62;
-  --accent: #e8552d;
-  --accent-soft: #fbe9e2;
-  --green: #2e7d5b;
-  --green-soft: #e3f1ea;
+  --surface-2: #f4f5f6;
+  --ink: #0e1417;
+  --muted: #6a7178;
+  --accent: #f2660c; /* Deligro orange — the action + the live moment */
+  --accent-soft: #fdecdd;
+  --accent-ink: #b8500e; /* readable orange for text on light */
+  --green: #17b26a;
+  --green-soft: #e7f8ef;
+  --deal: #e5352b; /* discount badges + strikethrough deal prices */
+  --deal-soft: #fdeceb;
+  --pop: #ffc531; /* Popular / bestseller amber */
+  --pop-ink: #7a5200;
   --blue: #2b5f8c;
-  --line: #e7e1d8;
+  --line: #ececef;
 
-  /* Elevation */
-  --shadow-sm: 0 1px 2px rgba(23, 21, 18, 0.04);
-  --shadow-md: 0 6px 24px -8px rgba(23, 21, 18, 0.12);
-  --shadow-lg: 0 20px 48px -16px rgba(23, 21, 18, 0.22);
-  --glow-accent: 0 12px 40px -8px rgba(232, 85, 45, 0.35);
+  /* Elevation — deliberately restrained */
+  --shadow-sm: 0 1px 2px rgba(14, 20, 23, 0.05);
+  --shadow-md: 0 8px 28px -12px rgba(14, 20, 23, 0.14);
+  --shadow-lg: 0 24px 56px -20px rgba(14, 20, 23, 0.24);
+  --glow-accent: 0 8px 22px -10px rgba(242, 102, 12, 0.55);
 
   /* Glass */
-  --glass-bg: rgba(255, 255, 255, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(14, 20, 23, 0.06);
 }
 
 [data-theme="dark"] {
-  /* Deep, glare-free dark for late-night cravings */
-  --bg: #14110d;
-  --surface: #1e1a15;
-  --surface-2: #262019;
-  --ink: #f4efe7;
-  --muted: #a89e8f;
-  --accent: #f2683f;
-  --accent-soft: rgba(58, 32, 22, 0.85);
-  --green: #4fb083;
-  --green-soft: rgba(22, 51, 37, 0.85);
+  /* Deep, near-black for late-night cravings — orange stays electric */
+  --bg: #0f1215;
+  --surface: #171b1f;
+  --surface-2: #21262b;
+  --ink: #f2f5f4;
+  --muted: #97a0a6;
+  --accent: #ff8534;
+  --accent-soft: rgba(74, 40, 16, 0.7);
+  --accent-ink: #ffa060;
+  --green: #2ed47f;
+  --green-soft: rgba(23, 61, 43, 0.7);
+  --deal: #ff5c4d;
+  --deal-soft: rgba(74, 27, 24, 0.7);
+  --pop: #ffce5c;
+  --pop-ink: #ffce5c;
   --blue: #5b96c9;
-  --line: #2f2820;
+  --line: #2a3036;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 6px 24px -8px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 20px 48px -16px rgba(0, 0, 0, 0.7);
-  --glow-accent: 0 12px 40px -8px rgba(242, 104, 63, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 28px -12px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 24px 56px -20px rgba(0, 0, 0, 0.72);
+  --glow-accent: 0 8px 22px -10px rgba(255, 133, 52, 0.5);
 
-  --glass-bg: rgba(30, 26, 21, 0.68);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(23, 27, 31, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.07);
 }
 
 @theme inline {
@@ -62,17 +75,21 @@
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
   --color-green: var(--green);
   --color-green-soft: var(--green-soft);
+  --color-deal: var(--deal);
+  --color-deal-soft: var(--deal-soft);
+  --color-pop: var(--pop);
+  --color-pop-ink: var(--pop-ink);
   --color-blue: var(--blue);
   --color-line: var(--line);
 
   --font-sans: var(--font-inter);
-  --font-serif: var(--font-fraunces);
   --font-mono: var(--font-mono-jb);
 
-  --radius-block: 1.25rem;
-  --radius-sheet: 1.75rem;
+  --radius-block: 1rem;
+  --radius-sheet: 1.5rem;
 }
 
 * {
@@ -93,19 +110,37 @@ body {
   transition: background-color 0.5s ease, color 0.5s ease;
 }
 
-/* ---------- Type scale ---------- */
+/* Every heading/title speaks in Bolt's bold grotesque voice — heavy
+   weight + tight tracking carry hierarchy app-wide, even where a screen
+   sets its own size with utilities. Low specificity so any Tailwind
+   weight/tracking class still wins when a screen wants to differ. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+/* ---------- Type scale ----------
+   Bolt's energy is bold grotesque, not serif. Weight + tight tracking
+   carry the hierarchy; sizes stay tight so headings feel punchy. */
 .text-display {
-  font-family: var(--font-serif), Georgia, serif;
-  font-size: clamp(2rem, 6vw, 2.35rem);
-  line-height: 1.05;
-  letter-spacing: -0.01em;
-  font-weight: 500;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: clamp(2rem, 6.5vw, 2.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  font-weight: 800;
 }
 .text-heading {
-  font-size: 1.3125rem; /* 21px */
-  line-height: 1.2;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: 1.375rem; /* 22px */
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 .text-body {
   font-size: 1rem;
@@ -113,9 +148,9 @@ body {
 }
 .text-label {
   font-size: 0.75rem;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--muted);
 }
 .text-data {
@@ -124,19 +159,32 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* ---------- Surfaces ---------- */
+/* ---------- Surfaces ----------
+   Flat by default: a hairline defines the block, the image does the talking.
+   Shadow only lifts on press/hover so the grid reads calm like Bolt's feed. */
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-block);
   box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease, transform 0.12s ease;
+}
+a.card:active,
+button.card:active {
+  transform: scale(0.985);
+}
+@media (hover: hover) {
+  a.card:hover,
+  button.card:hover {
+    box-shadow: var(--shadow-md);
+  }
 }
 
+/* Bolt uses solid, opaque bars & sheets — no frosted blur. This utility keeps
+   its name for compatibility but now renders a flat surface with a hairline. */
 .glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border: 1px solid var(--glass-border);
+  background: var(--surface);
+  border: 1px solid var(--line);
 }
 
 /* ---------- App shell (mobile-first, centered on desktop) ----------
@@ -171,27 +219,123 @@ body {
     display: grid;
     place-items: center;
     min-height: 100dvh;
-    padding: 24px;
+    padding: 20px;
     background: var(--surface-2);
   }
 
+  /* ---------- iPhone 17 Pro Max frame ----------
+     Titanium bezel + Dynamic Island + side buttons + home indicator, sized to
+     the real 440×956pt aspect ratio. Only shown on wider screens; on phones the
+     app stays edge-to-edge and the real device draws its own chrome. */
   .device {
     display: block;
-    padding: 12px;
-    border-radius: 44px;
-    background: #121212;
-    box-shadow: var(--shadow-lg);
+    position: relative;
+    height: min(932px, calc(100dvh - 40px));
+    aspect-ratio: 440 / 956;
+    padding: 14px;
+    border-radius: 62px;
+    /* Layered background: four edge "buttons" over the brushed-titanium body. */
+    background-image:
+      linear-gradient(#4a4a4d, #2c2c2e),
+      linear-gradient(#4a4a4d, #2c2c2e),
+      linear-gradient(#4a4a4d, #2c2c2e),
+      linear-gradient(#4a4a4d, #2c2c2e),
+      linear-gradient(
+        150deg,
+        #5c5c5f 0%,
+        #2a2a2c 20%,
+        #131315 55%,
+        #3f3f42 100%
+      );
+    background-repeat: no-repeat;
+    background-size: 3px 28px, 3px 54px, 3px 54px, 3px 72px, 100% 100%;
+    background-position: left 20%, left 33%, left 44%, right 26%, center;
+    box-shadow:
+      inset 0 0 0 1.5px rgba(255, 255, 255, 0.08),
+      0 2px 3px rgba(0, 0, 0, 0.4),
+      0 44px 90px -30px rgba(0, 0, 0, 0.55),
+      0 14px 34px -14px rgba(0, 0, 0, 0.4);
+  }
+  /* Dynamic Island — a real cut-out, always black regardless of app theme. */
+  .device::before {
+    content: "";
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 33%;
+    max-width: 118px;
+    height: 30px;
+    background: #000;
+    border-radius: 16px;
+    z-index: 5;
+    pointer-events: none;
+  }
+  /* Home indicator — tinted to the app theme so it reads on light and dark. */
+  .device::after {
+    content: "";
+    position: absolute;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 34%;
+    max-width: 138px;
+    height: 5px;
+    border-radius: 99px;
+    background: color-mix(in srgb, var(--ink) 32%, transparent);
+    z-index: 5;
+    pointer-events: none;
   }
 
-  /* Screen — explicit width because every child is absolutely positioned,
-     so the shell has no intrinsic width to shrink-wrap the bezel around. */
+  /* Screen — fills the bezel. `z-index:0` gives it its own stacking context so
+     full-screen overlays (splash, onboarding) never paint over the island,
+     status bar or home indicator; the box-shadow is the black gasket. */
   .app-shell {
-    width: min(390px, calc(100vw - 72px));
+    width: 100%;
+    height: 100%;
     max-width: none;
-    height: min(844px, calc(100dvh - 72px));
     margin-inline: 0;
-    border-radius: 32px;
+    border-radius: 48px;
     border: none;
+    z-index: 0;
+    box-shadow: 0 0 0 3px #0a0a0c;
+  }
+
+  /* Simulated iOS status bar — time (left) + signal/wifi/battery (right),
+     flanking the Dynamic Island. z-index sits above every screen overlay so it
+     always reads, like the real OS bar. The icon cluster is an alpha mask
+     tinted to --ink, so it stays crisp in both light and dark. */
+  .app-shell::before {
+    content: "9:41";
+    position: absolute;
+    top: 16px;
+    left: 30px;
+    z-index: 80;
+    font: 700 15px/1 var(--font-sans), -apple-system, system-ui, sans-serif;
+    letter-spacing: 0.2px;
+    color: var(--ink);
+    pointer-events: none;
+  }
+  .app-shell::after {
+    content: "";
+    position: absolute;
+    top: 18px;
+    right: 26px;
+    z-index: 80;
+    width: 62px;
+    height: 11px;
+    background: var(--ink);
+    pointer-events: none;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 14' fill='%23000'%3E%3Crect x='0' y='9' width='3.4' height='5' rx='1'/%3E%3Crect x='5' y='6.3' width='3.4' height='7.7' rx='1'/%3E%3Crect x='10' y='3.6' width='3.4' height='10.4' rx='1'/%3E%3Crect x='15' y='1' width='3.4' height='13' rx='1'/%3E%3Cpath d='M22.8,10 Q31,3.5 39.2,10 L37,11.8 Q31,6.8 25,11.8 Z'/%3E%3Ccircle cx='31' cy='13' r='1.3'/%3E%3Crect x='46.5' y='3.2' width='27' height='8' rx='2' fill='none' stroke='%23000' stroke-width='1.2'/%3E%3Crect x='74.2' y='5.4' width='1.8' height='3.6' rx='.9'/%3E%3Crect x='48' y='4.7' width='16' height='5' rx='1'/%3E%3C/svg%3E") no-repeat center / contain;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 14' fill='%23000'%3E%3Crect x='0' y='9' width='3.4' height='5' rx='1'/%3E%3Crect x='5' y='6.3' width='3.4' height='7.7' rx='1'/%3E%3Crect x='10' y='3.6' width='3.4' height='10.4' rx='1'/%3E%3Crect x='15' y='1' width='3.4' height='13' rx='1'/%3E%3Cpath d='M22.8,10 Q31,3.5 39.2,10 L37,11.8 Q31,6.8 25,11.8 Z'/%3E%3Ccircle cx='31' cy='13' r='1.3'/%3E%3Crect x='46.5' y='3.2' width='27' height='8' rx='2' fill='none' stroke='%23000' stroke-width='1.2'/%3E%3Crect x='74.2' y='5.4' width='1.8' height='3.6' rx='.9'/%3E%3Crect x='48' y='4.7' width='16' height='5' rx='1'/%3E%3C/svg%3E") no-repeat center / contain;
+  }
+
+  /* Reserve a status-bar strip so app content clears the Dynamic Island. */
+  .app-scroll {
+    padding-top: 40px;
+  }
+  .onboarding {
+    padding-top: 40px;
   }
 }
 
@@ -326,11 +470,11 @@ body {
   text-align: center;
 }
 .splash-word {
-  font-family: var(--font-serif), Georgia, serif;
-  font-weight: 500;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 800;
   font-size: clamp(2.75rem, 15vw, 3.5rem);
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.04em;
   color: var(--accent);
   opacity: 0;
   animation: splash-rise 0.7s 0.15s cubic-bezier(0.22, 1, 0.36, 1) forwards;
@@ -428,14 +572,13 @@ body {
   top: max(18px, env(safe-area-inset-top));
   right: 16px;
   z-index: 2;
-  padding: 8px 14px;
+  padding: 8px 16px;
   border-radius: 999px;
   font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--muted);
-  background: color-mix(in srgb, var(--bg) 55%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
 }
 .onboarding-art {
   flex: 1 1 auto;
@@ -550,13 +693,36 @@ body:has(.dashboard-shell) {
 }
 .pill-accent {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .pill-green {
   background: var(--green-soft);
-  color: var(--green);
+  color: var(--accent-ink);
 }
 .pill-muted {
   background: var(--surface-2);
   color: var(--muted);
+}
+.pill-deal {
+  background: var(--deal);
+  color: #fff;
+}
+.pill-pop {
+  background: var(--pop);
+  color: var(--pop-ink);
+}
+
+/* Bolt-signature rating chip: solid dark capsule with a gold star,
+   overlaid on food photography. */
+.rating-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1;
 }

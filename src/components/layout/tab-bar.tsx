@@ -47,14 +47,18 @@ export function TabBar() {
             <Icon
               className={cn(
                 "size-6 transition-colors",
-                active ? "text-accent" : "text-muted"
+                active ? "text-ink" : "text-muted"
               )}
-              strokeWidth={active ? 2.4 : 2}
+              strokeWidth={active ? 2.6 : 2}
+              fill={active ? "currentColor" : "none"}
+              fillOpacity={active ? 0.12 : 0}
             />
             <span
               className={cn(
-                "text-[11px] font-medium transition-colors",
-                active ? "text-accent" : "text-muted"
+                "text-[11px] transition-colors",
+                active
+                  ? "font-bold text-ink"
+                  : "font-medium text-muted"
               )}
             >
               {tab.label}

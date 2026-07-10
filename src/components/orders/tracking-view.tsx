@@ -73,6 +73,14 @@ export function TrackingView({
     }
   }
 
+  const headline = delivered
+    ? "Delivered"
+    : cancelled
+      ? "Cancelled"
+      : order.etaMinutes
+        ? `${order.etaMinutes} min`
+        : "Arriving";
+
   return (
     <>
       {isUuid && !delivered && !cancelled ? <AutoRefresh interval={5000} /> : null}
@@ -83,7 +91,7 @@ export function TrackingView({
           <span className="grid size-6 place-items-center rounded-full bg-green text-white">
             <Check className="size-4" strokeWidth={3} />
           </span>
-          <span className="text-sm font-semibold">Order placed</span>
+          <span className="text-sm font-bold">Order placed</span>
         </div>
       ) : null}
 
@@ -96,10 +104,7 @@ export function TrackingView({
       <div className="relative h-56 overflow-hidden">
         <div
           className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(135deg,#e8efe9,#f2ece2)",
-          }}
+          style={{ background: "linear-gradient(135deg,#e6f4ec,#eef1f2)" }}
         />
         <div
           className="absolute inset-0 opacity-[0.5]"
@@ -135,146 +140,132 @@ export function TrackingView({
         </div>
       </div>
 
-      {/* Status card floats over the map */}
-      <div className="relative -mt-6 space-y-4 rounded-t-[var(--radius-sheet)] bg-bg px-4 pt-5">
+      {/* Solid sheet floats over the map */}
+      <div className="relative -mt-6 space-y-4 rounded-t-[var(--radius-sheet)] bg-bg px-4 pt-6">
+        {/* Grab handle */}
+        <span className="mx-auto -mt-2 mb-1 block h-1 w-10 rounded-full bg-line" />
+
+        {/* Headline: estimated time / status */}
+        <div className="text-center">
+          <p className="text-sm text-muted">
+            {delivered
+              ? "Your order was delivered"
+              : cancelled
+                ? "This order was cancelled"
+                : "Estimated time of delivery"}
+          </p>
+          <p
+            className={cn(
+              "text-[40px] font-extrabold leading-none tracking-tight",
+              delivered && "text-green",
+              cancelled && "text-deal"
+            )}
+          >
+            {headline}
+          </p>
+        </div>
+
         {delivered ? (
-          <div className="card border-green/40 bg-green-soft p-5 text-center">
-            <div className="mx-auto mb-2 grid size-12 place-items-center rounded-full bg-green text-white">
-              <Check className="size-6" strokeWidth={3} />
-            </div>
-            <h2 className="text-heading text-green">Delivered</h2>
-            <p className="text-sm text-muted">
+          <div className="rounded-2xl bg-green-soft p-5 text-center">
+            <p className="text-[15px] font-bold">
               {rated ? "Thanks for rating!" : "Hope it was delicious. How was it?"}
             </p>
-            <div className="mt-3 flex justify-center gap-1.5">
+            <div className="mt-3 flex justify-center gap-2">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
                   key={n}
                   disabled={rateBusy || rated || !isUuid}
                   onClick={() => submitRating(n)}
                   aria-label={`Rate ${n} star${n > 1 ? "s" : ""}`}
-                  className="press grid size-10 place-items-center rounded-xl border border-line bg-surface disabled:opacity-100"
+                  className="press grid size-11 place-items-center rounded-full bg-surface disabled:opacity-100"
                 >
                   <Star
                     className={cn(
                       "size-5",
-                      n <= rating ? "fill-accent text-accent" : "text-muted"
+                      n <= rating ? "fill-pop text-pop" : "text-muted"
                     )}
                   />
                 </button>
               ))}
             </div>
           </div>
-        ) : cancelled ? (
-          <div className="card p-5 text-center">
-            <div className="mx-auto mb-2 grid size-12 place-items-center rounded-full bg-surface-2 text-muted">
-              <XCircle className="size-6" />
-            </div>
-            <h2 className="text-heading">Order cancelled</h2>
-            <p className="text-sm text-muted">This order was cancelled.</p>
-          </div>
-        ) : (
-          <div className="card p-5">
-            <p className="text-label">Arriving in</p>
-            <p className="mt-0.5">
-              <span className="font-serif text-4xl font-medium text-accent">
-                {order.etaMinutes}
-              </span>{" "}
-              <span className="text-2xl font-semibold">min</span>
-            </p>
-
-            {/* Stepper */}
-            <ol className="mt-4 space-y-0">
-              {TRACKING_STEPS.map((step, i) => {
-                const done = i < current;
-                const active = i === current;
-                const last = i === TRACKING_STEPS.length - 1;
-                return (
-                  <li key={step.key} className="flex gap-3">
-                    <div className="flex flex-col items-center">
+        ) : cancelled ? null : (
+          /* Bolt-style vertical timeline */
+          <ol className="pl-1">
+            {TRACKING_STEPS.map((step, i) => {
+              const done = i < current;
+              const active = i === current;
+              const last = i === TRACKING_STEPS.length - 1;
+              return (
+                <li key={step.key} className="flex gap-3.5">
+                  <div className="flex flex-col items-center">
+                    <span
+                      className={cn(
+                        "grid size-6 shrink-0 place-items-center rounded-full border-2",
+                        done && "border-green bg-green text-white",
+                        active && "border-green bg-surface",
+                        !done && !active && "border-line bg-surface"
+                      )}
+                    >
+                      {done ? (
+                        <Check className="size-3.5" strokeWidth={3} />
+                      ) : active ? (
+                        <span className="size-2.5 rounded-full bg-green" />
+                      ) : null}
+                    </span>
+                    {!last ? (
                       <span
                         className={cn(
-                          "grid size-6 shrink-0 place-items-center rounded-full border-2",
-                          done && "border-green bg-green text-white",
-                          active && "border-accent bg-accent-soft pulse-ring",
-                          !done && !active && "border-line"
+                          "my-1 w-0.5 flex-1 rounded-full",
+                          done ? "bg-green" : "bg-line"
                         )}
-                      >
-                        {done ? (
-                          <Check className="size-3.5" strokeWidth={3} />
-                        ) : active ? (
-                          <span className="size-2 rounded-full bg-accent" />
-                        ) : null}
-                      </span>
-                      {!last ? (
-                        <span
-                          className={cn(
-                            "my-0.5 w-0.5 flex-1 rounded-full",
-                            done ? "bg-green" : "bg-line"
-                          )}
-                          style={{ minHeight: 22 }}
-                        />
-                      ) : null}
-                    </div>
-                    <div className={cn("pb-4", last && "pb-0")}>
-                      <p
-                        className={cn(
-                          "text-[15px] font-semibold leading-tight",
-                          !done && !active && "text-muted"
-                        )}
-                      >
-                        {step.title}
-                      </p>
-                      <p className="text-xs text-muted">{step.sub}</p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
+                        style={{ minHeight: 26 }}
+                      />
+                    ) : null}
+                  </div>
+                  <div className={cn("pb-5", last && "pb-0")}>
+                    <p
+                      className={cn(
+                        "text-[15px] font-bold leading-tight",
+                        !done && !active && "text-muted"
+                      )}
+                    >
+                      {step.title}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted">{step.sub}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
         )}
 
         {/* Delivery handover code */}
         {deliveryOtp && !delivered && !cancelled ? (
-          <div className="card flex items-center gap-3 border-accent/30 bg-accent-soft p-4">
+          <div className="flex items-center gap-3 rounded-2xl bg-accent-soft p-4">
             <span className="grid size-10 place-items-center rounded-xl bg-accent text-white">
               <ShieldCheck className="size-5" />
             </span>
             <div className="flex-1">
-              <p className="text-label">Delivery code</p>
+              <p className="text-label !text-accent-ink">Delivery code</p>
               <p className="text-xs text-muted">Share with your rider at the door</p>
             </div>
-            <span className="text-data text-2xl font-bold tracking-[0.3em] text-accent">
+            <span className="text-data text-2xl font-extrabold tracking-[0.3em] text-accent-ink">
               {deliveryOtp}
             </span>
           </div>
         ) : null}
 
-        {/* Cancel (only before the kitchen starts) */}
-        {canCancel ? (
-          <div className="space-y-1">
-            <button
-              onClick={cancelOrder}
-              disabled={cancelBusy}
-              className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3 text-sm font-semibold text-muted disabled:opacity-60"
-            >
-              {cancelBusy ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
-              Cancel order
-            </button>
-            {cancelMsg ? <p className="text-center text-xs text-accent">{cancelMsg}</p> : null}
-          </div>
-        ) : null}
-
         {/* Rider card */}
-        {order.rider && !delivered ? (
+        {order.rider && !delivered && !cancelled ? (
           <div className="card flex items-center gap-3 p-4">
-            <span className="grid size-12 place-items-center rounded-full bg-surface-2 text-lg font-bold text-ink">
+            <span className="grid size-12 place-items-center rounded-full bg-surface-2 text-lg font-extrabold text-ink">
               {order.rider.name.charAt(0)}
             </span>
             <div className="flex-1">
               <p className="text-[15px] font-bold">{order.rider.name}</p>
               <p className="flex items-center gap-1 text-xs text-muted">
-                <Star className="size-3 fill-green text-green" />
+                <Star className="size-3 fill-pop text-pop" />
                 {order.rider.rating} · {order.rider.vehicle}
               </p>
             </div>
@@ -295,7 +286,9 @@ export function TrackingView({
 
         {/* Order items */}
         <div className="card p-4">
-          <h2 className="text-label mb-3">Your order</h2>
+          <h2 className="mb-3 text-[17px] font-extrabold tracking-tight">
+            Order {shortOrderId(order.id)}
+          </h2>
           <ul className="space-y-2 text-sm">
             {order.lines.map((l) => (
               <li key={l.itemId} className="flex justify-between">
@@ -306,15 +299,34 @@ export function TrackingView({
               </li>
             ))}
           </ul>
-          <div className="mt-3 flex justify-between border-t border-dashed border-line pt-3">
-            <span className="font-bold">Total {delivered ? "paid" : "(Cash)"}</span>
-            <span className="text-data text-base font-bold">
+          <div className="mt-3 flex justify-between border-t border-line pt-3">
+            <span className="font-extrabold">Total {delivered ? "paid" : "(Cash)"}</span>
+            <span className="text-data text-base font-extrabold">
               {formatINR(order.total)}
             </span>
           </div>
         </div>
 
-        <button className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-semibold text-muted">
+        {/* Cancel (only before the kitchen starts) */}
+        {canCancel ? (
+          <div className="space-y-1">
+            <button
+              onClick={cancelOrder}
+              disabled={cancelBusy}
+              className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-deal disabled:opacity-60"
+            >
+              {cancelBusy ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
+              Cancel order
+            </button>
+            {cancelMsg ? (
+              <p className="rounded-xl bg-deal-soft px-3 py-2 text-center text-sm font-medium text-deal">
+                {cancelMsg}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        <button className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-ink">
           <CircleHelp className="size-4" /> Get help with this order
         </button>
       </div>

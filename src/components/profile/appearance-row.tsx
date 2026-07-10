@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { Sun, Moon } from "lucide-react";
 import { useUI } from "@/stores/ui-store";
 import { cn } from "@/lib/utils/cn";
 
@@ -16,52 +15,57 @@ export function AppearanceRow() {
   }, [initTheme]);
 
   return (
-    <div className="card flex items-center justify-between p-4">
-      <div>
-        <p className="text-[15px] font-semibold">Appearance</p>
-        <p className="text-xs text-muted">
-          Auto-switches by time of day. Light by day, dark at night.
-        </p>
-      </div>
-      <div className="flex items-center gap-1 rounded-full bg-surface-2 p-0.5">
-        <Seg
-          on={hydrated && theme === "light"}
-          onClick={() => setTheme("light")}
-          label="Light"
-          icon={<Sun className="size-4" />}
-        />
-        <Seg
-          on={hydrated && theme === "dark"}
-          onClick={() => setTheme("dark")}
-          label="Dark"
-          icon={<Moon className="size-4" />}
-        />
-      </div>
+    <div className="flex gap-3">
+      <Swatch
+        on={hydrated && theme === "light"}
+        onClick={() => setTheme("light")}
+        label="Light"
+        preview="bg-white"
+      />
+      <Swatch
+        on={hydrated && theme === "dark"}
+        onClick={() => setTheme("dark")}
+        label="Dark"
+        preview="bg-[#0f1215]"
+      />
     </div>
   );
 }
 
-function Seg({
+function Swatch({
   on,
   onClick,
   label,
-  icon,
+  preview,
 }: {
   on: boolean;
   onClick: () => void;
   label: string;
-  icon: React.ReactNode;
+  preview: string;
 }) {
   return (
     <button
       onClick={onClick}
+      className="press flex flex-1 flex-col items-center gap-1.5"
       aria-label={label}
-      className={cn(
-        "press grid size-9 place-items-center rounded-full",
-        on ? "bg-surface text-accent shadow-[var(--shadow-sm)]" : "text-muted"
-      )}
     >
-      {icon}
+      <span
+        className={cn(
+          "grid h-14 w-full place-items-center rounded-2xl border-2",
+          preview,
+          on ? "border-accent" : "border-line"
+        )}
+      >
+        {on ? <span className="size-3 rounded-full bg-accent" /> : null}
+      </span>
+      <span
+        className={cn(
+          "text-[13px]",
+          on ? "font-bold text-ink" : "font-medium text-muted"
+        )}
+      >
+        {label}
+      </span>
     </button>
   );
 }

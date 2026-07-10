@@ -17,8 +17,8 @@ export function RestaurantMenu({ restaurant }: { restaurant: Restaurant }) {
 
   return (
     <div>
-      {/* Category filter chips */}
-      <div className="no-scrollbar sticky top-0 z-10 -mx-4 flex gap-2 overflow-x-auto bg-bg/85 px-4 py-3 backdrop-blur">
+      {/* Category tabs — Bolt-style text tabs with an underline indicator */}
+      <div className="no-scrollbar sticky top-0 z-10 flex gap-5 overflow-x-auto border-b border-line bg-bg px-4">
         {restaurant.categories.map((c) => {
           const on = c === active;
           return (
@@ -26,26 +26,29 @@ export function RestaurantMenu({ restaurant }: { restaurant: Restaurant }) {
               key={c}
               onClick={() => setActive(c)}
               className={cn(
-                "press shrink-0 rounded-full border px-4 py-1.5 text-sm font-semibold",
-                on
-                  ? "border-accent bg-accent text-white"
-                  : "border-line bg-surface text-muted"
+                "press relative shrink-0 whitespace-nowrap py-3 text-[15px] transition-colors",
+                on ? "font-bold text-ink" : "font-medium text-muted"
               )}
             >
               {c}
+              {on ? (
+                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-ink" />
+              ) : null}
             </button>
           );
         })}
       </div>
 
-      <h2 className="px-1 pb-1 pt-1 text-label">
-        {active} · {items.length} items
-      </h2>
+      <div className="px-4">
+        <h2 className="pb-1 pt-5 text-[22px] font-extrabold tracking-tight">
+          {active}
+        </h2>
 
-      <div className="divide-y divide-line">
-        {items.map((item) => (
-          <MenuItemRow key={item.id} item={item} restaurant={restaurant} />
-        ))}
+        <div className="divide-y divide-line">
+          {items.map((item) => (
+            <MenuItemRow key={item.id} item={item} restaurant={restaurant} />
+          ))}
+        </div>
       </div>
     </div>
   );

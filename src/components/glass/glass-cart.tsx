@@ -72,7 +72,7 @@ export function GlassCart() {
           <button
             aria-label="Close cart"
             onClick={closeCart}
-            className="animate-fade-in absolute inset-0 bg-ink/30 backdrop-blur-[2px]"
+            className="animate-fade-in absolute inset-0 bg-ink/40"
           />
           <div className="glass animate-sheet-in absolute inset-x-0 bottom-0 max-h-[86%] overflow-hidden rounded-t-[var(--radius-sheet)] shadow-[var(--shadow-lg)]">
             <div className="flex items-center justify-between px-5 pb-2 pt-4">

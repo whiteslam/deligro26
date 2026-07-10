@@ -74,10 +74,12 @@ export function HomeHeader({ savedAddress }: { savedAddress?: SavedAddress | nul
 
       <Link
         href="/search"
-        className="press mt-3 flex h-12 items-center gap-3 rounded-2xl border border-line bg-surface px-4 text-muted"
+        className="press mt-3 flex h-12 items-center gap-3 rounded-full bg-surface-2 px-4 text-muted"
       >
-        <Search className="size-5" />
-        <span className="text-[15px]">Search dishes, restaurants…</span>
+        <Search className="size-5" strokeWidth={2.25} />
+        <span className="text-[15px] font-medium">
+          Search dishes, restaurants…
+        </span>
       </Link>
     </div>
   );

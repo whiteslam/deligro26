@@ -108,7 +108,7 @@ function DbPanel({ tab, snapshot }: { tab: BuildTab; snapshot: BuildDbSnapshot |
               <dt className="text-sm font-medium">{row.label}</dt>
               <dd className="truncate font-mono text-[11px] text-muted">{row.table}</dd>
             </div>
-            <span className="shrink-0 font-serif text-lg font-medium tabular-nums">
+            <span className="shrink-0 text-lg font-extrabold tabular-nums tracking-tight">
               {row.value}
             </span>
           </div>
@@ -139,7 +139,7 @@ function MilestoneList({
                 <p className="text-label">
                   {m.week === 0 ? "Foundation" : `Week ${m.week}`} · {m.range}
                 </p>
-                <h2 className="mt-0.5 font-serif text-xl font-medium">{m.title}</h2>
+                <h2 className="mt-0.5 text-xl font-extrabold tracking-tight">{m.title}</h2>
                 <p className="mt-1 text-sm text-muted">{m.goal}</p>
               </div>
               <span className="shrink-0 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-semibold text-muted">
@@ -277,7 +277,7 @@ export default async function BuildTrackerPage({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-label">{tabConfig.label} portal</p>
-              <h2 className="mt-0.5 font-serif text-xl font-medium">{tabConfig.summary}</h2>
+              <h2 className="mt-0.5 text-xl font-extrabold tracking-tight">{tabConfig.summary}</h2>
             </div>
             <Link
               href={tabConfig.portal}
@@ -291,7 +291,7 @@ export default async function BuildTrackerPage({
           <div className="mt-4 flex items-end justify-between">
             <div>
               <p className="text-label">Section progress</p>
-              <p className="mt-1 font-serif text-3xl font-medium">{p.pct}%</p>
+              <p className="mt-1 text-3xl font-extrabold tracking-tight">{p.pct}%</p>
             </div>
             <p className="text-sm text-muted">
               <span className="font-semibold text-[color:var(--green)]">{p.done} done</span>

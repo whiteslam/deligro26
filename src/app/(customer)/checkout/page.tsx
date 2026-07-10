@@ -1,5 +1,11 @@
 import { CheckoutView } from "@/components/checkout/checkout-view";
+import { requireUser } from "@/lib/auth";
 
-export default function CheckoutPage() {
+// Checkout needs a real account (addresses, wallet, placing an order). The proxy
+// already bounces guests to /login; this is the server-side backstop.
+export const dynamic = "force-dynamic";
+
+export default async function CheckoutPage() {
+  await requireUser();
   return <CheckoutView />;
 }

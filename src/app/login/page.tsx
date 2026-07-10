@@ -2,10 +2,9 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LogIn, ShieldAlert, Smartphone } from "lucide-react";
+import { ShieldAlert, Smartphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { OtpLogin } from "@/components/auth/otp-login";
 
@@ -68,65 +67,69 @@ function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="card w-full max-w-sm space-y-4 p-6">
-      <div className="flex items-center gap-2">
-        <span className="grid size-10 place-items-center rounded-xl bg-accent-soft text-accent">
-          <LogIn className="size-5" />
-        </span>
-        <div>
-          <h1 className="text-heading leading-none">Sign in</h1>
-          <p className="mt-1 text-xs text-muted">Deligro · one account, your role</p>
-        </div>
-      </div>
+    <form onSubmit={onSubmit} className="w-full max-w-sm">
+      <h1 className="text-center text-[26px] font-extrabold tracking-tight">
+        Sign in
+      </h1>
+      <p className="mt-1.5 text-center text-sm text-muted">
+        Deligro · one account, your role
+      </p>
 
       {denied ? (
-        <p className="flex items-start gap-2 rounded-lg bg-accent-soft px-3 py-2 text-xs text-accent">
-          <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
+        <p className="mt-5 flex items-start gap-2 rounded-xl bg-deal-soft px-3 py-2.5 text-sm font-medium text-deal">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0" />
           Your account doesn&apos;t have access to that area.
         </p>
       ) : null}
 
-      <label className="block">
-        <span className="text-label">Email</span>
+      <div className="mt-6 space-y-2.5">
         <input
           type="email"
           required
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-accent"
-          placeholder="you@example.com"
+          className="h-14 w-full rounded-2xl bg-surface-2 px-4 text-[15px] font-medium outline-none ring-accent focus:ring-2"
+          placeholder="Email"
         />
-      </label>
-
-      <label className="block">
-        <span className="text-label">Password</span>
         <input
           type="password"
           required
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-accent"
-          placeholder="••••••••"
+          className="h-14 w-full rounded-2xl bg-surface-2 px-4 text-[15px] font-medium outline-none ring-accent focus:ring-2"
+          placeholder="Password"
         />
-      </label>
+      </div>
 
-      {error ? <p className="text-sm text-accent">{error}</p> : null}
+      {error ? (
+        <p className="mt-3 rounded-xl bg-deal-soft px-3 py-2.5 text-center text-sm font-medium text-deal">
+          {error}
+        </p>
+      ) : null}
 
-      <Button type="submit" size="lg" className="w-full" disabled={busy}>
+      <button
+        type="submit"
+        disabled={busy}
+        className="press mt-4 flex h-14 w-full items-center justify-center rounded-full bg-accent text-[17px] font-bold text-white shadow-[var(--glow-accent)] disabled:opacity-50"
+      >
         {busy ? "Signing in…" : "Sign in"}
-      </Button>
+      </button>
+
+      <div className="my-5 flex items-center gap-3 text-xs font-semibold text-muted">
+        <span className="h-px flex-1 bg-line" /> OR <span className="h-px flex-1 bg-line" />
+      </div>
 
       <button
         type="button"
         onClick={() => { setMode("otp"); setError(null); }}
-        className="press flex w-full items-center justify-center gap-2 rounded-xl border border-line py-2.5 text-sm font-semibold text-muted hover:text-ink"
+        className="press flex h-14 w-full items-center justify-center gap-2 rounded-full border border-line bg-surface text-[15px] font-bold text-ink"
       >
-        <Smartphone className="size-4" /> Login with OTP
+        <Smartphone className="size-5" /> Login with OTP
       </button>
 
-      <p className="text-center text-xs text-muted">
+      <p className="mt-5 text-center text-xs leading-relaxed text-muted">
         Restaurant &amp; admin accounts should enable MFA. OTP login is
         rate-limited per phone number.
       </p>
@@ -136,13 +139,19 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="dashboard-shell grid place-items-center p-4">
-      <div className="absolute right-4 top-4">
-        <ThemeToggle />
+    <div className="device">
+      <div className="app-shell">
+        <div className="absolute right-4 top-4 z-10">
+          <ThemeToggle />
+        </div>
+        {/* min-h-full + justify-center keeps the form centred but lets it scroll
+            if the OTP step + errors grow taller than the phone screen. */}
+        <div className="app-scroll no-scrollbar flex min-h-full flex-col items-center justify-center px-6 py-10">
+          <Suspense fallback={null}>
+            <LoginForm />
+          </Suspense>
+        </div>
       </div>
-      <Suspense fallback={null}>
-        <LoginForm />
-      </Suspense>
     </div>
   );
 }

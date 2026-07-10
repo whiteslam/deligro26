@@ -8,16 +8,16 @@ const base =
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-accent text-white shadow-[var(--glow-accent)] hover:brightness-105",
+    "bg-accent text-white shadow-[var(--glow-accent)] hover:brightness-[1.03]",
   secondary: "bg-surface-2 text-ink hover:bg-line/60",
   ghost: "text-ink hover:bg-surface-2",
   outline: "border border-line text-ink bg-surface hover:bg-surface-2",
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-9 px-4 text-sm",
-  md: "h-11 px-5 text-[15px]",
-  lg: "h-14 px-6 text-base",
+  sm: "h-10 px-4 text-sm",
+  md: "h-12 px-5 text-[15px]",
+  lg: "h-14 px-6 text-[17px] font-bold",
 };
 
 export function Button({
