@@ -9,10 +9,12 @@ export function RoleTopBar({
   role,
   accent,
   nav,
+  actions,
 }: {
   role: string;
   accent?: string; // small colored dot to distinguish portals
   nav?: React.ReactNode;
+  actions?: React.ReactNode;
 }) {
   return (
     <header className="glass sticky top-0 z-30 border-x-0 border-t-0">
@@ -29,6 +31,7 @@ export function RoleTopBar({
           <nav className="ml-4 hidden items-center gap-1 md:flex">{nav}</nav>
         ) : null}
         <div className="ml-auto flex items-center gap-2">
+          {actions}
           <ThemeToggle />
           {isSupabaseConfigured ? (
             <form action="/auth/signout" method="post">
@@ -85,11 +88,15 @@ export function StatCard({
   value,
   delta,
   tone = "muted",
+  deltaTone,
+  compact = false,
 }: {
   label: string;
   value: string;
   delta?: string;
   tone?: "accent" | "green" | "muted";
+  deltaTone?: "accent" | "green" | "muted";
+  compact?: boolean;
 }) {
   const toneClass =
     tone === "green"
@@ -97,12 +104,25 @@ export function StatCard({
       : tone === "accent"
         ? "text-accent"
         : "text-muted";
+  const deltaClass =
+    deltaTone === "green"
+      ? "text-green"
+      : deltaTone === "accent"
+        ? "text-accent"
+        : toneClass;
   return (
-    <div className="card p-4">
-      <p className="text-label">{label}</p>
-      <p className="text-data mt-2 text-2xl font-semibold text-ink">{value}</p>
+    <div className={cn("card", compact ? "p-3" : "p-4")}>
+      <p className={cn(compact ? "text-[11px]" : "text-label")}>{label}</p>
+      <p
+        className={cn(
+          "text-data font-semibold text-ink",
+          compact ? "mt-1 text-xl" : "mt-2 text-2xl"
+        )}
+      >
+        {value}
+      </p>
       {delta ? (
-        <p className={cn("mt-1 text-xs font-semibold", toneClass)}>{delta}</p>
+        <p className={cn("mt-1 text-xs font-semibold", deltaClass)}>{delta}</p>
       ) : null}
     </div>
   );

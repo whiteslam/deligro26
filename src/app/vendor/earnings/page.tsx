@@ -1,72 +1,97 @@
-import { StatCard, SectionTitle } from "@/components/roles/role-ui";
-import { formatINR } from "@/lib/utils/format";
+import { VendorPageHeader } from "@/components/vendor/vendor-page-header";
+import { VendorEarningsCharts } from "@/components/vendor/vendor-earnings-charts";
+import { getProfile } from "@/lib/auth";
+import { resolveVendorRestaurant } from "@/lib/data-access/vendor-restaurant";
+import { getVendorEarningsSummary } from "@/lib/data-access/vendor-earnings";
+import type { VendorEarningsSummary } from "@/lib/data-access/vendor-earnings";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-const WEEK = [
-  { day: "Mon", amount: 8200 },
-  { day: "Tue", amount: 9400 },
-  { day: "Wed", amount: 7600 },
-  { day: "Thu", amount: 11200 },
-  { day: "Fri", amount: 14800 },
-  { day: "Sat", amount: 16900 },
-  { day: "Sun", amount: 13100 },
+const DEMO_WEEK = [
+  { day: "Mon", amount: 8200, orders: 18 },
+  { day: "Tue", amount: 9400, orders: 21 },
+  { day: "Wed", amount: 7600, orders: 16 },
+  { day: "Thu", amount: 11200, orders: 24 },
+  { day: "Fri", amount: 14800, orders: 31 },
+  { day: "Sat", amount: 16900, orders: 36 },
+  { day: "Sun", amount: 13100, orders: 28 },
 ];
 
-export default function RestaurantEarningsPage() {
-  const total = WEEK.reduce((s, d) => s + d.amount, 0);
-  const max = Math.max(...WEEK.map((d) => d.amount));
+function demoStats(): VendorEarningsSummary {
+  const weekTotal = DEMO_WEEK.reduce((s, d) => s + d.amount, 0);
+  const orderCount = DEMO_WEEK.reduce((s, d) => s + d.orders, 0);
+  const best = DEMO_WEEK.reduce(
+    (top, d) => (d.amount > top.amount ? d : top),
+    DEMO_WEEK[0]
+  );
+
+  return {
+    weekTotal,
+    orderCount,
+    daily: DEMO_WEEK,
+    lifetimeTotal: 72400,
+    lifetimeOrders: 198,
+    avgOrderValue: Math.round(weekTotal / orderCount),
+    lifetimeAvgOrderValue: Math.round(72400 / 198),
+    todayRevenue: 4200,
+    todayOrders: 9,
+    lastWeekTotal: 68150,
+    lastWeekOrders: 186,
+    weekChangePercent: 12,
+    cancelledCount: 6,
+    cancelledValue: 2840,
+    pendingCount: 3,
+    pendingValue: 1560,
+    bestDay: best.day,
+    bestDayAmount: best.amount,
+  };
+}
+
+function DemoEarningsPage() {
+  return (
+    <VendorEarningsCharts
+      restaurantName="Saffron Kitchen"
+      stats={demoStats()}
+      demo
+    />
+  );
+}
+
+export default async function RestaurantEarningsPage() {
+  if (!isSupabaseConfigured) {
+    return <DemoEarningsPage />;
+  }
+
+  const profile = await getProfile();
+  if (profile?.role !== "restaurant") {
+    return <DemoEarningsPage />;
+  }
+
+  let restaurant: Awaited<ReturnType<typeof resolveVendorRestaurant>> = null;
+  try {
+    restaurant = await resolveVendorRestaurant();
+  } catch {
+    return <DemoEarningsPage />;
+  }
+
+  if (!restaurant) {
+    return (
+      <div className="space-y-6">
+        <VendorPageHeader
+          title="Earnings"
+          subtitle="No restaurant linked to your account."
+        />
+      </div>
+    );
+  }
+
+  let summary: VendorEarningsSummary;
+  try {
+    summary = await getVendorEarningsSummary(restaurant.id);
+  } catch {
+    return <DemoEarningsPage />;
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-heading">Earnings</h1>
-        <p className="text-sm text-muted">This week · payouts settle weekly.</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="This week" value={formatINR(total)} tone="green" />
-        <StatCard label="Orders" value="212" />
-        <StatCard label="Commission" value="18%" tone="muted" />
-        <StatCard label="Next payout" value="Mon" tone="accent" />
-      </div>
-
-      <section className="card p-4">
-        <SectionTitle>Daily revenue</SectionTitle>
-        <div className="flex h-40 items-end justify-between gap-2">
-          {WEEK.map((d) => (
-            <div key={d.day} className="flex flex-1 flex-col items-center gap-2">
-              <div className="flex w-full flex-1 items-end">
-                <div
-                  className="w-full rounded-t-md bg-accent/80"
-                  style={{ height: `${(d.amount / max) * 100}%` }}
-                  title={formatINR(d.amount)}
-                />
-              </div>
-              <span className="text-[11px] text-muted">{d.day}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="card divide-y divide-line">
-        <div className="flex items-center justify-between p-4">
-          <div>
-            <p className="font-semibold">Payout · last week</p>
-            <p className="text-xs text-muted">Settled to HDFC ••4821</p>
-          </div>
-          <span className="text-data font-semibold text-green">
-            {formatINR(72400)}
-          </span>
-        </div>
-        <div className="flex items-center justify-between p-4">
-          <div>
-            <p className="font-semibold">Payout · 2 weeks ago</p>
-            <p className="text-xs text-muted">Settled to HDFC ••4821</p>
-          </div>
-          <span className="text-data font-semibold text-green">
-            {formatINR(68150)}
-          </span>
-        </div>
-      </section>
-    </div>
+    <VendorEarningsCharts restaurantName={restaurant.name} stats={summary} />
   );
 }

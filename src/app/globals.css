@@ -536,6 +536,180 @@ body:has(.dashboard-shell) {
   }
 }
 
+/* Vendor portal — mobile-first with bottom tab bar + desktop sidebar */
+.vendor-shell {
+  display: flex;
+  min-height: 100dvh;
+  background: var(--bg);
+}
+.vendor-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  flex-shrink: 0;
+}
+.vendor-content {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.vendor-shell .dashboard-main.vendor-main {
+  flex: 1;
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  padding: 16px 16px calc(92px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 1024px) {
+  .vendor-shell .dashboard-main.vendor-main {
+    padding: 28px 32px 40px;
+  }
+}
+.vendor-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.vendor-top-bar {
+  --vendor-top-offset: 56px;
+}
+@media (min-width: 640px) {
+  .vendor-top-bar {
+    --vendor-top-offset: 52px;
+  }
+}
+@media (min-width: 768px) {
+  .vendor-top-bar {
+    --vendor-top-offset: 60px;
+  }
+}
+
+/* Vendor UI primitives */
+.vendor-hero {
+  background: linear-gradient(
+    135deg,
+    var(--surface) 0%,
+    var(--accent-soft) 120%
+  );
+  box-shadow: var(--shadow-md);
+}
+.vendor-hero-glow {
+  background: radial-gradient(
+    ellipse 80% 60% at 100% 0%,
+    color-mix(in srgb, var(--accent) 18%, transparent),
+    transparent 70%
+  );
+}
+.vendor-metric {
+  border-radius: var(--radius-block);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.vendor-metric:hover {
+  box-shadow: var(--shadow-md);
+}
+.vendor-panel {
+  border-radius: var(--radius-block);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+@media (min-width: 640px) {
+  .vendor-panel {
+    padding: 1.25rem;
+  }
+}
+.vendor-empty {
+  border-radius: var(--radius-block);
+  border: 1px dashed var(--line);
+  background: var(--surface-2);
+}
+.vendor-kanban-col {
+  backdrop-filter: blur(8px);
+}
+.vendor-order-card {
+  border-radius: var(--radius-block);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.vendor-order-card:hover {
+  box-shadow: var(--shadow-md);
+}
+@media (min-width: 1024px) {
+  .vendor-order-card:hover {
+    transform: translateY(-2px);
+  }
+}
+.vendor-order-card--new {
+  animation: vendor-order-in 0.45s ease-out;
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+@keyframes vendor-order-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.vendor-segment {
+  position: relative;
+  border-radius: 1rem;
+  background: var(--surface-2);
+  padding: 0.25rem;
+}
+.vendor-segment-btn {
+  position: relative;
+  z-index: 1;
+}
+.vendor-segment-btn[data-active="true"] {
+  color: var(--ink);
+}
+.vendor-segment-indicator {
+  position: absolute;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  border-radius: 0.75rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.vendor-menu-item {
+  border-radius: var(--radius-block);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.vendor-menu-item:hover {
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--line));
+  box-shadow: var(--shadow-md);
+}
+.vendor-profile-cover {
+  background: linear-gradient(
+    135deg,
+    var(--accent) 0%,
+    color-mix(in srgb, var(--accent) 60%, var(--blue)) 100%
+  );
+}
+.vendor-chart-bar {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 95%, white) 0%,
+    var(--accent) 100%
+  );
+}
+.vendor-fab {
+  box-shadow: var(--glow-accent), var(--shadow-lg);
+}
+
 /* Small status/labelling pill used across the role portals. */
 .pill {
   display: inline-flex;

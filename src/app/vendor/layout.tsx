@@ -1,27 +1,58 @@
-import { RoleTopBar } from "@/components/roles/role-ui";
-import { PortalNav } from "@/components/roles/portal-nav";
+import { VendorTopBar } from "@/components/vendor/vendor-top-bar";
+import {
+  VendorBottomNav,
+  VendorSidebar,
+} from "@/components/vendor/vendor-sidebar";
 import { requireRole } from "@/lib/auth";
-
-const LINKS = [
-  { href: "/vendor", label: "Orders" },
-  { href: "/vendor/menu", label: "Menu" },
-  { href: "/vendor/earnings", label: "Earnings" },
-];
+import {
+  listOwnedRestaurants,
+  resolveVendorRestaurant,
+} from "@/lib/data-access/vendor-restaurant";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { RESTAURANT_NAME } from "@/lib/roles-data";
 
 export default async function RestaurantLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requireRole("restaurant"); // vendor accounts only
+  await requireRole("restaurant");
+
+  let restaurantName = RESTAURANT_NAME;
+  let isOpen = true;
+  let restaurants: Awaited<ReturnType<typeof listOwnedRestaurants>> = [];
+  let activeSlug = "";
+
+  if (isSupabaseConfigured) {
+    try {
+      restaurants = await listOwnedRestaurants();
+      const active = await resolveVendorRestaurant();
+      if (active) {
+        restaurantName = active.name;
+        isOpen = active.isOpen;
+        activeSlug = active.slug;
+      }
+    } catch {
+      // demo fallback name
+    }
+  }
+
+  const shellProps = {
+    restaurantName,
+    isOpen,
+    restaurants,
+    activeSlug,
+    showControls: isSupabaseConfigured,
+  };
+
   return (
-    <div className="dashboard-shell">
-      <RoleTopBar
-        role="Restaurant · Saffron Kitchen"
-        accent="var(--accent)"
-        nav={<PortalNav links={LINKS} />}
-      />
-      <main className="dashboard-main">{children}</main>
+    <div className="dashboard-shell vendor-shell">
+      <VendorSidebar {...shellProps} />
+      <div className="vendor-content">
+        <VendorTopBar {...shellProps} />
+        <main className="dashboard-main vendor-main">{children}</main>
+      </div>
+      <VendorBottomNav />
     </div>
   );
 }

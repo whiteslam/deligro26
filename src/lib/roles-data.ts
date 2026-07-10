@@ -13,15 +13,24 @@ export interface RoleOrderLine {
 }
 
 /* ---------- Restaurant (merchant) ---------- */
+export interface KitchenOrderCustomer {
+  name: string;
+  phone: string | null;
+  initials: string;
+}
+
 export interface KitchenOrder {
   id: string;
   code: string; // short human ref, e.g. "#D-4821"
   customer: string;
+  customerProfile?: KitchenOrderCustomer;
   area: string;
+  deliveryLine?: string;
   placedAgo: string; // "2 min ago"
   lines: RoleOrderLine[];
   total: number;
   note?: string;
+  status?: string;
 }
 
 export const RESTAURANT_NAME = "Saffron Kitchen";
