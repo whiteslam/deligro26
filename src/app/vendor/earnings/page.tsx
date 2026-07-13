@@ -1,71 +1,69 @@
 import { StatCard, SectionTitle } from "@/components/roles/role-ui";
 import { formatINR } from "@/lib/utils/format";
+import { getVendorEarnings } from "@/lib/data-access/vendor-earnings";
 
-const WEEK = [
-  { day: "Mon", amount: 8200 },
-  { day: "Tue", amount: 9400 },
-  { day: "Wed", amount: 7600 },
-  { day: "Thu", amount: 11200 },
-  { day: "Fri", amount: 14800 },
-  { day: "Sat", amount: 16900 },
-  { day: "Sun", amount: 13100 },
-];
+/**
+ * Earnings, counted from this restaurant's own delivered orders.
+ *
+ * Every number on this page used to be invented — a hardcoded week of revenue, a
+ * fabricated order count, an "18% commission" that is applied nowhere in the
+ * order path, and payouts "settled to HDFC ••4821". A real vendor, behind a real
+ * login, was shown money that did not exist.
+ *
+ * Commission and payouts are simply not shown: neither exists in the system yet,
+ * and a blank where a feature isn't built is honest in a way that a plausible
+ * number never is.
+ */
+export const dynamic = "force-dynamic";
 
-export default function RestaurantEarningsPage() {
-  const total = WEEK.reduce((s, d) => s + d.amount, 0);
-  const max = Math.max(...WEEK.map((d) => d.amount));
+export default async function RestaurantEarningsPage() {
+  const { week, weekTotal, weekOrders, empty } = await getVendorEarnings();
+  const max = Math.max(...week.map((d) => d.amount), 1);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-heading">Earnings</h1>
-        <p className="text-sm text-muted">This week · payouts settle weekly.</p>
+        <p className="text-sm text-muted">
+          Delivered orders, last 7 days. Payouts aren&rsquo;t automated yet.
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="This week" value={formatINR(total)} tone="green" />
-        <StatCard label="Orders" value="212" />
-        <StatCard label="Commission" value="18%" tone="muted" />
-        <StatCard label="Next payout" value="Mon" tone="accent" />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-2">
+        <StatCard
+          label="Last 7 days"
+          value={formatINR(weekTotal)}
+          tone="green"
+        />
+        <StatCard label="Orders delivered" value={String(weekOrders)} />
       </div>
 
       <section className="card p-4">
         <SectionTitle>Daily revenue</SectionTitle>
-        <div className="flex h-40 items-end justify-between gap-2">
-          {WEEK.map((d) => (
-            <div key={d.day} className="flex flex-1 flex-col items-center gap-2">
-              <div className="flex w-full flex-1 items-end">
-                <div
-                  className="w-full rounded-t-md bg-accent/80"
-                  style={{ height: `${(d.amount / max) * 100}%` }}
-                  title={formatINR(d.amount)}
-                />
+        {empty ? (
+          <p className="py-6 text-sm text-muted">
+            No delivered orders in the last 7 days. Revenue appears here as
+            orders are completed.
+          </p>
+        ) : (
+          <div className="flex h-40 items-end justify-between gap-2">
+            {week.map((d) => (
+              <div
+                key={d.date}
+                className="flex flex-1 flex-col items-center gap-2"
+              >
+                <div className="flex w-full flex-1 items-end">
+                  <div
+                    className="w-full rounded-t-md bg-accent/80"
+                    style={{ height: `${(d.amount / max) * 100}%` }}
+                    title={formatINR(d.amount)}
+                  />
+                </div>
+                <span className="text-[11px] text-muted">{d.label}</span>
               </div>
-              <span className="text-[11px] text-muted">{d.day}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="card divide-y divide-line">
-        <div className="flex items-center justify-between p-4">
-          <div>
-            <p className="font-semibold">Payout · last week</p>
-            <p className="text-xs text-muted">Settled to HDFC ••4821</p>
+            ))}
           </div>
-          <span className="text-data font-semibold text-green">
-            {formatINR(72400)}
-          </span>
-        </div>
-        <div className="flex items-center justify-between p-4">
-          <div>
-            <p className="font-semibold">Payout · 2 weeks ago</p>
-            <p className="text-xs text-muted">Settled to HDFC ••4821</p>
-          </div>
-          <span className="text-data font-semibold text-green">
-            {formatINR(68150)}
-          </span>
-        </div>
+        )}
       </section>
     </div>
   );

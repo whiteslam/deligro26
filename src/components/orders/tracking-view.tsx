@@ -17,7 +17,7 @@ import type { Order } from "@/types";
 import { PageHeader } from "@/components/layout/page-header";
 import { TrackingMap } from "@/components/orders/tracking-map";
 import { useLiveTracking } from "@/hooks/use-live-tracking";
-import { TRACKING_STEPS, statusIndex } from "@/lib/utils/order-status";
+import { trackingSteps, statusIndex } from "@/lib/utils/order-status";
 import { shortOrderId } from "@/lib/utils/order-map";
 import { formatINR } from "@/lib/utils/format";
 import { DEFAULT_CENTER } from "@/lib/maps/config";
@@ -214,10 +214,13 @@ export function TrackingView({
           </div>
         ) : cancelled ? null : (
           <ol className="pl-1">
-            {TRACKING_STEPS.map((step, i) => {
+            {trackingSteps({
+              restaurantName: order.restaurantName,
+              riderName: displayRider?.name,
+            }).map((step, i) => {
               const done = i < current;
               const active = i === current;
-              const last = i === TRACKING_STEPS.length - 1;
+              const last = i === 3;
               return (
                 <li key={step.key} className="flex gap-3.5">
                   <div className="flex flex-col items-center">
@@ -284,10 +287,19 @@ export function TrackingView({
             </span>
             <div className="flex-1">
               <p className="text-[15px] font-bold">{displayRider.name}</p>
-              <p className="flex items-center gap-1 text-xs text-muted">
-                <Star className="size-3 fill-pop text-pop" />
-                {displayRider.rating} · {displayRider.vehicle}
-              </p>
+              {/* Only shown when we actually know it. Every rider used to be
+                  labelled "4.9 ★ · Bike" — a rating we have never collected. */}
+              {displayRider.rating !== undefined ? (
+                <p className="flex items-center gap-1 text-xs text-muted">
+                  <Star className="size-3 fill-pop text-pop" />
+                  {displayRider.rating}
+                  {displayRider.vehicle ? ` · ${displayRider.vehicle}` : ""}
+                </p>
+              ) : displayRider.vehicle ? (
+                <p className="text-xs text-muted">{displayRider.vehicle}</p>
+              ) : (
+                <p className="text-xs text-muted">Your courier</p>
+              )}
             </div>
             <button
               type="button"

@@ -53,3 +53,36 @@ export function clampTip(tip: number): number {
   if (!Number.isFinite(tip)) return 0;
   return Math.min(Math.max(Math.round(tip), 0), MAX_TIP);
 }
+
+/* ---------- Rider payout ---------- */
+
+/** Share of the food bill that goes to the rider. */
+export const RIDER_COMMISSION = 0.08;
+
+/** No trip pays less than this, however small the order. */
+export const RIDER_MIN_PAYOUT = 30;
+
+/**
+ * What the rider earns for a delivery.
+ *
+ * Deliberately computed on the FOOD subtotal, not the order total: the total
+ * includes the delivery fee, the customer's GST and their tip, and paying a
+ * commission on someone's tax is not a policy anyone chose — it was an accident
+ * of using the wrong number.
+ *
+ * The tip is then added in full, which is what checkout promises the customer
+ * ("the courier will get 100% of your tip").
+ */
+export function riderPayout({
+  itemSubtotal,
+  tip = 0,
+}: {
+  itemSubtotal: number;
+  tip?: number;
+}): number {
+  const commission = Math.max(
+    RIDER_MIN_PAYOUT,
+    Math.round(itemSubtotal * RIDER_COMMISSION)
+  );
+  return commission + clampTip(tip);
+}

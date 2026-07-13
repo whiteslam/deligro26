@@ -25,7 +25,7 @@ export function HomeView({
   savedAddress: SavedAddress | null;
   restaurants: Restaurant[];
   activeOrder: Order | null;
-  promo: Restaurant;
+  promo: Restaurant | null;
   popular: Restaurant[];
   nearby: Restaurant[];
 }) {
@@ -114,7 +114,7 @@ export function HomeView({
             </div>
           </Section>
 
-          {promo.offer ? (
+          {promo?.offer ? (
             <div className="px-4">
               <Link
                 href={`/restaurant/${promo.slug}`}
@@ -160,7 +160,7 @@ export function HomeView({
           </section>
 
           <p className="px-4 pb-2 pt-2 text-center text-xs text-muted">
-            Freshly made, delivered warm — usually in under 30 minutes.
+            Freshly made, delivered warm.
           </p>
         </div>
       )}

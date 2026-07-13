@@ -7,29 +7,22 @@ import { AVAILABLE_JOBS, DRIVER_TODAY } from "@/lib/roles-data";
 const DEMO_BOARD: DriverBoardData = {
   available: AVAILABLE_JOBS,
   active: null,
-  today: {
-    trips: DRIVER_TODAY.trips,
-    earnings: DRIVER_TODAY.earnings,
-    onlineHours: DRIVER_TODAY.onlineHours,
-    rating: DRIVER_TODAY.rating,
-  },
+  today: { trips: DRIVER_TODAY.trips, earnings: DRIVER_TODAY.earnings },
 };
 
 export default async function DriverPage() {
-  let board = DEMO_BOARD;
-  let live = false;
-
-  if (isSupabaseConfigured) {
-    const profile = await getProfile();
-    if (profile?.role === "driver") {
-      try {
-        board = await getDriverBoard(profile.id);
-        live = true;
-      } catch {
-        // fall back to demo data
-      }
-    }
+  // Demo jobs only when there is no backend at all. They used to also stand in
+  // whenever the live query threw — fabricated jobs ("Blue Tokai Cafe", ₹62)
+  // that look identical to real ones, offered to a real rider.
+  if (!isSupabaseConfigured) {
+    return <DriverBoard initial={DEMO_BOARD} live={false} />;
   }
 
-  return <DriverBoard initial={board} live={live} />;
+  const profile = await getProfile();
+  if (profile?.role !== "driver") {
+    return <DriverBoard initial={DEMO_BOARD} live={false} />;
+  }
+
+  const board = await getDriverBoard(profile.id);
+  return <DriverBoard initial={board} live />;
 }

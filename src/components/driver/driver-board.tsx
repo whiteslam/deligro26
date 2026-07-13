@@ -107,12 +107,11 @@ export function DriverBoard({
         </button>
       </div>
 
-      {/* Today */}
+      {/* Today. "Online 5.5 h" and "Rating 4.8 ★" used to sit here as constants —
+          the same numbers for every driver, every day. We track neither. */}
       <div className="grid grid-cols-2 gap-3">
         <StatCard label="Today's earnings" value={formatINR(today.earnings)} tone="green" />
         <StatCard label="Trips" value={String(today.trips)} tone="accent" />
-        <StatCard label="Online" value={`${today.onlineHours} h`} />
-        <StatCard label="Rating" value={`${today.rating} ★`} />
       </div>
 
       {/* Active delivery */}
@@ -156,7 +155,9 @@ export function DriverBoard({
                   </p>
                 </div>
                 <span className="text-data text-sm text-muted">
-                  {active.job.distanceKm} km
+                  {active.job.distanceKm !== undefined
+                    ? `${active.job.distanceKm} km`
+                    : "Distance unknown"}
                 </span>
               </div>
 
@@ -262,7 +263,9 @@ export function DriverBoard({
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <Pill tone="muted">{job.distanceKm} km</Pill>
+                    {job.distanceKm !== undefined ? (
+                      <Pill tone="muted">{job.distanceKm} km</Pill>
+                    ) : null}
                     <Pill tone="muted">{job.items} items</Pill>
                   </div>
                   <Button

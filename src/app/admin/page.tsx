@@ -1,10 +1,34 @@
 import Link from "next/link";
-import { ShieldCheck, AlertTriangle, Check } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { StatCard, SectionTitle, Pill } from "@/components/roles/role-ui";
 import { Button } from "@/components/ui/button";
-import { ADMIN_METRICS, PENDING_APPROVALS } from "@/lib/roles-data";
+import {
+  getAdminMetrics,
+  listPendingRestaurants,
+} from "@/lib/data-access/admin-stats";
+import { ApproveRestaurantButton } from "@/components/admin/approve-restaurant-button";
+import { formatINR } from "@/lib/utils/format";
 
-export default function AdminOverviewPage() {
+/**
+ * Platform health, counted from the database.
+ *
+ * Everything here used to come from `roles-data`: "1,284 orders today", "₹4.9L
+ * GMV", "86 active riders", plus two invented security alerts ("18 failed admin
+ * logins in 10 min from 3 IPs") — under a footer promising that every admin
+ * action was logged and audited. There was no Supabase branch at all, so an
+ * operator was reading fiction and could act on it.
+ *
+ * The alerts are removed rather than reimplemented: there is no alerting
+ * pipeline, and no section is honest where an invented incident is not.
+ */
+export const dynamic = "force-dynamic";
+
+export default async function AdminOverviewPage() {
+  const [metrics, pending] = await Promise.all([
+    getAdminMetrics(),
+    listPendingRestaurants(),
+  ]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -18,76 +42,44 @@ export default function AdminOverviewPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {ADMIN_METRICS.map((m) => (
-          <StatCard
-            key={m.label}
-            label={m.label}
-            value={m.value}
-            delta={m.delta}
-            tone={m.tone}
-          />
-        ))}
+        <StatCard
+          label="Orders today"
+          value={String(metrics.ordersToday)}
+          tone="accent"
+        />
+        <StatCard label="GMV today" value={formatINR(metrics.gmvToday)} />
+        <StatCard
+          label="Riders on a job"
+          value={String(metrics.activeRiders)}
+          tone="green"
+        />
+        <StatCard
+          label="Awaiting approval"
+          value={String(metrics.pendingApprovals)}
+        />
       </div>
 
-      {/* Alerts */}
       <section>
-        <SectionTitle>Alerts</SectionTitle>
-        <div className="space-y-2">
-          <div className="card flex items-start gap-3 border-l-4 border-l-accent p-4">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-accent" />
-            <div>
-              <p className="text-sm font-semibold">
-                Coupon abuse pattern flagged
-              </p>
-              <p className="text-xs text-muted">
-                Order #P-3301 — large coupon against a near-zero total. Held for
-                review.
-              </p>
-            </div>
-          </div>
-          <div className="card flex items-start gap-3 p-4">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-muted" />
-            <div>
-              <p className="text-sm font-semibold">Failed-login spike</p>
-              <p className="text-xs text-muted">
-                18 failed admin logins in 10 min from 3 IPs — rate limiter
-                engaged.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Approvals */}
-      <section>
-        <SectionTitle
-          right={<Pill tone="accent">{PENDING_APPROVALS.length}</Pill>}
-        >
+        <SectionTitle right={<Pill tone="accent">{pending.length}</Pill>}>
           Pending approvals
         </SectionTitle>
         <div className="card divide-y divide-line">
-          {PENDING_APPROVALS.map((a) => (
-            <div
-              key={a.name}
-              className="flex items-center gap-3 p-4"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">
-                  {a.name}{" "}
-                  <span className="text-xs font-normal text-muted">
-                    · {a.type}
-                  </span>
-                </p>
-                <p className="truncate text-xs text-muted">{a.detail}</p>
+          {pending.length === 0 ? (
+            <p className="p-4 text-sm text-muted">
+              Nothing waiting. A new restaurant lands here and stays invisible to
+              customers until it is approved.
+            </p>
+          ) : (
+            pending.map((r) => (
+              <div key={r.id} className="flex items-center gap-3 p-4">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{r.name}</p>
+                  <p className="truncate text-xs text-muted">/{r.slug}</p>
+                </div>
+                <ApproveRestaurantButton id={r.id} name={r.name} />
               </div>
-              <span className="hidden text-xs text-muted sm:block">
-                {a.submitted}
-              </span>
-              <Button size="sm" variant="outline">
-                Review
-              </Button>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </section>
 
@@ -103,11 +95,6 @@ export default function AdminOverviewPage() {
           </Button>
         </Link>
       </section>
-
-      <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted">
-        <Check className="size-3.5" /> Every admin action here is logged and
-        audited server-side.
-      </p>
     </div>
   );
 }

@@ -60,7 +60,7 @@ export async function getOrderTrackingSnapshot(
   const { data: order, error } = await supabase
     .from("orders")
     .select(
-      "id, status, address, restaurant_id, restaurants ( eta_min, eta_max )"
+      "id, status, address, restaurant_id, restaurants ( eta_min, eta_max, lat, lng )"
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -69,18 +69,34 @@ export async function getOrderTrackingSnapshot(
   if (!order) return null;
 
   const restaurant = one(
-    order.restaurants as { eta_min?: number; eta_max?: number } | null
+    order.restaurants as {
+      eta_min?: number;
+      eta_max?: number;
+      lat?: number | null;
+      lng?: number | null;
+    } | null
   );
   const etaMinutes = restaurant?.eta_min ?? 25;
   const destination = parseDestination(order.address);
-  const restaurantPoint = restaurantPointForOrder(
-    order.restaurant_id as string,
-    destination,
-    {
+
+  // The shop's actual position, now that vendors pin it (migration 0009). This
+  // query used not to select lat/lng at all, so the restaurant marker was always
+  // Bemetara's centre plus a made-up offset — and if that landed near the
+  // customer, it was re-placed 0.8 km away at an angle hashed from the
+  // restaurant's UUID. The pin the customer watched their food leave from was
+  // fiction. The synthetic point remains only as a fallback for a shop that
+  // hasn't pinned itself yet.
+  const pinned =
+    typeof restaurant?.lat === "number" && typeof restaurant?.lng === "number"
+      ? { lat: restaurant.lat, lng: restaurant.lng }
+      : null;
+
+  const restaurantPoint =
+    pinned ??
+    restaurantPointForOrder(order.restaurant_id as string, destination, {
       lat: DEFAULT_CENTER.lat + 0.012,
       lng: DEFAULT_CENTER.lng - 0.008,
-    }
-  );
+    });
 
   const admin = createAdminClient();
   const { data: delivery } = await admin
@@ -99,10 +115,11 @@ export async function getOrderTrackingSnapshot(
       .eq("id", delivery.driver_id)
       .maybeSingle();
     if (driver) {
+      // Name and phone are real. Rating and vehicle are simply not known — we
+      // don't rate riders and we don't record what they drive — so they are left
+      // out rather than filled in with a flattering "4.9 ★ · Bike".
       rider = {
         name: driver.full_name?.trim() || "Your courier",
-        rating: 4.9,
-        vehicle: "Bike",
         phone: driver.phone?.trim() || "",
       };
     }

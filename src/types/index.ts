@@ -113,8 +113,9 @@ export interface Order {
 
 export interface Rider {
   name: string;
-  rating: number;
-  vehicle: string;
+  /** We don't rate riders yet. Undefined = unknown, never a flattering guess. */
+  rating?: number;
+  vehicle?: string;
   phone: string;
 }
 

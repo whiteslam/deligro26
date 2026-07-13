@@ -40,10 +40,13 @@ export function ShopDistance({ shop }: { shop: Shop }) {
 }
 
 /**
- * Bare text for the restaurant page's info card, which has a slot to fill and
- * so can't render nothing — an unpinned shop falls back to its seeded figure.
+ * Bare text for the restaurant page's info card.
+ *
+ * A shop the vendor has never pinned has no distance, and this used to fill the
+ * slot with a literal "2 km" — the same 2 km for every unpinned shop, for every
+ * customer, however far away they were. The label is simply empty instead.
  */
 export function ShopDistanceText({ shop }: { shop: Shop }) {
   const distance = useShopDistance(shop);
-  return <>{distance ?? `${shop.distanceKm ?? 2} km`}</>;
+  return <>{distance ?? ""}</>;
 }

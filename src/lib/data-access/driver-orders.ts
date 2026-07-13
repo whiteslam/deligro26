@@ -3,6 +3,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { shortOrderId } from "@/lib/utils/order-map";
 import { notifyOnTheWay, notifyDelivered } from "@/lib/notifications/order-events";
 import type { DeliveryJob } from "@/lib/roles-data";
+import { riderPayout } from "@/lib/pricing";
+import { haversineKm } from "@/lib/geo/distance";
+import { isMissingColumn } from "@/lib/data-access/schema-probe";
 
 /**
  * Driver marketplace + active delivery, on live data.
@@ -25,25 +28,60 @@ export interface DriverActive {
 export interface DriverBoardData {
   available: DeliveryJob[];
   active: DriverActive | null;
-  today: { trips: number; earnings: number; onlineHours: number; rating: number };
+  // onlineHours (5.5) and rating (4.8) used to be constants sitting in the LIVE
+  // board: every driver, forever, was shown the same made-up shift length and
+  // the same made-up rating. We track neither, so we report neither.
+  today: { trips: number; earnings: number };
 }
 
 function one<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
 }
 
-/** Rider payout — demo heuristic: 8% of order, floor ₹30. */
-function payoutFor(total: number): number {
-  return Math.max(30, Math.round(total * 0.08));
+/**
+ * What the rider is paid for this order. The commission is taken on the FOOD
+ * subtotal (total minus the fee, the tax and the tip) — it used to be taken on
+ * the gross, so riders were being paid a percentage of the customer's GST — and
+ * the tip is then passed through in full.
+ */
+function payoutFor(r: Pick<OrderRow, "total" | "delivery_fee" | "tax_amount" | "tip">): number {
+  const tip = r.tip ?? 0;
+  const itemSubtotal = Math.max(
+    0,
+    (r.total ?? 0) - (r.delivery_fee ?? 0) - (r.tax_amount ?? 0) - tip
+  );
+  return riderPayout({ itemSubtotal, tip });
 }
 
 interface OrderRow {
   id: string;
   total: number;
-  address: { label?: string; line?: string } | null;
-  restaurants: { name: string } | { name: string }[] | null;
+  delivery_fee?: number;
+  tax_amount?: number;
+  tip?: number;
+  address: { label?: string; line?: string; lat?: number; lng?: number } | null;
+  restaurants:
+    | { name: string; lat?: number | null; lng?: number | null }
+    | { name: string; lat?: number | null; lng?: number | null }[]
+    | null;
   profiles: { full_name: string | null } | { full_name: string | null }[] | null;
   order_items: { qty: number }[];
+}
+
+/** Pickup → drop, when both ends are known. Never a stand-in number. */
+function jobDistance(r: OrderRow): number | undefined {
+  const shop = one(r.restaurants);
+  const from =
+    typeof shop?.lat === "number" && typeof shop?.lng === "number"
+      ? { lat: shop.lat, lng: shop.lng }
+      : null;
+  const to =
+    typeof r.address?.lat === "number" && typeof r.address?.lng === "number"
+      ? { lat: r.address.lat, lng: r.address.lng }
+      : null;
+
+  if (!from || !to) return undefined;
+  return Math.round(haversineKm(from, to) * 10) / 10;
 }
 
 function toJob(r: OrderRow): DeliveryJob {
@@ -56,31 +94,63 @@ function toJob(r: OrderRow): DeliveryJob {
     restaurant,
     pickupArea: restaurant,
     dropArea: r.address?.label ?? r.address?.line ?? "Delivery",
-    distanceKm: 2.5,
-    payout: payoutFor(r.total),
+    // Was hardcoded to 2.5 for every job, on every screen, forever.
+    distanceKm: jobDistance(r),
+    payout: payoutFor(r),
     items,
     customer,
   };
 }
 
 const ORDER_SELECT =
-  "id, total, address, restaurants(name), profiles(full_name), order_items(qty)";
+  "id, total, delivery_fee, tax_amount, tip, address, restaurants(name, lat, lng), profiles(full_name), order_items(qty)";
+
+/**
+ * The same query for a database that predates migrations 0009 (shop coords) and
+ * 0013 (tip). Without this, asking for a column that doesn't exist is a hard 400
+ * and the board silently shows a driver no jobs at all.
+ */
+const ORDER_SELECT_LEGACY =
+  "id, total, delivery_fee, tax_amount, address, restaurants(name), profiles(full_name), order_items(qty)";
+
+let ordersHaveGeoAndTip: boolean | null = null;
+
+/** Run a driver-board order query, retrying on the pre-0009/0013 column set. */
+async function selectJobs<T>(
+  run: (columns: string) => PromiseLike<{ data: T | null; error: { code?: string } | null }>
+): Promise<T | null> {
+  if (ordersHaveGeoAndTip !== false) {
+    const { data, error } = await run(ORDER_SELECT);
+    if (!error) {
+      ordersHaveGeoAndTip = true;
+      return data;
+    }
+    if (!isMissingColumn(error)) throw error;
+    ordersHaveGeoAndTip = false;
+  }
+
+  const { data, error } = await run(ORDER_SELECT_LEGACY);
+  if (error) throw error;
+  return data;
+}
 
 export async function getDriverBoard(driverId: string): Promise<DriverBoardData> {
   const supabase = createAdminClient();
 
   // Active delivery for this driver (assigned or picked up).
-  const { data: activeRows } = await supabase
-    .from("deliveries")
-    .select(`status, order:orders(${ORDER_SELECT})`)
-    .eq("driver_id", driverId)
-    .in("status", ["assigned", "picked_up"])
-    .order("assigned_at", { ascending: false })
-    .limit(1);
+  type ActiveRow = { status: string; order: OrderRow | OrderRow[] | null };
+  const activeRows = await selectJobs<ActiveRow[]>((columns) =>
+    supabase
+      .from("deliveries")
+      .select(`status, order:orders(${columns})`)
+      .eq("driver_id", driverId)
+      .in("status", ["assigned", "picked_up"])
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .overrideTypes<ActiveRow[]>()
+  );
 
-  const activeRow = one(activeRows) as
-    | { status: string; order: OrderRow | OrderRow[] | null }
-    | null;
+  const activeRow = one(activeRows);
   let active: DriverActive | null = null;
   if (activeRow) {
     const order = one(activeRow.order);
@@ -99,33 +169,49 @@ export async function getDriverBoard(driverId: string): Promise<DriverBoardData>
     .in("status", ["assigned", "picked_up", "delivered"]);
   const takenIds = new Set((taken ?? []).map((d) => d.order_id as string));
 
-  const { data: readyRows } = await supabase
-    .from("orders")
-    .select(ORDER_SELECT)
-    .eq("status", "ready")
-    .order("created_at", { ascending: true });
+  const readyRows = await selectJobs<OrderRow[]>((columns) =>
+    supabase
+      .from("orders")
+      .select(columns)
+      .eq("status", "ready")
+      .order("created_at", { ascending: true })
+      .overrideTypes<OrderRow[]>()
+  );
 
-  const available = (readyRows as OrderRow[] | null ?? [])
+  const available = (readyRows ?? [])
     .filter((r) => !takenIds.has(r.id))
     .map(toJob);
 
   // Today's completed trips + earnings for this driver.
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
-  const { data: doneRows } = await supabase
-    .from("deliveries")
-    .select("order:orders(total)")
-    .eq("driver_id", driverId)
-    .eq("status", "delivered")
-    .gte("delivered_at", startOfDay.toISOString());
+  type DoneRow = { order: OrderRow | OrderRow[] | null };
+  const doneRows = await selectJobs<DoneRow[]>((columns) =>
+    supabase
+      .from("deliveries")
+      // Only the charge columns are needed here, and they're the ones that may
+      // not exist yet — so this rides the same pre-migration fallback.
+      .select(
+        columns.includes("tip")
+          ? "order:orders(total, delivery_fee, tax_amount, tip)"
+          : "order:orders(total, delivery_fee, tax_amount)"
+      )
+      .eq("driver_id", driverId)
+      .eq("status", "delivered")
+      .gte("delivered_at", startOfDay.toISOString())
+      .overrideTypes<DoneRow[]>()
+  );
 
-  const done = (doneRows ?? []) as { order: { total: number } | { total: number }[] | null }[];
-  const earnings = done.reduce((sum, d) => sum + payoutFor(one(d.order)?.total ?? 0), 0);
+  const done = doneRows ?? [];
+  const earnings = done.reduce((sum, d) => {
+    const order = one(d.order);
+    return sum + (order ? payoutFor(order) : 0);
+  }, 0);
 
   return {
     available,
     active,
-    today: { trips: done.length, earnings, onlineHours: 5.5, rating: 4.8 },
+    today: { trips: done.length, earnings },
   };
 }
 

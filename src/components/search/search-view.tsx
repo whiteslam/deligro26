@@ -10,7 +10,9 @@ import { cn } from "@/lib/utils/cn";
 
 type Sort = "eta" | "rating";
 
-const RECENT = ["Biryani", "Pizza", "Healthy bowls"] as const;
+// Suggestions, not history. These three were labelled "Recent" and shown to
+// every user — including someone who had never searched for anything.
+const SUGGESTIONS = ["Biryani", "Pizza", "Healthy bowls"] as const;
 
 const QUICK_FILTERS = [
   { id: "veg", label: "Pure Veg" },
@@ -147,10 +149,10 @@ export function SearchView({
         {showRecent ? (
           <div className="mt-4">
             <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
-              Recent
+              Try searching
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {RECENT.map((term) => (
+              {SUGGESTIONS.map((term) => (
                 <button
                   key={term}
                   type="button"

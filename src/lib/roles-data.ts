@@ -85,7 +85,8 @@ export interface DeliveryJob {
   restaurant: string;
   pickupArea: string;
   dropArea: string;
-  distanceKm: number;
+  /** Undefined when the shop or the address has no coordinates. */
+  distanceKm?: number;
   payout: number;
   items: number;
   customer: string;

@@ -21,10 +21,15 @@ export default async function HomePage() {
     savedAddress = def ? { label: def.label, line: def.line } : null;
   }
 
+  // `restaurants[0]!` — the non-null assertion was a lie whenever the catalog
+  // read failed: listRestaurants() returns [] on error, so `promo` was undefined
+  // and the feed threw on `promo.offer`. An empty catalog is a normal failure,
+  // not a crash.
   const promo =
     restaurants.find((r) => r.promoted && r.open && r.offer) ??
     restaurants.find((r) => r.open) ??
-    restaurants[0]!;
+    restaurants[0] ??
+    null;
   const popular = [...restaurants]
     .sort((a, b) => b.rating - a.rating)
     .slice(0, 6);

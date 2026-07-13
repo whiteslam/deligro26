@@ -117,8 +117,10 @@ export default async function ProfilePage() {
         </span>
       </div>
 
-      {/* Payment */}
-      <SectionHead title="Payment" action="Edit" />
+      {/* Payment. "Edit" and "Change" used to sit here as affordances for a
+          picker that doesn't exist — Cash on Delivery is the only method, so the
+          row states it rather than inviting a tap that does nothing. */}
+      <SectionHead title="Payment" />
       <div className="flex items-center gap-3 border-b border-line pb-4">
         <span className="grid size-9 place-items-center rounded-lg bg-surface-2 text-ink">
           <Wallet className="size-[18px]" />
@@ -126,7 +128,7 @@ export default async function ProfilePage() {
         <span className="flex-1 text-[15px] font-semibold">
           Cash on Delivery
         </span>
-        <span className="text-sm font-bold text-accent-ink">Change</span>
+        <span className="text-sm text-muted">Only method for now</span>
       </div>
 
       {/* Profile */}
@@ -160,19 +162,6 @@ export default async function ProfilePage() {
             </Link>
           );
         })}
-      </div>
-
-      {/* Become a courier — decorative promo */}
-      <div className="mt-6 flex items-center gap-4 rounded-2xl bg-accent-soft p-4">
-        <div className="flex-1">
-          <p className="text-[15px] font-extrabold tracking-tight">
-            Become a courier
-          </p>
-          <p className="mt-0.5 text-sm text-muted">Earn money on your schedule</p>
-        </div>
-        <span className="grid size-12 shrink-0 place-items-center rounded-full bg-accent text-white">
-          <Wallet className="size-6" />
-        </span>
       </div>
 
       {/* Sign out — native form POST, clears the session server-side. */}

@@ -17,16 +17,15 @@ const STATUS: Record<
 };
 
 export default async function AdminOrdersPage() {
-  let ADMIN_ORDERS_DATA = ADMIN_ORDERS;
-  if (isSupabaseConfigured) {
-    try {
-      const live = await listAllOrders();
-      if (live.length > 0) ADMIN_ORDERS_DATA = live;
-    } catch {
-      // fall back to demo rows
-    }
-  }
-  return renderOrders(ADMIN_ORDERS_DATA);
+  // The demo rows are only for a build with no backend at all. They used to
+  // stand in whenever the live list came back EMPTY (`if (live.length > 0)`) or
+  // threw — so a quiet hour, or one transient error, showed an admin seven
+  // invented orders with invented customers under the heading "Live & recent".
+  // An empty table is a fact; fabricated rows are not.
+  if (!isSupabaseConfigured) return renderOrders(ADMIN_ORDERS);
+
+  const live = await listAllOrders();
+  return renderOrders(live);
 }
 
 function renderOrders(ADMIN_ORDERS: AdminOrderRow[]) {

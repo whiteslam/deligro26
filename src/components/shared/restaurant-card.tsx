@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Clock, BadgePercent, Bike, Heart } from "lucide-react";
+import { Clock, BadgePercent, Bike } from "lucide-react";
 import type { Restaurant } from "@/types";
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { RatingPill } from "@/components/shared/rating";
@@ -46,10 +46,10 @@ export function RestaurantCard({
             {r.offer}
           </span>
         ) : null}
-        {/* Favourite — decorative for now, wired up later */}
-        <span className="absolute right-2.5 top-2.5 grid size-8 place-items-center rounded-full bg-surface/95 text-ink shadow-[var(--shadow-sm)] backdrop-blur-[2px]">
-          <Heart className="size-[17px]" strokeWidth={2.25} />
-        </span>
+        {/* The decorative heart that used to sit here was a lie in both
+            directions: it never showed whether a place WAS a favourite, and
+            tapping it never made one. The working control is on the restaurant
+            page (RestaurantActions). */}
         {!r.open ? (
           <span className="absolute bottom-2.5 right-2.5 rounded-full bg-ink px-2.5 py-1 text-xs font-semibold text-white">
             Opens soon
