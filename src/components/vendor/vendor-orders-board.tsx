@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Check, X, ChefHat, Bell, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatCard, SectionTitle, Pill } from "@/components/roles/role-ui";
@@ -72,12 +72,20 @@ export function VendorOrdersBoard({
 
   // When auto-refresh pulls fresh server data, adopt it as the source of truth
   // (new orders appear, accepted ones move) while keeping the local ready tally.
-  useEffect(() => {
-    if (live) {
-      setIncoming(initialIncoming);
-      setPreparing(initialPreparing);
-    }
-  }, [live, initialIncoming, initialPreparing]);
+  //
+  // Done during render, not in an effect: an effect would paint one frame of the
+  // stale board before correcting itself, and a kitchen screen showing an order
+  // that's already gone — even for a frame — is exactly the bug worth avoiding.
+  const [adopted, setAdopted] = useState({ initialIncoming, initialPreparing });
+  if (
+    live &&
+    (adopted.initialIncoming !== initialIncoming ||
+      adopted.initialPreparing !== initialPreparing)
+  ) {
+    setAdopted({ initialIncoming, initialPreparing });
+    setIncoming(initialIncoming);
+    setPreparing(initialPreparing);
+  }
 
   async function patchStatus(
     order: KitchenOrder,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,12 +21,18 @@ export function ProfileEditSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // The draft starts from the saved value each time the sheet opens (and if the
+  // saved value changes underneath it). Adjusted during render rather than in
+  // an effect: an effect would paint one frame holding the previous edit before
+  // correcting itself, and React re-runs this render before touching the DOM.
+  const [synced, setSynced] = useState({ open, value });
+  if (synced.open !== open || synced.value !== value) {
+    setSynced({ open, value });
     if (open) {
       setDraft(value);
       setError(null);
     }
-  }, [open, value]);
+  }
 
   if (!open) return null;
 

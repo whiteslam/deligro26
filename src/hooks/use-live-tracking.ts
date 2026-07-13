@@ -47,7 +47,10 @@ export function useLiveTracking(
     riderPosition: null,
   });
   const [interp, setInterp] = useState<TrackingInterp | null>(null);
-  const [tick, setTick] = useState(0);
+  // Seeded with the current time rather than 0, so the very first render can
+  // place the rider without reading the clock during render (impure: two renders
+  // in the same commit could disagree). The interval below advances it.
+  const [tick, setTick] = useState(() => Date.now());
 
   const poll = useCallback(async () => {
     if (!isSupabaseConfigured || !isUuid) return;
@@ -76,7 +79,13 @@ export function useLiveTracking(
 
   useEffect(() => {
     if (!isSupabaseConfigured || !isUuid) return;
-    void poll();
+
+    // The first read is scheduled rather than called inline. poll() only touches
+    // state after awaiting the fetch, but an effect body calling it directly
+    // reads as a synchronous setState — so it goes through a timer, the same
+    // "callback from an external system" shape as the interval below. A 0ms
+    // delay, so the first snapshot still lands on the first frame.
+    const first = setTimeout(() => void poll(), 0);
     const id = setInterval(() => {
       if (!document.hidden) void poll();
     }, 3000);
@@ -84,6 +93,7 @@ export function useLiveTracking(
     document.addEventListener("visibilitychange", onFocus);
     window.addEventListener("focus", onFocus);
     return () => {
+      clearTimeout(first);
       clearInterval(id);
       document.removeEventListener("visibilitychange", onFocus);
       window.removeEventListener("focus", onFocus);
@@ -108,7 +118,7 @@ export function useLiveTracking(
           destination: tracking.destination,
           storedRider: interp.storedRider,
           etaMinutes: tracking.etaMinutes,
-          now: tick || Date.now(),
+          now: tick,
         })
       : tracking.riderPosition;
 

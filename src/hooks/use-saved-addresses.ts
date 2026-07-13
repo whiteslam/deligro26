@@ -18,6 +18,18 @@ export interface AddressInput {
   isDefault?: boolean;
 }
 
+async function fetchAddresses(): Promise<SavedAddress[]> {
+  const res = await fetch("/api/addresses");
+  const data = await res.json();
+  return data.addresses ?? [];
+}
+
+/** Keep the current selection if it survived the refresh, else the default. */
+function pickSelected(list: SavedAddress[], prev: string): string {
+  if (prev && list.some((a) => a.id === prev)) return prev;
+  return list.find((a) => a.isDefault)?.id ?? list[0]?.id ?? "";
+}
+
 export function useSavedAddresses() {
   const [addresses, setAddresses] = useState<SavedAddress[]>(
     isSupabaseConfigured ? [] : ADDRESSES
@@ -29,37 +41,55 @@ export function useSavedAddresses() {
       : (ADDRESSES.find((a) => a.isDefault)?.id ?? ADDRESSES[0]?.id ?? "")
   );
 
+  const adopt = useCallback((list: SavedAddress[]) => {
+    setAddresses(list);
+    setSelectedId((prev) => pickSelected(list, prev));
+  }, []);
+
+  /** Re-read the list after a change. Called from event handlers, never on mount. */
   const refresh = useCallback(async () => {
     if (!isSupabaseConfigured) {
-      setAddresses(ADDRESSES);
-      setSelectedId(
-        ADDRESSES.find((a) => a.isDefault)?.id ?? ADDRESSES[0]?.id ?? ""
-      );
+      adopt(ADDRESSES);
       setLoading(false);
       return;
     }
 
     setLoading(true);
     try {
-      const res = await fetch("/api/addresses");
-      const data = await res.json();
-      const list: SavedAddress[] = data.addresses ?? [];
-      setAddresses(list);
-      setSelectedId((prev) => {
-        if (prev && list.some((a) => a.id === prev)) return prev;
-        return list.find((a) => a.isDefault)?.id ?? list[0]?.id ?? "";
-      });
+      adopt(await fetchAddresses());
     } catch {
       setAddresses([]);
       setSelectedId("");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [adopt]);
 
+  // The first load is deliberately not `refresh()`: refresh sets state before it
+  // awaits (the spinner, and the whole demo-mode branch), and doing that
+  // synchronously inside an effect makes React render twice before it can paint.
+  // Here the initial state already describes both cases — demo mode is seeded,
+  // configured mode starts out loading — so the effect only has to fill in the
+  // answer once it actually has one.
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    if (!isSupabaseConfigured) return;
+
+    let alive = true;
+    void (async () => {
+      try {
+        const list = await fetchAddresses();
+        if (alive) adopt(list);
+      } catch {
+        if (alive) setAddresses([]);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [adopt]);
 
   const selected =
     addresses.find((a) => a.id === selectedId) ?? addresses[0] ?? null;

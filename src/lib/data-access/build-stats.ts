@@ -23,26 +23,6 @@ export interface BuildDbSnapshot {
   addresses: number;
 }
 
-const EMPTY: BuildDbSnapshot = {
-  profiles_customer: 0,
-  profiles_restaurant: 0,
-  profiles_driver: 0,
-  profiles_admin: 0,
-  restaurants: 0,
-  restaurants_open: 0,
-  restaurants_approved: 0,
-  legacy_restaurants: 0,
-  distinct_restaurant_owners: 0,
-  menu_items: 0,
-  legacy_menu_items: 0,
-  orders: 0,
-  deliveries: 0,
-  deliveries_unassigned: 0,
-  refunds: 0,
-  refunds_pending: 0,
-  addresses: 0,
-};
-
 async function count(
   table: string,
   filter?: { col: string; val: string | boolean }

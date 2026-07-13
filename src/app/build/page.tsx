@@ -125,13 +125,24 @@ function MilestoneList({
   milestones: Milestone[];
   globalOffset: number;
 }) {
-  let buildNo = globalOffset;
+  // Each milestone's build numbers continue where the previous one stopped.
+  // Derived by folding over the list rather than by advancing a counter inside
+  // the map: a variable reassigned from inside a render closure isn't a pure
+  // function of the inputs, and would carry its value across re-renders.
+  const numbered = milestones.reduce<
+    { milestone: Milestone; startNo: number }[]
+  >((acc, m) => {
+    const prev = acc[acc.length - 1];
+    const startNo = prev
+      ? prev.startNo + prev.milestone.tasks.length
+      : globalOffset + 1;
+    return [...acc, { milestone: m, startNo }];
+  }, []);
+
   return (
     <div className="space-y-4">
-      {milestones.map((m) => {
+      {numbered.map(({ milestone: m, startNo }) => {
         const doneCount = m.tasks.filter((t) => t.status === "done").length;
-        const startNo = buildNo + 1;
-        buildNo += m.tasks.length;
         return (
           <section key={`${m.week}-${m.title}`} className="card p-5">
             <div className="flex items-start justify-between gap-3">

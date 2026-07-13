@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -51,7 +51,11 @@ export function CheckoutView() {
   } = useSavedAddresses();
 
   const [showPicker, setShowPicker] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
+  // Asked for explicitly ("Add another address", or a failed place-order). With
+  // no address saved at all the form is the only thing to show — and it offers
+  // no Cancel in that state — so that case is derived rather than stored: state
+  // that duplicates a fact already in `addresses` can only drift from it.
+  const [addFormRequested, setAddFormRequested] = useState(false);
   const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(
     null
   );
@@ -68,21 +72,29 @@ export function CheckoutView() {
   const [status, setStatus] = useState<CheckoutStatus>("ready");
   const [error, setError] = useState<string | null>(null);
 
+  const showAddForm =
+    addFormRequested || (!addrLoading && addresses.length === 0);
+
   const payTotal = total + tip;
 
-  useEffect(() => {
-    if (!selectedAddress) return;
-    if (selectedAddress.lat != null && selectedAddress.lng != null) {
-      setMapCoords({ lat: selectedAddress.lat, lng: selectedAddress.lng });
+  // Move the map pin onto whichever address the customer picked. Adjusted during
+  // render rather than in an effect, so the map never paints a frame still
+  // showing the previous address's pin.
+  //
+  // Keyed on the address id, not the object: saving a pin re-fetches the list
+  // and hands back a new object for the same address, and re-running on that
+  // would wipe the "Saved" confirmation the customer just earned.
+  const addressId = selectedAddress?.id ?? null;
+  const [syncedAddressId, setSyncedAddressId] = useState(addressId);
+  if (addressId !== syncedAddressId) {
+    setSyncedAddressId(addressId);
+    if (selectedAddress) {
+      if (selectedAddress.lat != null && selectedAddress.lng != null) {
+        setMapCoords({ lat: selectedAddress.lat, lng: selectedAddress.lng });
+      }
+      setPinSaved(false);
     }
-    setPinSaved(false);
-  }, [selectedAddress]);
-
-  useEffect(() => {
-    if (!addrLoading && addresses.length === 0) {
-      setShowAddForm(true);
-    }
-  }, [addrLoading, addresses.length]);
+  }
 
   const pinMoved =
     selectedAddress &&
@@ -118,7 +130,7 @@ export function CheckoutView() {
 
     if (!selectedAddress) {
       setError("Add a delivery address to continue.");
-      setShowAddForm(true);
+      setAddFormRequested(true);
       return;
     }
     if (!courierInstructions.trim()) {
@@ -242,11 +254,11 @@ export function CheckoutView() {
                 compact
                 onSave={async (input) => {
                   await createAddress(input);
-                  setShowAddForm(false);
+                  setAddFormRequested(false);
                 }}
                 onCancel={
                   addresses.length
-                    ? () => setShowAddForm(false)
+                    ? () => setAddFormRequested(false)
                     : undefined
                 }
               />
@@ -415,7 +427,7 @@ export function CheckoutView() {
         selectedId={selectedId}
         onSelect={setSelectedId}
         onClose={() => setShowPicker(false)}
-        onAddNew={() => setShowAddForm(true)}
+        onAddNew={() => setAddFormRequested(true)}
       />
     </div>
   );

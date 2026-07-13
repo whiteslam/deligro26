@@ -178,7 +178,7 @@ export default function LocationPage() {
           </p>
         ) : addresses.length === 0 ? (
           <p className="py-6 text-sm text-muted">
-            Nothing saved yet. Add an address and it'll show up here.
+            Nothing saved yet. Add an address and it&rsquo;ll show up here.
           </p>
         ) : (
           <ul className="divide-y divide-line">
