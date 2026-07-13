@@ -1,4 +1,5 @@
 import { WelcomeFlow } from "@/components/auth/welcome-flow";
+import { StatusBar } from "@/components/layout/status-bar";
 
 /**
  * App-launch entry for visitors without a session. The proxy sends every anon
@@ -15,6 +16,7 @@ export default function WelcomePage() {
     <div className="device">
       <div className="app-shell">
         <WelcomeFlow />
+        <StatusBar />
       </div>
     </div>
   );

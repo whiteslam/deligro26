@@ -5,13 +5,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldAlert, Smartphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { StatusBar } from "@/components/layout/status-bar";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { OtpLogin } from "@/components/auth/otp-login";
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") ?? "/portals";
+  // Straight into the customer app after sign-in. A `next` set by the proxy
+  // (e.g. bounced from /vendor or /checkout) still wins, so operators land where
+  // they were headed rather than on a role chooser.
+  const next = params.get("next") ?? "/";
   const denied = params.get("denied") === "1";
 
   const [mode, setMode] = useState<"password" | "otp">("password");
@@ -141,7 +145,10 @@ export default function LoginPage() {
   return (
     <div className="device">
       <div className="app-shell">
-        <div className="absolute right-4 top-4 z-10">
+        <StatusBar />
+        {/* Below the status-bar strip, which is opaque and would otherwise
+            cover the toggle in the framed (desktop) view. */}
+        <div className="absolute right-4 top-4 z-10 min-[480px]:top-[64px]">
           <ThemeToggle />
         </div>
         {/* min-h-full + justify-center keeps the form centred but lets it scroll

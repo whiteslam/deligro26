@@ -16,15 +16,22 @@ export function MenuItemRow({
   item: MenuItem;
   restaurant: Restaurant;
 }) {
-  const qty = useCart((s) => s.qtyOf(item.id));
+  const lines = useCart((s) => s.lines);
   const add = useCart((s) => s.add);
   const setQty = useCart((s) => s.setQty);
   const openSheet = useItemSheet((s) => s.open);
 
+  const qty = lines.find((l) => l.itemId === item.id)?.qty ?? 0;
   const ref = { slug: restaurant.slug, name: restaurant.name };
 
+  const handleAdd = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    add(item, ref);
+  };
+
   return (
-    <div className={cn("flex gap-4 py-4", item.soldOut && "opacity-60")}>
+    <div className={cn("relative flex gap-3.5 py-3.5 pb-5", item.soldOut && "opacity-60")}>
       <button
         type="button"
         onClick={() => openSheet(item, restaurant)}
@@ -37,23 +44,22 @@ export function MenuItemRow({
         ) : null}
         <div className="flex items-center gap-1.5">
           <VegMark veg={item.veg} />
-          <h3 className="text-[16px] font-bold leading-tight">{item.name}</h3>
+          <h3 className="text-[15px] font-bold leading-tight">{item.name}</h3>
         </div>
-        <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-muted">
+        <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-muted">
           {item.description}
         </p>
-        <p className="mt-2 text-[15px] font-extrabold tracking-tight">
+        <p className="mt-1.5 text-[14px] font-extrabold tracking-tight">
           {formatINR(item.price)}
         </p>
       </button>
 
-      {/* Photo with an overlaid add control (Bolt signature) */}
-      <div className="relative size-24 shrink-0">
+      <div className="relative z-20 size-24 shrink-0">
         <PhotoTile
           tint={restaurant.accentTint}
           src={item.image}
           alt={item.name}
-          className="size-24 rounded-xl"
+          className="size-24 rounded-lg"
         />
 
         {item.soldOut ? (
@@ -62,28 +68,37 @@ export function MenuItemRow({
           </span>
         ) : qty === 0 ? (
           <button
-            onClick={() => add(item, ref)}
+            type="button"
+            onClick={handleAdd}
             aria-label={`Add ${item.name}`}
-            className="press absolute -bottom-2 -right-2 grid size-9 place-items-center rounded-full border border-line bg-surface text-accent-ink shadow-[var(--shadow-md)]"
+            className="press bolt-add"
           >
-            <Plus className="size-5" strokeWidth={2.75} />
+            Add
           </button>
         ) : (
-          <div className="press absolute -bottom-2 -right-2 flex h-9 items-center gap-1 rounded-full bg-accent px-1 text-white shadow-[var(--glow-accent)]">
+          <div className="bolt-add-qty">
             <button
-              onClick={() => setQty(item.id, qty - 1)}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setQty(item.id, qty - 1);
+              }}
               aria-label="Remove one"
-              className="grid size-7 place-items-center rounded-full hover:bg-white/15"
+              className="grid size-7 place-items-center rounded-md hover:bg-white/15"
             >
               <Minus className="size-4" strokeWidth={2.75} />
             </button>
-            <span className="min-w-4 text-center text-data font-bold tabular-nums">
+            <span className="min-w-4 text-center text-data text-sm font-bold tabular-nums">
               {qty}
             </span>
             <button
-              onClick={() => setQty(item.id, qty + 1)}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setQty(item.id, qty + 1);
+              }}
               aria-label="Add one"
-              className="grid size-7 place-items-center rounded-full hover:bg-white/15"
+              className="grid size-7 place-items-center rounded-md hover:bg-white/15"
             >
               <Plus className="size-4" strokeWidth={2.75} />
             </button>

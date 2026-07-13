@@ -5,8 +5,8 @@ import { RotateCcw, ChevronRight } from "lucide-react";
 import type { Order } from "@/types";
 import { useCart } from "@/stores/cart-store";
 import { useUI } from "@/stores/ui-store";
-import { cartLinesFromOrder, getRestaurant } from "@/lib/data";
 import { STATUS_META } from "@/lib/utils/order-status";
+import { orderLinesToCartLines } from "@/lib/utils/cart";
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
@@ -20,17 +20,15 @@ export function OrderCard({ order }: { order: Order }) {
   const meta = STATUS_META[order.status];
   const live = order.status === "ON_THE_WAY" || order.status === "KITCHEN";
   const cancelled = order.status === "CANCELLED";
-  const restaurant = getRestaurant(order.restaurantSlug);
   const tint =
     order.restaurantAccent ??
-    restaurant?.accentTint ??
     "linear-gradient(135deg,#34e39a,#17b26a)";
-  const image = order.restaurantImage ?? restaurant?.image;
+  const image = order.restaurantImage;
 
   const handleReorder = () => {
     reorder(
       { slug: order.restaurantSlug, name: order.restaurantName },
-      cartLinesFromOrder(order)
+      orderLinesToCartLines(order)
     );
     openCart();
   };

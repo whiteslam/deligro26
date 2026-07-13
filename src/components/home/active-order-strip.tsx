@@ -3,24 +3,20 @@ import { ChevronRight } from "lucide-react";
 import type { Order } from "@/types";
 import { STATUS_META } from "@/lib/utils/order-status";
 import { PhotoTile } from "@/components/shared/photo-tile";
-import { getRestaurant } from "@/lib/data";
 
 /** Bolt-style ongoing-order card — a calm white row with a live green dot. */
 export function ActiveOrderStrip({ order }: { order: Order | null }) {
   if (!order) return null;
 
   const meta = STATUS_META[order.status];
-  const restaurant = getRestaurant(order.restaurantSlug);
   const tint =
-    order.restaurantAccent ??
-    restaurant?.accentTint ??
-    "linear-gradient(135deg,#34e39a,#17b26a)";
-  const image = order.restaurantImage ?? restaurant?.image;
+    order.restaurantAccent ?? "linear-gradient(135deg,#34e39a,#17b26a)";
+  const image = order.restaurantImage;
 
   return (
     <Link
       href={`/orders/${order.id}`}
-      className="press card flex items-center gap-3 p-3"
+      className="press flex items-center gap-3 rounded-2xl border border-line bg-surface p-3"
     >
       <PhotoTile
         tint={tint}

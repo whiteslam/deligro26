@@ -147,6 +147,9 @@ export async function acceptDelivery(driverId: string, orderId: string): Promise
     driver_id: driverId,
     status: "assigned",
     assigned_at: new Date().toISOString(),
+    driver_lat: 21.7157 + 0.012,
+    driver_lng: 81.5335 - 0.008,
+    driver_location_at: new Date().toISOString(),
   });
   if (error) throw error;
 }
@@ -174,7 +177,13 @@ export async function advanceDelivery(
 
   if (delivery.status === "assigned") {
     // Picked up → order is on the way.
-    await supabase.from("deliveries").update({ status: "picked_up" }).eq("id", delivery.id);
+    await supabase
+      .from("deliveries")
+      .update({
+        status: "picked_up",
+        picked_up_at: new Date().toISOString(),
+      })
+      .eq("id", delivery.id);
     await supabase.from("orders").update({ status: "on_the_way" }).eq("id", orderId);
     await notifyOnTheWay(orderId);
     return { ok: true };

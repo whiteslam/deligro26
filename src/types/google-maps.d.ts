@@ -30,17 +30,23 @@ declare namespace google.maps {
     streetViewControl?: boolean;
     fullscreenControl?: boolean;
   }
-  class Map {
-    constructor(el: HTMLElement, opts?: MapOptions);
-    panTo(pos: LatLngLiteral | LatLng): void;
-    setZoom(zoom: number): void;
-    addListener(event: string, handler: (e: MapMouseEvent) => void): MapsEventListener;
-  }
   interface MarkerOptions {
     map?: Map;
     position?: LatLngLiteral | LatLng;
     draggable?: boolean;
     title?: string;
+    icon?: SymbolIcon;
+  }
+  interface SymbolIcon {
+    path?: SymbolPath | string;
+    scale?: number;
+    fillColor?: string;
+    fillOpacity?: number;
+    strokeColor?: string;
+    strokeWeight?: number;
+  }
+  enum SymbolPath {
+    CIRCLE = 0,
   }
   class Marker {
     constructor(opts?: MarkerOptions);
@@ -49,11 +55,41 @@ declare namespace google.maps {
     setMap(map: Map | null): void;
     addListener(event: string, handler: (e: MapMouseEvent) => void): MapsEventListener;
   }
+  interface PolylineOptions {
+    map?: Map;
+    path?: (LatLngLiteral | LatLng)[];
+    strokeColor?: string;
+    strokeOpacity?: number;
+    strokeWeight?: number;
+    geodesic?: boolean;
+  }
+  class Polyline {
+    constructor(opts?: PolylineOptions);
+    setPath(path: (LatLngLiteral | LatLng)[]): void;
+  }
+  class LatLngBounds {
+    constructor();
+    extend(point: LatLngLiteral | LatLng): void;
+  }
+  class Map {
+    constructor(el: HTMLElement, opts?: MapOptions);
+    panTo(pos: LatLngLiteral | LatLng): void;
+    setZoom(zoom: number): void;
+    fitBounds(bounds: LatLngBounds, padding?: number): void;
+    addListener(event: string, handler: (e: MapMouseEvent) => void): MapsEventListener;
+  }
   interface GeocoderRequest {
     location?: LatLngLiteral | LatLng;
   }
+  interface GeocoderAddressComponent {
+    long_name: string;
+    short_name: string;
+    types: string[];
+  }
   interface GeocoderResult {
     formatted_address: string;
+    address_components: GeocoderAddressComponent[];
+    types: string[];
   }
   interface GeocoderResponse {
     results: GeocoderResult[];

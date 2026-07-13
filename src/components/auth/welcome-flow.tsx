@@ -13,13 +13,12 @@ import { continueAsGuest } from "@/lib/auth/guest-actions";
  */
 export function WelcomeFlow() {
   return (
-    <div className="onboarding animate-fade-in">
-      {/* Header: Deligro wordmark · Skip (browse as guest) */}
+    <div className="onboarding animate-fade-in bg-bg">
       <div
-        className="relative flex items-center justify-center px-4 pb-2"
+        className="relative flex items-center justify-center border-b border-line px-4 pb-3"
         style={{ paddingTop: "max(18px, env(safe-area-inset-top))" }}
       >
-        <span className="text-[22px] font-extrabold tracking-tight">Deligro</span>
+        <span className="text-[20px] font-extrabold tracking-tight">Deligro</span>
 
         {/* Skip → server action latches the guest cookie and routes to the feed. */}
         <form action={continueAsGuest} className="absolute right-3">

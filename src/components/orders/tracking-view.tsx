@@ -1,15 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Phone, Check, MessageCircle, CircleHelp, Star, ShieldCheck, XCircle, Loader2 } from "lucide-react";
+import {
+  Phone,
+  Check,
+  MessageCircle,
+  CircleHelp,
+  Star,
+  ShieldCheck,
+  XCircle,
+  Loader2,
+} from "lucide-react";
 import type { Order } from "@/types";
 import { PageHeader } from "@/components/layout/page-header";
-import { AutoRefresh } from "@/components/shared/auto-refresh";
+import { TrackingMap } from "@/components/orders/tracking-map";
+import { useLiveTracking } from "@/hooks/use-live-tracking";
 import { TRACKING_STEPS, statusIndex } from "@/lib/utils/order-status";
 import { shortOrderId } from "@/lib/utils/order-map";
 import { formatINR } from "@/lib/utils/format";
+import { DEFAULT_CENTER } from "@/lib/maps/config";
 import { cn } from "@/lib/utils/cn";
+
+function callablePhone(phone: string | undefined): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 10) return null;
+  return digits.startsWith("91") ? `+${digits}` : `+91${digits.slice(-10)}`;
+}
 
 export function TrackingView({
   order,
@@ -25,15 +44,54 @@ export function TrackingView({
 
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelMsg, setCancelMsg] = useState<string | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [rating, setRating] = useState(0);
   const [rateBusy, setRateBusy] = useState(false);
   const [rated, setRated] = useState(false);
 
-  const current = statusIndex(order.status);
-  const delivered = order.status === "DELIVERED";
-  const cancelled = order.status === "CANCELLED";
-  const canCancel = order.status === "PLACED" || order.status === "KITCHEN";
   const isUuid = /^[0-9a-f-]{36}$/i.test(order.id);
+  const live = useLiveTracking(order.id, {
+    status: order.status,
+    etaMinutes: order.etaMinutes,
+    rider: order.rider ?? null,
+  });
+
+  const displayStatus = isUuid ? live.status : order.status;
+  const displayEta = isUuid ? live.etaMinutes : order.etaMinutes;
+  const displayRider = isUuid ? (live.rider ?? order.rider) : order.rider;
+
+  const current = statusIndex(displayStatus);
+  const delivered = displayStatus === "DELIVERED";
+  const cancelled = displayStatus === "CANCELLED";
+  const canCancel =
+    displayStatus === "PLACED" || displayStatus === "KITCHEN";
+
+  const mockRestaurant = useMemo(
+    () => ({
+      lat: DEFAULT_CENTER.lat + 0.012,
+      lng: DEFAULT_CENTER.lng - 0.008,
+    }),
+    []
+  );
+  const mockDestination = DEFAULT_CENTER;
+
+  const restaurant = isUuid ? live.restaurant : mockRestaurant;
+  const destination = isUuid ? live.destination : mockDestination;
+  const showRiderOnMap =
+    !delivered &&
+    !cancelled &&
+    Boolean(displayRider) &&
+    (displayStatus === "ON_THE_WAY" || displayStatus === "KITCHEN");
+  const riderOnMap = isUuid
+    ? live.riderPosition
+    : showRiderOnMap
+      ? {
+          lat: mockRestaurant.lat + (mockDestination.lat - mockRestaurant.lat) * 0.55,
+          lng: mockRestaurant.lng + (mockDestination.lng - mockRestaurant.lng) * 0.55,
+        }
+      : null;
+
+  const riderTel = callablePhone(displayRider?.phone);
 
   useEffect(() => {
     if (!justPlaced) return;
@@ -50,7 +108,11 @@ export function TrackingView({
         router.refresh();
       } else {
         const data = await res.json().catch(() => ({}));
-        setCancelMsg(data.error === "too_late" ? "The kitchen already started — can't cancel now." : "Could not cancel. Try again.");
+        setCancelMsg(
+          data.error === "too_late"
+            ? "The kitchen already started — can't cancel now."
+            : "Could not cancel. Try again."
+        );
       }
     } finally {
       setCancelBusy(false);
@@ -58,7 +120,7 @@ export function TrackingView({
   }
 
   async function submitRating(n: number) {
-    if (!isUuid) return; // mock order, nothing to persist
+    if (!isUuid) return;
     setRating(n);
     setRateBusy(true);
     try {
@@ -77,15 +139,12 @@ export function TrackingView({
     ? "Delivered"
     : cancelled
       ? "Cancelled"
-      : order.etaMinutes
-        ? `${order.etaMinutes} min`
+      : displayEta
+        ? `${displayEta} min`
         : "Arriving";
 
   return (
-    <>
-      {isUuid && !delivered && !cancelled ? <AutoRefresh interval={5000} /> : null}
-
-      {/* Placed toast */}
+    <div className="relative">
       {toast ? (
         <div className="animate-slide-up glass fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 shadow-[var(--shadow-md)]">
           <span className="grid size-6 place-items-center rounded-full bg-green text-white">
@@ -100,52 +159,16 @@ export function TrackingView({
         subtitle={order.restaurantName}
       />
 
-      {/* Map area — live rider on the way */}
-      <div className="relative h-56 overflow-hidden">
-        <div
-          className="absolute inset-0"
-          style={{ background: "linear-gradient(135deg,#e6f4ec,#eef1f2)" }}
-        />
-        <div
-          className="absolute inset-0 opacity-[0.5]"
-          style={{
-            backgroundImage:
-              "linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px)",
-            backgroundSize: "28px 28px",
-          }}
-        />
-        {/* dashed route */}
-        <svg
-          className="absolute inset-0 h-full w-full"
-          viewBox="0 0 400 224"
-          fill="none"
-          preserveAspectRatio="none"
-        >
-          <path
-            d="M60 40 C 140 60, 120 150, 220 150 S 340 170, 340 190"
-            stroke="var(--accent)"
-            strokeWidth="3"
-            strokeDasharray="6 8"
-            strokeLinecap="round"
-            opacity="0.7"
-          />
-        </svg>
-        {/* rider dot */}
-        <div className="absolute left-[54px] top-[30px]">
-          <span className="pulse-ring grid size-6 place-items-center rounded-full bg-accent ring-4 ring-white/70" />
-        </div>
-        {/* destination */}
-        <div className="absolute bottom-[26px] right-[52px] grid size-7 place-items-center rounded-full bg-ink text-bg ring-4 ring-white/70">
-          <span className="size-2 rounded-full bg-bg" />
-        </div>
-      </div>
+      <TrackingMap
+        restaurant={restaurant}
+        destination={destination}
+        rider={riderOnMap}
+        showRider={showRiderOnMap}
+      />
 
-      {/* Solid sheet floats over the map */}
-      <div className="relative -mt-6 space-y-4 rounded-t-[var(--radius-sheet)] bg-bg px-4 pt-6">
-        {/* Grab handle */}
-        <span className="mx-auto -mt-2 mb-1 block h-1 w-10 rounded-full bg-line" />
+      <div className="bolt-sheet relative -mt-6 space-y-4 px-4 pt-2">
+        <div className="bolt-sheet-handle" />
 
-        {/* Headline: estimated time / status */}
         <div className="text-center">
           <p className="text-sm text-muted">
             {delivered
@@ -190,7 +213,6 @@ export function TrackingView({
             </div>
           </div>
         ) : cancelled ? null : (
-          /* Bolt-style vertical timeline */
           <ol className="pl-1">
             {TRACKING_STEPS.map((step, i) => {
               const done = i < current;
@@ -240,7 +262,6 @@ export function TrackingView({
           </ol>
         )}
 
-        {/* Delivery handover code */}
         {deliveryOtp && !delivered && !cancelled ? (
           <div className="flex items-center gap-3 rounded-2xl bg-accent-soft p-4">
             <span className="grid size-10 place-items-center rounded-xl bg-accent text-white">
@@ -256,35 +277,47 @@ export function TrackingView({
           </div>
         ) : null}
 
-        {/* Rider card */}
-        {order.rider && !delivered && !cancelled ? (
+        {displayRider && !delivered && !cancelled ? (
           <div className="card flex items-center gap-3 p-4">
             <span className="grid size-12 place-items-center rounded-full bg-surface-2 text-lg font-extrabold text-ink">
-              {order.rider.name.charAt(0)}
+              {displayRider.name.charAt(0)}
             </span>
             <div className="flex-1">
-              <p className="text-[15px] font-bold">{order.rider.name}</p>
+              <p className="text-[15px] font-bold">{displayRider.name}</p>
               <p className="flex items-center gap-1 text-xs text-muted">
                 <Star className="size-3 fill-pop text-pop" />
-                {order.rider.rating} · {order.rider.vehicle}
+                {displayRider.rating} · {displayRider.vehicle}
               </p>
             </div>
             <button
+              type="button"
               aria-label="Message rider"
-              className="press grid size-11 place-items-center rounded-full border border-line bg-surface text-ink"
+              disabled
+              className="press grid size-11 place-items-center rounded-full border border-line bg-surface text-ink opacity-50"
             >
               <MessageCircle className="size-5" />
             </button>
-            <button
-              aria-label="Call rider"
-              className="press grid size-11 place-items-center rounded-full bg-accent text-white shadow-[var(--glow-accent)]"
-            >
-              <Phone className="size-5" />
-            </button>
+            {riderTel ? (
+              <a
+                href={`tel:${riderTel}`}
+                aria-label="Call rider"
+                className="press grid size-11 place-items-center rounded-full bg-accent text-white shadow-[var(--glow-accent)]"
+              >
+                <Phone className="size-5" />
+              </a>
+            ) : (
+              <button
+                type="button"
+                aria-label="Call rider"
+                disabled
+                className="press grid size-11 place-items-center rounded-full bg-accent text-white opacity-50 shadow-[var(--glow-accent)]"
+              >
+                <Phone className="size-5" />
+              </button>
+            )}
           </div>
         ) : null}
 
-        {/* Order items */}
         <div className="card p-4">
           <h2 className="mb-3 text-[17px] font-extrabold tracking-tight">
             Order {shortOrderId(order.id)}
@@ -307,15 +340,18 @@ export function TrackingView({
           </div>
         </div>
 
-        {/* Cancel (only before the kitchen starts) */}
         {canCancel ? (
           <div className="space-y-1">
             <button
-              onClick={cancelOrder}
+              onClick={() => setShowCancelConfirm(true)}
               disabled={cancelBusy}
               className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-deal disabled:opacity-60"
             >
-              {cancelBusy ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
+              {cancelBusy ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <XCircle className="size-4" />
+              )}
               Cancel order
             </button>
             {cancelMsg ? (
@@ -326,10 +362,63 @@ export function TrackingView({
           </div>
         ) : null}
 
-        <button className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-ink">
+        <Link
+          href={`/profile/help?order=${encodeURIComponent(order.id)}`}
+          className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-ink"
+        >
           <CircleHelp className="size-4" /> Get help with this order
-        </button>
+        </Link>
       </div>
-    </>
+
+      {showCancelConfirm ? (
+        // `fixed` so it covers the phone screen rather than the scrolled page
+        // it's rendered inside — the app shell is the containing block.
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => setShowCancelConfirm(false)}
+            className="animate-fade-in absolute inset-0 bg-ink/40"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cancel-order-title"
+            className="absolute left-1/2 top-1/2 w-[min(100%-2rem,20rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-surface p-5 shadow-[var(--shadow-lg)]"
+          >
+            <h2
+              id="cancel-order-title"
+              className="text-center text-[17px] font-extrabold tracking-tight"
+            >
+              Cancel order?
+            </h2>
+            <p className="mt-2 text-center text-sm leading-relaxed text-muted">
+              Do you want to cancel your order? This can&apos;t be undone.
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCancelConfirm(false)}
+                disabled={cancelBusy}
+                className="press rounded-full border border-line bg-surface py-3 text-sm font-bold text-ink disabled:opacity-60"
+              >
+                No
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowCancelConfirm(false);
+                  await cancelOrder();
+                }}
+                disabled={cancelBusy}
+                className="press rounded-full bg-deal py-3 text-sm font-bold text-white disabled:opacity-60"
+              >
+                Yes, cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }

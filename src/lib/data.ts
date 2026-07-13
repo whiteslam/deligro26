@@ -3,6 +3,7 @@ import type {
   Category,
   Order,
   Restaurant,
+  StoreCategory,
 } from "@/types";
 
 /* ============================================================
@@ -25,6 +26,21 @@ export const CATEGORIES: Category[] = [
   { id: "desserts", label: "Desserts", emoji: "🍰" },
   { id: "south", label: "South Indian", emoji: "🥞" },
   { id: "rolls", label: "Rolls", emoji: "🌯" },
+];
+
+/**
+ * The Stores tab taxonomy. A store lands in a category when one of its cuisine
+ * tags matches — so onboarding a bakery means tagging it "Bakery", nothing more.
+ * "Pick & Drop" is an errand service rather than a storefront, which is why it
+ * has no food tags of its own.
+ */
+export const STORE_CATEGORIES: StoreCategory[] = [
+  { id: "bakery", label: "Bakery", emoji: "🥐", tags: ["Bakery", "Desserts"] },
+  { id: "dairy", label: "Dairy", emoji: "🥛", tags: ["Dairy"] },
+  { id: "groceries", label: "Groceries", emoji: "🛒", tags: ["Groceries", "Kirana"] },
+  { id: "pick-drop", label: "Pick & Drop", emoji: "🛵", tags: ["Pick & Drop"] },
+  { id: "raw-meat", label: "Raw Meat", emoji: "🍗", tags: ["Raw Meat", "Meat", "Fish"] },
+  { id: "chowpaty", label: "Chowpaty", emoji: "🍧", tags: ["Chowpaty", "Street Food", "Chaat"] },
 ];
 
 export const RESTAURANTS: Restaurant[] = [

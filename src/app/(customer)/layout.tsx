@@ -1,5 +1,7 @@
+import { StatusBar } from "@/components/layout/status-bar";
 import { TabBar } from "@/components/layout/tab-bar";
 import { GlassCart } from "@/components/glass/glass-cart";
+import { CartHydrator } from "@/components/glass/cart-hydrator";
 import { ItemSheet } from "@/components/restaurant/item-sheet";
 import { SplashScreen } from "@/components/shared/splash-screen";
 import { LocationPermissionSheet } from "@/components/location/location-permission-sheet";
@@ -24,9 +26,11 @@ export default async function CustomerLayout({
   return (
     <div className="device">
       <div className="app-shell">
-        <div className="app-scroll no-scrollbar pb-[92px]">{children}</div>
+        <div className="app-scroll no-scrollbar pb-[80px]">{children}</div>
+        <StatusBar />
         <ItemSheet />
         <GlassCart />
+        <CartHydrator />
         <TabBar />
         <LocationPermissionSheet />
         <SplashScreen />

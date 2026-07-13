@@ -21,6 +21,10 @@ export function PageHeader({
   return (
     <header
       className={cn(
+        // top-0, not top-[--status-h]: sticky offsets are measured from where
+        // .app-scroll's content starts, and its padding-top already clears the
+        // status bar. Offsetting again parks the header a status-bar's height
+        // too low and the feed shows through the gap above it.
         "sticky top-0 z-20 flex items-center gap-3 px-4 py-3",
         transparent ? "bg-transparent" : "glass",
         className
@@ -29,13 +33,13 @@ export function PageHeader({
       <button
         onClick={() => router.back()}
         aria-label="Go back"
-        className="press grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
+        className="grid size-9 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
       >
         <ChevronLeft className="size-5" />
       </button>
       <div className="min-w-0 flex-1">
         {title ? (
-          <h1 className="truncate text-[17px] font-bold leading-tight">
+          <h1 className="truncate text-[16px] font-extrabold leading-tight tracking-tight">
             {title}
           </h1>
         ) : null}

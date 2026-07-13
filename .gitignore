@@ -48,3 +48,8 @@ supabase/seed/legacy_customers.sql
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Design reference archive (Bolt Food iOS teardown) — 279MB of screenshots,
+# kept locally only. GitHub rejects files over 100MB.
+/Bolt Food ios May 2025/
+/Bolt Food ios May 2025.zip

@@ -6,16 +6,18 @@ import {
   Clock,
   Star,
   Bike,
-  Heart,
-  Share,
-  Search,
   BadgePercent,
 } from "lucide-react";
 import { getRestaurant } from "@/lib/catalog";
 import { RESTAURANTS } from "@/lib/data";
 import { PhotoTile } from "@/components/shared/photo-tile";
+import { ImmersiveScreen } from "@/components/layout/immersive-screen";
 import { RestaurantMenu } from "@/components/restaurant/restaurant-menu";
+import { RestaurantActions } from "@/components/restaurant/restaurant-actions";
+import { ShopDistanceText } from "@/components/shared/shop-distance";
 import { formatEta, formatRating, formatCount } from "@/lib/utils/format";
+import { getProfile } from "@/lib/auth";
+import { isFavorite } from "@/lib/data-access/favorites";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export async function generateStaticParams() {
@@ -32,42 +34,47 @@ export default async function RestaurantPage({
   const r = await getRestaurant(slug);
   if (!r) notFound();
 
+  // Who's looking, and have they already hearted this place? Both are cheap and
+  // guests short-circuit to (null, false) — see data-access/favorites.
+  const [profile, favorite] = await Promise.all([
+    getProfile(),
+    isSupabaseConfigured ? isFavorite(slug) : Promise.resolve(false),
+  ]);
+
   const deliveryFee = r.priceTier === 1 ? "Free" : `₹${r.priceTier * 20}`;
 
   return (
-    <div>
-      {/* Hero photo with overlaid name + circular controls */}
+    <ImmersiveScreen>
+      {/* Hero photo, edge to edge under the status bar, with overlaid name +
+          circular controls. It's taller than the reserved strip it now sits
+          beneath, so the visible artwork stays the size it was. */}
       <div className="relative">
         <PhotoTile
           tint={r.accentTint}
           src={r.image}
           alt={r.name}
-          className="h-60 w-full"
+          className="h-[calc(13rem+var(--status-h))] w-full"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/25" />
 
         <Link
           href="/"
           aria-label="Back"
-          className="press absolute left-4 top-4 grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
+          className="press absolute left-4 top-[calc(var(--status-h)+1rem)] grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
         >
           <ChevronLeft className="size-5" />
         </Link>
-        <div className="absolute right-4 top-4 flex gap-2">
-          {/* Decorative for now — wired up later */}
-          <span className="grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]">
-            <Heart className="size-5" />
-          </span>
-          <span className="grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]">
-            <Share className="size-5" />
-          </span>
-          <span className="grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]">
-            <Search className="size-5" />
-          </span>
-        </div>
+        <RestaurantActions
+          key={r.slug}
+          slug={r.slug}
+          name={r.name}
+          tagline={r.tagline}
+          initialFavorite={favorite}
+          signedIn={Boolean(profile)}
+        />
 
         <div className="absolute inset-x-0 bottom-5 text-center">
-          <h1 className="px-6 text-[26px] font-extrabold leading-tight tracking-tight text-white">
+          <h1 className="px-6 text-[23px] font-extrabold leading-tight tracking-tight text-white">
             {r.name}
           </h1>
           <span className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-white/90">
@@ -92,7 +99,7 @@ export default async function RestaurantPage({
           <InfoCol
             icon={<Clock className="size-4 text-ink" />}
             value={formatEta(r.etaMin, r.etaMax)}
-            label={`${r.distanceKm} km`}
+            label={<ShopDistanceText shop={r} />}
           />
         </div>
       </div>
@@ -117,10 +124,19 @@ export default async function RestaurantPage({
       <div className="mt-2">
         <RestaurantMenu restaurant={r} />
       </div>
-    </div>
+    </ImmersiveScreen>
   );
 }
 
+/**
+ * One stat: icon, value, and the small print under it.
+ *
+ * The icon sits BESIDE the two lines rather than inline with the value. Inline,
+ * the icon+value group centred as a unit, which pushed the number ~10px right of
+ * the label below it — so "5.0" hung off-centre over "(0)". Stacking value and
+ * label into one left-aligned block gives them a shared edge, and centring that
+ * block keeps the three stats even across the card.
+ */
 function InfoCol({
   icon,
   value,
@@ -128,15 +144,17 @@ function InfoCol({
 }: {
   icon: React.ReactNode;
   value: string;
-  label: string;
+  label: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-0.5 px-2 text-center">
-      <span className="flex items-center gap-1 text-[15px] font-extrabold tracking-tight">
-        {icon}
-        {value}
+    <div className="flex items-center justify-center gap-1.5 px-1.5">
+      <span className="shrink-0">{icon}</span>
+      <span className="flex min-w-0 flex-col leading-tight">
+        <span className="truncate text-[14px] font-extrabold tracking-tight">
+          {value}
+        </span>
+        <span className="truncate text-[11px] text-muted">{label}</span>
       </span>
-      <span className="text-[12px] text-muted">{label}</span>
     </div>
   );
 }

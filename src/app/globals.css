@@ -10,6 +10,11 @@
    ============================================================ */
 
 :root {
+  /* Height of the status-bar strip screens must keep clear. On a real phone
+     that's the notch inset; the desktop frame overrides it to its fake bar's
+     height. Screens read it rather than hard-coding 56px. */
+  --status-h: env(safe-area-inset-top, 0px);
+
   /* Light — bright, high-contrast, appetite-forward */
   --bg: #ffffff;
   --surface: #ffffff;
@@ -88,8 +93,8 @@
   --font-sans: var(--font-inter);
   --font-mono: var(--font-mono-jb);
 
-  --radius-block: 1rem;
-  --radius-sheet: 1.5rem;
+  --radius-block: 0.875rem;
+  --radius-sheet: 1.25rem;
 }
 
 * {
@@ -137,17 +142,17 @@ h6 {
   font-weight: 800;
 }
 .text-heading {
-  font-size: 1.375rem; /* 22px */
+  font-size: 1.25rem; /* 20px — section titles */
   line-height: 1.15;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 .text-body {
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: 0.9375rem; /* 15px */
+  line-height: 1.55;
 }
 .text-label {
-  font-size: 0.75rem;
+  font-size: 0.6875rem; /* 11px */
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-weight: 700;
@@ -155,7 +160,7 @@ h6 {
 }
 .text-data {
   font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 0.875rem;
+  font-size: 0.8125rem; /* 13px */
   letter-spacing: -0.01em;
 }
 
@@ -184,7 +189,188 @@ button.card:active {
    its name for compatibility but now renders a flat surface with a hairline. */
 .glass {
   background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+/* ---------- App header ----------
+   Unlike .glass this draws no panel and no rule: it paints the page background
+   so the feed scrolls cleanly underneath it. On dark, a --surface panel over a
+   --bg page reads as a boxed-in edge, which is exactly what we don't want at
+   the top of the feed. */
+.app-header {
+  background: var(--bg);
+}
+
+/* A row that collapses to nothing without anyone hard-coding its height: the
+   1fr → 0fr grid row is animatable, so the content and its padding shrink away
+   smoothly whatever they happen to measure. Used by the feed header to shed its
+   address / notifications / profile row on scroll. */
+.collapsible {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.18s ease,
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.collapsible > * {
+  min-height: 0; /* lets the grid row actually shrink below content height */
+  overflow: hidden;
+}
+.collapsible.is-collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .collapsible {
+    transition: none;
+  }
+}
+
+/* ---------- Bolt Food iOS primitives (May 2025 refresh) ----------
+   Shared shapes used across customer screens — flat surfaces, ink chips,
+   centred ADD pills on menu photos, and full-width basket bar. */
+.bolt-search {
+  display: flex;
+  height: 44px;
+  align-items: center;
+  gap: 10px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  padding: 0 14px;
+  color: var(--muted);
+}
+.bolt-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  outline: none;
+  color: var(--ink);
+}
+.bolt-search input::placeholder {
+  color: var(--muted);
+}
+
+.bolt-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  border-radius: 999px;
   border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.bolt-chip-on {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.bolt-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.bolt-section-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.bolt-add {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  z-index: 30;
+  display: inline-flex;
+  min-width: 64px;
+  transform: translateX(-50%);
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  border: 1.5px solid var(--accent);
+  background: var(--surface);
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  box-shadow: var(--shadow-sm);
+}
+.bolt-add-qty {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  z-index: 30;
+  display: inline-flex;
+  transform: translateX(-50%);
+  align-items: center;
+  gap: 2px;
+  border-radius: 7px;
+  background: var(--accent);
+  padding: 2px 3px;
+  color: #fff;
+  box-shadow: var(--glow-accent);
+}
+
+.bolt-basket-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 11px;
+  background: var(--accent);
+  padding: 11px 14px;
+  color: #fff;
+  box-shadow: var(--glow-accent);
+}
+
+.bolt-sheet {
+  border-radius: 20px 20px 0 0;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+.bolt-sheet-handle {
+  width: 36px;
+  height: 4px;
+  margin: 10px auto 0;
+  border-radius: 99px;
+  background: var(--line);
+}
+
+.bolt-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.bolt-list-row:last-child {
+  border-bottom: 0;
+}
+
+.tab-bar-shell {
+  background: var(--surface);
+  border: none;
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -4px 24px -12px rgba(14, 20, 23, 0.08);
+}
+[data-theme="dark"] .tab-bar-shell {
+  box-shadow: 0 -4px 24px -12px rgba(0, 0, 0, 0.35);
 }
 
 /* ---------- App shell (mobile-first, centered on desktop) ----------
@@ -192,13 +378,22 @@ button.card:active {
    and glass cart stay pinned like a native app. */
 .app-shell {
   width: 100%;
-  max-width: 440px;
+  max-width: 402px;
   margin-inline: auto;
   height: 100dvh;
   position: relative;
   background: var(--bg);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
+  font-size: 15px; /* Slightly denser than browser default 16px */
+
+  /* Makes the shell — not the viewport — the containing block for
+     `position: fixed` descendants. Without it a fixed overlay (sheet, modal,
+     toast) escapes the phone and spans the whole browser window in the desktop
+     frame. Any transform does this; `contain: paint` would too, but the CSS
+     build strips it for our browser targets. So every overlay can position
+     itself against "the screen" without knowing it's inside a mock. */
+  transform: translateZ(0);
 }
 .app-scroll {
   position: absolute;
@@ -206,6 +401,37 @@ button.card:active {
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
+  /* Every screen clears the status bar by default. --status-h is the notch inset
+     on a real phone and the fake bar's height inside the desktop frame, so one
+     variable covers both — sticky headers offset by it too. */
+  padding-top: var(--status-h);
+}
+
+/* ---------- Immersive screens ----------
+   Opted into by a screen whose artwork should run edge to edge under the status
+   bar (the restaurant hero). The scroller drops its reserved strip, and the
+   status bar stops painting a panel — it floats on a scrim over the photo
+   instead, so the time and radios stay legible without a seam beneath them.
+   Once the hero has scrolled away the bar takes its solid background back,
+   otherwise white icons would end up on light content. */
+.app-scroll:has(.immersive) {
+  padding-top: 0;
+}
+.app-shell:has(.immersive) .status-bar {
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.5),
+    rgba(0, 0, 0, 0.15) 70%,
+    transparent
+  );
+  color: #fff;
+  transition:
+    background 0.25s ease,
+    color 0.25s ease;
+}
+.app-shell:has(.immersive.is-scrolled) .status-bar {
+  background: var(--bg);
+  color: var(--ink);
 }
 /* ---------- Phone frame ----------
    On phones the app is edge-to-edge. On wider screens we wrap the shell in a
@@ -214,128 +440,156 @@ button.card:active {
   display: contents; /* mobile: no frame — the shell fills the viewport */
 }
 
+/* On a real phone iOS draws the status bar itself — ours is only for the
+   desktop frame preview, so it stays hidden until the frame appears. */
+.status-bar {
+  display: none;
+}
+
 @media (min-width: 480px) {
   body {
     display: grid;
-    place-items: center;
+    /* `safe` so that if the phone ever does overflow (a browser that rejects the
+       calc() zoom below renders it 1:1), it stays scrollable instead of having
+       its top cropped off by centring. */
+    place-items: safe center;
     min-height: 100dvh;
-    padding: 20px;
-    background: var(--surface-2);
+    padding: 24px;
+    background: #ffffff;
   }
 
-  /* ---------- iPhone 17 Pro Max frame ----------
-     Titanium bezel + Dynamic Island + side buttons + home indicator, sized to
-     the real 440×956pt aspect ratio. Only shown on wider screens; on phones the
-     app stays edge-to-edge and the real device draws its own chrome. */
+  /* ---------- iPhone 16 Pro frame ----------
+     The screen is pinned to its true 402×874pt size — the size every customer
+     screen is laid out for — so type and spacing keep their intended scale.
+     The frame is never squeezed to fit; instead the whole phone (bezel, screen
+     and content together) zooms down on short viewports, which preserves the
+     proportions rather than cramping a 402pt layout into a narrower box. */
   .device {
+    --bezel: 12px;
+    --device-w: 426px; /* 402pt screen + bezel */
+    --device-h: 898px; /* 874pt screen + bezel */
     display: block;
     position: relative;
-    height: min(932px, calc(100dvh - 40px));
-    aspect-ratio: 440 / 956;
-    padding: 14px;
-    border-radius: 62px;
-    /* Layered background: four edge "buttons" over the brushed-titanium body. */
-    background-image:
-      linear-gradient(#4a4a4d, #2c2c2e),
-      linear-gradient(#4a4a4d, #2c2c2e),
-      linear-gradient(#4a4a4d, #2c2c2e),
-      linear-gradient(#4a4a4d, #2c2c2e),
-      linear-gradient(
-        150deg,
-        #5c5c5f 0%,
-        #2a2a2c 20%,
-        #131315 55%,
-        #3f3f42 100%
-      );
-    background-repeat: no-repeat;
-    background-size: 3px 28px, 3px 54px, 3px 54px, 3px 72px, 100% 100%;
-    background-position: left 20%, left 33%, left 44%, right 26%, center;
+    width: var(--device-w);
+    height: var(--device-h);
+    padding: var(--bezel);
+    border-radius: 55px;
+    background: #1c1c1e;
     box-shadow:
-      inset 0 0 0 1.5px rgba(255, 255, 255, 0.08),
-      0 2px 3px rgba(0, 0, 0, 0.4),
-      0 44px 90px -30px rgba(0, 0, 0, 0.55),
-      0 14px 34px -14px rgba(0, 0, 0, 0.4);
+      inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+      0 24px 48px -12px rgba(0, 0, 0, 0.45);
+
+    /* Shrink the whole phone — bezel, screen and content together — to fit the
+       window, never past 1:1. `zoom` scales layout rather than just paint, so
+       the screen stays exactly 402×874 internally: nothing reflows, the phone
+       just gets smaller. This is what keeps type and spacing at the scale the
+       screens were designed for instead of squeezing them into a narrow box. */
+    zoom: min(
+      1,
+      calc((100dvh - 48px) / var(--device-h)),
+      calc((100dvw - 48px) / var(--device-w))
+    );
   }
-  /* Dynamic Island — a real cut-out, always black regardless of app theme. */
+
+  /* Dynamic Island — sits in the status-bar row on the bezel */
   .device::before {
     content: "";
     position: absolute;
-    top: 24px;
+    top: calc(var(--bezel) + 11px);
     left: 50%;
     transform: translateX(-50%);
-    width: 33%;
-    max-width: 118px;
-    height: 30px;
+    width: 118px;
+    height: 33px;
     background: #000;
-    border-radius: 16px;
-    z-index: 5;
+    border-radius: 17px;
+    z-index: 10;
     pointer-events: none;
   }
-  /* Home indicator — tinted to the app theme so it reads on light and dark. */
+  /* Home indicator */
   .device::after {
     content: "";
     position: absolute;
-    bottom: 22px;
+    bottom: calc(var(--bezel) + 8px);
     left: 50%;
     transform: translateX(-50%);
-    width: 34%;
-    max-width: 138px;
+    width: 140px;
     height: 5px;
     border-radius: 99px;
-    background: color-mix(in srgb, var(--ink) 32%, transparent);
+    background: color-mix(in srgb, var(--ink) 28%, transparent);
     z-index: 5;
     pointer-events: none;
   }
 
-  /* Screen — fills the bezel. `z-index:0` gives it its own stacking context so
-     full-screen overlays (splash, onboarding) never paint over the island,
-     status bar or home indicator; the box-shadow is the black gasket. */
   .app-shell {
-    width: 100%;
-    height: 100%;
+    width: 402px;
+    height: 874px;
     max-width: none;
     margin-inline: 0;
-    border-radius: 48px;
+    border-radius: 43px;
     border: none;
     z-index: 0;
-    box-shadow: 0 0 0 3px #0a0a0c;
+    box-shadow: 0 0 0 2px #0a0a0c;
   }
 
-  /* Simulated iOS status bar — time (left) + signal/wifi/battery (right),
-     flanking the Dynamic Island. z-index sits above every screen overlay so it
-     always reads, like the real OS bar. The icon cluster is an alpha mask
-     tinted to --ink, so it stays crisp in both light and dark. */
-  .app-shell::before {
-    content: "9:41";
+  /* Simulated iOS status bar (see components/layout/status-bar.tsx) — an opaque
+     strip so scroll content never shows through the Dynamic Island zone. The
+     time sits centred in the left "ear" beside the island; the radios sit in
+     the right one. */
+  .status-bar {
+    display: flex;
     position: absolute;
-    top: 16px;
-    left: 30px;
-    z-index: 80;
-    font: 700 15px/1 var(--font-sans), -apple-system, system-ui, sans-serif;
-    letter-spacing: 0.2px;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 70;
+    height: 56px;
+    padding: 4px 24px 0;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg);
     color: var(--ink);
     pointer-events: none;
   }
-  .app-shell::after {
-    content: "";
-    position: absolute;
-    top: 18px;
-    right: 26px;
-    z-index: 80;
-    width: 62px;
-    height: 11px;
-    background: var(--ink);
-    pointer-events: none;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 14' fill='%23000'%3E%3Crect x='0' y='9' width='3.4' height='5' rx='1'/%3E%3Crect x='5' y='6.3' width='3.4' height='7.7' rx='1'/%3E%3Crect x='10' y='3.6' width='3.4' height='10.4' rx='1'/%3E%3Crect x='15' y='1' width='3.4' height='13' rx='1'/%3E%3Cpath d='M22.8,10 Q31,3.5 39.2,10 L37,11.8 Q31,6.8 25,11.8 Z'/%3E%3Ccircle cx='31' cy='13' r='1.3'/%3E%3Crect x='46.5' y='3.2' width='27' height='8' rx='2' fill='none' stroke='%23000' stroke-width='1.2'/%3E%3Crect x='74.2' y='5.4' width='1.8' height='3.6' rx='.9'/%3E%3Crect x='48' y='4.7' width='16' height='5' rx='1'/%3E%3C/svg%3E") no-repeat center / contain;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 14' fill='%23000'%3E%3Crect x='0' y='9' width='3.4' height='5' rx='1'/%3E%3Crect x='5' y='6.3' width='3.4' height='7.7' rx='1'/%3E%3Crect x='10' y='3.6' width='3.4' height='10.4' rx='1'/%3E%3Crect x='15' y='1' width='3.4' height='13' rx='1'/%3E%3Cpath d='M22.8,10 Q31,3.5 39.2,10 L37,11.8 Q31,6.8 25,11.8 Z'/%3E%3Ccircle cx='31' cy='13' r='1.3'/%3E%3Crect x='46.5' y='3.2' width='27' height='8' rx='2' fill='none' stroke='%23000' stroke-width='1.2'/%3E%3Crect x='74.2' y='5.4' width='1.8' height='3.6' rx='.9'/%3E%3Crect x='48' y='4.7' width='16' height='5' rx='1'/%3E%3C/svg%3E") no-repeat center / contain;
+  .status-bar-time {
+    width: 96px; /* fixed: centres the time in the left ear, and the clock
+                    filling in after mount can't shift anything */
+    text-align: center;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.1px;
+    font-variant-numeric: tabular-nums;
+  }
+  .status-bar-icons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-bar-icon {
+    display: block;
+    height: auto; /* width is set per-icon; viewBox gives the height */
   }
 
-  /* Reserve a status-bar strip so app content clears the Dynamic Island. */
-  .app-scroll {
-    padding-top: 40px;
+  /* Reserve space below the status bar + Dynamic Island. .app-scroll picks this
+     up through --status-h; the overlays below sit outside it. */
+  .device {
+    --status-h: 56px;
   }
   .onboarding {
-    padding-top: 40px;
+    padding-top: 56px;
+  }
+
+  /* Full-screen overlays must clear the status bar too */
+  .splash {
+    padding-top: 56px;
+  }
+
+  /* The tab bar reserves the home-indicator strip, as it does on iOS; the
+     floating basket bar clears the taller bar. */
+  .tab-bar-shell {
+    padding-bottom: 14px;
+  }
+  .device .bolt-basket-bar {
+    bottom: 84px;
   }
 }
 
@@ -432,6 +686,98 @@ button.card:active {
 }
 .animate-fade-in {
   animation: fade-in 0.25s ease both;
+}
+
+/* ---------- Location illustration ----------
+   The pin drops in once, then breathes; its shadow and the radar ping stay in
+   phase with the float so the whole scene reads as one movement.
+   `transform-box: fill-box` makes transform-origin resolve against each shape's
+   own box rather than the SVG viewport. */
+.loc-pin,
+.loc-ping,
+.loc-shadow,
+.loc-cloud-a,
+.loc-cloud-b {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes loc-pin-drop {
+  from {
+    transform: translateY(-22px) scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+@keyframes loc-pin-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.loc-pin {
+  transform-origin: center bottom;
+  animation:
+    loc-pin-drop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both,
+    loc-pin-float 2.8s ease-in-out 0.55s infinite;
+}
+
+/* Tighter and darker as the pin sinks, wider and fainter as it lifts. */
+@keyframes loc-shadow {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.16;
+  }
+  50% {
+    transform: scale(0.84);
+    opacity: 0.09;
+  }
+}
+.loc-shadow {
+  animation: loc-shadow 2.8s ease-in-out 0.55s infinite both;
+  opacity: 0.16;
+}
+
+@keyframes loc-ping {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+.loc-ping {
+  opacity: 0;
+  animation: loc-ping 2.8s ease-out 0.55s infinite;
+}
+
+@keyframes loc-drift {
+  0%,
+  100% {
+    transform: translateX(-4px);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+}
+.loc-cloud-a {
+  animation: loc-drift 7s ease-in-out infinite;
+}
+.loc-cloud-b {
+  animation: loc-drift 9s ease-in-out infinite reverse;
 }
 
 /* ---------- Splash ----------

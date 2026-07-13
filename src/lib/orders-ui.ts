@@ -60,19 +60,20 @@ export async function getOrdersPageData(): Promise<OrdersPageData> {
 
     return { active, past, isDemo: false };
   } catch {
-    return demoOrders();
+    return { active: null, past: [], isDemo: false };
   }
 }
 
-/** Single order for tracking — tries DB first (UUID), then mock (DLG-*). */
+/** Single order for tracking — live DB only when Supabase is on. */
 export async function getOrderForTracking(id: string): Promise<Order | null> {
   if (isSupabaseConfigured) {
     try {
       const row = await getOrderById(id);
       if (row) return mapDbOrderRow(row);
     } catch {
-      // fall through
+      return null;
     }
+    return null;
   }
 
   const mock = [ACTIVE_ORDER, ...PAST_ORDERS].find((o) => o.id === id);

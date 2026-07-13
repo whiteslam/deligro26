@@ -28,7 +28,8 @@ function ItemSheetInner() {
 
   const add = useCart((s) => s.add);
   const setQty = useCart((s) => s.setQty);
-  const inCart = useCart((s) => s.qtyOf(item.id));
+  const lines = useCart((s) => s.lines);
+  const inCart = lines.find((l) => l.itemId === item.id)?.qty ?? 0;
 
   const [qty, setLocalQty] = useState(Math.max(inCart, 1));
 
@@ -47,7 +48,8 @@ function ItemSheetInner() {
         onClick={onClose}
         className="animate-fade-in absolute inset-0 bg-ink/40"
       />
-      <div className="animate-sheet-in absolute inset-x-0 bottom-0 max-h-[92%] overflow-hidden rounded-t-[var(--radius-sheet)] bg-surface shadow-[var(--shadow-lg)]">
+      <div className="animate-sheet-in bolt-sheet absolute inset-x-0 bottom-0 max-h-[92%] overflow-hidden">
+        <div className="bolt-sheet-handle" />
         <div className="no-scrollbar max-h-[92vh] overflow-y-auto">
           {/* Hero image with close */}
           <div className="relative">
@@ -90,7 +92,7 @@ function ItemSheetInner() {
 
         {/* Footer: quantity + add */}
         <div className="flex items-center gap-3 border-t border-line bg-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-          <div className="flex h-14 shrink-0 items-center gap-1 rounded-full border border-line px-1">
+          <div className="flex h-12 shrink-0 items-center gap-1 rounded-full border border-line px-1">
             <button
               onClick={() => setLocalQty((q) => Math.max(1, q - 1))}
               aria-label="Remove one"
@@ -113,7 +115,7 @@ function ItemSheetInner() {
           <button
             onClick={commit}
             disabled={item.soldOut}
-            className="press flex h-14 flex-1 items-center justify-between rounded-full bg-accent px-6 text-[17px] font-bold text-white shadow-[var(--glow-accent)] disabled:opacity-50"
+            className="press flex h-12 flex-1 items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-white shadow-[var(--glow-accent)] disabled:opacity-50"
           >
             <span>{item.soldOut ? "Sold out" : "Add"}</span>
             {!item.soldOut ? <span>{formatINR(item.price * qty)}</span> : null}

@@ -116,15 +116,15 @@ export function OtpLogin({
   }
 
   const ctaClass =
-    "press flex h-14 w-full items-center justify-center gap-2 rounded-full bg-accent text-[17px] font-bold text-white shadow-[var(--glow-accent)] disabled:opacity-50";
+    "press flex h-12 w-full items-center justify-center gap-2 rounded-full bg-accent text-[16px] font-bold text-white shadow-[var(--glow-accent)] disabled:opacity-50";
 
   // ---- Phone step ----
   if (step === "phone") {
     const field = (
-      <div className="flex gap-2">
+      <div className="flex w-full gap-2">
         {/* Country prefix — India-only for now, styled as a selector to match
             the two-field sign-up shape. */}
-        <span className="flex h-14 shrink-0 items-center gap-1.5 rounded-2xl bg-surface-2 px-3.5 text-[15px] font-semibold">
+        <span className="flex h-12 shrink-0 items-center gap-1.5 rounded-xl border border-line bg-surface-2 px-3 text-[14px] font-bold">
           🇮🇳 +91 <ChevronDown className="size-4 text-muted" />
         </span>
         <input
@@ -134,7 +134,7 @@ export function OtpLogin({
           value={phone}
           onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
           onKeyDown={(e) => e.key === "Enter" && phone && requestCode()}
-          className="h-14 w-full rounded-2xl bg-surface-2 px-4 text-[15px] font-medium outline-none ring-accent focus:ring-2"
+          className="h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface-2 px-3.5 text-[14px] font-semibold outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
           placeholder="Phone number"
           autoFocus={onboarding}
         />
@@ -163,7 +163,7 @@ export function OtpLogin({
       return (
         <div className="flex min-h-full w-full flex-col">
           <div className="mt-2">
-            <h1 className="text-[26px] font-extrabold tracking-tight">{heading}</h1>
+            <h1 className="text-[23px] font-extrabold tracking-tight">{heading}</h1>
             <p className="mt-1.5 text-sm text-muted">{sub}</p>
             <div className="mt-6">{field}</div>
             {error ? <ValidationError>{error}</ValidationError> : null}
@@ -179,7 +179,7 @@ export function OtpLogin({
 
     return (
       <div key="phone" className="animate-fade-in w-full max-w-sm">
-        <h1 className="text-center text-[26px] font-extrabold tracking-tight">
+        <h1 className="text-center text-[23px] font-extrabold tracking-tight">
           {heading}
         </h1>
         <p className="mt-1.5 text-center text-sm text-muted">{sub}</p>
@@ -217,9 +217,9 @@ export function OtpLogin({
             <div
               key={i}
               className={cn(
-                "grid h-14 flex-1 place-items-center rounded-2xl text-2xl font-extrabold tabular-nums transition-colors",
-                code[i] ? "bg-surface ring-2 ring-line" : "bg-surface-2",
-                active && "bg-surface ring-2 ring-accent"
+                "grid h-12 flex-1 place-items-center rounded-xl text-xl font-extrabold tabular-nums transition-colors",
+                code[i] ? "border border-line bg-surface" : "bg-surface-2",
+                active && "border-2 border-ink bg-surface"
               )}
             >
               {code[i] ?? ""}
@@ -278,7 +278,7 @@ export function OtpLogin({
       <div className="flex min-h-full w-full flex-col">
         <div className="mt-2">
           {back}
-          <h1 className="text-[26px] font-extrabold tracking-tight">
+          <h1 className="text-[23px] font-extrabold tracking-tight">
             Enter the code
           </h1>
           <p className="mt-1.5 text-sm text-muted">
@@ -300,7 +300,7 @@ export function OtpLogin({
   return (
     <div key="code" className="animate-slide-up w-full max-w-sm">
       {back}
-      <h1 className="text-[26px] font-extrabold tracking-tight">
+      <h1 className="text-[23px] font-extrabold tracking-tight">
         Enter the code
       </h1>
       <p className="mt-1.5 text-sm text-muted">A code was sent to +91 {phone}</p>

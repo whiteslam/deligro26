@@ -19,9 +19,9 @@ export async function listRestaurants(): Promise<Restaurant[]> {
 
   try {
     const live = await listRestaurantsFromDb();
-    return live.length > 0 ? live : RESTAURANTS;
+    return live;
   } catch {
-    return RESTAURANTS;
+    return [];
   }
 }
 
@@ -32,10 +32,10 @@ export async function getRestaurant(slug: string): Promise<Restaurant | undefine
     const live = await getRestaurantFromDb(slug);
     if (live) return live;
   } catch {
-    // fall through to mock
+    // no mock fallback when backend is configured
   }
 
-  return getMockRestaurant(slug);
+  return undefined;
 }
 
 export async function listRestaurantSlugs(): Promise<string[]> {

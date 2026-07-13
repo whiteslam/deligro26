@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils/cn";
 
 type Sort = "eta" | "rating";
 
+const RECENT = ["Biryani", "Pizza", "Healthy bowls"] as const;
+
 const QUICK_FILTERS = [
   { id: "veg", label: "Pure Veg" },
   { id: "rating", label: "Rating 4.5+" },
@@ -85,26 +87,24 @@ export function SearchView({
   };
 
   const activeCount = filters.size + (cuisine ? 1 : 0);
+  const showRecent = !query && !cuisine && filters.size === 0;
 
   return (
     <div>
-      {/* Search bar */}
-      <div className="glass sticky top-0 z-20 px-4 pb-3 pt-4">
-        <h1 className="mb-3 text-heading">Search</h1>
-        <div className="flex h-12 items-center gap-2 rounded-2xl border border-line bg-surface px-4">
-          <Search className="size-5 text-muted" />
+      <div className="glass sticky top-0 z-20 px-4 pb-3 pt-3">
+        <div className="bolt-search">
+          <Search className="size-5 shrink-0" />
           <input
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search dishes, restaurants…"
-            className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted"
+            placeholder="Search for restaurants or dishes"
           />
           {query ? (
             <button
               onClick={() => setQuery("")}
               aria-label="Clear"
-              className="press grid size-6 place-items-center rounded-full bg-surface-2 text-muted"
+              className="press grid size-6 shrink-0 place-items-center rounded-full bg-surface text-muted"
             >
               <X className="size-4" />
             </button>
@@ -113,11 +113,14 @@ export function SearchView({
       </div>
 
       <div className="px-4 pt-3">
-        {/* Filters */}
         <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1">
-          <span className="grid size-9 shrink-0 place-items-center rounded-full border border-line bg-surface text-muted">
+          <button
+            type="button"
+            aria-label="Filters"
+            className="press grid size-9 shrink-0 place-items-center rounded-full border border-line bg-surface text-muted"
+          >
             <SlidersHorizontal className="size-4" />
-          </span>
+          </button>
           {QUICK_FILTERS.map((f) => (
             <Chip
               key={f.id}
@@ -141,14 +144,33 @@ export function SearchView({
           ))}
         </div>
 
-        {/* Sort + count */}
-        <div className="mt-3 flex items-center justify-between">
-          <p className="text-sm text-muted">
+        {showRecent ? (
+          <div className="mt-4">
+            <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
+              Recent
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {RECENT.map((term) => (
+                <button
+                  key={term}
+                  type="button"
+                  onClick={() => setQuery(term)}
+                  className="press rounded-full bg-surface-2 px-3.5 py-2 text-sm font-semibold text-ink"
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-sm font-medium text-muted">
             {results.length}{" "}
             {results.length === 1 ? "restaurant" : "restaurants"}
             {activeCount ? ` · ${activeCount} filters` : ""}
           </p>
-          <div className="flex items-center gap-1 rounded-full bg-surface-2 p-0.5 text-xs font-semibold">
+          <div className="flex items-center gap-1 rounded-full bg-surface-2 p-0.5 text-xs font-bold">
             <SortBtn on={sort === "eta"} onClick={() => setSort("eta")}>
               Fastest
             </SortBtn>
@@ -158,7 +180,6 @@ export function SearchView({
           </div>
         </div>
 
-        {/* Results */}
         {results.length ? (
           <div className="mt-4 space-y-4">
             {results.map((r) => (
@@ -208,13 +229,9 @@ function Chip({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={cn(
-        "press shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium",
-        on
-          ? "border-accent bg-accent-soft text-accent"
-          : "border-line bg-surface text-muted"
-      )}
+      className={cn("press bolt-chip", on && "bolt-chip-on")}
     >
       {children}
     </button>
@@ -232,6 +249,7 @@ function SortBtn({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={cn(
         "press rounded-full px-3 py-1.5",

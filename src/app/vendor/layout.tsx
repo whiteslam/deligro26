@@ -6,6 +6,7 @@ const LINKS = [
   { href: "/vendor", label: "Orders" },
   { href: "/vendor/menu", label: "Menu" },
   { href: "/vendor/earnings", label: "Earnings" },
+  { href: "/vendor/settings", label: "Shop" },
 ];
 
 export default async function RestaurantLayout({

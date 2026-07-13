@@ -23,6 +23,8 @@ export interface MenuItem {
   soldOut?: boolean;
   popular?: boolean;
   bestseller?: boolean;
+  /** Units ordered in the popularity window — what the Popular rank is built on. */
+  unitsSold?: number;
 }
 
 export interface Restaurant {
@@ -36,12 +38,29 @@ export interface Restaurant {
   etaMax: number;
   priceTier: PriceTier;
   costForTwo: number;
+  /**
+   * Seeded, customer-independent distance. Only a fallback now: when the shop
+   * has been pinned (lat/lng below) the UI measures the real distance from the
+   * customer instead. Kept so shops that haven't pinned yet still show
+   * something.
+   */
   distanceKm: number;
+  /** Where the shop actually is — null until the vendor pins it on the map. */
+  lat?: number | null;
+  lng?: number | null;
+  address?: string | null;
   offer?: string;
   promoted?: boolean;
   open: boolean;
   categories: string[];
   menu: MenuItem[];
+  /**
+   * How this menu's Popular list was arrived at: "orders" = ranked by units sold
+   * in the last 30 days, "picks" = too little order history to rank, so the
+   * hand-picked flags stand in. The UI captions itself from this, so it never
+   * calls a pick a bestseller.
+   */
+  popularBasis?: "orders" | "picks";
   accentTint: string; // photo fallback gradient (shows while the image loads)
   image: string; // cover photography
 }
@@ -50,6 +69,15 @@ export interface Category {
   id: string;
   label: string;
   emoji: string;
+}
+
+/**
+ * A storefront type on the Stores tab (bakery, dairy, …) — not a food cuisine.
+ * `tags` are the vendor cuisine tags that belong to the category, so a store
+ * shows up under it as soon as it carries one of them.
+ */
+export interface StoreCategory extends Category {
+  tags: string[];
 }
 
 export type OrderStatus =

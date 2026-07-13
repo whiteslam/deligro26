@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2, LocateFixed, Search } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
 import { loadGoogleMaps } from "@/lib/maps/loader";
 import { isMapsConfigured, DEFAULT_CENTER } from "@/lib/maps/config";
 
@@ -23,9 +24,12 @@ export interface PickedLocation {
 export function MapPicker({
   initial,
   onPick,
+  variant = "form",
 }: {
   initial?: { lat: number; lng: number } | null;
   onPick: (loc: PickedLocation) => void;
+  /** "checkout" — embedded map with Adjust pin, no search bar */
+  variant?: "form" | "checkout";
 }) {
   const mapEl = useRef<HTMLDivElement>(null);
   const searchEl = useRef<HTMLInputElement>(null);
@@ -130,40 +134,69 @@ export function MapPicker({
     );
   }
 
-  if (status === "error") return null;
+  if (status === "error") {
+    if (variant === "checkout") {
+      return (
+        <div className="relative overflow-hidden rounded-xl bg-surface-2">
+          <div className="grid h-44 place-items-center text-sm text-muted">
+            Map unavailable — enter address details below
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }
+
+  const checkout = variant === "checkout";
 
   return (
-    <div className="space-y-2">
-      {/* Search */}
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-        <input
-          ref={searchEl}
-          type="text"
-          placeholder="Search for area, street, landmark…"
-          className="w-full rounded-lg border border-line bg-surface py-2 pl-9 pr-3 text-sm outline-none focus:border-accent"
-        />
-      </div>
+    <div className={checkout ? undefined : "space-y-2"}>
+      {!checkout ? (
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+          <input
+            ref={searchEl}
+            type="text"
+            placeholder="Search for area, street, landmark…"
+            className="w-full rounded-lg border border-line bg-surface py-2 pl-9 pr-3 text-sm outline-none focus:border-accent"
+          />
+        </div>
+      ) : null}
 
-      {/* Map */}
-      <div className="relative overflow-hidden rounded-xl border border-line">
-        <div ref={mapEl} className="h-52 w-full bg-surface-2" />
+      <div className="relative overflow-hidden rounded-xl bg-surface-2">
+        <div ref={mapEl} className={cn("w-full", checkout ? "h-44" : "h-52")} />
         {status === "loading" ? (
           <div className="absolute inset-0 grid place-items-center bg-surface-2/60">
             <Loader2 className="size-6 animate-spin text-muted" />
           </div>
         ) : null}
-        <button
-          type="button"
-          onClick={useMyLocation}
-          disabled={locating}
-          className="press absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-accent shadow-[var(--shadow-md)] disabled:opacity-60"
-        >
-          {locating ? <Loader2 className="size-3.5 animate-spin" /> : <LocateFixed className="size-3.5" />}
-          Use my location
-        </button>
+        {checkout ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+            <span className="rounded-full bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-[var(--shadow-md)]">
+              Adjust pin
+            </span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={useMyLocation}
+            disabled={locating}
+            className="press absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-accent shadow-[var(--shadow-md)] disabled:opacity-60"
+          >
+            {locating ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <LocateFixed className="size-3.5" />
+            )}
+            Use my location
+          </button>
+        )}
       </div>
-      <p className="text-xs text-muted">Tap the map or drag the pin to set your exact delivery spot.</p>
+      {!checkout ? (
+        <p className="text-xs text-muted">
+          Tap the map or drag the pin to set your exact delivery spot.
+        </p>
+      ) : null}
     </div>
   );
 }

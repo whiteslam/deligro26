@@ -1,9 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, LoaderCircle, MapPin, Navigation, Search } from "lucide-react";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
+import {
+  Bell,
+  ChevronDown,
+  LoaderCircle,
+  MapPin,
+  Navigation,
+  Search,
+  User,
+  X,
+} from "lucide-react";
 import { useLocation } from "@/stores/location-store";
+import { useScrollCollapse } from "@/hooks/use-scroll-collapse";
+import { cn } from "@/lib/utils/cn";
 
 /** The user's saved default address, resolved server-side and passed in. */
 export interface SavedAddress {
@@ -11,76 +21,136 @@ export interface SavedAddress {
   line: string;
 }
 
-export function HomeHeader({ savedAddress }: { savedAddress?: SavedAddress | null }) {
+/**
+ * Sticky header for the feed screens: where we deliver, and what you're looking
+ * for.
+ *
+ * Scrolling into the feed collapses the whole top row — address, notifications
+ * and profile — leaving just the search field. The row is the only thing that
+ * moves; see use-scroll-collapse for the hysteresis that stops the height it
+ * gives back from bouncing the header (an earlier version of this flickered
+ * exactly that way).
+ */
+export function HomeHeader({
+  savedAddress,
+  query = "",
+  onQueryChange,
+}: {
+  savedAddress?: SavedAddress | null;
+  query?: string;
+  onQueryChange?: (value: string) => void;
+}) {
   const status = useLocation((s) => s.status);
   const label = useLocation((s) => s.label);
   const sublabel = useLocation((s) => s.sublabel);
-  const openAsk = useLocation((s) => s.openAsk);
-  const detect = useLocation((s) => s.detect);
+
+  const collapsed = useScrollCollapse();
 
   const detecting = status === "loading";
   const detected = status === "granted" && !!label;
 
-  // Prefer a live GPS fix; otherwise the user's saved default address; and if
-  // they have neither, a prompt to set one (never a hardcoded stranger's address).
-  const primary = detected ? label! : savedAddress?.label ?? "Set your location";
-  const secondary = detected
-    ? sublabel ?? "Current location"
-    : savedAddress
-      ? savedAddress.line.split(",").slice(-2).join(",").trim()
-      : "Tap to detect";
+  // The store always holds a location — it starts at Bemetara, the city we
+  // deliver in, and a detected fix or a saved address replaces it. So the
+  // header shows a real place from the first paint instead of "Set your
+  // location", and it always names the same place the distances are measured
+  // from. A saved address still wins over the city default.
+  const place = detected ? { label, sublabel } : null;
+  const saved = savedAddress
+    ? {
+        label: savedAddress.label,
+        sublabel: savedAddress.line.split(",").slice(-2).join(",").trim(),
+      }
+    : null;
+  const fallback = label ? { label, sublabel } : null;
 
-  // Tapping opens the explainer first (native OS prompt only on Enable),
-  // unless the user already denied — then retry detection directly.
-  const onTap = () => {
-    if (status === "denied" || status === "unsupported") detect();
-    else openAsk();
-  };
+  const shown = place ?? saved ?? fallback;
+  const primary = shown?.label ?? "Set your location";
+  const secondary = shown?.sublabel ?? "Tap to detect";
 
   return (
-    <div className="glass sticky top-0 z-20 px-4 pb-3 pt-4">
-      <div className="flex items-center justify-between gap-3">
-        <button
-          onClick={onTap}
-          className="press flex min-w-0 flex-1 items-center gap-2 text-left"
-          aria-label="Change delivery location"
-        >
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
-            {detecting ? (
-              <LoaderCircle className="size-[18px] animate-spin" />
-            ) : detected ? (
-              <Navigation className="size-[18px]" />
-            ) : (
-              <MapPin className="size-[18px]" />
-            )}
-          </span>
-          <span className="flex min-w-0 flex-col">
-            <span className="text-label !normal-case !tracking-normal !text-[11px]">
-              {detecting ? "Locating you…" : "Deliver to"}
-            </span>
-            <span className="flex min-w-0 items-center gap-1 text-[15px] font-bold leading-tight">
-              <span className="min-w-0 truncate">
-                {primary}
-                {secondary ? (
-                  <span className="font-medium text-muted"> · {secondary}</span>
-                ) : null}
+    <div className="app-header sticky top-0 z-20 px-4 pb-3 pt-2.5">
+      {/* `inert` as well as the CSS pointer-events: a collapsed row is gone as
+          far as tapping and the tab order are concerned, not just invisible. */}
+      <div
+        className={cn("collapsible", collapsed && "is-collapsed")}
+        inert={collapsed}
+      >
+        {/* The clipping child carries no padding of its own — padding lives on
+            the row inside it. A grid item's padding is added outside the height
+            the 0fr row gives it, so any here would survive the collapse as a
+            stubborn sliver of empty space. */}
+        <div>
+          <div className="flex items-center gap-2 pb-3">
+            {/* Goes to the picker, not the permission sheet — re-asking for a
+                permission the device has already answered does nothing. */}
+            <Link
+              href="/location"
+              className="press flex min-w-0 flex-1 items-center gap-2 text-left"
+              aria-label="Change delivery location"
+            >
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface-2 text-ink">
+                {detecting ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : detected ? (
+                  <Navigation className="size-4" />
+                ) : (
+                  <MapPin className="size-4" />
+                )}
               </span>
-              <ChevronDown className="size-4 shrink-0" />
-            </span>
-          </span>
-        </button>
-        <ThemeToggle className="shrink-0" />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
+                  {detecting ? "Locating…" : "Deliver to"}
+                </span>
+                <span className="flex min-w-0 items-center gap-1 text-[15px] font-extrabold leading-tight tracking-tight">
+                  <span className="min-w-0 truncate">{primary}</span>
+                  {secondary ? (
+                    <span className="truncate font-semibold text-muted">
+                      · {secondary}
+                    </span>
+                  ) : null}
+                  <ChevronDown className="size-4 shrink-0 text-muted" />
+                </span>
+              </span>
+            </Link>
+
+            <Link
+              href="/profile/notifications"
+              aria-label="Notifications"
+              className="press grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-ink"
+            >
+              <Bell className="size-[18px]" />
+            </Link>
+            <Link
+              href="/profile"
+              aria-label="Profile"
+              className="press grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-ink"
+            >
+              <User className="size-[18px]" />
+            </Link>
+          </div>
+        </div>
       </div>
 
-      <Link
-        href="/search"
-        className="press mt-3 flex h-12 items-center gap-3 rounded-full bg-surface-2 px-4 text-muted"
-      >
-        <Search className="size-5" strokeWidth={2.25} />
-        <span className="text-[15px] font-medium">
-          Search dishes, restaurants…
-        </span>
-      </Link>
+      <div className="bolt-search w-full">
+        <Search className="size-5 shrink-0" strokeWidth={2.25} />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => onQueryChange?.(e.target.value)}
+          placeholder="Search for restaurants or dishes"
+          aria-label="Search for restaurants or dishes"
+        />
+        {query ? (
+          <button
+            type="button"
+            onClick={() => onQueryChange?.("")}
+            aria-label="Clear search"
+            className="press grid size-6 shrink-0 place-items-center rounded-full bg-surface text-muted"
+          >
+            <X className="size-4" />
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

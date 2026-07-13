@@ -108,6 +108,9 @@ export const useCart = create<CartState>()(
           lines: lines.map((l) => ({ ...l })),
         }),
     }),
-    { name: "deligro-cart" }
+    {
+      name: "deligro-cart",
+      skipHydration: true,
+    }
   )
 );

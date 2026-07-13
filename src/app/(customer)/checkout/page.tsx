@@ -7,5 +7,9 @@ export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage() {
   await requireUser();
-  return <CheckoutView />;
+  return (
+    <div className="relative -mb-[92px] min-h-full">
+      <CheckoutView />
+    </div>
+  );
 }

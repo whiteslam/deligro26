@@ -4,37 +4,29 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  Briefcase,
-  Check,
-  Bike,
-  PersonStanding,
-  CalendarClock,
-  Wallet,
+  ChevronLeft,
   ChevronRight,
   Loader2,
   ShoppingBag,
-  Tag,
-  Plus,
   MapPin,
-  Info,
+  AlertTriangle,
+  Trash2,
+  Bike,
 } from "lucide-react";
 import { useCart } from "@/stores/cart-store";
-import { ADDRESSES, ACTIVE_ORDER } from "@/lib/data";
-import type { Address } from "@/types";
+import { ACTIVE_ORDER } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { MapPicker } from "@/components/location/map-picker";
 import { Button } from "@/components/ui/button";
-import { VegMark } from "@/components/shared/veg-mark";
-import { formatINR } from "@/lib/utils/format";
+import { AddAddressForm } from "@/components/addresses/add-address-form";
+import { AddressPickerSheet } from "@/components/addresses/address-picker-sheet";
+import { useSavedAddresses } from "@/hooks/use-saved-addresses";
 import { cn } from "@/lib/utils/cn";
+import { formatINR } from "@/lib/utils/format";
 
-type Fulfilment = "delivery" | "pickup" | "schedule";
 type CheckoutStatus = "ready" | "processing" | "placed";
 
-// Tip presets — static for now; wired to payment later.
 const TIPS = [0, 20, 30, 50];
 
 export function CheckoutView() {
@@ -42,114 +34,98 @@ export function CheckoutView() {
   const lines = useCart((s) => s.lines);
   const restaurantSlug = useCart((s) => s.restaurantSlug);
   const restaurantName = useCart((s) => s.restaurantName);
-  const subtotal = useCart((s) => s.subtotal());
-  const deliveryFee = useCart((s) => s.deliveryFee());
-  const taxes = useCart((s) => s.taxes());
-  const total = useCart((s) => s.total());
+  const subtotal = lines.reduce((sum, l) => sum + l.price * l.qty, 0);
+  const deliveryFee = lines.length ? 29 : 0;
+  const taxes = Math.round(subtotal * 0.05);
+  const total = subtotal + deliveryFee + taxes;
   const clear = useCart((s) => s.clear);
 
-  // Addresses: live from the DB when signed in, mock in demo mode.
-  const [addresses, setAddresses] = useState<Address[]>(
-    isSupabaseConfigured ? [] : ADDRESSES
-  );
-  const [addrLoading, setAddrLoading] = useState(isSupabaseConfigured);
-  const [addressId, setAddressId] = useState<string>(
-    isSupabaseConfigured ? "" : ADDRESSES.find((a) => a.isDefault)?.id ?? ADDRESSES[0].id
-  );
-  const [showAdd, setShowAdd] = useState(false);
-  const [newLabel, setNewLabel] = useState("Home");
-  const [newLine, setNewLine] = useState("");
-  const [newCoords, setNewCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [addBusy, setAddBusy] = useState(false);
+  const {
+    addresses,
+    loading: addrLoading,
+    selectedId,
+    setSelectedId,
+    selected: selectedAddress,
+    create: createAddress,
+    update: updateAddress,
+  } = useSavedAddresses();
 
-  const [fulfilment, setFulfilment] = useState<Fulfilment>("delivery");
+  const [showPicker, setShowPicker] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(
+    null
+  );
+  const [pinBusy, setPinBusy] = useState(false);
+  const [pinSaved, setPinSaved] = useState(false);
+
+  const [apartment, setApartment] = useState("");
+  const [entryCode, setEntryCode] = useState("");
+  const [floor, setFloor] = useState("");
+  const [buildingName, setBuildingName] = useState("");
+  const [courierInstructions, setCourierInstructions] = useState("");
+
   const [tip, setTip] = useState(0);
   const [status, setStatus] = useState<CheckoutStatus>("ready");
   const [error, setError] = useState<string | null>(null);
 
-  const eta = ACTIVE_ORDER.etaMinutes ?? 25;
   const payTotal = total + tip;
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/addresses");
-        const data = await res.json();
-        if (cancelled) return;
-        const list: Address[] = data.addresses ?? [];
-        setAddresses(list);
-        setAddressId(list.find((a) => a.isDefault)?.id ?? list[0]?.id ?? "");
-        if (list.length === 0) setShowAdd(true);
-      } catch {
-        /* keep empty; user can add */
-      } finally {
-        if (!cancelled) setAddrLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (!selectedAddress) return;
+    if (selectedAddress.lat != null && selectedAddress.lng != null) {
+      setMapCoords({ lat: selectedAddress.lat, lng: selectedAddress.lng });
+    }
+    setPinSaved(false);
+  }, [selectedAddress]);
 
-  async function addAddress() {
-    if (newLine.trim().length < 6) return;
-    setAddBusy(true);
+  useEffect(() => {
+    if (!addrLoading && addresses.length === 0) {
+      setShowAddForm(true);
+    }
+  }, [addrLoading, addresses.length]);
+
+  const pinMoved =
+    selectedAddress &&
+    mapCoords &&
+    (selectedAddress.lat !== mapCoords.lat || selectedAddress.lng !== mapCoords.lng);
+
+  const showDistanceWarning = Boolean(selectedAddress) && !mapCoords;
+
+  async function savePinToAddress() {
+    if (!selectedAddress || !mapCoords) return;
+    setPinBusy(true);
+    setError(null);
     try {
-      const res = await fetch("/api/addresses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          label: newLabel,
-          line: newLine.trim(),
-          lat: newCoords?.lat ?? null,
-          lng: newCoords?.lng ?? null,
-        }),
+      await updateAddress(selectedAddress.id, {
+        lat: mapCoords.lat,
+        lng: mapCoords.lng,
       });
-      const data = await res.json();
-      if (res.ok && data.address) {
-        setAddresses((prev) => [...prev, data.address]);
-        setAddressId(data.address.id);
-        setShowAdd(false);
-        setNewLine("");
-        setNewCoords(null);
-      }
+      setPinSaved(true);
+    } catch {
+      setError("Could not save pin to your address.");
     } finally {
-      setAddBusy(false);
+      setPinBusy(false);
     }
   }
 
-  if (lines.length === 0 && status !== "placed") {
-    return (
-      <>
-        <PageHeader title="Checkout" />
-        <EmptyState
-          className="mt-10"
-          icon={<ShoppingBag className="size-7" />}
-          title="Your cart is empty"
-          description="Add a few dishes and they'll show up here, ready to check out."
-          action={
-            <Link href="/">
-              <Button>Browse restaurants</Button>
-            </Link>
-          }
-        />
-      </>
-    );
+  function clearCart() {
+    clear();
+    router.back();
   }
-
-  const selectedAddress =
-    addresses.find((a) => a.id === addressId) ?? addresses[0];
 
   const placeOrder = async () => {
     setError(null);
 
     if (!selectedAddress) {
       setError("Add a delivery address to continue.");
-      setShowAdd(true);
+      setShowAddForm(true);
       return;
     }
+    if (!courierInstructions.trim()) {
+      setError("Add instructions for the courier.");
+      return;
+    }
+
     setStatus("processing");
 
     if (isSupabaseConfigured) {
@@ -168,7 +144,18 @@ export function CheckoutView() {
             lines: lines.map((l) => ({ itemId: l.itemId, qty: l.qty })),
             address: {
               label: selectedAddress.label,
-              line: selectedAddress.line,
+              line: [
+                selectedAddress.line,
+                apartment.trim(),
+                entryCode.trim() && `Entry ${entryCode.trim()}`,
+                floor.trim() && `Floor ${floor.trim()}`,
+                buildingName.trim(),
+                courierInstructions.trim(),
+              ]
+                .filter(Boolean)
+                .join(", "),
+              lat: mapCoords?.lat ?? selectedAddress.lat,
+              lng: mapCoords?.lng ?? selectedAddress.lng,
             },
           }),
         });
@@ -201,7 +188,6 @@ export function CheckoutView() {
       }
     }
 
-    // Demo mode — simulated placement.
     window.setTimeout(() => {
       setStatus("placed");
       clear();
@@ -209,216 +195,188 @@ export function CheckoutView() {
     }, 1400);
   };
 
+  if (lines.length === 0 && status !== "placed") {
+    return (
+      <>
+        <CheckoutHeader title="Checkout" onBack={() => router.back()} />
+        <EmptyState
+          className="mt-10"
+          icon={<ShoppingBag className="size-7" />}
+          title="Your cart is empty"
+          description="Add a few dishes and they'll show up here, ready to check out."
+          action={
+            <Link href="/">
+              <Button>Browse restaurants</Button>
+            </Link>
+          }
+        />
+      </>
+    );
+  }
+
   return (
-    <>
-      <PageHeader title="Checkout" subtitle={restaurantName ?? undefined} />
+    <div className="relative min-h-full bg-surface-2">
+      <CheckoutHeader
+        title={restaurantName ?? "Checkout"}
+        onBack={() => router.back()}
+        onClear={clearCart}
+      />
 
-      <div className="space-y-3 px-4 pt-3">
-        {/* Delivery or pickup? */}
+      <div className="space-y-3 px-4 pb-4 pt-3">
         <section className="card overflow-hidden">
-          <h2 className="px-4 pb-1 pt-4 text-[17px] font-extrabold tracking-tight">
-            Delivery or pickup?
-          </h2>
-          <div className="divide-y divide-line">
-            <FulfilmentRow
-              on={fulfilment === "delivery"}
-              onClick={() => setFulfilment("delivery")}
-              icon={<Bike className="size-5" />}
-              title="Delivery"
-              sub={`${eta}–${eta + 8} min`}
-              trailing={
-                <span className="text-sm font-bold">
-                  {deliveryFee === 0 ? "Free" : formatINR(deliveryFee)}
-                </span>
-              }
-            />
-            <FulfilmentRow
-              on={fulfilment === "pickup"}
-              onClick={() => setFulfilment("pickup")}
-              icon={<PersonStanding className="size-5" />}
-              title="Pickup"
-              sub={`${Math.max(eta - 10, 5)}–${eta} min`}
-              trailing={<span className="text-sm font-bold">Free</span>}
-            />
-            <FulfilmentRow
-              on={fulfilment === "schedule"}
-              onClick={() => setFulfilment("schedule")}
-              icon={<CalendarClock className="size-5" />}
-              title="Schedule"
-              sub="Pick a time"
-            />
-          </div>
-        </section>
-
-        {/* Promo */}
-        <button className="press card flex w-full items-center gap-3 p-4 text-left">
-          <Tag className="size-5 text-accent-ink" />
-          <span className="flex-1 text-[15px] font-semibold">
-            Apply a coupon
-          </span>
-          <ChevronRight className="size-5 text-muted" />
-        </button>
-
-        {/* Order summary */}
-        <section className="card p-4">
-          <h2 className="mb-3 text-[17px] font-extrabold tracking-tight">
-            Order summary
-          </h2>
-          <ul className="space-y-2.5">
-            {lines.map((l) => (
-              <li key={l.itemId} className="flex items-center gap-2.5 text-sm">
-                <VegMark veg={l.veg} />
-                <span className="text-muted">{l.qty}×</span>
-                <span className="min-w-0 flex-1 truncate font-medium">
-                  {l.name}
-                </span>
-                <span className="text-data">{formatINR(l.price * l.qty)}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-3 space-y-2 border-t border-line pt-3 text-[15px]">
-            <Row label="Subtotal" value={formatINR(subtotal)} muted />
-            <Row label="Delivery fee" value={formatINR(deliveryFee)} muted />
-            <Row label="Taxes & charges" value={formatINR(taxes)} muted />
-            <Row label="Tips" value={formatINR(tip)} muted />
-            <div className="border-t border-line pt-2">
-              <Row label="To pay (Cash)" value={formatINR(payTotal)} bold />
-            </div>
-          </div>
-        </section>
-
-        {/* Delivery address */}
-        <section className="card p-4">
-          <h2 className="mb-3 text-[17px] font-extrabold tracking-tight">
-            Delivery address
-          </h2>
-
           {addrLoading ? (
-            <p className="flex items-center gap-2 py-2 text-sm text-muted">
+            <p className="flex items-center gap-2 p-4 text-sm text-muted">
               <Loader2 className="size-4 animate-spin" /> Loading your addresses…
             </p>
-          ) : (
-            <div className="space-y-2">
-              {addresses.map((a) => {
-                const on = a.id === addressId;
-                return (
-                  <button
-                    key={a.id}
-                    onClick={() => setAddressId(a.id)}
-                    className={cn(
-                      "press flex w-full items-start gap-3 rounded-xl border p-3 text-left",
-                      on ? "border-accent bg-accent-soft" : "border-line"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "grid size-9 shrink-0 place-items-center rounded-lg",
-                        on ? "bg-accent text-white" : "bg-surface-2 text-muted"
-                      )}
-                    >
-                      {a.label === "Work" ? (
-                        <Briefcase className="size-[18px]" />
-                      ) : (
-                        <Home className="size-[18px]" />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2 text-[15px] font-semibold">
-                        {a.label}
-                        {a.isDefault ? (
-                          <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
-                            Default
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="mt-0.5 block text-sm leading-snug text-muted">
-                        {a.line}
-                      </span>
-                    </span>
-                    {on ? <Check className="size-5 shrink-0 text-accent" /> : null}
-                  </button>
-                );
-              })}
-
-              {showAdd ? (
-                <div className="space-y-2 rounded-xl border border-line p-3">
-                  {/* Drop-a-pin location (Google Maps). Fills the line below and
-                      captures precise lat/lng; renders nothing without a key. */}
-                  <MapPicker
-                    initial={newCoords}
-                    onPick={({ lat, lng, address }) => {
-                      setNewCoords({ lat, lng });
-                      if (address) setNewLine(address);
-                    }}
-                  />
-                  <div className="flex gap-2">
-                    {["Home", "Work", "Other"].map((l) => (
-                      <button
-                        key={l}
-                        onClick={() => setNewLabel(l)}
-                        className={cn(
-                          "press rounded-full border px-3 py-1 text-xs font-semibold",
-                          newLabel === l ? "border-accent bg-accent-soft text-accent-ink" : "border-line text-muted"
-                        )}
-                      >
-                        {l}
-                      </button>
-                    ))}
-                  </div>
-                  <textarea
-                    value={newLine}
-                    onChange={(e) => setNewLine(e.target.value)}
-                    rows={2}
-                    placeholder="Flat / house no, area, city, pincode"
-                    className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-                  />
-                  <div className="flex gap-2">
-                    <Button size="sm" disabled={addBusy || newLine.trim().length < 6} onClick={addAddress}>
-                      {addBusy ? <Loader2 className="size-4 animate-spin" /> : "Save address"}
-                    </Button>
-                    {addresses.length > 0 ? (
-                      <button className="text-sm font-semibold text-muted" onClick={() => setShowAdd(false)}>
-                        Cancel
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowAdd(true)}
-                  className="press flex w-full items-center gap-2 rounded-xl border border-dashed border-line p-3 text-sm font-semibold text-accent-ink"
-                >
-                  <Plus className="size-4" /> Add a new address
-                </button>
-              )}
-
-              {addresses.length === 0 && !showAdd ? (
-                <p className="flex items-center gap-2 text-xs text-muted">
-                  <MapPin className="size-3.5" /> Add where we should deliver.
+          ) : showAddForm ? (
+            <>
+              <div className="border-b border-line px-4 py-3">
+                <h2 className="text-[15px] font-bold">
+                  {addresses.length ? "Add delivery address" : "Set delivery address"}
+                </h2>
+                <p className="mt-0.5 text-xs text-muted">
+                  Search on the map or enter your full address.
                 </p>
+              </div>
+              <AddAddressForm
+                compact
+                onSave={async (input) => {
+                  await createAddress(input);
+                  setShowAddForm(false);
+                }}
+                onCancel={
+                  addresses.length
+                    ? () => setShowAddForm(false)
+                    : undefined
+                }
+              />
+            </>
+          ) : selectedAddress ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowPicker(true)}
+                className="press flex w-full items-center gap-3 border-b border-line px-4 py-3.5 text-left"
+              >
+                <MapPin className="size-5 shrink-0 text-ink" strokeWidth={2.25} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-semibold uppercase tracking-wide text-muted">
+                    {selectedAddress.label}
+                    {selectedAddress.isDefault ? " · Default" : ""}
+                  </span>
+                  <span className="mt-0.5 block text-[15px] font-medium leading-snug">
+                    {selectedAddress.line}
+                  </span>
+                </span>
+                <ChevronRight className="size-5 shrink-0 text-muted" />
+              </button>
+
+              {showDistanceWarning ? (
+                <div className="flex items-start gap-2.5 border-b border-line bg-deal-soft px-4 py-3 text-sm font-medium text-deal">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <span>Check your address, you&apos;re a bit far away</span>
+                </div>
               ) : null}
-            </div>
-          )}
+
+              <div className="space-y-3 p-4">
+                <MapPicker
+                  key={selectedId}
+                  variant="checkout"
+                  initial={mapCoords}
+                  onPick={({ lat, lng }) => {
+                    setMapCoords({ lat, lng });
+                    setPinSaved(false);
+                  }}
+                />
+
+                {pinMoved ? (
+                  <button
+                    type="button"
+                    onClick={savePinToAddress}
+                    disabled={pinBusy}
+                    className="press w-full rounded-xl border border-accent bg-accent-soft py-2.5 text-sm font-bold text-accent-ink disabled:opacity-60"
+                  >
+                    {pinBusy ? (
+                      <Loader2 className="mx-auto size-4 animate-spin" />
+                    ) : pinSaved ? (
+                      "Pin saved to address"
+                    ) : (
+                      "Save pin to this address"
+                    )}
+                  </button>
+                ) : null}
+
+                <CheckoutField
+                  placeholder="Apartment, flat or suite number"
+                  value={apartment}
+                  onChange={setApartment}
+                />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <CheckoutField
+                    placeholder="Entry code"
+                    value={entryCode}
+                    onChange={setEntryCode}
+                  />
+                  <CheckoutField
+                    placeholder="Floor"
+                    value={floor}
+                    onChange={setFloor}
+                  />
+                </div>
+
+                <CheckoutField
+                  label="Building name"
+                  placeholder="Building name"
+                  value={buildingName}
+                  onChange={setBuildingName}
+                />
+
+                <CheckoutField
+                  label="Instructions for the courier"
+                  placeholder="Instructions for the courier"
+                  value={courierInstructions}
+                  onChange={setCourierInstructions}
+                  required
+                />
+
+                <p className="text-xs text-muted">*Required fields</p>
+
+                <Link
+                  href="/profile/addresses"
+                  className="block text-center text-sm font-semibold text-accent-ink"
+                >
+                  Manage saved addresses
+                </Link>
+              </div>
+            </>
+          ) : null}
         </section>
 
-        {/* Tip the courier — static for now */}
         <section className="card p-4">
-          <h2 className="text-[17px] font-extrabold tracking-tight">
-            Tip the courier?
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            The courier will get 100% of your tip.
-          </p>
-          <div className="mt-3 flex gap-2">
+          <div className="flex gap-4">
+            <div className="grid size-20 shrink-0 place-items-center rounded-2xl bg-accent-soft">
+              <Bike className="size-9 text-accent-ink" strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0 flex-1 pt-1">
+              <h2 className="text-[17px] font-extrabold tracking-tight">
+                Tip the courier?
+              </h2>
+              <p className="mt-1 text-sm leading-snug text-muted">
+                The courier will get 100% of your tip. You can cancel the tip
+                later.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
             {TIPS.map((t) => (
               <button
                 key={t}
+                type="button"
                 onClick={() => setTip(t)}
                 className={cn(
-                  "press flex-1 rounded-full border py-2.5 text-sm font-bold",
-                  tip === t
-                    ? "border-accent bg-accent text-white"
-                    : "border-line bg-surface text-ink"
+                  "press bolt-chip min-w-[72px] justify-center",
+                  tip === t && "bolt-chip-on"
                 )}
               >
                 {t === 0 ? "No tip" : formatINR(t)}
@@ -427,46 +385,16 @@ export function CheckoutView() {
           </div>
         </section>
 
-        {/* Payment — COD only in Phase 1 */}
-        <section className="card p-4">
-          <h2 className="mb-3 text-[17px] font-extrabold tracking-tight">
-            Payment
-          </h2>
-          <div className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-lg bg-surface-2 text-ink">
-              <Wallet className="size-[18px]" />
-            </span>
-            <span className="flex-1">
-              <span className="block text-[15px] font-semibold">
-                Cash on Delivery
-              </span>
-              <span className="block text-xs text-muted">
-                Pay the rider when your food arrives
-              </span>
-            </span>
-            <Check className="size-5 text-accent" />
-          </div>
-          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
-            <Info className="size-3.5" />
-            Online payments (UPI · cards · wallets) arrive in a later phase.
-          </p>
-        </section>
-
-        <p className="pb-2 text-center text-xs text-muted">
-          By placing this order you agree to pay {formatINR(payTotal)} in cash on
-          delivery.
-        </p>
         {error ? (
-          <p className="pb-2 text-center text-sm text-deal">{error}</p>
+          <p className="text-center text-sm text-deal">{error}</p>
         ) : null}
       </div>
 
-      {/* Sticky place-order CTA */}
       <div className="glass sticky bottom-0 z-20 border-t border-line p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <button
           onClick={placeOrder}
           disabled={status !== "ready"}
-          className="press flex h-14 w-full items-center justify-between rounded-full bg-accent px-6 text-[17px] font-bold text-white shadow-[var(--glow-accent)] disabled:opacity-70"
+          className="press flex h-12 w-full items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-white shadow-[var(--glow-accent)] disabled:opacity-70"
         >
           {status === "processing" ? (
             <span className="mx-auto flex items-center gap-2">
@@ -480,75 +408,83 @@ export function CheckoutView() {
           )}
         </button>
       </div>
-    </>
-  );
-}
 
-function FulfilmentRow({
-  on,
-  onClick,
-  icon,
-  title,
-  sub,
-  trailing,
-}: {
-  on: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  title: string;
-  sub: string;
-  trailing?: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="press flex w-full items-center gap-3 px-4 py-3.5 text-left"
-    >
-      <span className="grid size-9 shrink-0 place-items-center text-ink">
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-bold">{title}</span>
-        <span className="block text-xs text-muted">{sub}</span>
-      </span>
-      {trailing}
-      <span
-        className={cn(
-          "grid size-5 shrink-0 place-items-center rounded-full border-2",
-          on ? "border-accent" : "border-line"
-        )}
-      >
-        {on ? <span className="size-2.5 rounded-full bg-accent" /> : null}
-      </span>
-    </button>
-  );
-}
-
-function Row({
-  label,
-  value,
-  muted,
-  bold,
-}: {
-  label: string;
-  value: string;
-  muted?: boolean;
-  bold?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className={cn(muted && "text-muted", bold && "font-extrabold")}>
-        {label}
-      </span>
-      <span
-        className={cn(
-          "text-data",
-          muted && "text-muted",
-          bold && "text-base font-extrabold"
-        )}
-      >
-        {value}
-      </span>
+      <AddressPickerSheet
+        open={showPicker}
+        addresses={addresses}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        onClose={() => setShowPicker(false)}
+        onAddNew={() => setShowAddForm(true)}
+      />
     </div>
+  );
+}
+
+function CheckoutHeader({
+  title,
+  onBack,
+  onClear,
+}: {
+  title: string;
+  onBack: () => void;
+  onClear?: () => void;
+}) {
+  return (
+    <header className="glass sticky top-0 z-20 flex items-center gap-3 px-4 py-3">
+      <button
+        onClick={onBack}
+        aria-label="Go back"
+        className="press grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
+      >
+        <ChevronLeft className="size-5" />
+      </button>
+      <h1 className="min-w-0 flex-1 truncate text-center text-[17px] font-extrabold leading-tight tracking-tight">
+        {title}
+      </h1>
+      {onClear ? (
+        <button
+          onClick={onClear}
+          aria-label="Clear cart"
+          className="press grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
+        >
+          <Trash2 className="size-[18px]" />
+        </button>
+      ) : (
+        <span className="size-10 shrink-0" aria-hidden />
+      )}
+    </header>
+  );
+}
+
+function CheckoutField({
+  label,
+  placeholder,
+  value,
+  onChange,
+  required,
+}: {
+  label?: string;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+}) {
+  return (
+    <label className="block">
+      {label ? (
+        <span className="mb-1.5 block text-xs font-medium text-muted">
+          {required ? "*" : ""}
+          {label}
+        </span>
+      ) : null}
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={label ? undefined : placeholder}
+        className="w-full rounded-xl bg-surface-2 px-3.5 py-3 text-[15px] text-ink outline-none placeholder:text-muted focus:ring-2 focus:ring-accent/30"
+      />
+    </label>
   );
 }
