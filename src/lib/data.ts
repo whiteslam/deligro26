@@ -460,10 +460,13 @@ export const ADDRESSES: Address[] = [
   },
 ];
 
+// Obviously fake on purpose. This is rendered whenever Supabase is unconfigured,
+// so anything realistic here is a real person's details served to strangers the
+// moment a key goes missing.
 export const USER = {
-  name: "Gaurav Mirjha",
-  phone: "+91 7987265706",
-  initials: "GM",
+  name: "Demo Customer",
+  phone: "+91 90000 00000",
+  initials: "DC",
   memberSince: "2024",
   orders: 47,
 };

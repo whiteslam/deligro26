@@ -15,9 +15,28 @@ const MAX_ATTEMPTS = 5;
 const RESEND_COOLDOWN_MS = 30 * 1000;
 const MAX_PER_HOUR = 6;
 
+/**
+ * The pepper is the only secret in the code hash: with it, a leaked
+ * `otp_codes.code_hash` is useless; without it, six digits are brute-forced in
+ * microseconds. So there is deliberately no default — a fallback value that
+ * ships in the repository is not a secret, and silently running on one is worse
+ * than refusing to run. Set OTP_PEPPER in every environment.
+ */
+function pepper(): string {
+  const value = process.env.OTP_PEPPER;
+  if (!value) {
+    throw new Error(
+      "OTP_PEPPER is not set. Generate one (`openssl rand -hex 32`) and add it " +
+        "to the server environment — OTP hashes are worthless without it."
+    );
+  }
+  return value;
+}
+
 function hashCode(phone: string, code: string): string {
-  const pepper = process.env.OTP_PEPPER ?? "deligro-otp";
-  return createHash("sha256").update(`${code}:${phone}:${pepper}`).digest("hex");
+  return createHash("sha256")
+    .update(`${code}:${phone}:${pepper()}`)
+    .digest("hex");
 }
 
 export interface RequestResult {

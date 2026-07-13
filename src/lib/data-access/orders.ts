@@ -1,5 +1,11 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { computeCharges } from "@/lib/pricing";
+import {
+  columnKnownMissing,
+  isMissingColumn,
+  rememberColumn,
+} from "@/lib/data-access/schema-probe";
 
 /**
  * Secure data access for orders. Every query here runs through the anon key,
@@ -22,6 +28,7 @@ export interface Order {
   total: number;
   delivery_fee: number;
   tax_amount: number;
+  tip: number;
   created_at: string;
   address: { label?: string; line?: string } | null;
   order_items: OrderItem[];
@@ -35,11 +42,43 @@ export interface Order {
   } | null;
 }
 
-const SELECT =
-  "id, restaurant_id, status, total, delivery_fee, tax_amount, created_at, address, order_items(name, qty, price, menu_items(external_id)), restaurants(slug, name, image_url, accent_tint, eta_min, eta_max)";
+const TIP_COLUMN = "orders.tip";
 
-const DELIVERY_FEE = 29;
-const TAX_RATE = 0.05;
+/** `tip` only exists once migration 0013 has been applied — see schema-probe. */
+function select(withTip: boolean): string {
+  return [
+    "id, restaurant_id, status, total, delivery_fee, tax_amount",
+    withTip ? ", tip" : "",
+    ", created_at, address",
+    ", order_items(name, qty, price, menu_items(external_id, veg))",
+    ", restaurants(slug, name, image_url, accent_tint, eta_min, eta_max)",
+  ].join("");
+}
+
+interface QueryResult<T> {
+  data: T | null;
+  error: { code?: string } | null;
+}
+
+/** Run an order query, retrying without `tip` on a database that predates 0013. */
+async function selectOrders<T>(
+  run: (columns: string) => PromiseLike<QueryResult<T>>
+): Promise<T | null> {
+  if (!columnKnownMissing(TIP_COLUMN)) {
+    const { data, error } = await run(select(true));
+    if (!error) {
+      rememberColumn(TIP_COLUMN, true);
+      return data;
+    }
+    if (!isMissingColumn(error)) throw error;
+    rememberColumn(TIP_COLUMN, false);
+  }
+
+  const { data, error } = await run(select(false));
+  if (error) throw error;
+  return data;
+}
+
 
 export interface CreateOrderLine {
   itemId: string;
@@ -50,6 +89,8 @@ export interface CreateOrderInput {
   restaurantSlug: string;
   lines: CreateOrderLine[];
   address: { label: string; line: string };
+  /** Courier tip, in whole rupees. Clamped server-side to what the UI offers. */
+  tip?: number;
 }
 
 /** Place an order — prices validated server-side from menu_items, never trusted from client. */
@@ -91,24 +132,44 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     return sum + item.price * line.qty;
   }, 0);
 
-  const deliveryFee = DELIVERY_FEE;
-  const taxAmount = Math.round(itemSubtotal * TAX_RATE);
+  // Charges are derived here from the shared constants and the DB's own prices —
+  // the client sends items and a tip, never an amount.
+  const charges = computeCharges(itemSubtotal, input.tip ?? 0);
 
-  const { data: order, error: orderError } = await supabase
-    .from("orders")
-    .insert({
-      customer_id: user.id,
-      restaurant_id: restaurant.id,
-      status: "placed",
-      delivery_fee: deliveryFee,
-      tax_amount: taxAmount,
-      total: 0,
-      address: input.address,
-    })
-    .select("id")
-    .single();
+  const base: Record<string, unknown> = {
+    customer_id: user.id,
+    restaurant_id: restaurant.id,
+    status: "placed",
+    delivery_fee: charges.deliveryFee,
+    tax_amount: charges.taxes,
+    // Placeholder: recompute_order_total() below writes the authoritative sum.
+    total: 0,
+    address: input.address,
+  };
+
+  const insertOrder = (withTip: boolean) =>
+    supabase
+      .from("orders")
+      .insert(withTip ? { ...base, tip: charges.tip } : base)
+      .select("id")
+      .single();
+
+  let { data: order, error: orderError } = await insertOrder(
+    !columnKnownMissing(TIP_COLUMN)
+  );
+
+  if (orderError && isMissingColumn(orderError)) {
+    // Migration 0013 hasn't been applied. We can still take the order — but we
+    // cannot take the tip, because there is nowhere to put it and charging for
+    // something we can't record is exactly the bug this replaced. Refuse the tip
+    // loudly instead of pocketing it silently.
+    rememberColumn(TIP_COLUMN, false);
+    if (charges.tip > 0) throw new Error("tip_unsupported");
+    ({ data: order, error: orderError } = await insertOrder(false));
+  }
 
   if (orderError) throw orderError;
+  if (!order) throw new Error("order_not_created");
 
   const orderItems = input.lines.map((line) => {
     const item = menuItems.find((m) => m.external_id === line.itemId)!;
@@ -139,15 +200,17 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
 /** One order by id, or null if it doesn't exist OR isn't visible to the caller. */
 export async function getOrderById(id: string): Promise<Order | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("orders")
-    .select(SELECT)
-    .eq("id", id)
-    .maybeSingle();
+  const data = await selectOrders<Record<string, unknown>>((columns) =>
+    supabase
+      .from("orders")
+      .select(columns)
+      .eq("id", id)
+      .maybeSingle()
+      .overrideTypes<Record<string, unknown>>()
+  );
 
-  if (error) throw error;
   if (!data) return null;
-  const row = data as Record<string, unknown>;
+  const row = data;
   const restaurants = row.restaurants;
   const restaurant = Array.isArray(restaurants) ? restaurants[0] : restaurants;
   return { ...row, restaurants: restaurant ?? null } as Order;
@@ -160,12 +223,14 @@ export async function getOrderById(id: string): Promise<Order | null> {
  */
 export async function listVisibleOrders(): Promise<Order[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("orders")
-    .select(SELECT)
-    .order("created_at", { ascending: false });
+  const data = await selectOrders<Record<string, unknown>[]>((columns) =>
+    supabase
+      .from("orders")
+      .select(columns)
+      .order("created_at", { ascending: false })
+      .overrideTypes<Record<string, unknown>[]>()
+  );
 
-  if (error) throw error;
   return (data ?? []).map((row) => {
     const record = row as Record<string, unknown>;
     const restaurants = record.restaurants;

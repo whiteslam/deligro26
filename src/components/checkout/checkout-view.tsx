@@ -24,10 +24,11 @@ import { AddressPickerSheet } from "@/components/addresses/address-picker-sheet"
 import { useSavedAddresses } from "@/hooks/use-saved-addresses";
 import { cn } from "@/lib/utils/cn";
 import { formatINR } from "@/lib/utils/format";
+import { computeCharges, TIP_OPTIONS } from "@/lib/pricing";
 
 type CheckoutStatus = "ready" | "processing" | "placed";
 
-const TIPS = [0, 20, 30, 50];
+
 
 export function CheckoutView() {
   const router = useRouter();
@@ -35,9 +36,6 @@ export function CheckoutView() {
   const restaurantSlug = useCart((s) => s.restaurantSlug);
   const restaurantName = useCart((s) => s.restaurantName);
   const subtotal = lines.reduce((sum, l) => sum + l.price * l.qty, 0);
-  const deliveryFee = lines.length ? 29 : 0;
-  const taxes = Math.round(subtotal * 0.05);
-  const total = subtotal + deliveryFee + taxes;
   const clear = useCart((s) => s.clear);
 
   const {
@@ -69,13 +67,16 @@ export function CheckoutView() {
   const [courierInstructions, setCourierInstructions] = useState("");
 
   const [tip, setTip] = useState(0);
+
+  // One definition of what an order costs, shared with the server that bills it.
+  const charges = computeCharges(subtotal, tip);
   const [status, setStatus] = useState<CheckoutStatus>("ready");
   const [error, setError] = useState<string | null>(null);
 
   const showAddForm =
     addFormRequested || (!addrLoading && addresses.length === 0);
 
-  const payTotal = total + tip;
+  const payTotal = charges.total;
 
   // Move the map pin onto whichever address the customer picked. Adjusted during
   // render rather than in an effect, so the map never paints a frame still
@@ -154,6 +155,9 @@ export function CheckoutView() {
           body: JSON.stringify({
             restaurantSlug,
             lines: lines.map((l) => ({ itemId: l.itemId, qty: l.qty })),
+            // The tip is money: the server re-derives the total including it,
+            // rather than us telling it what to charge.
+            tip,
             address: {
               label: selectedAddress.label,
               line: [
@@ -183,7 +187,9 @@ export function CheckoutView() {
           setError(
             data.error === "invalid_items"
               ? "Something in your cart is no longer available."
-              : "Could not place the order. Try again."
+              : data.error === "tip_unsupported"
+                ? "Tipping isn't available right now — set the tip to “No tip” to place your order."
+                : "Could not place the order. Try again."
           );
           setStatus("ready");
           return;
@@ -381,7 +387,7 @@ export function CheckoutView() {
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            {TIPS.map((t) => (
+            {TIP_OPTIONS.map((t) => (
               <button
                 key={t}
                 type="button"

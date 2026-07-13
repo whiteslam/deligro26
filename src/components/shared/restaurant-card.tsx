@@ -4,7 +4,8 @@ import type { Restaurant } from "@/types";
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { RatingPill } from "@/components/shared/rating";
 import { ShopDistance } from "@/components/shared/shop-distance";
-import { formatEta } from "@/lib/utils/format";
+import { formatEta, formatINR } from "@/lib/utils/format";
+import { DELIVERY_FEE } from "@/lib/pricing";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -73,7 +74,11 @@ export function RestaurantCard({
         <div className="mt-1.5 flex items-center gap-2 text-[12px] font-medium text-muted">
           <span className="inline-flex items-center gap-1">
             <Bike className="size-4" />
-            {r.priceTier === 1 ? "Free" : `₹${r.priceTier * 20}`}
+            {/* The fee we actually bill. This used to read `priceTier * 20`,
+                which advertised "Free" or "₹40" on a shop that then charged ₹29
+                at checkout — priceTier is the ₹/₹₹/₹₹₹ cost-for-two indicator,
+                never a delivery fee. */}
+            {formatINR(DELIVERY_FEE)}
           </span>
           <span className="text-line">•</span>
           <span className="inline-flex items-center gap-1">

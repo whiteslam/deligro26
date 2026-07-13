@@ -71,8 +71,20 @@ const admin = createClient(url, serviceKey, {
 
 type Role = "restaurant" | "driver" | "admin";
 
-// Shared demo password. Change before using anywhere real.
-const PASSWORD = "DeligroDemo1!";
+/**
+ * Never a literal: a password committed to the repository is a public password,
+ * and one of these accounts is an *admin*. Supply it at run time:
+ *
+ *   SEED_PASSWORD='...' npm run db:seed-users
+ */
+const PASSWORD = process.env.SEED_PASSWORD ?? "";
+if (PASSWORD.length < 12) {
+  console.error(
+    "Set SEED_PASSWORD (12+ chars) before seeding — these accounts include an admin.\n" +
+      "  SEED_PASSWORD=\"$(openssl rand -base64 18)\" npm run db:seed-users"
+  );
+  process.exit(1);
+}
 
 const ACCOUNTS: { email: string; role: Role; fullName: string }[] = [
   // Same email seed-catalog uses, so this account owns the seeded restaurants.

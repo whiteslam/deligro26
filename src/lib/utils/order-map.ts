@@ -46,11 +46,18 @@ export function formatOrderPlacedAt(iso: string): string {
   });
 }
 
+interface DbMenuItemRef {
+  external_id: string | null;
+  veg: boolean | null;
+}
+
 interface DbOrderItemRow {
   name: string;
   qty: number;
   price: number;
-  menu_items?: { external_id: string | null } | { external_id: string | null }[] | null;
+  // Null when the dish has since been deleted from the menu — then we genuinely
+  // do not know whether it was veg, and must not guess.
+  menu_items?: DbMenuItemRef | DbMenuItemRef[] | null;
 }
 
 export function mapDbOrderRow(row: DbOrder): import("@/types").Order {
@@ -77,6 +84,7 @@ export function mapDbOrderRow(row: DbOrder): import("@/types").Order {
         name: item.name,
         qty: item.qty,
         price: item.price,
+        veg: menuItem?.veg ?? undefined,
       };
     }),
   };

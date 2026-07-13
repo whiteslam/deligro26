@@ -92,6 +92,8 @@ export interface OrderLine {
   name: string;
   qty: number;
   price: number;
+  /** Undefined = unknown (the dish is no longer on the menu). Never assume veg. */
+  veg?: boolean;
 }
 
 export interface Order {
@@ -128,5 +130,6 @@ export interface CartLine {
   name: string;
   price: number;
   qty: number;
-  veg: boolean;
+  /** Undefined = unknown. A wrong veg mark is a dietary claim, so we show none. */
+  veg?: boolean;
 }

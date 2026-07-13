@@ -59,8 +59,14 @@ const admin = createClient(url, serviceKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-const VENDOR_EMAIL = "vendor@deligro.demo";
-const VENDOR_PASSWORD = "DeligroDemo1!";
+const VENDOR_EMAIL = process.env.SEED_VENDOR_EMAIL ?? "vendor@deligro.demo";
+// Same rule as seed-users: no committed password. Must match the one that
+// account was created with.
+const VENDOR_PASSWORD = process.env.SEED_PASSWORD ?? "";
+if (VENDOR_PASSWORD.length < 12) {
+  console.error("Set SEED_PASSWORD (the vendor account's password) before seeding.");
+  process.exit(1);
+}
 
 /**
  * Find the vendor by email, paging through ALL users. A single listUsers()

@@ -9,6 +9,7 @@ import { useUI } from "@/stores/ui-store";
 import { QtyStepper } from "@/components/shared/qty-stepper";
 import { VegMark } from "@/components/shared/veg-mark";
 import { formatINR } from "@/lib/utils/format";
+import { computeCharges } from "@/lib/pricing";
 import { cn } from "@/lib/utils/cn";
 
 const HIDDEN_ON = ["/checkout"];
@@ -23,9 +24,8 @@ export function GlassCart() {
   const clear = useCart((s) => s.clear);
   const count = lines.reduce((n, l) => n + l.qty, 0);
   const subtotal = lines.reduce((sum, l) => sum + l.price * l.qty, 0);
-  const deliveryFee = lines.length ? 29 : 0;
-  const taxes = Math.round(subtotal * 0.05);
-  const total = subtotal + deliveryFee + taxes;
+  // Shared with checkout and with the server that bills — see lib/pricing.
+  const { deliveryFee, taxes, total } = computeCharges(subtotal);
 
   const cartOpen = useUI((s) => s.cartOpen);
   const openCart = useUI((s) => s.openCart);

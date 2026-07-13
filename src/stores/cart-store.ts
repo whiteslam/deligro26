@@ -3,9 +3,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CartLine, MenuItem } from "@/types";
+import { DELIVERY_FEE, TAX_RATE } from "@/lib/pricing";
 
-const DELIVERY_FEE = 29;
-const TAX_RATE = 0.05;
 
 interface CartState {
   restaurantSlug: string | null;

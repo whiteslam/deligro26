@@ -15,7 +15,8 @@ import { ImmersiveScreen } from "@/components/layout/immersive-screen";
 import { RestaurantMenu } from "@/components/restaurant/restaurant-menu";
 import { RestaurantActions } from "@/components/restaurant/restaurant-actions";
 import { ShopDistanceText } from "@/components/shared/shop-distance";
-import { formatEta, formatRating, formatCount } from "@/lib/utils/format";
+import { formatEta, formatRating, formatCount, formatINR } from "@/lib/utils/format";
+import { DELIVERY_FEE } from "@/lib/pricing";
 import { getProfile } from "@/lib/auth";
 import { isFavorite } from "@/lib/data-access/favorites";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -41,7 +42,8 @@ export default async function RestaurantPage({
     isSupabaseConfigured ? isFavorite(slug) : Promise.resolve(false),
   ]);
 
-  const deliveryFee = r.priceTier === 1 ? "Free" : `₹${r.priceTier * 20}`;
+  // What checkout will actually charge — see lib/pricing.
+  const deliveryFee = formatINR(DELIVERY_FEE);
 
   return (
     <ImmersiveScreen>

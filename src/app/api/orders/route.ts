@@ -17,6 +17,9 @@ function mapCreateError(message: string) {
     case "empty_cart":
     case "invalid_items":
       return { status: 400, error: message };
+    case "tip_unsupported":
+      // The database predates migration 0013 and has nowhere to record a tip.
+      return { status: 503, error: "tip_unsupported" };
     default:
       return { status: 500, error: "server_error" };
   }

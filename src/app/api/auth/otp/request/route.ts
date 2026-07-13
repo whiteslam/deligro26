@@ -30,8 +30,23 @@ export async function POST(request: Request) {
 
   const sms = await sendOtpSms(phone, result.code!);
 
-  // In dev (no RENFLAIR_API_KEY) surface the code so the flow is testable.
-  const devCode = sms.devMode ? result.code : undefined;
+  // Handing the code back in the response makes the flow testable without an SMS
+  // provider — and would hand anyone the login code for any phone number, which
+  // is a complete pre-auth account takeover. `devMode` alone is not enough of a
+  // guard: it is true whenever RENFLAIR_API_KEY is missing, and a key missing
+  // from the production environment is exactly the accident that must not become
+  // an authentication bypass. So it is also fenced behind a non-production build.
+  const inProduction = process.env.NODE_ENV === "production";
+  const devCode = sms.devMode && !inProduction ? result.code : undefined;
+
+  // A production deploy with no SMS provider can't sign anyone in. Say so,
+  // rather than silently returning ok:true for a code that was never delivered.
+  if (sms.devMode && inProduction) {
+    console.error(
+      "OTP requested but RENFLAIR_API_KEY is not set — no SMS was sent."
+    );
+    return NextResponse.json({ error: "sms_unavailable" }, { status: 503 });
+  }
 
   return NextResponse.json({
     ok: true,

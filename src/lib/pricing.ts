@@ -1,0 +1,55 @@
+/**
+ * What an order costs. One definition, used by the basket, the checkout, the
+ * listing cards, and the server that actually bills.
+ *
+ * These numbers used to be copy-pasted into four files — and the copy that
+ * looked canonical (the cart store) was read by nobody, so changing it did
+ * nothing while the customer was quietly shown three different delivery fees for
+ * the same order. Anything that needs a fee or a tax imports it from here.
+ *
+ * Safe on the client (no secrets), but the server is still the authority: the
+ * amount billed is recomputed from these constants in `createOrder`, never taken
+ * from what the browser sends.
+ */
+
+/** Flat delivery fee, in whole rupees. */
+export const DELIVERY_FEE = 29;
+
+/** Applied to the item subtotal only — fees are not taxed. */
+export const TAX_RATE = 0.05;
+
+/** Tip amounts offered at checkout. 0 = no tip. */
+export const TIP_OPTIONS = [0, 20, 30, 50] as const;
+
+/** Refuses a tip the UI never offered, so the API can't be fed an arbitrary one. */
+export const MAX_TIP = Math.max(...TIP_OPTIONS);
+
+export interface OrderCharges {
+  subtotal: number;
+  deliveryFee: number;
+  taxes: number;
+  tip: number;
+  /** What the customer pays. */
+  total: number;
+}
+
+/** The one place the arithmetic lives. */
+export function computeCharges(subtotal: number, tip = 0): OrderCharges {
+  const deliveryFee = subtotal > 0 ? DELIVERY_FEE : 0;
+  const taxes = Math.round(subtotal * TAX_RATE);
+  const safeTip = clampTip(tip);
+
+  return {
+    subtotal,
+    deliveryFee,
+    taxes,
+    tip: safeTip,
+    total: subtotal + deliveryFee + taxes + safeTip,
+  };
+}
+
+/** A tip is whole rupees, never negative, never more than the UI offers. */
+export function clampTip(tip: number): number {
+  if (!Number.isFinite(tip)) return 0;
+  return Math.min(Math.max(Math.round(tip), 0), MAX_TIP);
+}
