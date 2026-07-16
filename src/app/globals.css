@@ -59,7 +59,7 @@
   --deal: #ff5c4d;
   --deal-soft: rgba(74, 27, 24, 0.7);
   --pop: #ffce5c;
-  --pop-ink: #ffce5c;
+  --pop-ink: #4a3000; /* dark ink so gold pills (.pill-pop) stay readable in dark mode */
   --blue: #5b96c9;
   --line: #2a3036;
 
