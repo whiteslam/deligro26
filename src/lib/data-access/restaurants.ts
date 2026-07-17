@@ -175,6 +175,37 @@ export async function listRestaurantsFromDb(): Promise<Restaurant[]> {
 }
 
 /**
+ * The signed-in user's hearted restaurants, with menus. Empty for guests or when
+ * nothing is saved. RLS scopes the favourites read to the caller, so the id list
+ * is already "mine"; we then fetch only those approved restaurants.
+ */
+export async function listFavoriteRestaurantsFromDb(): Promise<Restaurant[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: favRows, error: favErr } = await supabase
+    .from("favorites")
+    .select("restaurant_id");
+  if (favErr || !favRows?.length) return [];
+
+  const ids = favRows.map((r) => r.restaurant_id);
+  const rows = await selectRestaurants<DbRestaurantRow[]>((select) =>
+    supabase
+      .from("restaurants")
+      .select(select)
+      .in("id", ids)
+      .eq("approved", true)
+      .order("name")
+      .overrideTypes<DbRestaurantRow[]>()
+  );
+
+  return (rows ?? []).map((row) => mapRestaurant(row));
+}
+
+/**
  * One restaurant, with its menu ranked by sales. The feed lists deliberately
  * skip the ranking — it's one RPC per restaurant, and no card shows dish-level
  * popularity — so only the menu screen pays for it.

@@ -5,6 +5,8 @@ import { RestaurantCard } from "@/components/shared/restaurant-card";
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StoreCategoryStrip } from "@/components/stores/store-category-strip";
+import { PickDropHero } from "@/components/stores/pick-drop-hero";
+import { GroceryListHero } from "@/components/stores/grocery-list-hero";
 import { listRestaurants } from "@/lib/catalog";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { listAddresses } from "@/lib/data-access/addresses";
@@ -56,7 +58,13 @@ export default async function StoresPage({
           <StoreCategoryStrip active={active?.id} />
         </section>
 
-        {all.length === 0 ? (
+        {active?.id === "groceries" ? (
+          <GroceryListHero savedAddress={savedAddress} />
+        ) : null}
+
+        {active?.id === "pick-drop" ? (
+          <PickDropHero />
+        ) : all.length === 0 ? (
           <EmptyState
             icon={<Store className="size-7" />}
             title={`No ${active?.label.toLowerCase() ?? "stores"} yet`}

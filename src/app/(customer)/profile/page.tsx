@@ -10,6 +10,7 @@ import {
   LogOut,
   LogIn,
   ShieldCheck,
+  Code2,
 } from "lucide-react";
 import { USER, ADDRESSES } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -30,6 +31,9 @@ const OTHER = [
   { icon: Info, label: "About Deligro", href: "/profile/about" },
 ];
 
+// Change this to the developers' inbox. Powers the "Contact developers" row.
+const DEVELOPER_EMAIL = "gauravm7722@gmail.com";
+
 export default async function ProfilePage() {
   // Profile is per-account — guests are bounced to /login by the proxy; this
   // backstops it server-side.
@@ -47,6 +51,7 @@ export default async function ProfilePage() {
         orders: USER.orders,
         addresses: ADDRESSES.length,
         favorites: 0,
+        isDeveloper: false,
       };
 
   if (!summary) {
@@ -86,11 +91,23 @@ export default async function ProfilePage() {
           name={summary.name}
           initials={summary.initials}
           avatarUrl={summary.avatarUrl}
+          developer={summary.isDeveloper}
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[17px] font-extrabold leading-tight">
-            Hello, {firstName}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="truncate text-[17px] font-extrabold leading-tight">
+              Hello, {firstName}
+            </p>
+            {summary.isDeveloper ? (
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide"
+                style={{ backgroundColor: "#ffc531", color: "#3d2800" }}
+              >
+                <Code2 className="size-3" />
+                Developer
+              </span>
+            ) : null}
+          </div>
           <p className="mt-1 truncate text-[13px] font-medium text-muted">
             {summary.phone ?? "Add a phone number below"}
           </p>
@@ -99,7 +116,10 @@ export default async function ProfilePage() {
 
       {/* Favourites */}
       <SectionHead title="Favourites" />
-      <div className="flex items-center gap-4 rounded-2xl border border-line bg-surface p-4">
+      <Link
+        href="/profile/favorites"
+        className="press flex items-center gap-4 rounded-2xl border border-line bg-surface p-4"
+      >
         <div className="min-w-0 flex-1">
           <p className="text-[15px] font-bold">
             {summary.favorites
@@ -108,14 +128,15 @@ export default async function ProfilePage() {
           </p>
           <p className="mt-0.5 text-sm text-muted">
             {summary.favorites
-              ? "Tap the heart on any restaurant to add or remove it."
+              ? "Tap to view all your saved restaurants."
               : "Save all your favourites in one place using the heart icon."}
           </p>
         </div>
         <span className="grid size-12 shrink-0 place-items-center rounded-full bg-deal-soft text-deal">
           <Heart className="size-6 fill-current" />
         </span>
-      </div>
+        <ChevronRight className="size-5 shrink-0 text-muted" />
+      </Link>
 
       {/* Payment. "Edit" and "Change" used to sit here as affordances for a
           picker that doesn't exist — Cash on Delivery is the only method, so the
@@ -162,6 +183,16 @@ export default async function ProfilePage() {
             </Link>
           );
         })}
+        <a
+          href={`mailto:${DEVELOPER_EMAIL}?subject=${encodeURIComponent("Deligro app feedback")}`}
+          className="press flex w-full items-center gap-3 py-3.5 text-left"
+        >
+          <Code2 className="size-5 shrink-0 text-ink" />
+          <span className="flex-1 text-[15px] font-medium">
+            Contact developers
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-muted" />
+        </a>
       </div>
 
       {/* Sign out — native form POST, clears the session server-side. */}
@@ -175,7 +206,7 @@ export default async function ProfilePage() {
       </form>
 
       <p className="pb-2 pt-6 text-center text-xs text-muted">
-        Deligro · Craving to doorstep
+        Deligro · Phoxera Solutions Private Limited
       </p>
     </div>
   );

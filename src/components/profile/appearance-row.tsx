@@ -1,70 +1,45 @@
 "use client";
 
 import { useEffect } from "react";
+import { Moon } from "lucide-react";
 import { useUI } from "@/stores/ui-store";
 import { cn } from "@/lib/utils/cn";
 
 export function AppearanceRow() {
   const theme = useUI((s) => s.theme);
   const hydrated = useUI((s) => s.hydrated);
-  const setTheme = useUI((s) => s.setTheme);
+  const toggleTheme = useUI((s) => s.toggleTheme);
   const initTheme = useUI((s) => s.initTheme);
 
   useEffect(() => {
     initTheme();
   }, [initTheme]);
 
-  return (
-    <div className="flex gap-3">
-      <Swatch
-        on={hydrated && theme === "light"}
-        onClick={() => setTheme("light")}
-        label="Light"
-        preview="bg-white"
-      />
-      <Swatch
-        on={hydrated && theme === "dark"}
-        onClick={() => setTheme("dark")}
-        label="Dark"
-        preview="bg-[#0f1215]"
-      />
-    </div>
-  );
-}
+  const isDark = hydrated && theme === "dark";
 
-function Swatch({
-  on,
-  onClick,
-  label,
-  preview,
-}: {
-  on: boolean;
-  onClick: () => void;
-  label: string;
-  preview: string;
-}) {
   return (
     <button
-      onClick={onClick}
-      className="press flex flex-1 flex-col items-center gap-1.5"
-      aria-label={label}
+      type="button"
+      role="switch"
+      aria-checked={isDark}
+      aria-label="Dark mode"
+      onClick={toggleTheme}
+      className="press flex w-full items-center gap-3 py-3.5 text-left"
     >
+      <Moon className="size-5 shrink-0 text-ink" />
+      <span className="flex-1 text-[15px] font-medium text-ink">Dark mode</span>
       <span
         className={cn(
-          "grid h-14 w-full place-items-center rounded-2xl border-2",
-          preview,
-          on ? "border-accent" : "border-line"
+          "relative h-[26px] w-[46px] shrink-0 rounded-full transition-colors duration-200",
+          isDark ? "bg-accent" : "bg-line"
         )}
       >
-        {on ? <span className="size-3 rounded-full bg-accent" /> : null}
-      </span>
-      <span
-        className={cn(
-          "text-[13px]",
-          on ? "font-bold text-ink" : "font-medium text-muted"
-        )}
-      >
-        {label}
+        <span
+          className={cn(
+            "absolute top-0.5 left-0.5 size-[22px] rounded-full bg-white shadow-sm transition-transform duration-200",
+            isDark && "translate-x-5"
+          )}
+        />
       </span>
     </button>
   );

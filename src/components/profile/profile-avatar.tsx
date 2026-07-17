@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, Loader2, Trash2, X } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
 
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
 const MAX_DIM = 512; // avatars never render larger than this
@@ -18,10 +19,13 @@ export function ProfileAvatar({
   name,
   initials,
   avatarUrl,
+  developer = false,
 }: {
   name: string;
   initials: string;
   avatarUrl: string | null;
+  // App owner / developer — wraps the avatar in a golden ring.
+  developer?: boolean;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -111,7 +115,14 @@ export function ProfileAvatar({
         aria-label={avatarUrl ? "Change or remove profile photo" : "Add a profile photo"}
         className="press relative shrink-0 rounded-full"
       >
-        <span className="grid size-16 place-items-center overflow-hidden rounded-full bg-accent-soft text-[19px] font-extrabold text-accent-ink">
+        <span
+          className={cn(
+            "grid size-16 place-items-center overflow-hidden rounded-full bg-accent-soft text-[19px] font-extrabold text-accent-ink",
+            // Golden ring for the boss — gold token + a soft gold glow.
+            developer &&
+              "ring-2 ring-pop ring-offset-2 ring-offset-bg shadow-[0_0_14px_-2px_var(--pop)]"
+          )}
+        >
           {shown ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img

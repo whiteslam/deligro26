@@ -3,29 +3,29 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, MapPinOff } from "lucide-react";
-import type { Order, Restaurant } from "@/types";
+import type { Banner, Order, Restaurant } from "@/types";
 import { useLocation } from "@/stores/location-store";
 import { PINNED_LOCATION } from "@/lib/location/pinned";
 import { distanceToShop } from "@/lib/geo/distance";
 import { HomeHeader, type SavedAddress } from "@/components/home/home-header";
 import { ActiveOrderStrip } from "@/components/home/active-order-strip";
 import { CategoryStrip } from "@/components/home/category-strip";
+import { PromoBannerCarousel } from "@/components/home/promo-banner-carousel";
 import { RestaurantCard } from "@/components/shared/restaurant-card";
-import { PhotoTile } from "@/components/shared/photo-tile";
 import { EmptyState } from "@/components/shared/empty-state";
 
 export function HomeView({
   savedAddress,
   restaurants,
   activeOrder,
-  promo,
+  banners,
   popular,
   nearby,
 }: {
   savedAddress: SavedAddress | null;
   restaurants: Restaurant[];
   activeOrder: Order | null;
-  promo: Restaurant | null;
+  banners: Banner[];
   popular: Restaurant[];
   nearby: Restaurant[];
 }) {
@@ -114,29 +114,8 @@ export function HomeView({
             </div>
           </Section>
 
-          {promo?.offer ? (
-            <div className="px-4">
-              <Link
-                href={`/restaurant/${promo.slug}`}
-                className="press relative flex items-center overflow-hidden rounded-2xl border border-line bg-surface"
-              >
-                <div className="flex-1 p-5">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-accent-ink">
-                    Limited offer
-                  </p>
-                  <p className="mt-1 text-[17px] font-extrabold leading-tight tracking-tight text-ink">
-                    {promo.name}
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-deal">{promo.offer}</p>
-                </div>
-                <PhotoTile
-                  tint={promo.accentTint}
-                  src={promo.image}
-                  alt={promo.name}
-                  className="h-28 w-28 shrink-0"
-                />
-              </Link>
-            </div>
+          {banners.length ? (
+            <PromoBannerCarousel banners={banners} placement="home_hero" />
           ) : null}
 
           <section className="space-y-3">

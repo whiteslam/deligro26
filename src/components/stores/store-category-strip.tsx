@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LayoutGrid } from "lucide-react";
 import { STORE_CATEGORIES } from "@/lib/data";
 import { CategoryIcon } from "@/components/home/category-icon";
 import { cn } from "@/lib/utils/cn";
@@ -11,6 +12,30 @@ import { cn } from "@/lib/utils/cn";
 export function StoreCategoryStrip({ active }: { active?: string }) {
   return (
     <div className="no-scrollbar flex gap-2 overflow-x-auto px-4">
+      <Link
+        href="/stores"
+        aria-current={!active ? "true" : undefined}
+        className="press flex w-[68px] shrink-0 flex-col items-center gap-1.5"
+      >
+        <span
+          className={cn(
+            "grid size-16 place-items-center rounded-xl transition-colors",
+            !active ? "bg-accent-soft ring-2 ring-accent" : "bg-surface-2"
+          )}
+        >
+          <LayoutGrid
+            className={cn("size-7", !active ? "text-accent-ink" : "text-ink")}
+          />
+        </span>
+        <span
+          className={cn(
+            "w-full truncate text-center text-[11px] font-semibold",
+            !active ? "text-accent-ink" : "text-ink"
+          )}
+        >
+          All stores
+        </span>
+      </Link>
       {STORE_CATEGORIES.map((c) => {
         const isActive = c.id === active;
         return (

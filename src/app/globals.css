@@ -549,6 +549,9 @@ button.card:active {
     background: var(--bg);
     color: var(--ink);
     pointer-events: none;
+    transition:
+      background 0.4s ease,
+      color 0.4s ease;
   }
   .status-bar-time {
     width: 96px; /* fixed: centres the time in the left ear, and the clock
@@ -578,9 +581,12 @@ button.card:active {
     padding-top: 56px;
   }
 
-  /* Full-screen overlays must clear the status bar too */
-  .splash {
-    padding-top: 56px;
+  /* The splash fills edge-to-edge (under the status bar, like a native launch
+     screen), so the simulated status bar goes transparent with white glyphs
+     over the orange instead of painting a white strip across the top. */
+  .app-shell:has(.splash) .status-bar {
+    background: transparent;
+    color: #ffffff;
   }
 
   /* The tab bar reserves the home-indicator strip, as it does on iOS; the
@@ -788,113 +794,45 @@ button.card:active {
   position: absolute;
   inset: 0;
   z-index: 60;
-  display: grid;
-  place-items: center;
-  background: var(--bg);
+  overflow: hidden;
+  /* Sampled from the source artwork so the fill matches the cropped pieces. */
+  background: #e59a01;
   transition: opacity 0.55s ease;
 }
 .splash[data-hiding="true"] {
   opacity: 0;
   pointer-events: none;
 }
-.splash-glow {
+.splash-brand {
   position: absolute;
-  width: min(360px, 82%);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--accent) 22%, transparent),
-    transparent 62%
-  );
-  filter: blur(8px);
-  opacity: 0;
-  animation: splash-glow-in 0.9s 0.1s ease forwards;
-}
-.splash-inner {
-  position: relative;
-  text-align: center;
-}
-.splash-word {
-  font-family: var(--font-sans), system-ui, sans-serif;
-  font-weight: 800;
-  font-size: clamp(2.75rem, 15vw, 3.5rem);
-  line-height: 1;
-  letter-spacing: -0.04em;
-  color: var(--accent);
-  opacity: 0;
-  animation: splash-rise 0.7s 0.15s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-.splash-rule {
-  height: 2px;
-  width: 64px;
-  margin: 18px auto 0;
-  border-radius: 2px;
-  background: var(--accent);
-  opacity: 0.9;
-  transform: scaleX(0);
-  transform-origin: center;
-  animation: splash-rule 0.6s 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-.splash-tag {
-  margin-top: 16px;
-  opacity: 0;
-  animation: splash-fade 0.6s 0.85s ease forwards;
-}
-.splash-loader {
-  position: absolute;
-  bottom: 11%;
+  top: 46%;
   left: 50%;
-  width: 120px;
-  height: 3px;
-  border-radius: 3px;
-  overflow: hidden;
-  transform: translateX(-50%);
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-  opacity: 0;
-  animation: splash-fade 0.5s 1s ease forwards;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(74%, 340px);
+  transform: translate(-50%, -50%);
 }
-.splash-loader::after {
-  content: "";
+.splash-logo {
+  width: 100%;
+  height: auto;
+}
+.splash-credit {
+  margin-top: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.9);
+}
+.splash-art {
   position: absolute;
-  inset: 0;
-  width: 42%;
-  border-radius: 3px;
-  background: var(--accent);
-  animation: splash-load 1.15s 1.05s ease-in-out infinite;
-}
-@keyframes splash-rise {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-@keyframes splash-rule {
-  to {
-    transform: scaleX(1);
-  }
-}
-@keyframes splash-fade {
-  to {
-    opacity: 1;
-  }
-}
-@keyframes splash-glow-in {
-  to {
-    opacity: 1;
-  }
-}
-@keyframes splash-load {
-  0% {
-    transform: translateX(-130%);
-  }
-  100% {
-    transform: translateX(360%);
-  }
+  bottom: 0;
+  left: 50%;
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  transform: translateX(-50%);
 }
 
 /* ---------- Onboarding ----------

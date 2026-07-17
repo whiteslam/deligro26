@@ -134,3 +134,110 @@ export interface CartLine {
   /** Undefined = unknown. A wrong veg mark is a dietary claim, so we show none. */
   veg?: boolean;
 }
+
+/* ============================================================
+   Promotional banners / ad campaigns.
+
+   The home screen (and other surfaces) never hardcode promos: they ask the
+   backend for the active campaigns at a placement and render whatever comes
+   back. Everything below is what the Admin Panel writes and the app reads.
+   ============================================================ */
+
+/**
+ * Surfaces a banner can be pinned to. The app asks for one placement at a time;
+ * a campaign can be attached to several. Adding a surface = adding a value here.
+ */
+export type BannerPlacement =
+  | "home_hero" // the carousel under "Popular right now" on the food home
+  | "home_food"
+  | "stores_top" // top of the Stores tab
+  | "grocery_top"
+  | "pharmacy_top"
+  | "checkout";
+
+/**
+ * Internal = a Deligro feature promo (Grocery, Pick & Drop, Membership…).
+ * Sponsored = a paid campaign from a partner; it wears the "Sponsored" badge.
+ */
+export type BannerKind = "internal" | "sponsored";
+
+/** Lifecycle. Only `active` (and in-window) campaigns are ever served. */
+export type BannerStatus = "draft" | "active" | "paused" | "archived";
+
+/**
+ * Where the CTA takes the user. `value` is interpreted per type — a slug for
+ * `restaurant`/`store`/`product`/`category`, a full URL for `external`, and is
+ * ignored for the section shortcuts (they route to a fixed path).
+ */
+export type BannerTargetType =
+  | "food"
+  | "grocery"
+  | "pick_drop"
+  | "shops"
+  | "pharmacy"
+  | "membership"
+  | "refer"
+  | "restaurant"
+  | "store"
+  | "product"
+  | "category"
+  | "external";
+
+export interface BannerTarget {
+  type: BannerTargetType;
+  /** Slug / URL / category id, depending on `type`. */
+  value?: string;
+}
+
+/** Optional audience narrowing. Empty arrays / undefined = everyone. */
+export interface BannerTargeting {
+  cities?: string[];
+  zones?: string[];
+  categories?: string[];
+  /** e.g. "new", "returning", "vip" — matched against the viewer's segment. */
+  segments?: string[];
+}
+
+/** Rolled-up performance for the Admin list. */
+export interface BannerAnalytics {
+  impressions: number;
+  clicks: number;
+  /** Click-through rate as a fraction (clicks / impressions), 0 when no views. */
+  ctr: number;
+  conversions: number;
+  orders: number;
+}
+
+export interface Banner {
+  id: string;
+  /** Admin-facing campaign name; also the default headline fallback. */
+  name: string;
+  headline: string;
+  /** Max ~2 lines in the UI — kept short at author time, truncated at render. */
+  description: string;
+  ctaLabel: string; // "Order Now", "Shop Now", "Explore"…
+  kind: BannerKind;
+  status: BannerStatus;
+  target: BannerTarget;
+  placements: BannerPlacement[];
+  /** Higher wins ordering within a placement; ties break on `displayOrder`. */
+  priority: number;
+  displayOrder: number;
+  /** Per-banner auto-advance, milliseconds. Clamped to 3–8s at render. */
+  autoSlideMs: number;
+  /** Landscape/desktop art. */
+  imageUrl?: string;
+  /** Portrait/mobile art; falls back to `imageUrl`. */
+  mobileImageUrl?: string;
+  /** Gradient shown under the image while it loads (and if it never does). */
+  tint: string;
+  /** Small emoji/badge glyph on the art, à la PhotoTile `label`. */
+  glyph?: string;
+  /** Paid campaigns show "Sponsored · {sponsorName}". */
+  sponsorName?: string;
+  targeting?: BannerTargeting;
+  /** ISO timestamps; undefined = open-ended on that side. */
+  startsAt?: string | null;
+  endsAt?: string | null;
+  analytics?: BannerAnalytics;
+}

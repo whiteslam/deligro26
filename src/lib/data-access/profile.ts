@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { countFavorites } from "@/lib/data-access/favorites";
+import { isDeveloperPhone } from "@/lib/developers";
 
 /**
  * Summary shown on the customer Profile tab. Everything here is the signed-in
@@ -16,6 +17,7 @@ export interface ProfileSummary {
   orders: number;
   addresses: number;
   favorites: number;
+  isDeveloper: boolean; // one of ours — drives the Developer badge + golden ring
 }
 
 export interface ProfileUpdateInput {
@@ -65,6 +67,7 @@ export async function getProfileSummary(): Promise<ProfileSummary | null> {
     orders: orderCount ?? 0,
     addresses: addressCount ?? 0,
     favorites,
+    isDeveloper: isDeveloperPhone(phone),
   };
 }
 

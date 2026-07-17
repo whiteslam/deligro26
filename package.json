@@ -12,6 +12,7 @@
     "lint": "eslint",
     "db:seed": "npx tsx scripts/seed-catalog.ts",
     "db:seed-users": "npx tsx scripts/seed-users.ts",
+    "db:seed-developer": "npx tsx scripts/seed-developer.ts",
     "db:set-vendor-phone": "npx tsx scripts/set-vendor-phone.ts",
     "db:import-legacy": "npx tsx scripts/import-legacy-catalog.ts",
     "db:import-legacy-owners": "npx tsx scripts/import-legacy-vendor-owners.ts",

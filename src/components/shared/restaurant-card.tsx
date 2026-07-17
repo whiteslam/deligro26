@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { Clock, BadgePercent, Bike } from "lucide-react";
+import { Clock, Bike } from "lucide-react";
+// BadgePercent — used by the temporarily hidden offer banner below
 import type { Restaurant } from "@/types";
 import { PhotoTile } from "@/components/shared/photo-tile";
-import { RatingPill } from "@/components/shared/rating";
+// RatingPill — used by the temporarily hidden rating star below
+// import { RatingPill } from "@/components/shared/rating";
 import { ShopDistance } from "@/components/shared/shop-distance";
 import { formatEta, formatINR } from "@/lib/utils/format";
 import { DELIVERY_FEE } from "@/lib/pricing";
@@ -40,12 +42,14 @@ export function RestaurantCard({
           alt={r.name}
           className={carousel ? "h-32 w-full" : "h-40 w-full"}
         />
+        {/* Temporarily hidden — offer banner not needed right now
         {r.offer ? (
           <span className="pill-deal absolute left-2.5 top-2.5 inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold uppercase tracking-wide">
             <BadgePercent className="size-3.5" />
             {r.offer}
           </span>
         ) : null}
+        */}
         {/* The decorative heart that used to sit here was a lie in both
             directions: it never showed whether a place WAS a favourite, and
             tapping it never made one. The working control is on the restaurant
@@ -54,14 +58,17 @@ export function RestaurantCard({
           <span className="absolute bottom-2.5 right-2.5 rounded-full bg-ink px-2.5 py-1 text-xs font-semibold text-white">
             Opens soon
           </span>
-        ) : (
+        ) : null}
+        {/* Temporarily hidden — rating star not needed right now
+        {r.open ? (
           <RatingPill
             variant="chip"
             rating={r.rating}
             count={r.ratingCount}
             className="absolute bottom-2.5 left-2.5"
           />
-        )}
+        ) : null}
+        */}
       </div>
 
       <div className="px-0.5 pt-2">
