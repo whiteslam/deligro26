@@ -443,11 +443,9 @@ function TrendIndicator({
 export function VendorEarningsCharts({
   restaurantName,
   stats,
-  demo = false,
 }: {
   restaurantName?: string;
   stats: VendorEarningsSummary;
-  demo?: boolean;
 }) {
   const revenueBars = stats.daily.map((d) => ({
     key: d.day,
@@ -480,8 +478,8 @@ export function VendorEarningsCharts({
         title="Earnings"
         subtitle={
           restaurantName
-            ? `${restaurantName} · charts & figures${demo ? " (demo)" : ""}.`
-            : `Charts & figures${demo ? " (demo)" : ""}.`
+            ? `${restaurantName} · revenue overview.`
+            : "Revenue overview."
         }
         action={
           <TrendIndicator
@@ -707,37 +705,9 @@ export function VendorEarningsCharts({
         />
       </VendorPanel>
 
-      {!demo ? (
-        <p className="px-2 text-center text-xs text-muted">
-          Payout charts will appear here once payouts are configured.
-        </p>
-      ) : (
-        <section className="vendor-panel">
-          <SectionTitle
-            right={
-              <span className="text-data text-sm font-bold text-green">
-                {formatINR(72400)}
-              </span>
-            }
-          >
-            Recent payouts
-          </SectionTitle>
-          <div className="space-y-3">
-            <HorizontalBarRow
-              label="Last week"
-              value={72400}
-              max={72400}
-              colorClass="bg-green"
-            />
-            <HorizontalBarRow
-              label="2 weeks ago"
-              value={68150}
-              max={72400}
-              colorClass="bg-green/70"
-            />
-          </div>
-        </section>
-      )}
+      <p className="px-2 text-center text-xs text-muted">
+        Payout history will appear here once payouts are configured.
+      </p>
     </div>
   );
 }

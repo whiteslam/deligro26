@@ -1,16 +1,20 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { X } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import { ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   createMenuItemAction,
   updateMenuItemAction,
 } from "@/app/vendor/actions";
-import type { MenuItem } from "@/types";
+import { createClient } from "@/lib/supabase/client";
+import type { VendorMenuItem } from "@/lib/data-access/vendor-menu";
 
 const INPUT =
   "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent";
+
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export type MenuFormValues = {
   name: string;
@@ -24,7 +28,7 @@ export type MenuFormValues = {
   imageUrl: string;
 };
 
-type MenuRow = MenuItem & { dbId: string };
+type MenuRow = VendorMenuItem;
 
 const EMPTY: MenuFormValues = {
   name: "",
@@ -53,27 +57,69 @@ function toFormValues(item?: MenuRow): MenuFormValues {
   };
 }
 
+async function uploadMenuImage(
+  restaurantId: string,
+  file: File
+): Promise<string> {
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    throw new Error("Use JPEG, PNG, or WebP.");
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error("Image must be under 2 MB.");
+  }
+
+  const ext =
+    file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${restaurantId}/${crypto.randomUUID()}.${ext}`;
+  const supabase = createClient();
+  const { error } = await supabase.storage
+    .from("menu-images")
+    .upload(path, file, { cacheControl: "3600", upsert: false });
+  if (error) throw error;
+
+  const { data } = supabase.storage.from("menu-images").getPublicUrl(path);
+  return data.publicUrl;
+}
+
 export function MenuItemFormSheet({
   open,
   mode,
   item,
   categories,
+  restaurantId,
   onClose,
 }: {
   open: boolean;
   mode: "create" | "edit";
   item?: MenuRow;
   categories: string[];
+  restaurantId: string;
   onClose: () => void;
 }) {
+  const fileRef = useRef<HTMLInputElement>(null);
   const [values, setValues] = useState<MenuFormValues>(() => toFormValues(item));
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [pending, startTransition] = useTransition();
 
   if (!open) return null;
 
   function set<K extends keyof MenuFormValues>(key: K, value: MenuFormValues[K]) {
     setValues((v) => ({ ...v, [key]: value }));
+  }
+
+  async function handlePickImage(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    setUploading(true);
+    try {
+      const url = await uploadMenuImage(restaurantId, file);
+      set("imageUrl", url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -137,95 +183,164 @@ export function MenuItemFormSheet({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Field label="Name" required>
-            <input
-              value={values.name}
-              onChange={(e) => set("name", e.target.value)}
-              className={INPUT}
-              placeholder="Paneer Butter Masala"
-              required
-            />
-          </Field>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <section className="space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted">
+              Basics
+            </p>
+            <Field label="Name" required>
+              <input
+                value={values.name}
+                onChange={(e) => set("name", e.target.value)}
+                className={INPUT}
+                placeholder="Paneer Butter Masala"
+                required
+              />
+            </Field>
 
-          <Field label="Category" required>
-            <input
-              value={values.category}
-              onChange={(e) => set("category", e.target.value)}
-              className={INPUT}
-              list="menu-categories"
-              placeholder="Burgers"
-              required
-            />
-            <datalist id="menu-categories">
-              {categories.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
-          </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Category" required>
+                <input
+                  value={values.category}
+                  onChange={(e) => set("category", e.target.value)}
+                  className={INPUT}
+                  list="menu-categories"
+                  placeholder="Burgers"
+                  required
+                />
+                <datalist id="menu-categories">
+                  {categories.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              </Field>
+              <Field label="Price (₹)" required>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={values.price}
+                  onChange={(e) => set("price", e.target.value)}
+                  className={INPUT}
+                  placeholder="199"
+                  required
+                />
+              </Field>
+            </div>
 
-          <Field label="Price (₹)" required>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              value={values.price}
-              onChange={(e) => set("price", e.target.value)}
-              className={INPUT}
-              placeholder="199"
-              required
-            />
-          </Field>
+            <Field label="Description">
+              <textarea
+                value={values.description}
+                onChange={(e) => set("description", e.target.value)}
+                className={`${INPUT} min-h-20 resize-y`}
+                placeholder="Short description for customers"
+              />
+            </Field>
+          </section>
 
-          <Field label="Description">
-            <textarea
-              value={values.description}
-              onChange={(e) => set("description", e.target.value)}
-              className={`${INPUT} min-h-20 resize-y`}
-              placeholder="Short description for customers"
-            />
-          </Field>
+          <section className="space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted">
+              Photo
+            </p>
+            <div className="flex items-start gap-3">
+              {values.imageUrl ? (
+                <img
+                  src={values.imageUrl}
+                  alt=""
+                  className="size-20 rounded-xl object-cover"
+                />
+              ) : (
+                <span className="grid size-20 place-items-center rounded-xl bg-surface-2 text-muted">
+                  <ImagePlus className="size-6" />
+                </span>
+              )}
+              <div className="min-w-0 flex-1 space-y-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    void handlePickImage(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={uploading}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  {uploading ? "Uploading…" : "Upload photo"}
+                </Button>
+                {values.imageUrl ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => set("imageUrl", "")}
+                  >
+                    Remove
+                  </Button>
+                ) : null}
+                <p className="text-[11px] text-muted">JPEG/PNG/WebP · max 2 MB</p>
+              </div>
+            </div>
+            <Field label="Or paste image URL">
+              <input
+                value={values.imageUrl}
+                onChange={(e) => set("imageUrl", e.target.value)}
+                className={INPUT}
+                placeholder="https://…"
+              />
+            </Field>
+          </section>
 
-          <Field label="Image URL">
-            <input
-              value={values.imageUrl}
-              onChange={(e) => set("imageUrl", e.target.value)}
-              className={INPUT}
-              placeholder="https://…"
-            />
-          </Field>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <ToggleRow
-              label="Vegetarian"
-              checked={values.veg}
-              onChange={(v) => set("veg", v)}
-            />
-            <ToggleRow
-              label="In stock"
-              checked={values.available}
-              onChange={(v) => set("available", v)}
-            />
-            <ToggleRow
-              label="Popular"
-              checked={values.popular}
-              onChange={(v) => set("popular", v)}
-            />
-            <ToggleRow
-              label="Bestseller"
-              checked={values.bestseller}
-              onChange={(v) => set("bestseller", v)}
-            />
-          </div>
+          <section className="space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted">
+              Flags
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <ToggleRow
+                label="Vegetarian"
+                checked={values.veg}
+                onChange={(v) => set("veg", v)}
+              />
+              <ToggleRow
+                label="In stock"
+                checked={values.available}
+                onChange={(v) => set("available", v)}
+              />
+              <ToggleRow
+                label="Popular"
+                checked={values.popular}
+                onChange={(v) => set("popular", v)}
+              />
+              <ToggleRow
+                label="Bestseller"
+                checked={values.bestseller}
+                onChange={(v) => set("bestseller", v)}
+              />
+            </div>
+          </section>
 
           {error ? <p className="text-sm text-red-500">{error}</p> : null}
 
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-2 pt-1">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" className="flex-1" disabled={pending}>
-              {pending ? "Saving…" : mode === "create" ? "Add item" : "Save changes"}
+            <Button
+              type="submit"
+              className="flex-1"
+              disabled={pending || uploading}
+            >
+              {pending
+                ? "Saving…"
+                : mode === "create"
+                  ? "Add item"
+                  : "Save changes"}
             </Button>
           </div>
         </form>

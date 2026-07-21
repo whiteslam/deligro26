@@ -9,9 +9,15 @@ import {
   VENDOR_RESTAURANT_COOKIE,
 } from "@/lib/data-access/vendor-restaurant";
 import {
+  bulkSetAvailable,
   createMenuItem,
   deleteMenuItem,
+  deleteMenuItems,
+  mergeCategory,
+  renameCategory,
   updateMenuItem,
+  upsertMenuItemsFromImport,
+  type MenuImportRow,
   type MenuItemInput,
 } from "@/lib/data-access/vendor-menu";
 
@@ -71,4 +77,46 @@ export async function deleteMenuItemAction(menuItemId: string) {
   if (!ok) throw new Error("not_found");
   revalidateVendorMenu();
   return { ok: true as const };
+}
+
+export async function deleteMenuItemsAction(menuItemIds: string[]) {
+  await requireRestaurantRole();
+  const count = await deleteMenuItems(menuItemIds);
+  revalidateVendorMenu();
+  return { ok: true as const, count };
+}
+
+export async function bulkSetAvailableAction(
+  menuItemIds: string[],
+  available: boolean
+) {
+  await requireRestaurantRole();
+  const count = await bulkSetAvailable(menuItemIds, available);
+  revalidateVendorMenu();
+  return { ok: true as const, count };
+}
+
+export async function renameCategoryAction(from: string, to: string) {
+  await requireRestaurantRole();
+  const count = await renameCategory(from, to);
+  revalidateVendorMenu();
+  return { ok: true as const, count };
+}
+
+export async function mergeCategoryAction(from: string, into: string) {
+  await requireRestaurantRole();
+  const count = await mergeCategory(from, into);
+  revalidateVendorMenu();
+  return { ok: true as const, count };
+}
+
+export async function importMenuCsvAction(rows: MenuImportRow[]) {
+  await requireRestaurantRole();
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("empty_import");
+  }
+  if (rows.length > 500) throw new Error("too_many_rows");
+  const result = await upsertMenuItemsFromImport(rows);
+  revalidateVendorMenu();
+  return { ok: true as const, ...result };
 }

@@ -1,19 +1,20 @@
-import { VendorMenuBoard } from "@/components/vendor/vendor-menu-board";
+import { VendorOverviewBoard } from "@/components/vendor/vendor-overview-board";
 import { VendorPageHeader } from "@/components/vendor/vendor-page-header";
 import { getProfile } from "@/lib/auth";
-import { listOwnedMenuItems } from "@/lib/data-access/vendor-menu";
+import { getVendorOverviewSummary } from "@/lib/data-access/vendor-overview";
+import type { VendorOverviewSummary } from "@/lib/data-access/vendor-overview";
 import { resolveVendorRestaurant } from "@/lib/data-access/vendor-restaurant";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export const dynamic = "force-dynamic";
 
-export default async function RestaurantMenuPage() {
+export default async function VendorOverviewPage() {
   if (!isSupabaseConfigured) {
     return (
       <div className="space-y-6">
         <VendorPageHeader
-          title="Menu"
-          subtitle="Connect Supabase to manage your menu."
+          title="Overview"
+          subtitle="Connect Supabase to view business insights."
         />
       </div>
     );
@@ -23,7 +24,10 @@ export default async function RestaurantMenuPage() {
   if (profile?.role !== "restaurant") {
     return (
       <div className="space-y-6">
-        <VendorPageHeader title="Menu" subtitle="Restaurant access required." />
+        <VendorPageHeader
+          title="Overview"
+          subtitle="Restaurant access required."
+        />
       </div>
     );
   }
@@ -35,7 +39,7 @@ export default async function RestaurantMenuPage() {
     return (
       <div className="space-y-6">
         <VendorPageHeader
-          title="Menu"
+          title="Overview"
           subtitle="Could not load your restaurant. Try again."
         />
       </div>
@@ -46,34 +50,28 @@ export default async function RestaurantMenuPage() {
     return (
       <div className="space-y-6">
         <VendorPageHeader
-          title="Menu"
+          title="Overview"
           subtitle="No restaurant linked to your account."
         />
       </div>
     );
   }
 
-  let menu: Awaited<ReturnType<typeof listOwnedMenuItems>> = null;
+  let summary: VendorOverviewSummary;
   try {
-    menu = await listOwnedMenuItems();
+    summary = await getVendorOverviewSummary(restaurant.id);
   } catch {
     return (
       <div className="space-y-6">
         <VendorPageHeader
-          title="Menu"
-          subtitle={`Could not load menu for ${restaurant.name}.`}
+          title="Overview"
+          subtitle={`Could not load overview for ${restaurant.name}.`}
         />
       </div>
     );
   }
 
   return (
-    <VendorMenuBoard
-      restaurantId={menu?.restaurantId ?? restaurant.id}
-      restaurantName={menu?.restaurantName ?? restaurant.name}
-      categories={menu?.categories ?? []}
-      items={menu?.items ?? []}
-      live
-    />
+    <VendorOverviewBoard restaurantName={restaurant.name} stats={summary} />
   );
 }

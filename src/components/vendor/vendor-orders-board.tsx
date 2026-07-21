@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Clock,
   ClipboardList,
+  ExternalLink,
   MapPin,
   Phone,
   Sparkles,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VendorSegmentedTabs } from "@/components/vendor/vendor-page-header";
+import { VendorOrderHistoryDialog } from "@/components/vendor/vendor-order-history-dialog";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import {
   VendorEmptyState,
@@ -37,6 +39,51 @@ function statusLabel(status: string) {
   return status;
 }
 
+function orderTitle(order: KitchenOrder): string {
+  if (order.lines.length === 0) return "Order";
+  if (order.lines.length === 1) return order.lines[0].name;
+  return `${order.lines[0].name} +${order.lines.length - 1} more`;
+}
+
+function orderDescription(order: KitchenOrder): string {
+  const first = order.lines[0];
+  if (first?.description) return first.description;
+  const customer = order.customerProfile?.name ?? order.customer;
+  return `${customer} · ${order.area}`;
+}
+
+function ItemThumb({
+  src,
+  name,
+  size = "md",
+}: {
+  src?: string | null;
+  name: string;
+  size?: "sm" | "md";
+}) {
+  const dim = size === "sm" ? "size-10" : "size-14";
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={name}
+        className={cn(dim, "shrink-0 rounded-xl object-cover")}
+      />
+    );
+  }
+  return (
+    <span
+      className={cn(
+        dim,
+        "grid shrink-0 place-items-center rounded-xl bg-surface-2 text-lg"
+      )}
+    >
+      🍽️
+    </span>
+  );
+}
+
 function OrderCard({
   order,
   variant = "default",
@@ -47,6 +94,9 @@ function OrderCard({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(variant === "new");
+  const first = order.lines[0];
+  const title = orderTitle(order);
+  const description = orderDescription(order);
 
   return (
     <article
@@ -58,32 +108,40 @@ function OrderCard({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="press flex w-full items-start justify-between gap-3 p-3 text-left sm:p-4"
+        className="press flex w-full items-start gap-3 p-3 text-left sm:p-4"
       >
-        <div className="min-w-0">
+        <ItemThumb src={first?.imageUrl} name={title} />
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-data font-bold">{order.code}</p>
+            <p className="text-data text-xs font-semibold text-muted">
+              {order.code}
+            </p>
             {variant === "new" ? (
               <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase text-accent">
                 New
               </span>
             ) : null}
           </div>
-          <p className="mt-1 flex items-center gap-1 text-sm text-muted">
-            <Clock className="size-3.5 shrink-0" /> {order.placedAgo}
+          <p className="mt-0.5 line-clamp-1 text-sm font-bold leading-snug">
+            {title}
           </p>
+          <p className="mt-0.5 line-clamp-2 text-xs text-muted">{description}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+            <span className="inline-flex items-center gap-1">
+              <Clock className="size-3.5 shrink-0" />
+              {order.placedAt || order.placedAgo}
+            </span>
+            <span className="text-data font-bold text-ink">
+              {formatINR(order.total)}
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-data text-base font-bold">
-            {formatINR(order.total)}
-          </span>
-          <ChevronDown
-            className={cn(
-              "size-4 text-muted transition-transform",
-              open && "rotate-180"
-            )}
-          />
-        </div>
+        <ChevronDown
+          className={cn(
+            "mt-1 size-4 shrink-0 text-muted transition-transform",
+            open && "rotate-180"
+          )}
+        />
       </button>
 
       {open ? (
@@ -119,17 +177,25 @@ function OrderCard({
             {order.lines.map((l, i) => (
               <li
                 key={i}
-                className="flex justify-between gap-3 rounded-lg bg-surface-2/80 px-3 py-2 text-sm"
+                className="flex items-start gap-3 rounded-xl border border-line bg-surface-2/60 p-2.5"
               >
-                <span>
-                  <span className="text-data font-semibold text-accent">
-                    {l.qty}×
-                  </span>{" "}
-                  {l.name}
-                </span>
-                <span className="text-data text-muted">
-                  {formatINR(l.price * l.qty)}
-                </span>
+                <ItemThumb src={l.imageUrl} name={l.name} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold leading-snug">
+                      <span className="text-data text-accent">{l.qty}×</span>{" "}
+                      {l.name}
+                    </p>
+                    <span className="text-data shrink-0 text-sm font-bold">
+                      {formatINR(l.price * l.qty)}
+                    </span>
+                  </div>
+                  {l.description ? (
+                    <p className="mt-0.5 line-clamp-2 text-xs text-muted">
+                      {l.description}
+                    </p>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
@@ -237,40 +303,180 @@ function PreparingList({
   );
 }
 
+function HistoryOrderCard({
+  order,
+  statusTone,
+}: {
+  order: KitchenOrder;
+  statusTone: "cancelled" | "done";
+}) {
+  const [open, setOpen] = useState(false);
+  const first = order.lines[0];
+  const title = orderTitle(order);
+  const description =
+    first?.description?.trim() ||
+    `${order.customerProfile?.name ?? order.customer} · ${order.area}`;
+
+  return (
+    <article className="vendor-order-card flex h-full flex-col overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="press flex w-full items-start gap-3 p-3 text-left"
+      >
+        <ItemThumb src={first?.imageUrl} name={title} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-data text-xs font-semibold text-muted">
+              {order.code}
+            </span>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
+                statusTone === "cancelled"
+                  ? "bg-red-500/10 text-red-500"
+                  : "bg-green/15 text-green"
+              )}
+            >
+              {statusTone === "cancelled"
+                ? "Cancelled"
+                : statusLabel(order.status ?? "delivered")}
+            </span>
+          </div>
+          <p className="mt-1 line-clamp-1 text-sm font-bold leading-snug">
+            {title}
+          </p>
+          <p className="mt-0.5 line-clamp-2 text-xs text-muted">{description}</p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1 text-xs text-muted">
+              <Clock className="size-3.5 shrink-0" />
+              {order.placedAt || order.placedAgo}
+            </span>
+            <span className="text-data text-sm font-bold">
+              {formatINR(order.total)}
+            </span>
+          </div>
+        </div>
+        <ChevronDown
+          className={cn(
+            "mt-1 size-4 shrink-0 text-muted transition-transform",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+
+      {open ? (
+        <div className="border-t border-line px-3 pb-3">
+          <div className="mt-3 flex gap-3 rounded-xl bg-surface-2 p-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent/15 text-sm font-bold text-accent">
+              {order.customerProfile?.initials ??
+                order.customer.slice(0, 2).toUpperCase()}
+            </span>
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="flex items-center gap-1.5 text-sm font-semibold">
+                <User className="size-3.5 text-muted" />
+                {order.customerProfile?.name ?? order.customer}
+              </p>
+              {order.customerProfile?.phone ? (
+                <a
+                  href={`tel:${order.customerProfile.phone.replace(/\s/g, "")}`}
+                  className="flex items-center gap-1.5 text-sm text-accent"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Phone className="size-3.5" />
+                  {order.customerProfile.phone}
+                </a>
+              ) : null}
+              <p className="flex items-start gap-1.5 text-xs text-muted">
+                <MapPin className="mt-0.5 size-3.5 shrink-0" />
+                <span className="line-clamp-2">{order.area}</span>
+              </p>
+            </div>
+          </div>
+
+          <ul className="mt-3 space-y-2">
+            {order.lines.map((l, i) => (
+              <li
+                key={i}
+                className="flex items-start gap-3 rounded-xl border border-line bg-surface-2/60 p-2.5"
+              >
+                <ItemThumb src={l.imageUrl} name={l.name} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold leading-snug">
+                      <span className="text-data text-accent">{l.qty}×</span>{" "}
+                      {l.name}
+                    </p>
+                    <span className="text-data shrink-0 text-sm font-bold">
+                      {formatINR(l.price * l.qty)}
+                    </span>
+                  </div>
+                  {l.description ? (
+                    <p className="mt-0.5 line-clamp-2 text-xs text-muted">
+                      {l.description}
+                    </p>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 function HistoryList({
   orders,
   empty,
   statusTone,
+  onViewAll,
 }: {
   orders: KitchenOrder[];
   empty: string;
   statusTone: "cancelled" | "done";
+  onViewAll?: () => void;
 }) {
   if (orders.length === 0) {
     return (
-      <VendorEmptyState
-        icon={ClipboardList}
-        title="Nothing here yet"
-        description={empty}
-      />
+      <div className="space-y-3">
+        <VendorEmptyState
+          icon={ClipboardList}
+          title="Nothing here yet"
+          description={empty}
+        />
+        {onViewAll ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={onViewAll}
+          >
+            <ExternalLink className="size-4" /> View full history
+          </Button>
+        ) : null}
+      </div>
     );
   }
   return (
     <div className="space-y-3">
-      {orders.map((o) => (
-        <OrderCard key={o.id} order={o}>
-          <span
-            className={cn(
-              "col-span-2 text-center text-xs font-bold uppercase tracking-wide",
-              statusTone === "cancelled" ? "text-red-500" : "text-green"
-            )}
-          >
-            {statusTone === "cancelled"
-              ? "Cancelled"
-              : statusLabel(o.status ?? "delivered")}
-          </span>
-        </OrderCard>
-      ))}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {orders.map((o) => (
+          <HistoryOrderCard key={o.id} order={o} statusTone={statusTone} />
+        ))}
+      </div>
+      {onViewAll ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={onViewAll}
+        >
+          <ExternalLink className="size-4" /> View all
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -297,6 +503,9 @@ export function VendorOrdersBoard({
   const [readyCount, setReadyCount] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<OrderTab>("new");
+  const [historyDialog, setHistoryDialog] = useState<
+    null | "cancelled" | "completed"
+  >(null);
 
   useEffect(() => {
     if (live) {
@@ -426,6 +635,7 @@ export function VendorOrdersBoard({
             orders={cancelled}
             empty="Rejected orders stay here for your records."
             statusTone="cancelled"
+            onViewAll={() => setHistoryDialog("cancelled")}
           />
         ) : null}
         {mobileTab === "done" && live ? (
@@ -433,6 +643,7 @@ export function VendorOrdersBoard({
             orders={recent}
             empty="No delivered orders yet."
             statusTone="done"
+            onViewAll={() => setHistoryDialog("completed")}
           />
         ) : null}
       </div>
@@ -448,14 +659,40 @@ export function VendorOrdersBoard({
 
       {live ? (
         <div className="hidden gap-4 lg:grid lg:grid-cols-2">
-          <VendorPanel title="Cancelled" accent="red">
+          <VendorPanel
+            title="Cancelled"
+            accent="red"
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setHistoryDialog("cancelled")}
+              >
+                View all
+              </Button>
+            }
+          >
             <HistoryList
               orders={cancelled}
               empty="Rejected orders stay in the database."
               statusTone="cancelled"
             />
           </VendorPanel>
-          <VendorPanel title="Completed" accent="green">
+          <VendorPanel
+            title="Completed"
+            accent="green"
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setHistoryDialog("completed")}
+              >
+                View all
+              </Button>
+            }
+          >
             <HistoryList
               orders={recent}
               empty="No delivered orders yet."
@@ -463,6 +700,14 @@ export function VendorOrdersBoard({
             />
           </VendorPanel>
         </div>
+      ) : null}
+
+      {historyDialog ? (
+        <VendorOrderHistoryDialog
+          open
+          kind={historyDialog}
+          onClose={() => setHistoryDialog(null)}
+        />
       ) : null}
     </div>
   );

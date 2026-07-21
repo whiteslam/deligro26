@@ -161,9 +161,12 @@ A shop / restaurant listing. Vendor account = `profiles` where `role = 'restaura
 | `image_url` | `text` | null | |
 | `popular` | `boolean` | `false` | |
 | `bestseller` | `boolean` | `false` | |
+| `sort_order` | `integer` | `0` | Vendor display order (`0009`) |
 | `created_at` | `timestamptz` | `now()` | |
 
 **Unique:** `(restaurant_id, external_id)` where `external_id` is not null
+
+**Storage:** public bucket `menu-images` — object path `{restaurant_id}/{filename}`; owners write via `owns_restaurant()` (`0009`)
 
 **Legacy PHP mapping:** `products` → `menu_items` (`status ON/OFF` → `available`)
 

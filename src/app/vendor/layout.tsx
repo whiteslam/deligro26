@@ -9,7 +9,6 @@ import {
   resolveVendorRestaurant,
 } from "@/lib/data-access/vendor-restaurant";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { RESTAURANT_NAME } from "@/lib/roles-data";
 
 export default async function RestaurantLayout({
   children,
@@ -18,8 +17,8 @@ export default async function RestaurantLayout({
 }) {
   await requireRole("restaurant");
 
-  let restaurantName = RESTAURANT_NAME;
-  let isOpen = true;
+  let restaurantName = "";
+  let isOpen = false;
   let restaurants: Awaited<ReturnType<typeof listOwnedRestaurants>> = [];
   let activeSlug = "";
 
@@ -33,16 +32,16 @@ export default async function RestaurantLayout({
         activeSlug = active.slug;
       }
     } catch {
-      // demo fallback name
+      // leave empty — pages show their own error states
     }
   }
 
   const shellProps = {
-    restaurantName,
+    restaurantName: restaurantName || "No restaurant",
     isOpen,
     restaurants,
     activeSlug,
-    showControls: isSupabaseConfigured,
+    showControls: isSupabaseConfigured && restaurants.length > 0,
   };
 
   return (

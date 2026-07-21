@@ -28,13 +28,23 @@ export function VendorTopBar({
     <header className="vendor-top-bar glass sticky top-0 z-30 border-x-0 border-t-0 lg:hidden">
       <div className="flex items-center gap-2 px-4 py-2.5">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            {isOpen ? <LivePulse className="scale-90" /> : null}
-            <p className="truncate text-sm font-bold">{restaurantName}</p>
-          </div>
-          <p className="text-[11px] text-muted">
-            {isOpen ? "Accepting orders" : "Store paused"}
-          </p>
+          {multiStore && showControls ? (
+            <RestaurantSwitcher
+              restaurants={restaurants}
+              activeSlug={activeSlug}
+              fullWidth
+            />
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                {isOpen ? <LivePulse className="scale-90" /> : null}
+                <p className="truncate text-sm font-bold">{restaurantName}</p>
+              </div>
+              <p className="text-[11px] text-muted">
+                {isOpen ? "Accepting orders" : "Store paused"}
+              </p>
+            </>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {showControls ? <RestaurantOpenToggle isOpen={isOpen} /> : null}
@@ -59,14 +69,10 @@ export function VendorTopBar({
           )}
         </div>
       </div>
-      {showControls && multiStore ? (
-        <div className="border-t border-line px-4 py-2">
-          <RestaurantSwitcher
-            restaurants={restaurants}
-            activeSlug={activeSlug}
-            fullWidth
-          />
-        </div>
+      {multiStore && showControls ? (
+        <p className="border-t border-line px-4 py-1.5 text-[11px] text-muted">
+          {isOpen ? "Accepting orders" : "Store paused"}
+        </p>
       ) : null}
     </header>
   );
