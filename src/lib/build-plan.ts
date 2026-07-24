@@ -266,7 +266,7 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
           title: "Restaurant open/closed toggle",
           detail: "Owner updates restaurants.is_open — no vendor write UI yet",
           db: "restaurants.is_open",
-          status: "todo",
+          status: "done",
         },
       ],
     },

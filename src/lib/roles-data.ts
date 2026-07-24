@@ -10,18 +10,30 @@ export interface RoleOrderLine {
   name: string;
   qty: number;
   price: number;
+  description?: string | null;
+  imageUrl?: string | null;
 }
 
 /* ---------- Restaurant (merchant) ---------- */
+export interface KitchenOrderCustomer {
+  name: string;
+  phone: string | null;
+  initials: string;
+}
+
 export interface KitchenOrder {
   id: string;
   code: string; // short human ref, e.g. "#D-4821"
   customer: string;
+  customerProfile?: KitchenOrderCustomer;
   area: string;
+  deliveryLine?: string;
   placedAgo: string; // "2 min ago"
+  placedAt: string; // absolute date/time for history cards
   lines: RoleOrderLine[];
   total: number;
   note?: string;
+  status?: string;
 }
 
 export const RESTAURANT_NAME = "Saffron Kitchen";
@@ -33,6 +45,7 @@ export const INCOMING_ORDERS: KitchenOrder[] = [
     customer: "Aarav M.",
     area: "Koramangala 5th Block",
     placedAgo: "just now",
+    placedAt: "Tue, 21 Jul, 10:00 pm",
     lines: [
       { name: "Hyderabadi Dum Biryani", qty: 2, price: 320 },
       { name: "Garlic Naan", qty: 2, price: 70 },
@@ -46,6 +59,7 @@ export const INCOMING_ORDERS: KitchenOrder[] = [
     customer: "Priya S.",
     area: "HSR Layout Sector 2",
     placedAgo: "1 min ago",
+    placedAt: "Tue, 21 Jul, 9:59 pm",
     lines: [
       { name: "Paneer Butter Masala", qty: 1, price: 260 },
       { name: "Jeera Rice", qty: 1, price: 140 },
@@ -58,6 +72,7 @@ export const INCOMING_ORDERS: KitchenOrder[] = [
     customer: "Rahul K.",
     area: "Indiranagar 12th Main",
     placedAgo: "3 min ago",
+    placedAt: "Tue, 21 Jul, 9:57 pm",
     lines: [{ name: "Chicken Biryani", qty: 3, price: 300 }],
     total: 900,
   },
@@ -70,6 +85,7 @@ export const PREPARING_ORDERS: KitchenOrder[] = [
     customer: "Neha R.",
     area: "BTM Layout",
     placedAgo: "8 min ago",
+    placedAt: "Tue, 21 Jul, 9:52 pm",
     lines: [
       { name: "Mutton Rogan Josh", qty: 1, price: 380 },
       { name: "Butter Naan", qty: 3, price: 60 },
