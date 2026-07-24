@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 
@@ -21,9 +21,14 @@ export function MenuAvailabilityToggle({
   const [available, setAvailable] = useState(initialAvailable);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
+  // Adopt a fresh server value during render rather than in an effect — an effect
+  // would paint one stale frame first, and syncing state in effects is exactly
+  // what the react-hooks lint rule flags.
+  const [adopted, setAdopted] = useState(initialAvailable);
+  if (adopted !== initialAvailable) {
+    setAdopted(initialAvailable);
     setAvailable(initialAvailable);
-  }, [initialAvailable]);
+  }
 
   async function toggle() {
     const next = !available;

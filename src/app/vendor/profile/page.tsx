@@ -30,19 +30,9 @@ export default async function VendorProfilePage() {
     );
   }
 
+  let profile: Awaited<ReturnType<typeof getVendorProfileSummary>>;
   try {
-    const profile = await getVendorProfileSummary();
-    if (!profile) {
-      return (
-        <div className="space-y-6">
-          <VendorPageHeader
-            title="Profile"
-            subtitle="Sign in to view your restaurant account."
-          />
-        </div>
-      );
-    }
-    return <VendorProfileView profile={profile} live />;
+    profile = await getVendorProfileSummary();
   } catch {
     return (
       <div className="space-y-6">
@@ -53,4 +43,17 @@ export default async function VendorProfilePage() {
       </div>
     );
   }
+
+  if (!profile) {
+    return (
+      <div className="space-y-6">
+        <VendorPageHeader
+          title="Profile"
+          subtitle="Sign in to view your restaurant account."
+        />
+      </div>
+    );
+  }
+
+  return <VendorProfileView profile={profile} live />;
 }

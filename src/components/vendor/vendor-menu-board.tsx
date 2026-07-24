@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckSquare,
@@ -71,9 +71,14 @@ export function VendorMenuBoard({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  useEffect(() => {
+  // Adopt fresh server rows during render (new/edited items from router.refresh)
+  // rather than syncing them in an effect, which paints a stale frame and trips
+  // the react-hooks lint rule.
+  const [adoptedItems, setAdoptedItems] = useState(initialItems);
+  if (adoptedItems !== initialItems) {
+    setAdoptedItems(initialItems);
     setItems(initialItems);
-  }, [initialItems]);
+  }
 
   const allCategories = useMemo(
     () =>
@@ -460,6 +465,7 @@ export function VendorMenuBoard({
 
                       <div className="relative shrink-0">
                         {item.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- vendor-supplied image URL, matches the app's <img> usage
                           <img
                             src={item.image}
                             alt=""

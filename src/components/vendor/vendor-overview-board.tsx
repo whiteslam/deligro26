@@ -354,6 +354,62 @@ function DonutChart({
   );
 }
 
+type TileProps = {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  name?: string;
+  fill?: string;
+  size?: number;
+};
+
+// Recharts Treemap tile renderer. Declared at module scope, not inside
+// BestsellersTreemap's render — a component created during render remounts and
+// loses state every frame (and the react-hooks lint rule rejects it).
+function ProductTile(props: TileProps) {
+  const { x = 0, y = 0, width = 0, height = 0, name, fill, size } = props;
+  if (width < 4 || height < 4) return null;
+  const showLabel = width > 48 && height > 36;
+  return (
+    <g>
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        rx={8}
+        fill={fill}
+        fillOpacity={0.88}
+      />
+      {showLabel ? (
+        <>
+          <text
+            x={x + 10}
+            y={y + 18}
+            fill="#fff"
+            fontSize={11}
+            fontWeight={700}
+          >
+            {String(name ?? "").length > 14
+              ? `${String(name).slice(0, 12)}…`
+              : name}
+          </text>
+          <text
+            x={x + 10}
+            y={y + 34}
+            fill="rgba(255,255,255,0.9)"
+            fontSize={10}
+            fontWeight={600}
+          >
+            {size} sold
+          </text>
+        </>
+      ) : null}
+    </g>
+  );
+}
+
 function BestsellersTreemap({
   data,
 }: {
@@ -380,59 +436,6 @@ function BestsellersTreemap({
     revenue: p.revenue,
     fill: palette[i % palette.length],
   }));
-
-  type TileProps = {
-    x?: number;
-    y?: number;
-    width?: number;
-    height?: number;
-    name?: string;
-    fill?: string;
-    size?: number;
-  };
-
-  function ProductTile(props: TileProps) {
-    const { x = 0, y = 0, width = 0, height = 0, name, fill, size } = props;
-    if (width < 4 || height < 4) return null;
-    const showLabel = width > 48 && height > 36;
-    return (
-      <g>
-        <rect
-          x={x}
-          y={y}
-          width={width}
-          height={height}
-          rx={8}
-          fill={fill}
-          fillOpacity={0.88}
-        />
-        {showLabel ? (
-          <>
-            <text
-              x={x + 10}
-              y={y + 18}
-              fill="#fff"
-              fontSize={11}
-              fontWeight={700}
-            >
-              {String(name ?? "").length > 14
-                ? `${String(name).slice(0, 12)}…`
-                : name}
-            </text>
-            <text
-              x={x + 10}
-              y={y + 34}
-              fill="rgba(255,255,255,0.9)"
-              fontSize={10}
-              fontWeight={600}
-            >
-              {size} sold
-            </text>
-          </>
-        ) : null}
-      </g>
-    );
-  }
 
   return (
     <div className="h-64 w-full">

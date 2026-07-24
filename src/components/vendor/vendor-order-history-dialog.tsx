@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Calendar,
   Clock,
@@ -161,50 +161,59 @@ export function VendorOrderHistoryDialog({
   const [query, setQuery] = useState("");
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  // Starts true so the spinner shows on open; the fetch flips it off once the
+  // first result lands. Refetches keep the current list visible until fresh
+  // data arrives (stale-while-revalidate) rather than flashing back to a spinner.
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const title =
     kind === "cancelled" ? "All cancelled orders" : "All completed orders";
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({
-        kind,
-        range,
-        limit: "150",
-      });
-      if (range === "date" && date) params.set("date", date);
-      if (query.trim()) params.set("search", query.trim());
-
-      const res = await fetch(`/api/vendor/orders/history?${params}`);
-      if (!res.ok) {
-        setError("Could not load orders.");
-        setOrders([]);
-        setTotal(0);
-        return;
-      }
-      const data = (await res.json()) as {
-        orders: KitchenOrder[];
-        total: number;
-      };
-      setOrders(data.orders ?? []);
-      setTotal(data.total ?? 0);
-    } catch {
-      setError("Could not load orders.");
-      setOrders([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [kind, range, date, query]);
-
+  // Load (and reload) history whenever the dialog opens or a filter changes.
+  // Every setState runs after an await so nothing fires synchronously inside the
+  // effect — the react-hooks lint rule flags synchronous effect setState.
   useEffect(() => {
     if (!open) return;
-    void load();
-  }, [open, load]);
+    let ignore = false;
+
+    void (async () => {
+      try {
+        const params = new URLSearchParams({ kind, range, limit: "150" });
+        if (range === "date" && date) params.set("date", date);
+        if (query.trim()) params.set("search", query.trim());
+
+        const res = await fetch(`/api/vendor/orders/history?${params}`);
+        if (ignore) return;
+        if (!res.ok) {
+          setError("Could not load orders.");
+          setOrders([]);
+          setTotal(0);
+          return;
+        }
+        const data = (await res.json()) as {
+          orders: KitchenOrder[];
+          total: number;
+        };
+        if (ignore) return;
+        setOrders(data.orders ?? []);
+        setTotal(data.total ?? 0);
+        setError(null);
+      } catch {
+        if (!ignore) {
+          setError("Could not load orders.");
+          setOrders([]);
+          setTotal(0);
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    })();
+
+    return () => {
+      ignore = true;
+    };
+  }, [open, kind, range, date, query]);
 
   useEffect(() => {
     if (!open) return;

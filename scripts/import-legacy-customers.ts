@@ -191,7 +191,7 @@ async function main() {
   let errors = 0;
   let done = 0;
 
-  await runPool(customers, CONCURRENCY, async (row, i) => {
+  await runPool(customers, CONCURRENCY, async (row) => {
     try {
       const status = await ensureCustomer(row);
       if (status === "created") created++;

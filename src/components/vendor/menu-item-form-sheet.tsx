@@ -244,6 +244,7 @@ export function MenuItemFormSheet({
             </p>
             <div className="flex items-start gap-3">
               {values.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- vendor-supplied image URL, matches the app's <img> usage
                 <img
                   src={values.imageUrl}
                   alt=""
