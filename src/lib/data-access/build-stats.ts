@@ -16,6 +16,7 @@ export interface BuildDbSnapshot {
   menu_items: number;
   legacy_menu_items: number;
   orders: number;
+  legacy_orders: number;
   deliveries: number;
   deliveries_unassigned: number;
   refunds: number;
@@ -71,10 +72,17 @@ export async function getBuildDbSnapshot(): Promise<BuildDbSnapshot | null> {
       count("addresses"),
     ]);
 
-    const { count: legacy_menu_items } = await supabase
-      .from("menu_items")
-      .select("*", { count: "exact", head: true })
-      .like("external_id", "legacy-%");
+    const [{ count: legacy_menu_items }, { count: legacy_orders }] =
+      await Promise.all([
+        supabase
+          .from("menu_items")
+          .select("*", { count: "exact", head: true })
+          .like("external_id", "legacy-%"),
+        supabase
+          .from("orders")
+          .select("*", { count: "exact", head: true })
+          .like("external_id", "legacy-%"),
+      ]);
 
     const { data: ownerRows } = await supabase
       .from("restaurants")
@@ -100,6 +108,7 @@ export async function getBuildDbSnapshot(): Promise<BuildDbSnapshot | null> {
       menu_items,
       legacy_menu_items: legacy_menu_items ?? 0,
       orders,
+      legacy_orders: legacy_orders ?? 0,
       deliveries,
       deliveries_unassigned,
       refunds,

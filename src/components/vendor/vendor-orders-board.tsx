@@ -209,8 +209,8 @@ export function VendorOrdersBoard({
       </div>
 
       <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted">
-        <ChefHat className="size-3.5" /> Enable MFA on restaurant accounts — they
-        can accept orders and change payouts.
+        <ChefHat className="size-3.5" /> MFA is required on restaurant accounts —
+        authenticator verified before this board unlocks.
       </p>
     </div>
   );

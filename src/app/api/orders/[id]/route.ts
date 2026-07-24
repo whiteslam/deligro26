@@ -40,7 +40,7 @@ export async function GET(
   }
 
   // Rate limit per user — cheap guard against scripted enumeration.
-  const limit = rateLimit(`orders:${user.id}`, 60, 60_000); // 60 / min
+  const limit = await rateLimit(`orders:${user.id}`, 60, 60_000); // 60 / min
   if (!limit.ok) {
     return NextResponse.json(
       { error: "rate_limited" },

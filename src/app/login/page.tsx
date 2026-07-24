@@ -6,6 +6,7 @@ import { ShieldAlert, Smartphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { StatusBar } from "@/components/layout/status-bar";
+import { SplashScreen } from "@/components/shared/splash-screen";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { OtpLogin } from "@/components/auth/otp-login";
 
@@ -59,13 +60,24 @@ function LoginForm() {
       email,
       password,
     });
-    setBusy(false);
 
     if (error) {
+      setBusy(false);
       // Deliberately generic — don't reveal whether the email exists.
       setError("Incorrect email or password.");
       return;
     }
+
+    // If this account already has TOTP, promote to aal2 before the portal gate.
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    setBusy(false);
+
+    if (aal?.currentLevel !== "aal2" && aal?.nextLevel === "aal2") {
+      router.push(`/mfa?next=${encodeURIComponent(next)}`);
+      router.refresh();
+      return;
+    }
+
     router.push(next);
     router.refresh();
   }
@@ -134,7 +146,7 @@ function LoginForm() {
       </button>
 
       <p className="mt-5 text-center text-xs leading-relaxed text-muted">
-        Restaurant &amp; admin accounts should enable MFA. OTP login is
+        Restaurant &amp; admin accounts require authenticator MFA. OTP login is
         rate-limited per phone number.
       </p>
     </form>
@@ -146,6 +158,7 @@ export default function LoginPage() {
     <div className="device">
       <div className="app-shell">
         <StatusBar />
+        <SplashScreen />
         {/* Below the status-bar strip, which is opaque and would otherwise
             cover the toggle in the framed (desktop) view. */}
         <div className="absolute right-4 top-4 z-10 min-[480px]:top-[64px]">

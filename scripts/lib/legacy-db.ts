@@ -68,6 +68,40 @@ export interface LegacyCustomer {
   username: string;
   useraddress: string;
   city: string;
+  latuser?: string;
+  longuser?: string;
+}
+
+/** One row from the legacy `orders` table (phpMyAdmin JSON). */
+export interface LegacyOrder {
+  id: string;
+  location_id: string;
+  shop_id: string;
+  user_id: string;
+  dboy_id: string;
+  uname: string;
+  ophone: string;
+  /** HTML cart snapshot — lines joined with `<br>`. */
+  pname: string;
+  /** Grand total paid (items + delivery − promo − wallet), rupees. */
+  price: string;
+  dcharge: string;
+  tax: string;
+  wallet: string;
+  promo_amount: string;
+  status: string;
+  tid: string;
+  ordertime: string;
+  shop_otp: string;
+  user_otp: string;
+  cancel_reason: string;
+}
+
+export interface ParsedOrderLine {
+  name: string;
+  qty: number;
+  /** Unit price in whole rupees. */
+  price: number;
 }
 
 export interface LegacyExport {
@@ -76,6 +110,7 @@ export interface LegacyExport {
   categories: LegacyCategory[];
   reviews: LegacyReview[];
   customers: LegacyCustomer[];
+  orders: LegacyOrder[];
   settings: LegacySettings | null;
 }
 
@@ -104,6 +139,7 @@ export function loadLegacyExport(jsonPath: string): LegacyExport {
     categories: table("category") as LegacyCategory[],
     reviews: table("review") as LegacyReview[],
     customers: table("user") as LegacyCustomer[],
+    orders: table("orders") as LegacyOrder[],
     settings: settingsRows[0]
       ? ({
           min_order_amount: settingsRows[0].min_order_amount ?? "0",
@@ -114,6 +150,115 @@ export function loadLegacyExport(jsonPath: string): LegacyExport {
         } satisfies LegacySettings)
       : null,
   };
+}
+
+/**
+ * Parse the legacy cart snapshot stored in `orders.pname`.
+ *
+ * Typical line: `✰ Paneer Chilli  Qty-1X Plate (Rs.90)`
+ * Lines are joined with `<br>`; a few rows omit Qty / use odd spacing.
+ */
+export function parsePnameHtml(pname: string): ParsedOrderLine[] {
+  const chunks = pname
+    .split(/<br\s*\/?\s*>/i)
+    .flatMap((chunk) =>
+      // Some rows jam two dishes together without a <br>.
+      chunk.split(/(?=✰)/g)
+    )
+    .map((c) =>
+      c
+        .replace(/✰/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/[<>]/g, " ")
+        .replace(/\s+/g, " ")
+        .replace(/[,\s]+$/, "")
+        .trim()
+    )
+    .filter(Boolean);
+
+  const lines: ParsedOrderLine[] = [];
+
+  for (const raw of chunks) {
+    // Primary: Name Qty-NX Unit (Rs.PRICE) — tolerate spacing / double ))
+    let m = raw.match(
+      /^(.*?)\s+Qty\s*-?\s*(\d+(?:\.\d+)?)\s*X\s*(.*?)\s*\(\s*Rs\.?\s*([\d.]+)\s*\)\)?$/i
+    );
+    if (m) {
+      const name = cleanItemName(m[1], m[3]);
+      const qty = normalizeQty(m[2]);
+      const price = Math.round(Number.parseFloat(m[4]));
+      if (name && qty > 0 && Number.isFinite(price) && price >= 0) {
+        lines.push({ name, qty, price });
+        continue;
+      }
+    }
+
+    // Fallback: Name (Rs.PRICE) or Name (PRICE) with implied qty 1
+    m = raw.match(/^(.*?)\s*\(\s*(?:Rs\.?\s*)?([\d.]+)\s*\)\s*$/i);
+    if (m) {
+      const name = cleanItemName(m[1], "");
+      const price = Math.round(Number.parseFloat(m[2]));
+      if (name && Number.isFinite(price) && price >= 0) {
+        lines.push({ name, qty: 1, price });
+      }
+    }
+  }
+
+  return lines;
+}
+
+function cleanItemName(name: string, unit: string): string {
+  let n = name.replace(/\s+/g, " ").trim();
+  const u = unit.replace(/\s+/g, " ").trim();
+  // Keep unit only when it isn't the meaningless default "Plate"/empty.
+  if (u && !/^(plate|piece|pack|packet|glass|cup|kg)?$/i.test(u)) {
+    n = `${n} (${u})`;
+  }
+  return n.slice(0, 200);
+}
+
+function normalizeQty(raw: string): number {
+  const n = Number.parseFloat(raw);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.max(1, Math.round(n));
+}
+
+/** Map legacy order status strings onto our order_status enum. */
+export function mapLegacyOrderStatus(
+  status: string
+): "delivered" | "cancelled" | "on_the_way" | "placed" {
+  const s = status.trim().toUpperCase();
+  if (s.includes("CANCEL")) return "cancelled";
+  if (s.includes("DELIVER")) return "delivered";
+  if (s.includes("PICK")) return "on_the_way";
+  return "placed";
+}
+
+/**
+ * Legacy ordertime is `DD/MM/YYYY hh:mm:ssam` (12h). Returns ISO or null.
+ */
+export function parseLegacyOrderTime(ordertime: string): string | null {
+  const m = ordertime
+    .trim()
+    .match(
+      /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})\s*(am|pm)$/i
+    );
+  if (!m) return null;
+  let hour = Number(m[4]);
+  const minute = Number(m[5]);
+  const second = Number(m[6]);
+  const ampm = m[7].toLowerCase();
+  if (ampm === "pm" && hour < 12) hour += 12;
+  if (ampm === "am" && hour === 12) hour = 0;
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const year = Number(m[3]);
+  // Store as IST wall-clock with an explicit +05:30 offset.
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const isoLocal = `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}+05:30`;
+  const d = new Date(isoLocal);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
 }
 
 /** Which legacy restaurants to include in an import run. */

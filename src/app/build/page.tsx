@@ -43,6 +43,7 @@ function dbRowsForTab(tab: BuildTab, db: BuildDbSnapshot): DbRow[] {
         { label: "Customer profiles", table: "profiles.role = customer", value: db.profiles_customer },
         { label: "Saved addresses", table: "addresses", value: db.addresses },
         { label: "Orders", table: "orders", value: db.orders },
+        { label: "Legacy orders", table: "orders.external_id", value: db.legacy_orders },
       ];
     case "vendor":
       return [
@@ -53,6 +54,7 @@ function dbRowsForTab(tab: BuildTab, db: BuildDbSnapshot): DbRow[] {
         { label: "Menu items", table: "menu_items", value: db.menu_items },
         { label: "Legacy menu items", table: "menu_items.external_id", value: db.legacy_menu_items },
         { label: "Orders (all)", table: "orders", value: db.orders },
+        { label: "Legacy orders", table: "orders.external_id", value: db.legacy_orders },
       ];
     case "driver":
       return [
@@ -67,6 +69,7 @@ function dbRowsForTab(tab: BuildTab, db: BuildDbSnapshot): DbRow[] {
         { label: "All profiles", table: "profiles", value: db.profiles_customer + db.profiles_restaurant + db.profiles_driver + db.profiles_admin },
         { label: "Restaurants (approved)", table: "restaurants.approved", value: `${db.restaurants_approved} / ${db.restaurants}` },
         { label: "Orders", table: "orders", value: db.orders },
+        { label: "Legacy orders", table: "orders.external_id", value: db.legacy_orders },
         { label: "Refunds (pending)", table: "refunds.status = pending", value: `${db.refunds_pending} / ${db.refunds}` },
         { label: "Addresses", table: "addresses", value: db.addresses },
       ];

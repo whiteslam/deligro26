@@ -22,7 +22,7 @@ export function RefundCard({ refund: r }: { refund: RefundRow }) {
     });
 
   return (
-    <div className="card p-4">
+    <div className="rounded-2xl border border-line bg-surface p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-data font-semibold">
@@ -34,7 +34,7 @@ export function RefundCard({ refund: r }: { refund: RefundRow }) {
               </span>
             ) : null}
           </p>
-          <p className="mt-0.5 truncate text-sm text-muted">
+          <p className="mt-0.5 line-clamp-2 text-sm text-muted">
             {r.reason ?? "No reason given"}
             {r.restaurantName ? ` · ${r.restaurantName}` : ""}
           </p>
@@ -44,7 +44,7 @@ export function RefundCard({ refund: r }: { refund: RefundRow }) {
         </span>
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
         {error ? (
           <span className="text-xs font-semibold text-deal">{error}</span>
         ) : (

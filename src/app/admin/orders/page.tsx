@@ -1,8 +1,12 @@
-import { SectionTitle } from "@/components/roles/role-ui";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { formatINR } from "@/lib/utils/format";
 import { ADMIN_ORDERS, type AdminOrderRow } from "@/lib/roles-data";
 import { listAllOrders } from "@/lib/data-access/admin-orders";
+import {
+  listPendingRestaurants,
+  type PendingRestaurant,
+} from "@/lib/data-access/admin-stats";
+import { PendingApprovals } from "@/components/admin/pending-approvals";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const STATUS: Record<
@@ -17,85 +21,67 @@ const STATUS: Record<
 };
 
 export default async function AdminOrdersPage() {
-  // The demo rows are only for a build with no backend at all. They used to
-  // stand in whenever the live list came back EMPTY (`if (live.length > 0)`) or
-  // threw — so a quiet hour, or one transient error, showed an admin seven
-  // invented orders with invented customers under the heading "Live & recent".
-  // An empty table is a fact; fabricated rows are not.
-  if (!isSupabaseConfigured) return renderOrders(ADMIN_ORDERS);
+  if (!isSupabaseConfigured) return renderOrders(ADMIN_ORDERS, []);
 
-  const live = await listAllOrders();
-  return renderOrders(live);
+  const [live, pending] = await Promise.all([
+    listAllOrders(),
+    listPendingRestaurants(),
+  ]);
+  return renderOrders(live, pending);
 }
 
-function renderOrders(ADMIN_ORDERS: AdminOrderRow[]) {
+function renderOrders(orders: AdminOrderRow[], pending: PendingRestaurant[]) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {isSupabaseConfigured ? <AutoRefresh interval={4000} /> : null}
-      <div>
-        <h1 className="text-heading">All orders</h1>
-        <p className="text-sm text-muted">
-          Viewing customer data here is audited.
+
+      <PendingApprovals pending={pending} />
+
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h1 className="text-[26px] font-extrabold tracking-tight">Orders</h1>
+          <p className="mt-0.5 text-sm text-muted">Live &amp; recent</p>
+        </div>
+        <span className="text-xs font-semibold text-muted">
+          {orders.length}
+        </span>
+      </div>
+
+      {orders.length === 0 ? (
+        <p className="rounded-2xl border border-line bg-surface px-4 py-8 text-center text-sm text-muted">
+          No orders yet.
         </p>
-      </div>
-
-      <SectionTitle
-        right={<span className="text-xs text-muted">{ADMIN_ORDERS.length} orders</span>}
-      >
-        Live &amp; recent
-      </SectionTitle>
-
-      {/* Desktop table */}
-      <div className="card hidden overflow-x-auto md:block">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-label border-b border-line text-left">
-              <th className="px-4 py-3 font-semibold">Order</th>
-              <th className="px-4 py-3 font-semibold">Customer</th>
-              <th className="px-4 py-3 font-semibold">Restaurant</th>
-              <th className="px-4 py-3 font-semibold">Status</th>
-              <th className="px-4 py-3 text-right font-semibold">Total</th>
-              <th className="px-4 py-3 text-right font-semibold">Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ADMIN_ORDERS.map((o) => (
-              <tr key={o.code} className="border-b border-line last:border-0">
-                <td className="text-data px-4 py-3 font-semibold">{o.code}</td>
-                <td className="px-4 py-3">{o.customer}</td>
-                <td className="px-4 py-3 text-muted">{o.restaurant}</td>
-                <td className="px-4 py-3">
-                  <span className={`pill ${STATUS[o.status].cls}`}>
-                    {STATUS[o.status].label}
-                  </span>
-                </td>
-                <td className="text-data px-4 py-3 text-right">
-                  {formatINR(o.total)}
-                </td>
-                <td className="px-4 py-3 text-right text-muted">{o.placedAt}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile cards */}
-      <div className="space-y-2 md:hidden">
-        {ADMIN_ORDERS.map((o) => (
-          <div key={o.code} className="card flex items-center gap-3 p-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-data font-semibold">{o.code}</p>
-              <p className="truncate text-xs text-muted">
-                {o.customer} · {o.restaurant}
-              </p>
-            </div>
-            <span className={`pill ${STATUS[o.status].cls}`}>
-              {STATUS[o.status].label}
-            </span>
-            <span className="text-data text-sm">{formatINR(o.total)}</span>
-          </div>
-        ))}
-      </div>
+      ) : (
+        <ul className="space-y-2">
+          {orders.map((o) => (
+            <li
+              key={o.code}
+              className="rounded-2xl border border-line bg-surface p-3.5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-data font-bold">{o.code}</p>
+                  <p className="mt-0.5 truncate text-sm text-ink">
+                    {o.customer}
+                  </p>
+                  <p className="truncate text-xs text-muted">{o.restaurant}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-data text-sm font-bold">
+                    {formatINR(o.total)}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted">{o.placedAt}</p>
+                </div>
+              </div>
+              <div className="mt-2.5">
+                <span className={`pill ${STATUS[o.status].cls}`}>
+                  {STATUS[o.status].label}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -1,0 +1,45 @@
+---
+description: Customer, auth, and admin UI must render inside the iPhone phone frame
+alwaysApply: true
+---
+
+# Mobile phone frame (required)
+
+Whenever you create, fix, or redesign **customer-facing, auth-entry, or admin UI**, it must render inside the phone mockup — never as a full-bleed desktop page (`dashboard-shell`).
+
+## Required shell
+
+```tsx
+<div className="device">
+  <div className="app-shell">
+    {/* screen content */}
+    <StatusBar />
+  </div>
+</div>
+```
+
+Reference implementations:
+- Customer app: `src/app/(customer)/layout.tsx` (already wraps all customer routes)
+- Admin portal: `src/app/admin/layout.tsx` (phone frame + bottom tab bar)
+- Auth entry: `src/app/welcome/page.tsx`, `src/app/signin/page.tsx`, `src/app/login/page.tsx`
+
+## Rules
+
+- **New customer pages** under `src/app/(customer)/` inherit the frame from the layout — do not add a second `.device` wrapper.
+- **Admin pages** under `src/app/admin/` inherit the frame from the admin layout — do not add a second `.device` wrapper or use `dashboard-shell`.
+- **New auth/entry routes** outside `(customer)` (e.g. `/signin`, `/welcome`, `/login`) must wrap themselves in `.device` + `.app-shell` + `<StatusBar />`, matching `/welcome`.
+- Prefer the **onboarding OTP layout** (`OtpLogin variant="onboarding"`) for customer auth screens so they fill the phone like `/welcome`.
+- Do **not** use `dashboard-shell`, centered max-width cards, or desktop-only layouts for customer/auth/admin screens.
+- On desktop (≥480px) `.device` is the iPhone frame; on a real phone it is `display: contents` (full viewport). Design for the 402×874 screen.
+
+## Exceptions (no phone frame)
+
+- Operator portals still on desktop shell: `/vendor`, `/driver`
+- Build tracker: `/build`
+- These correctly use `dashboard-shell`.
+
+## Checklist before finishing UI work
+
+1. Does the screen appear inside the phone frame on desktop?
+2. If the route is outside `(customer)`, did you add `.device` / `.app-shell` / `StatusBar` (or inherit from admin layout)?
+3. Did you avoid `dashboard-shell` for customer/auth/admin UI?

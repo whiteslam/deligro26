@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { shortOrderId } from "@/lib/utils/order-map";
-import { formatRelativeTime } from "@/lib/utils/relative-time";
+import { formatDateTime } from "@/lib/utils/relative-time";
 import type { AdminOrderRow } from "@/lib/roles-data";
 
 /**
@@ -49,6 +49,6 @@ export async function listAllOrders(limit = 50): Promise<AdminOrderRow[]> {
     restaurant: one(r.restaurants)?.name ?? "—",
     status: STATUS_MAP[r.status] ?? "PLACED",
     total: r.total,
-    placedAt: formatRelativeTime(r.created_at),
+    placedAt: formatDateTime(r.created_at),
   }));
 }

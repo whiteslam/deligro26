@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { computeCharges } from "@/lib/pricing";
+import { computeChargesWith } from "@/lib/pricing";
+import { getSettings } from "@/lib/settings";
 import {
   columnKnownMissing,
   isMissingColumn,
@@ -132,9 +133,19 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     return sum + item.price * line.qty;
   }, 0);
 
-  // Charges are derived here from the shared constants and the DB's own prices —
-  // the client sends items and a tip, never an amount.
-  const charges = computeCharges(itemSubtotal, input.tip ?? 0);
+  // Charges are derived here from the live platform settings and the DB's own
+  // prices — the client sends items and a tip, never an amount. This is the
+  // authoritative bill: whatever fee/tax/threshold the admin set applies here.
+  const settings = await getSettings();
+  const charges = computeChargesWith(
+    {
+      deliveryFee: settings.deliveryFee,
+      taxRate: settings.taxRate,
+      freeDeliveryThreshold: settings.freeDeliveryThreshold,
+    },
+    itemSubtotal,
+    input.tip ?? 0
+  );
 
   const base: Record<string, unknown> = {
     customer_id: user.id,

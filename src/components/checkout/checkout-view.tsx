@@ -24,13 +24,21 @@ import { AddressPickerSheet } from "@/components/addresses/address-picker-sheet"
 import { useSavedAddresses } from "@/hooks/use-saved-addresses";
 import { cn } from "@/lib/utils/cn";
 import { formatINR } from "@/lib/utils/format";
-import { computeCharges, TIP_OPTIONS } from "@/lib/pricing";
+import { computeChargesWith, TIP_OPTIONS } from "@/lib/pricing";
 
 type CheckoutStatus = "ready" | "processing" | "placed";
 
+/** Live platform config from the Admin Settings tab — the same values billed. */
+export interface CheckoutConfig {
+  deliveryFee: number;
+  taxRate: number;
+  freeDeliveryThreshold: number;
+  minOrder: number;
+  acceptingOrders: boolean;
+  maintenanceMessage: string;
+}
 
-
-export function CheckoutView() {
+export function CheckoutView({ config }: { config: CheckoutConfig }) {
   const router = useRouter();
   const lines = useCart((s) => s.lines);
   const restaurantSlug = useCart((s) => s.restaurantSlug);
@@ -68,8 +76,9 @@ export function CheckoutView() {
 
   const [tip, setTip] = useState(0);
 
-  // One definition of what an order costs, shared with the server that bills it.
-  const charges = computeCharges(subtotal, tip);
+  // One definition of what an order costs, from the live platform settings the
+  // server bills with — so the quote here equals the charge.
+  const charges = computeChargesWith(config, subtotal, tip);
   const [status, setStatus] = useState<CheckoutStatus>("ready");
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +86,12 @@ export function CheckoutView() {
     addFormRequested || (!addrLoading && addresses.length === 0);
 
   const payTotal = charges.total;
+
+  // Availability gates: the platform can be paused, or a minimum can apply.
+  const belowMinimum = config.minOrder > 0 && subtotal < config.minOrder;
+  const shortBy = config.minOrder - subtotal;
+  const ordersClosed = !config.acceptingOrders;
+  const checkoutBlocked = ordersClosed || belowMinimum;
 
   // Move the map pin onto whichever address the customer picked. Adjusted during
   // render rather than in an effect, so the map never paints a frame still
@@ -129,6 +144,21 @@ export function CheckoutView() {
   const placeOrder = async () => {
     setError(null);
 
+    if (ordersClosed) {
+      setError(
+        config.maintenanceMessage.trim() ||
+          "We're not accepting orders right now. Please try again shortly."
+      );
+      return;
+    }
+    if (belowMinimum) {
+      setError(
+        `Add ${formatINR(shortBy)} more to reach the ${formatINR(
+          config.minOrder
+        )} minimum order.`
+      );
+      return;
+    }
     if (!selectedAddress) {
       setError("Add a delivery address to continue.");
       setAddFormRequested(true);
@@ -409,15 +439,29 @@ export function CheckoutView() {
       </div>
 
       <div className="glass sticky bottom-0 z-20 border-t border-line p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        {ordersClosed ? (
+          <p className="mb-2 flex items-center gap-1.5 text-center text-sm font-medium text-deal">
+            <AlertTriangle className="size-4 shrink-0" />
+            {config.maintenanceMessage.trim() ||
+              "We're not accepting orders right now."}
+          </p>
+        ) : belowMinimum ? (
+          <p className="mb-2 text-center text-sm font-medium text-muted">
+            Add {formatINR(shortBy)} more to reach the{" "}
+            {formatINR(config.minOrder)} minimum.
+          </p>
+        ) : null}
         <button
           onClick={placeOrder}
-          disabled={status !== "ready"}
+          disabled={status !== "ready" || checkoutBlocked}
           className="press flex h-12 w-full items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-white shadow-[var(--glow-accent)] disabled:opacity-70"
         >
           {status === "processing" ? (
             <span className="mx-auto flex items-center gap-2">
               <Loader2 className="size-5 animate-spin" /> Placing order…
             </span>
+          ) : ordersClosed ? (
+            <span className="mx-auto">Orders paused</span>
           ) : (
             <>
               <span>Place order</span>

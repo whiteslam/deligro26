@@ -1,21 +1,23 @@
 import { Suspense } from "react";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
-import { Wordmark } from "@/components/shared/logo";
+import { StatusBar } from "@/components/layout/status-bar";
+import { SplashScreen } from "@/components/shared/splash-screen";
 import { SignInClient } from "./signin-client";
 
+/**
+ * Customer OTP gate — rendered inside the phone mockup so checkout / orders /
+ * profile auth feels continuous with the rest of the app (same as /welcome).
+ */
 export const dynamic = "force-dynamic";
 
 export default function SignInPage() {
   return (
-    <div className="dashboard-shell grid place-items-center p-4">
-      <div className="absolute right-4 top-4">
-        <ThemeToggle />
-      </div>
-      <div className="flex w-full max-w-sm flex-col items-center gap-6">
-        <Wordmark className="text-2xl" />
+    <div className="device">
+      <div className="app-shell">
         <Suspense fallback={null}>
           <SignInClient />
         </Suspense>
+        <StatusBar />
+        <SplashScreen />
       </div>
     </div>
   );

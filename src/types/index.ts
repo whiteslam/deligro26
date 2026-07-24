@@ -208,6 +208,49 @@ export interface BannerAnalytics {
   orders: number;
 }
 
+/* ============================================================
+   Platform settings — the single admin-owned configuration row.
+
+   These are values the app genuinely reads: order billing, the customer's
+   support contacts, which delivery verticals are switched on, and the rider
+   payout formula. The Admin Settings tab writes this; the app reads it.
+   ============================================================ */
+export interface PlatformSettings {
+  // ---- Fees & tax (authoritative for billing) ----
+  /** Flat delivery fee in whole rupees. */
+  deliveryFee: number;
+  /** Fraction applied to the item subtotal only (0.05 = 5%). */
+  taxRate: number;
+  /** Subtotal at/above which delivery is free. 0 = never free. */
+  freeDeliveryThreshold: number;
+  /** Minimum subtotal required to check out. 0 = no minimum. */
+  minOrder: number;
+
+  // ---- Support & brand ----
+  businessName: string;
+  supportPhone: string;
+  supportEmail: string;
+  supportWhatsapp: string;
+  businessAddress: string;
+
+  // ---- Availability ----
+  /** Master switch — when off, the app stops taking new orders. */
+  acceptingOrders: boolean;
+  /** Shown to customers when set; empty = nothing shown. */
+  maintenanceMessage: string;
+  featureGrocery: boolean;
+  featurePharmacy: boolean;
+  featurePickDrop: boolean;
+
+  // ---- Ops defaults ----
+  defaultPrepMinutes: number;
+  deliveryRadiusKm: number;
+  /** Share of the food subtotal paid to the rider (0.08 = 8%). */
+  riderCommission: number;
+  /** Floor on any single delivery payout, in rupees. */
+  riderMinPayout: number;
+}
+
 export interface Banner {
   id: string;
   /** Admin-facing campaign name; also the default headline fallback. */

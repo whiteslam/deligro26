@@ -1,28 +1,27 @@
-import { RoleTopBar } from "@/components/roles/role-ui";
-import { PortalNav } from "@/components/roles/portal-nav";
+import { StatusBar } from "@/components/layout/status-bar";
+import { AdminHeader } from "@/components/admin/admin-header";
+import { AdminTabBar } from "@/components/admin/admin-tab-bar";
 import { requireRole } from "@/lib/auth";
-
-const LINKS = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/orders", label: "Orders" },
-  { href: "/admin/refunds", label: "Refunds" },
-  { href: "/admin/banners", label: "Campaigns" },
-];
+import { requireOperatorMfa } from "@/lib/auth/mfa";
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requireRole("admin"); // server-side gate — not just hidden in the UI
+  await requireRole("admin");
+  await requireOperatorMfa("/admin", "admin"); // mandatory — cannot be disabled
+
   return (
-    <div className="dashboard-shell">
-      <RoleTopBar
-        role="Admin · Operations"
-        accent="var(--green)"
-        nav={<PortalNav links={LINKS} />}
-      />
-      <main className="dashboard-main">{children}</main>
+    <div className="device">
+      <div className="app-shell">
+        <div className="app-scroll no-scrollbar pb-[80px]">
+          <AdminHeader />
+          <div className="px-4 pb-6 pt-4">{children}</div>
+        </div>
+        <StatusBar />
+        <AdminTabBar />
+      </div>
     </div>
   );
 }

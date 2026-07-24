@@ -1,4 +1,8 @@
 import type { NextConfig } from "next";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Security headers (checklist §7 + §4). Applied to every response.
@@ -49,6 +53,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Parent ~/package-lock.json (unrelated) + this app's lockfiles confuse
+  // Turbopack's workspace-root inference — pin explicitly to this project.
+  turbopack: {
+    root: projectRoot,
+  },
+  outputFileTracingRoot: projectRoot,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

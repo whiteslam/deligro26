@@ -1,6 +1,7 @@
 import { RoleTopBar } from "@/components/roles/role-ui";
 import { PortalNav } from "@/components/roles/portal-nav";
 import { requireRole } from "@/lib/auth";
+import { requireOperatorMfa } from "@/lib/auth/mfa";
 import { getOwnedRestaurantFromDb } from "@/lib/data-access/restaurants";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -17,6 +18,8 @@ export default async function RestaurantLayout({
   children: React.ReactNode;
 }) {
   await requireRole("restaurant"); // vendor accounts only
+  // Optional for vendors: only challenged if they opted in from settings.
+  await requireOperatorMfa("/vendor", "restaurant");
 
   // Whose shop this actually is. The top bar used to read "Restaurant · Saffron
   // Kitchen" for every vendor, on every page — a hardcoded string, while the

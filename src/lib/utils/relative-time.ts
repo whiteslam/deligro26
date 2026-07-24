@@ -12,3 +12,15 @@ export function formatRelativeTime(iso: string): string {
 
   return date.toLocaleDateString("en-IN", { weekday: "short" });
 }
+
+/** Absolute date + time e.g. "24 Jul, 8:24 PM" for order feeds. */
+export function formatDateTime(iso: string): string {
+  const date = new Date(iso);
+  const day = date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const time = date.toLocaleTimeString("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return `${day}, ${time}`;
+}

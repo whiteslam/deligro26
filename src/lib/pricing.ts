@@ -33,10 +33,35 @@ export interface OrderCharges {
   total: number;
 }
 
-/** The one place the arithmetic lives. */
-export function computeCharges(subtotal: number, tip = 0): OrderCharges {
-  const deliveryFee = subtotal > 0 ? DELIVERY_FEE : 0;
-  const taxes = Math.round(subtotal * TAX_RATE);
+/** The fee/tax knobs the arithmetic needs — a slice of PlatformSettings. */
+export interface ChargesConfig {
+  deliveryFee: number;
+  taxRate: number;
+  /** Subtotal at/above which delivery is free. 0 = never free. */
+  freeDeliveryThreshold: number;
+}
+
+/** The module defaults as a config, used when no settings are supplied. */
+export const DEFAULT_CHARGES_CONFIG: ChargesConfig = {
+  deliveryFee: DELIVERY_FEE,
+  taxRate: TAX_RATE,
+  freeDeliveryThreshold: 0,
+};
+
+/**
+ * The one place the arithmetic lives, parameterised by config. Free delivery
+ * kicks in at the threshold; tax is on the item subtotal only.
+ */
+export function computeChargesWith(
+  config: ChargesConfig,
+  subtotal: number,
+  tip = 0
+): OrderCharges {
+  const qualifiesFree =
+    config.freeDeliveryThreshold > 0 &&
+    subtotal >= config.freeDeliveryThreshold;
+  const deliveryFee = subtotal > 0 && !qualifiesFree ? config.deliveryFee : 0;
+  const taxes = Math.round(subtotal * config.taxRate);
   const safeTip = clampTip(tip);
 
   return {
@@ -46,6 +71,11 @@ export function computeCharges(subtotal: number, tip = 0): OrderCharges {
     tip: safeTip,
     total: subtotal + deliveryFee + taxes + safeTip,
   };
+}
+
+/** Back-compat wrapper: the module defaults, for callers without live config. */
+export function computeCharges(subtotal: number, tip = 0): OrderCharges {
+  return computeChargesWith(DEFAULT_CHARGES_CONFIG, subtotal, tip);
 }
 
 /** A tip is whole rupees, never negative, never more than the UI offers. */

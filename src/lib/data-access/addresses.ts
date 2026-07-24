@@ -97,7 +97,12 @@ export async function updateAddress(id: string, input: Partial<AddressInput>): P
 
 export async function deleteAddress(id: string): Promise<boolean> {
   const supabase = await createClient();
-  const { error } = await supabase.from("addresses").delete().eq("id", id);
+  const { data, error } = await supabase
+    .from("addresses")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
-  return true;
+  return Boolean(data?.id);
 }

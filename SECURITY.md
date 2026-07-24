@@ -45,13 +45,17 @@ escalation), authoritative order totals (`recompute_order_total`), consistent
 404s, secrets kept server-side (`.env.local` gitignored; service-role key never
 `NEXT_PUBLIC`), **security headers** (CSP, HSTS, X-Frame-Options, nosniff,
 Referrer-Policy, Permissions-Policy — `next.config.ts`), and **app-level rate
-limiting** (`src/lib/rate-limit.ts`, applied to the orders API).
+limiting** (`src/lib/rate-limit.ts` via Upstash/Vercel KV, applied to the orders
+API; in-memory fallback when KV env vars are unset).
 
-**Still to wire when you go live:** payment webhook signature verification, MFA
-for admin/restaurant (Supabase MFA), a distributed rate-limit store (Upstash /
-Vercel KV) so limits hold across serverless instances, a nonce-based CSP to drop
-`'unsafe-inline'` from `script-src`, and swapping the portals' mock data for the
-RLS-backed data layer.
+**Still to wire when you go live:** payment webhook signature verification, a
+nonce-based CSP to drop `'unsafe-inline'` from `script-src`, and swapping any
+remaining portal mocks for the RLS-backed data layer.
+
+**MFA (admin / restaurant):** Supabase TOTP. Layouts call `requireOperatorMfa()`
+so sessions must be `aal2`. First visit enrolls at `/mfa/setup`; later sign-ins
+challenge at `/mfa`. Enable MFA in the Supabase dashboard
+(**Authentication → Providers / Multi-Factor → TOTP**).
 
 ### CSP note
 The CSP in `next.config.ts` allows `'unsafe-inline'` for scripts because of the
@@ -77,9 +81,28 @@ replace `'unsafe-inline'` with `'nonce-…'` in `script-src`.
 
 ## Test it yourself (do this before launch)
 
+### Automated suite (preferred)
+
+```bash
+# Password for QA + demo accounts (never commit). Creates qa-customer-a/b@deligro.qa.
+QA_PASSWORD='…' npm run test:idor     # RLS + HTTP cross-account IDOR
+BASE_URL=http://localhost:3003 npm run test:e2e   # guest gates, headers, auth walls
+ZAP_TARGET_URL=https://your-staging.example npm run test:zap   # OWASP ZAP baseline
+
+# All three (ZAP only if ZAP_TARGET_URL / STAGING_URL is set):
+QA_PASSWORD='…' BASE_URL=http://localhost:3003 npm run test:qa
+```
+
+Scripts live in `scripts/qa/`. The IDOR suite provisions two customers, plants an
+order + address for A, then asserts B gets **null / 404** (never a data leak),
+vendors/drivers cannot see unowned orders, and `lock_role` blocks escalation.
+
+### Manual spot-checks
+
 - Create two customers, A and B. Sign in as A, note an order id from the Network
   tab, then `GET /api/orders/<A's id>` while signed in as **B** → must be **404**.
 - Sign in as a customer and open `/admin` → must redirect to `/login?denied=1`.
 - Try to `update public.profiles set role='admin'` as a normal user via the API →
   blocked by `lock_role`.
-- Run OWASP ZAP against a **staging** copy, never production data.
+- Run OWASP ZAP against a **staging** copy, never production data
+  (`npm run test:zap`).

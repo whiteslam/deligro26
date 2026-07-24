@@ -8,7 +8,7 @@ import { requireUser } from "@/lib/auth";
 import { cn } from "@/lib/utils/cn";
 
 export default async function OrdersPage() {
-  // Order history is per-account — guests are bounced to /login by the proxy;
+  // Order history is per-account — guests are bounced to /signin by the proxy;
   // this backstops it server-side.
   await requireUser();
   const { active, past } = await getOrdersPageData();

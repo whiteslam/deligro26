@@ -1,18 +1,7 @@
-import { SectionTitle, Pill } from "@/components/roles/role-ui";
+import { Pill } from "@/components/roles/role-ui";
 import { listRefunds } from "@/lib/data-access/refunds";
 import { RefundCard } from "@/components/admin/refund-card";
 
-/**
- * The real refund queue.
- *
- * This page used to render three invented refunds from `roles-data`, and its
- * Approve button called nothing — it set a local `decided` map and rendered
- * "Approved · logged". Nothing was approved. Nothing was logged. An admin could
- * walk away believing they had settled a customer's money.
- *
- * Rows now come from the `refunds` table, and deciding one writes `status` and
- * `decided_by` through an RLS-gated server action.
- */
 export const dynamic = "force-dynamic";
 
 export default async function AdminRefundsPage() {
@@ -20,25 +9,23 @@ export default async function AdminRefundsPage() {
   const pending = refunds.filter((r) => r.status === "pending");
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-heading">Refund queue</h1>
-        <p className="text-sm text-muted">
-          Deciding a refund records who decided it. Only pending refunds can be
-          decided.
-        </p>
+    <div className="space-y-4">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h1 className="text-[26px] font-extrabold tracking-tight">Refunds</h1>
+          <p className="mt-0.5 text-sm text-muted">
+            Decisions are recorded with your account
+          </p>
+        </div>
+        <Pill tone="accent">{pending.length}</Pill>
       </div>
 
-      <SectionTitle right={<Pill tone="accent">{pending.length} pending</Pill>}>
-        Requests
-      </SectionTitle>
-
       {refunds.length === 0 ? (
-        <p className="card p-4 text-sm text-muted">
-          No refund requests. When a customer asks for one it appears here.
+        <p className="rounded-2xl border border-line bg-surface px-4 py-8 text-center text-sm text-muted">
+          No refund requests yet.
         </p>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {refunds.map((r) => (
             <RefundCard key={r.id} refund={r} />
           ))}

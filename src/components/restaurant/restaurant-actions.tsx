@@ -51,7 +51,7 @@ export function RestaurantActions({
 
   async function toggleFavorite() {
     if (!signedIn) {
-      router.push(`/login?next=/restaurant/${slug}`);
+      router.push(`/signin?next=/restaurant/${slug}`);
       return;
     }
 

@@ -1,5 +1,6 @@
 import { WelcomeFlow } from "@/components/auth/welcome-flow";
 import { StatusBar } from "@/components/layout/status-bar";
+import { SplashScreen } from "@/components/shared/splash-screen";
 
 /**
  * App-launch entry for visitors without a session. The proxy sends every anon
@@ -17,6 +18,7 @@ export default function WelcomePage() {
       <div className="app-shell">
         <WelcomeFlow />
         <StatusBar />
+        <SplashScreen />
       </div>
     </div>
   );

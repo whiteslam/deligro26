@@ -9,7 +9,7 @@ import { GUEST_COOKIE } from "@/lib/auth/guest";
 //   1. Refresh the Supabase session cookie on every request (updateSession).
 //   2. Coarse access control — the single place the "app launch" routing lives:
 //        anon   → blocked from the app shell, redirected to /welcome
-//        guest  → browse-only feed; gated customer routes bounce to /login
+//        guest  → browse-only feed; gated customer routes bounce to /signin (OTP)
 //        user   → full access
 //
 // Fine-grained role enforcement (is this user actually an admin/vendor/driver?)
@@ -20,7 +20,10 @@ import { GUEST_COOKIE } from "@/lib/auth/guest";
 const PUBLIC_PATHS = ["/welcome", "/login", "/signin"];
 
 /** Entry pages a signed-in user should be bounced away from (already onboarded). */
-const ENTRY_PATHS = ["/welcome", "/login"];
+const ENTRY_PATHS = ["/welcome", "/login", "/signin"];
+
+/** MFA challenge / enroll — need a session, but must stay reachable at aal1. */
+const MFA_PATHS = ["/mfa"];
 
 /** Operator portals — require a logged-in user (role is checked server-side). */
 const PROTECTED = ["/admin", "/vendor", "/driver"];
@@ -56,6 +59,17 @@ export async function proxy(request: NextRequest) {
   // Public entry pages: always allowed.
   if (matches(path, PUBLIC_PATHS)) return response;
 
+  // MFA pages: signed-in only (aal1 sessions must not be bounced to /).
+  if (matches(path, MFA_PATHS)) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("next", path);
+      return NextResponse.redirect(url);
+    }
+    return response;
+  }
+
   // Operator portals: must be a logged-in user (guest is not enough).
   if (matches(path, PROTECTED) && !user) {
     const url = request.nextUrl.clone();
@@ -65,9 +79,10 @@ export async function proxy(request: NextRequest) {
   }
 
   // Gated customer routes: a guest is NOT enough — must be a real user.
+  // Send them to phone OTP (/signin), not the operator email/password /login.
   if (matches(path, GATED_CUSTOMER) && !user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/signin";
     url.searchParams.set("next", path);
     return NextResponse.redirect(url);
   }

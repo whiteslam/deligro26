@@ -160,13 +160,13 @@ export interface AdminOrderRow {
 }
 
 export const ADMIN_ORDERS: AdminOrderRow[] = [
-  { code: "#D-4823", customer: "Rahul K.", restaurant: "Saffron Kitchen", status: "PLACED", total: 900, placedAt: "8:24 PM" },
-  { code: "#B-9910", customer: "Karan V.", restaurant: "Blue Tokai Cafe", status: "KITCHEN", total: 420, placedAt: "8:21 PM" },
-  { code: "#P-3345", customer: "Divya N.", restaurant: "Pizza Loft", status: "ON_THE_WAY", total: 660, placedAt: "8:14 PM" },
-  { code: "#D-4818", customer: "Neha R.", restaurant: "Saffron Kitchen", status: "ON_THE_WAY", total: 560, placedAt: "8:09 PM" },
-  { code: "#S-7781", customer: "Meera J.", restaurant: "South Spice", status: "DELIVERED", total: 340, placedAt: "7:58 PM" },
-  { code: "#D-4801", customer: "Imran H.", restaurant: "Saffron Kitchen", status: "DELIVERED", total: 720, placedAt: "7:44 PM" },
-  { code: "#B-9902", customer: "Sana P.", restaurant: "Blue Tokai Cafe", status: "CANCELLED", total: 210, placedAt: "7:31 PM" },
+  { code: "#D-4823", customer: "Rahul K.", restaurant: "Saffron Kitchen", status: "PLACED", total: 900, placedAt: "24 Jul, 8:24 PM" },
+  { code: "#B-9910", customer: "Karan V.", restaurant: "Blue Tokai Cafe", status: "KITCHEN", total: 420, placedAt: "24 Jul, 8:21 PM" },
+  { code: "#P-3345", customer: "Divya N.", restaurant: "Pizza Loft", status: "ON_THE_WAY", total: 660, placedAt: "24 Jul, 8:14 PM" },
+  { code: "#D-4818", customer: "Neha R.", restaurant: "Saffron Kitchen", status: "ON_THE_WAY", total: 560, placedAt: "24 Jul, 8:09 PM" },
+  { code: "#S-7781", customer: "Meera J.", restaurant: "South Spice", status: "DELIVERED", total: 340, placedAt: "24 Jul, 7:58 PM" },
+  { code: "#D-4801", customer: "Imran H.", restaurant: "Saffron Kitchen", status: "DELIVERED", total: 720, placedAt: "24 Jul, 7:44 PM" },
+  { code: "#B-9902", customer: "Sana P.", restaurant: "Blue Tokai Cafe", status: "CANCELLED", total: 210, placedAt: "24 Jul, 7:31 PM" },
 ];
 
 export interface ApprovalRow {

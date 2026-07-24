@@ -39,7 +39,8 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (!(await requireUser())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params;
   try {
-    await deleteAddress(id);
+    const ok = await deleteAddress(id);
+    if (!ok) return NextResponse.json({ error: "not_found" }, { status: 404 });
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "server_error" }, { status: 500 });

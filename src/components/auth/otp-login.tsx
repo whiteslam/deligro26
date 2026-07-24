@@ -106,7 +106,13 @@ export function OtpLogin({
         return;
       }
 
-      router.push(next);
+      const { data: aal } =
+        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aal?.currentLevel !== "aal2" && aal?.nextLevel === "aal2") {
+        router.push(`/mfa?next=${encodeURIComponent(next)}`);
+      } else {
+        router.push(next);
+      }
       router.refresh();
     } catch {
       setError("Network error — please try again.");

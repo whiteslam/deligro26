@@ -1,16 +1,10 @@
 import Link from "next/link";
 import { Plus, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StatCard } from "@/components/roles/role-ui";
 import { listAllBanners, bannersBackendReady } from "@/lib/banners";
 import type { Banner, BannerStatus } from "@/types";
 import { BannerRowActions } from "./banner-row-actions";
 
-/**
- * Campaign manager. Every promotional banner in the app is a row here — the
- * mobile app renders whatever this list marks live, so this is the single place
- * promos are turned on, scheduled, prioritised, and measured.
- */
 export const dynamic = "force-dynamic";
 
 const STATUS_PILL: Record<BannerStatus, string> = {
@@ -43,48 +37,43 @@ export default async function AdminBannersPage() {
   const ctr = totals.impressions > 0 ? totals.clicks / totals.impressions : 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-heading">Campaigns</h1>
-          <p className="text-sm text-muted">
-            Promotional banners & sponsored ads across the app
-          </p>
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] font-extrabold tracking-tight">Campaigns</h1>
+          <p className="mt-0.5 text-sm text-muted">Banners &amp; sponsored ads</p>
         </div>
-        <Link href="/admin/banners/new">
+        <Link href="/admin/banners/new" className="shrink-0">
           <Button size="sm">
-            <Plus className="size-4" /> New campaign
+            <Plus className="size-4" /> New
           </Button>
         </Link>
       </div>
 
       {!backendReady ? (
-        <p className="rounded-xl border border-pop/40 bg-pop/10 px-3.5 py-3 text-sm font-medium text-ink">
-          Preview mode — these are the built-in sample campaigns. Apply migration{" "}
-          <code className="rounded bg-surface-2 px-1">0014_banners.sql</code> to
-          your database to create, edit, and persist your own. The customer app
-          shows these samples until then.
+        <p className="rounded-2xl border border-pop/40 bg-pop/10 px-3.5 py-3 text-sm font-medium text-ink">
+          Preview mode — apply{" "}
+          <code className="rounded bg-surface-2 px-1 text-xs">0014_banners.sql</code>{" "}
+          to persist campaigns.
         </p>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Live now" value={String(live.length)} tone="green" />
-        <StatCard
+      <div className="grid grid-cols-2 gap-2.5">
+        <MiniStat label="Live" value={String(live.length)} />
+        <MiniStat
           label="Impressions"
           value={totals.impressions.toLocaleString("en-IN")}
-          tone="accent"
         />
-        <StatCard label="Avg CTR" value={pct(ctr)} />
-        <StatCard label="Orders driven" value={String(totals.orders)} />
+        <MiniStat label="Avg CTR" value={pct(ctr)} />
+        <MiniStat label="Orders" value={String(totals.orders)} />
       </div>
 
       {banners.length === 0 ? (
-        <div className="card flex flex-col items-center gap-3 p-10 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-10 text-center">
           <Megaphone className="size-8 text-muted" />
           <p className="font-semibold">No campaigns yet</p>
-          <p className="max-w-sm text-sm text-muted">
-            Create your first banner — grocery, pharmacy, a festival offer, or a
-            paid sponsored slot — and it appears in the app instantly.
+          <p className="text-sm text-muted">
+            Create a banner and it shows in the customer app.
           </p>
           <Link href="/admin/banners/new">
             <Button size="sm">
@@ -93,53 +82,56 @@ export default async function AdminBannersPage() {
           </Link>
         </div>
       ) : (
-        <div className="card divide-y divide-line overflow-hidden">
+        <ul className="space-y-2.5">
           {banners.map((b) => (
-            <BannerRow key={b.id} banner={b} />
+            <BannerCard key={b.id} banner={b} />
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );
 }
 
-function BannerRow({ banner: b }: { banner: Banner }) {
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+        {label}
+      </p>
+      <p className="text-data mt-1 text-lg font-bold">{value}</p>
+    </div>
+  );
+}
+
+function BannerCard({ banner: b }: { banner: Banner }) {
   const a = b.analytics;
   return (
-    <div className="flex flex-wrap items-center gap-3 p-4">
-      <div
-        className="hidden size-12 shrink-0 place-items-center rounded-xl text-xl sm:grid"
-        style={{ background: b.tint }}
-      >
-        {b.glyph ?? "📢"}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="truncate font-semibold">{b.headline}</p>
-          <span className={STATUS_PILL[b.status]}>{b.status}</span>
-          {b.kind === "sponsored" ? (
-            <span className="pill pill-accent">Sponsored</span>
-          ) : null}
+    <li className="rounded-2xl border border-line bg-surface p-3.5">
+      <div className="flex gap-3">
+        <div
+          className="grid size-11 shrink-0 place-items-center rounded-xl text-lg"
+          style={{ background: b.tint }}
+        >
+          {b.glyph ?? "📢"}
         </div>
-        <p className="truncate text-xs text-muted">
-          {b.name} · {b.placements.join(", ") || "no placement"} · priority{" "}
-          {b.priority}
-        </p>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="truncate font-semibold">{b.headline}</p>
+            <span className={STATUS_PILL[b.status]}>{b.status}</span>
+          </div>
+          <p className="mt-0.5 truncate text-xs text-muted">
+            {b.name}
+            {b.kind === "sponsored" ? " · Sponsored" : ""}
+          </p>
+          <p className="mt-2 text-[11px] text-muted">
+            {(a?.impressions ?? 0).toLocaleString("en-IN")} imp ·{" "}
+            {pct(a?.ctr ?? 0)} CTR · {a?.clicks ?? 0} clicks
+          </p>
+        </div>
       </div>
-
-      <div className="hidden text-right text-xs text-muted md:block">
-        <p className="font-semibold text-ink">
-          {(a?.impressions ?? 0).toLocaleString("en-IN")}
-        </p>
-        <p>impressions</p>
+      <div className="mt-3 border-t border-line pt-3">
+        <BannerRowActions id={b.id} status={b.status} />
       </div>
-      <div className="hidden text-right text-xs text-muted md:block">
-        <p className="font-semibold text-ink">{pct(a?.ctr ?? 0)}</p>
-        <p>CTR · {a?.clicks ?? 0} clicks</p>
-      </div>
-
-      <BannerRowActions id={b.id} status={b.status} />
-    </div>
+    </li>
   );
 }
