@@ -32,17 +32,13 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-/* Time-of-day aware theme: set before paint to avoid a flash.
-   Auto by local time (dark 19:00–06:00) unless the user has chosen. */
+/* Light by default; set before paint to avoid a flash. Only an explicit saved
+   choice ('light' or 'dark') overrides it — anything else falls back to light. */
 const themeBootstrap = `
 (function () {
   try {
     var saved = localStorage.getItem('deligro-theme');
-    var theme = saved;
-    if (!theme || theme === 'auto') {
-      var h = new Date().getHours();
-      theme = (h >= 19 || h < 6) ? 'dark' : 'light';
-    }
+    var theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
     document.documentElement.setAttribute('data-theme', theme);
   } catch (e) {}
 })();

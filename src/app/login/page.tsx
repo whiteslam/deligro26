@@ -2,43 +2,82 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ShieldAlert, Smartphone } from "lucide-react";
+import { Mail, ShieldAlert, Smartphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { StatusBar } from "@/components/layout/status-bar";
 import { SplashScreen } from "@/components/shared/splash-screen";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { OtpLogin } from "@/components/auth/otp-login";
+import { continueAsGuest } from "@/lib/auth/guest-actions";
 
+/**
+ * The one global entry point — customers and operators all sign in here. Phone
+ * OTP leads (what most customers use); operators toggle to email + password
+ * (and get an MFA challenge). Anonymous visitors can also browse as a guest,
+ * but only from the bare /login — once we've been sent here to gate a specific
+ * action (`next` set), an account is required.
+ */
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  // Straight into the customer app after sign-in. A `next` set by the proxy
-  // (e.g. bounced from /vendor or /checkout) still wins, so operators land where
-  // they were headed rather than on a role chooser.
+  // Straight into the app after sign-in. A `next` set by the proxy (bounced from
+  // /vendor, /checkout, …) still wins, so people land where they were headed.
   const next = params.get("next") ?? "/";
   const denied = params.get("denied") === "1";
+  // Guest browse is only the *entry* affordance (bare /login). When we were sent
+  // here to gate a specific action, `next` is set and an account is required.
+  const showGuest = next === "/";
 
-  const [mode, setMode] = useState<"password" | "otp">("password");
+  // OTP first: phone is what most customers use; operators flip to password.
+  const [mode, setMode] = useState<"otp" | "password">("otp");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const guest = showGuest ? (
+    <form action={continueAsGuest}>
+      <button
+        type="submit"
+        className="press mt-4 block w-full text-center text-sm font-semibold text-muted hover:text-ink"
+      >
+        Browse as guest
+      </button>
+    </form>
+  ) : null;
+
+  const divider = (
+    <div className="my-5 flex items-center gap-3 text-xs font-semibold text-muted">
+      <span className="h-px flex-1 bg-line" /> OR{" "}
+      <span className="h-px flex-1 bg-line" />
+    </div>
+  );
+
   if (mode === "otp") {
     return (
-      <div className="flex w-full max-w-sm flex-col items-center gap-3">
+      <div className="w-full max-w-sm">
         <OtpLogin
           next={next}
-          heading="Sign in with OTP"
-          sub="Enter the mobile number on your account."
+          heading="Sign in"
+          sub="Deligro · one account, your role"
         />
+        {divider}
         <button
-          className="text-xs font-semibold text-muted hover:text-ink"
-          onClick={() => setMode("password")}
+          type="button"
+          onClick={() => {
+            setMode("password");
+            setError(null);
+          }}
+          className="press flex h-14 w-full items-center justify-center gap-2 rounded-full border border-line bg-surface text-[15px] font-bold text-ink"
         >
-          Use email &amp; password instead
+          <Mail className="size-5" /> Email &amp; password
         </button>
+        {guest}
+        <p className="mt-5 text-center text-xs leading-relaxed text-muted">
+          Restaurant &amp; admin accounts require authenticator MFA. OTP login is
+          rate-limited per phone number.
+        </p>
       </div>
     );
   }
@@ -133,22 +172,20 @@ function LoginForm() {
         {busy ? "Signing in…" : "Sign in"}
       </button>
 
-      <div className="my-5 flex items-center gap-3 text-xs font-semibold text-muted">
-        <span className="h-px flex-1 bg-line" /> OR <span className="h-px flex-1 bg-line" />
-      </div>
+      {divider}
 
       <button
         type="button"
-        onClick={() => { setMode("otp"); setError(null); }}
+        onClick={() => {
+          setMode("otp");
+          setError(null);
+        }}
         className="press flex h-14 w-full items-center justify-center gap-2 rounded-full border border-line bg-surface text-[15px] font-bold text-ink"
       >
         <Smartphone className="size-5" /> Login with OTP
       </button>
 
-      <p className="mt-5 text-center text-xs leading-relaxed text-muted">
-        Restaurant &amp; admin accounts require authenticator MFA. OTP login is
-        rate-limited per phone number.
-      </p>
+      {guest}
     </form>
   );
 }

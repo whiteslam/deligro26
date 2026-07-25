@@ -13,7 +13,7 @@ let played = false;
 
 /**
  * Cold-start splash. Overlays the app shell (or whichever entry screen loads
- * first), then fades out — so it appears before the login/welcome screen, the
+ * first), then fades out — so it appears before the login screen, the
  * way a native app does, not after it.
  *
  * Brand splash: solid Deligro orange with the wordmark and delivery-rider

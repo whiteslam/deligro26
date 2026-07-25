@@ -8,7 +8,7 @@
  *
  *   user  — real Supabase session      → full access
  *   guest — this cookie, no session     → browse-only, gated actions bounce
- *   anon  — neither                      → blocked, sent to /welcome
+ *   anon  — neither                      → blocked, sent to /login
  *
  * This file holds only the constant so it is safe to import from the proxy
  * runtime. Cookie *writes* live in ./guest-actions ("use server").

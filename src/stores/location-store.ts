@@ -7,10 +7,10 @@ import { PINNED_LOCATION } from "@/lib/location/pinned";
 /**
  * Current-location state for the delivery header.
  *
- * The browser Geolocation API surfaces its own native permission prompt the
- * first time `getCurrentPosition` is called. We front that with an in-app
- * explainer sheet (see LocationPermissionSheet) so the user knows why we're
- * asking before the OS dialog appears — the standard mobile pattern.
+ * The header starts at the pinned delivery city and users set their area
+ * deliberately from the /location page (detect or pick) — there's no auto
+ * permission popup on app open. Detection there triggers the browser's own
+ * native Geolocation prompt.
  */
 
 export type LocationStatus =

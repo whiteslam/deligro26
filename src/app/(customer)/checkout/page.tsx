@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 
 // Checkout needs a real account (addresses, wallet, placing an order). The proxy
-// already bounces guests to /signin; this is the server-side backstop.
+// already bounces guests to /login; this is the server-side backstop.
 export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage() {

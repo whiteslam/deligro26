@@ -207,7 +207,7 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
         });
 
         if (res.status === 401) {
-          router.push("/signin?next=/checkout");
+          router.push("/login?next=/checkout");
           setStatus("ready");
           return;
         }

@@ -149,9 +149,9 @@ export const MILESTONES: Milestone[] = [
     goal: "Anyone can explore without an account; login is demanded only at order — via phone OTP.",
     tasks: [
       { title: "Skip onboarding for signed-in users", detail: "Gate the 3-slide carousel on auth, not just localStorage", status: "done" },
-      { title: "Phone-number OTP login", detail: "Custom Renflair SMS OTP + magic-link session (/signin); operators keep email+password on /login", status: "done" },
+      { title: "Phone-number OTP login", detail: "Custom Renflair SMS OTP + magic-link session; one global /login (OTP for customers, email+password for operators)", status: "done" },
       { title: "OTP verify screen", detail: "6-digit code entry, 30s resend cooldown, DB rate limit (6/hour)", status: "done" },
-      { title: "\"Order\" triggers auth", detail: "Proxy gates checkout/orders/profile → /signin?next=… (OTP); operators still use /login", status: "done" },
+      { title: "\"Order\" triggers auth", detail: "Proxy gates checkout/orders/profile → /login?next=… (OTP first); operators use the same page", status: "done" },
       { title: "Post-login profile bootstrap", detail: "First name + save on first order — edit sheet exists, not forced", status: "todo" },
     ],
   },

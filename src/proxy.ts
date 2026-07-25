@@ -8,19 +8,22 @@ import { GUEST_COOKIE } from "@/lib/auth/guest";
 // Two jobs, in order:
 //   1. Refresh the Supabase session cookie on every request (updateSession).
 //   2. Coarse access control — the single place the "app launch" routing lives:
-//        anon   → blocked from the app shell, redirected to /welcome
-//        guest  → browse-only feed; gated customer routes bounce to /signin (OTP)
+//        anon   → blocked from the app shell, redirected to /login
+//        guest  → browse-only feed; gated customer routes bounce to /login
 //        user   → full access
+//
+// One global /login handles everyone: phone OTP for customers, email + password
+// (+ MFA) for operators, and a "browse as guest" option on the bare entry.
 //
 // Fine-grained role enforcement (is this user actually an admin/vendor/driver?)
 // still happens server-side in each portal's layout via requireRole(). Proxy
 // stays coarse and DB-free so it's cheap.
 
-/** Entry / auth pages — always reachable without a session. */
-const PUBLIC_PATHS = ["/welcome", "/login", "/signin"];
+/** Entry / auth page — always reachable without a session. */
+const PUBLIC_PATHS = ["/login"];
 
-/** Entry pages a signed-in user should be bounced away from (already onboarded). */
-const ENTRY_PATHS = ["/welcome", "/login", "/signin"];
+/** Entry page a signed-in user should be bounced away from (already onboarded). */
+const ENTRY_PATHS = ["/login"];
 
 /** MFA challenge / enroll — need a session, but must stay reachable at aal1. */
 const MFA_PATHS = ["/mfa"];
@@ -78,19 +81,19 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Gated customer routes: a guest is NOT enough — must be a real user.
-  // Send them to phone OTP (/signin), not the operator email/password /login.
+  // Gated customer routes: a guest is NOT enough — must be a real user. Same
+  // /login as operators (OTP is one tap in); `next` set means no guest option.
   if (matches(path, GATED_CUSTOMER) && !user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/signin";
+    url.pathname = "/login";
     url.searchParams.set("next", path);
     return NextResponse.redirect(url);
   }
 
   // Everything else in the app shell (main feed, search, restaurants, portals
-  // index) needs at least an explicit guest. Pure anon → the entry screen.
+  // index) needs at least an explicit guest. Pure anon → the login/entry screen.
   if (!user && !guest) {
-    return NextResponse.redirect(new URL("/welcome", request.url));
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   return response;

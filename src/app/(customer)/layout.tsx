@@ -4,7 +4,6 @@ import { GlassCart } from "@/components/glass/glass-cart";
 import { CartHydrator } from "@/components/glass/cart-hydrator";
 import { ItemSheet } from "@/components/restaurant/item-sheet";
 import { SplashScreen } from "@/components/shared/splash-screen";
-import { LocationPermissionSheet } from "@/components/location/location-permission-sheet";
 import { OneSignalInit } from "@/components/notifications/onesignal-init";
 import { getProfile } from "@/lib/auth";
 
@@ -20,7 +19,7 @@ export default async function CustomerLayout({
   children: React.ReactNode;
 }) {
   // Auth cookie gates per-user extras (push). Onboarding now lives entirely in
-  // the /welcome entry flow — no first-run carousel over the feed.
+  // the /login entry flow — no first-run carousel over the feed.
   const profile = await getProfile();
 
   return (
@@ -32,7 +31,6 @@ export default async function CustomerLayout({
         <GlassCart />
         <CartHydrator />
         <TabBar />
-        <LocationPermissionSheet />
         <SplashScreen />
         {profile ? <OneSignalInit /> : null}
       </div>
