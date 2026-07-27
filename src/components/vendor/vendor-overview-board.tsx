@@ -592,7 +592,7 @@ export function VendorOverviewBoard({
   );
 
   return (
-    <div className="space-y-4 lg:space-y-6">
+    <div className="min-w-0 space-y-4 overflow-x-hidden lg:space-y-6">
       <VendorHero
         title="Overview"
         subtitle={

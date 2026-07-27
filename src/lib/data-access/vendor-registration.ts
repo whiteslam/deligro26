@@ -1,8 +1,9 @@
 import "server-only";
-import { randomBytes } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/data-access/vendor-categories";
+import { legiblePassword } from "@/lib/utils/password";
+import { toE164 } from "@/lib/auth/phone";
 
 /**
  * The vendor registration wizard's backend (migration 0018). Drafts are stored
@@ -57,6 +58,8 @@ export interface VendorDraftData {
   menuItems?: DraftMenuItem[];
   tcAccepted?: boolean;
   tcVersion?: string;
+  /** Set once the owner's mobile has been OTP-verified in the wizard (non-blocking). */
+  phoneVerified?: boolean;
 }
 
 export interface RegistrationDraft {
@@ -227,7 +230,7 @@ async function uniqueRestaurantSlug(
 }
 
 function newPassword(): string {
-  return randomBytes(9).toString("base64url");
+  return legiblePassword();
 }
 
 export class EmailTakenError extends Error {
@@ -268,10 +271,17 @@ export async function createVendorAccount(
   const password =
     data.password && data.password.length >= 8 ? data.password : newPassword();
 
+  // Store the mobile in E.164 so OTP login resolves this owner (the OTP flow
+  // looks the phone up in E.164; a raw 10-digit value would never match and the
+  // vendor would land in a blank customer account instead of their portal).
+  const mobileE164 = data.mobile ? toE164(data.mobile) : null;
+
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email,
     password,
+    phone: mobileE164 ?? undefined,
     email_confirm: true,
+    phone_confirm: Boolean(mobileE164 && data.phoneVerified),
     user_metadata: { full_name: data.ownerName ?? data.shopName },
   });
   if (createErr) throw createErr;
@@ -283,7 +293,7 @@ export async function createVendorAccount(
         id: ownerId,
         role: "restaurant",
         full_name: data.ownerName ?? data.shopName ?? null,
-        phone: data.mobile ?? null,
+        phone: mobileE164 ?? data.mobile ?? null,
       },
       { onConflict: "id" }
     );
@@ -302,9 +312,11 @@ export async function createVendorAccount(
         is_open: true,
         status: "pending",
         owner_name: data.ownerName ?? null,
-        owner_mobile: data.mobile ?? null,
+        owner_mobile: mobileE164 ?? data.mobile ?? null,
         owner_alt_mobile: data.altMobile ?? null,
         owner_email: email,
+        owner_phone_verified: Boolean(mobileE164 && data.phoneVerified),
+        temp_password: password,
         commission_pct: Math.min(100, Math.max(0, data.commissionPct ?? 0)),
         min_order: Math.max(0, Math.trunc(data.minOrder ?? 0)),
         delivery_available: data.deliveryAvailable ?? true,

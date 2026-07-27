@@ -6,6 +6,7 @@ import type {
 } from "@/types/vendor-orders";
 import { shortOrderId } from "@/lib/utils/order-map";
 import { formatRelativeTime } from "@/lib/utils/relative-time";
+import { addIstDays, startOfIstMonth } from "@/lib/utils/ist-time";
 
 export type {
   VendorHistoryKind,
@@ -105,6 +106,7 @@ function mapKitchenOrder(row: VendorOrderRow): KitchenOrder {
 export async function listKitchenOrders(restaurantId: string): Promise<{
   incoming: KitchenOrder[];
   preparing: KitchenOrder[];
+  ready: KitchenOrder[];
 }> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -121,10 +123,13 @@ export async function listKitchenOrders(restaurantId: string): Promise<{
     .filter((r) => r.status === "placed")
     .map(mapKitchenOrder);
   const preparing = rows
-    .filter((r) => r.status === "kitchen" || r.status === "ready")
+    .filter((r) => r.status === "kitchen")
+    .map(mapKitchenOrder);
+  const ready = rows
+    .filter((r) => r.status === "ready")
     .map(mapKitchenOrder);
 
-  return { incoming, preparing };
+  return { incoming, preparing, ready };
 }
 
 /** Completed + cancelled order history for the selected restaurant. */
@@ -133,45 +138,59 @@ export async function listVendorOrderHistory(
   limit = 6
 ): Promise<{ completed: KitchenOrder[]; cancelled: KitchenOrder[] }> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("orders")
-    .select(SELECT)
-    .eq("restaurant_id", restaurantId)
-    .in("status", ["delivered", "cancelled", "on_the_way"])
-    .order("created_at", { ascending: false })
-    .limit(limit * 2);
+  const [completedRes, cancelledRes] = await Promise.all([
+    supabase
+      .from("orders")
+      .select(SELECT)
+      .eq("restaurant_id", restaurantId)
+      .eq("status", "delivered")
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    supabase
+      .from("orders")
+      .select(SELECT)
+      .eq("restaurant_id", restaurantId)
+      .eq("status", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(limit),
+  ]);
 
-  if (error) throw error;
+  if (completedRes.error) throw completedRes.error;
+  if (cancelledRes.error) throw cancelledRes.error;
 
-  const rows = ((data ?? []) as VendorOrderRow[]).map(mapKitchenOrder);
-  const cancelled = rows.filter((r) => r.status === "cancelled").slice(0, limit);
-  const completed = rows
-    .filter((r) => r.status !== "cancelled")
-    .slice(0, limit);
-
-  return { completed, cancelled };
+  return {
+    completed: ((completedRes.data ?? []) as VendorOrderRow[]).map(
+      mapKitchenOrder
+    ),
+    cancelled: ((cancelledRes.data ?? []) as VendorOrderRow[]).map(
+      mapKitchenOrder
+    ),
+  };
 }
 
 function monthBounds(offsetMonths: number): { start: Date; end: Date } {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth() + offsetMonths, 1);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(now.getFullYear(), now.getMonth() + offsetMonths + 1, 1);
-  end.setHours(0, 0, 0, 0);
+  let cursor = startOfIstMonth(now);
+  if (offsetMonths < 0) {
+    for (let i = 0; i < -offsetMonths; i += 1) {
+      cursor = startOfIstMonth(addIstDays(cursor, -1));
+    }
+  } else if (offsetMonths > 0) {
+    for (let i = 0; i < offsetMonths; i += 1) {
+      cursor = startOfIstMonth(addIstDays(cursor, 32));
+    }
+  }
+  const start = cursor;
+  const end = startOfIstMonth(addIstDays(start, 32));
   return { start, end };
 }
 
 function dayBounds(isoDate: string): { start: Date; end: Date } | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate.trim());
   if (!match) return null;
-  const y = Number(match[1]);
-  const m = Number(match[2]) - 1;
-  const d = Number(match[3]);
-  const start = new Date(y, m, d);
+  const start = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00+05:30`);
   if (Number.isNaN(start.getTime())) return null;
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
+  const end = addIstDays(start, 1);
   return { start, end };
 }
 
@@ -183,7 +202,7 @@ export async function listVendorOrderArchive(
   const statuses =
     query.kind === "cancelled"
       ? (["cancelled"] as const)
-      : (["delivered", "on_the_way"] as const);
+      : (["delivered"] as const);
 
   let q = supabase
     .from("orders")
@@ -249,15 +268,55 @@ export async function listRecentVendorOrders(
   return [...completed, ...cancelled].slice(0, limit);
 }
 
+const KITCHEN_TRANSITIONS: Record<
+  string,
+  ReadonlyArray<"kitchen" | "ready" | "cancelled">
+> = {
+  placed: ["kitchen", "cancelled"],
+  kitchen: ["ready", "cancelled"],
+  ready: ["cancelled"],
+};
+
+/**
+ * Vendor kitchen status update — requires restaurant ownership and a valid
+ * transition from the order's current status.
+ */
 export async function updateKitchenOrderStatus(
   orderId: string,
   status: "kitchen" | "ready" | "cancelled"
 ): Promise<boolean> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data: order, error: loadError } = await supabase
+    .from("orders")
+    .select("id, status, restaurant_id, restaurants!inner(owner_id)")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (loadError) throw loadError;
+  if (!order) return false;
+
+  const restaurant = Array.isArray(order.restaurants)
+    ? order.restaurants[0]
+    : order.restaurants;
+  if (!restaurant || restaurant.owner_id !== user.id) {
+    throw new Error("forbidden");
+  }
+
+  const allowed = KITCHEN_TRANSITIONS[order.status] ?? [];
+  if (!allowed.includes(status)) {
+    throw new Error("invalid_transition");
+  }
+
   const { data, error } = await supabase
     .from("orders")
     .update({ status })
     .eq("id", orderId)
+    .eq("status", order.status)
     .select("id")
     .maybeSingle();
 

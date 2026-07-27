@@ -986,6 +986,8 @@ body:has(.dashboard-shell) {
   width: 100%;
   max-width: none;
   margin-inline: 0;
+  min-width: 0;
+  overflow-x: clip;
   padding: 16px 16px calc(92px + env(safe-area-inset-bottom, 0px));
 }
 @media (min-width: 1024px) {
@@ -1125,6 +1127,44 @@ body:has(.dashboard-shell) {
     var(--accent) 0%,
     color-mix(in srgb, var(--accent) 60%, var(--blue)) 100%
   );
+}
+.vendor-profile-hero {
+  min-height: 280px;
+  box-shadow: var(--shadow-md);
+}
+.vendor-profile-hero-veil {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ink) 18%, transparent) 0%,
+      color-mix(in srgb, var(--ink) 35%, transparent) 40%,
+      color-mix(in srgb, var(--ink) 78%, transparent) 100%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ink) 40%, transparent) 0%,
+      transparent 55%
+    );
+}
+.vendor-profile-ring {
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.vendor-profile-stat {
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.vendor-profile-stat:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+  transform: translateY(-1px);
+}
+.vendor-profile-link {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.vendor-profile-link:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  box-shadow: var(--shadow-sm);
+}
+.vendor-profile-panel {
+  animation: fade-in 0.45s ease both;
 }
 .vendor-chart-bar {
   background: linear-gradient(

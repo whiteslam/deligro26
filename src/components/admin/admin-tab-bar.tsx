@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   ReceiptText,
-  RotateCcw,
+  Store,
   Megaphone,
   Settings,
 } from "lucide-react";
@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils/cn";
 const TABS = [
   {
     href: "/admin",
-    label: "Home",
+    label: "Dashboard",
     icon: LayoutDashboard,
     match: (p: string) => p === "/admin",
   },
@@ -25,10 +25,10 @@ const TABS = [
     match: (p: string) => p.startsWith("/admin/orders"),
   },
   {
-    href: "/admin/refunds",
-    label: "Refunds",
-    icon: RotateCcw,
-    match: (p: string) => p.startsWith("/admin/refunds"),
+    href: "/admin/vendors",
+    label: "Vendor",
+    icon: Store,
+    match: (p: string) => p.startsWith("/admin/vendors"),
   },
   {
     href: "/admin/banners",

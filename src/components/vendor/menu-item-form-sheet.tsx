@@ -9,6 +9,7 @@ import {
 } from "@/app/vendor/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { VendorMenuItem } from "@/lib/data-access/vendor-menu";
+import { formatINR } from "@/lib/utils/format";
 
 const INPUT =
   "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent";
@@ -26,6 +27,7 @@ export type MenuFormValues = {
   popular: boolean;
   bestseller: boolean;
   imageUrl: string;
+  externalId: string;
 };
 
 type MenuRow = VendorMenuItem;
@@ -40,6 +42,7 @@ const EMPTY: MenuFormValues = {
   popular: false,
   bestseller: false,
   imageUrl: "",
+  externalId: "",
 };
 
 function toFormValues(item?: MenuRow): MenuFormValues {
@@ -54,7 +57,21 @@ function toFormValues(item?: MenuRow): MenuFormValues {
     popular: Boolean(item.popular),
     bestseller: Boolean(item.bestseller),
     imageUrl: item.image ?? "",
+    externalId: item.externalId ?? "",
   };
+}
+
+function formatAddedOn(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return null;
+  }
 }
 
 async function uploadMenuImage(
@@ -145,6 +162,7 @@ export function MenuItemFormSheet({
       popular: values.popular,
       bestseller: values.bestseller,
       imageUrl: values.imageUrl,
+      externalId: values.externalId.trim() || null,
     };
 
     startTransition(async () => {
@@ -236,6 +254,41 @@ export function MenuItemFormSheet({
                 placeholder="Short description for customers"
               />
             </Field>
+
+            <Field label="External ID (for CSV re-import)">
+              <input
+                value={values.externalId}
+                onChange={(e) => set("externalId", e.target.value)}
+                className={INPUT}
+                placeholder="item-001"
+              />
+              <p className="mt-1 text-[11px] text-muted">
+                Optional stable key — keep the same when re-importing a sheet.
+              </p>
+            </Field>
+
+            {mode === "edit" && item ? (
+              <div className="rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-xs text-muted">
+                {formatAddedOn(item.createdAt) ? (
+                  <p>
+                    Added on{" "}
+                    <span className="font-semibold text-ink">
+                      {formatAddedOn(item.createdAt)}
+                    </span>
+                  </p>
+                ) : null}
+                <p className="mt-0.5">
+                  Sold{" "}
+                  <span className="text-data font-semibold text-ink">
+                    {item.soldCount}
+                  </span>{" "}
+                  · revenue{" "}
+                  <span className="text-data font-semibold text-ink">
+                    {formatINR(item.soldRevenue)}
+                  </span>
+                </p>
+              </div>
+            ) : null}
           </section>
 
           <section className="space-y-3">

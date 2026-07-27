@@ -16,12 +16,18 @@ interface DbMenuItem {
   popular: boolean;
   bestseller: boolean;
   sort_order: number;
+  created_at?: string | null;
 }
 
 export type VendorMenuItem = MenuItem & {
   dbId: string;
   externalId: string | null;
   sortOrder: number;
+  createdAt: string | null;
+  /** Units sold (non-cancelled orders). */
+  soldCount: number;
+  /** Revenue from those sales (rupees). */
+  soldRevenue: number;
 };
 
 export interface MenuItemInput {
@@ -51,12 +57,16 @@ export interface MenuImportRow {
   imageUrl?: string | null;
 }
 
-function mapMenuItem(row: DbMenuItem): VendorMenuItem {
+function mapMenuItem(
+  row: DbMenuItem,
+  sales?: { soldCount: number; soldRevenue: number }
+): VendorMenuItem {
   return {
     dbId: row.id,
     id: row.external_id ?? row.id,
     externalId: row.external_id,
     sortOrder: row.sort_order ?? 0,
+    createdAt: row.created_at ?? null,
     name: row.name,
     description: row.description ?? "",
     price: row.price,
@@ -66,6 +76,8 @@ function mapMenuItem(row: DbMenuItem): VendorMenuItem {
     soldOut: !row.available,
     popular: row.popular,
     bestseller: row.bestseller,
+    soldCount: sales?.soldCount ?? 0,
+    soldRevenue: sales?.soldRevenue ?? 0,
   };
 }
 
@@ -98,6 +110,46 @@ async function requireOwnedRestaurant() {
   return restaurant;
 }
 
+const SALE_STATUSES = [
+  "kitchen",
+  "ready",
+  "on_the_way",
+  "delivered",
+] as const;
+
+/** Aggregate units sold + revenue per menu_item_id for this restaurant. */
+async function loadMenuItemSales(
+  restaurantId: string
+): Promise<Map<string, { soldCount: number; soldRevenue: number }>> {
+  const supabase = await createClient();
+  const map = new Map<string, { soldCount: number; soldRevenue: number }>();
+
+  const { data, error } = await supabase
+    .from("order_items")
+    .select("menu_item_id, qty, price, orders!inner(restaurant_id, status)")
+    .eq("orders.restaurant_id", restaurantId)
+    .in("orders.status", [...SALE_STATUSES])
+    .not("menu_item_id", "is", null);
+
+  if (error) {
+    // Don't fail the whole menu if sales join isn't available
+    return map;
+  }
+
+  for (const row of data ?? []) {
+    const id = row.menu_item_id as string | null;
+    if (!id) continue;
+    const qty = Number(row.qty) || 0;
+    const unit = Number(row.price) || 0;
+    const existing = map.get(id) ?? { soldCount: 0, soldRevenue: 0 };
+    existing.soldCount += qty;
+    existing.soldRevenue += qty * unit;
+    map.set(id, existing);
+  }
+
+  return map;
+}
+
 /** Menu for the signed-in vendor's active restaurant. */
 export async function listOwnedMenuItems(): Promise<{
   restaurantId: string;
@@ -114,7 +166,7 @@ export async function listOwnedMenuItems(): Promise<{
   const primary = await supabase
     .from("menu_items")
     .select(
-      "id, external_id, name, description, price, veg, available, category, image_url, popular, bestseller, sort_order"
+      "id, external_id, name, description, price, veg, available, category, image_url, popular, bestseller, sort_order, created_at"
     )
     .eq("restaurant_id", restaurant.id)
     .order("sort_order", { ascending: true })
@@ -126,7 +178,7 @@ export async function listOwnedMenuItems(): Promise<{
     const fallback = await supabase
       .from("menu_items")
       .select(
-        "id, external_id, name, description, price, veg, available, category, image_url, popular, bestseller"
+        "id, external_id, name, description, price, veg, available, category, image_url, popular, bestseller, created_at"
       )
       .eq("restaurant_id", restaurant.id)
       .order("category")
@@ -139,7 +191,10 @@ export async function listOwnedMenuItems(): Promise<{
     data = (primary.data ?? []) as DbMenuItem[];
   }
 
-  const items = data.map(mapMenuItem);
+  const salesByItem = await loadMenuItemSales(restaurant.id);
+  const items = data.map((row) =>
+    mapMenuItem(row, salesByItem.get(row.id))
+  );
   const categories = [
     ...Array.from(new Set(items.map((m) => m.category).filter(Boolean))),
   ].sort((a, b) => {
@@ -182,7 +237,11 @@ export async function updateMenuItem(
   if (!restaurant) return false;
 
   const patch: Record<string, unknown> = {};
-  if (input.name !== undefined) patch.name = input.name.trim();
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) throw new Error("name_required");
+    patch.name = name;
+  }
   if (input.description !== undefined)
     patch.description = input.description.trim() || null;
   if (input.price !== undefined) {
@@ -276,6 +335,31 @@ export async function bulkSetAvailable(
   return data?.length ?? 0;
 }
 
+/** Bulk set popular and/or bestseller flags. */
+export async function bulkSetFlags(
+  menuItemIds: string[],
+  flags: { popular?: boolean; bestseller?: boolean }
+): Promise<number> {
+  const restaurant = await requireOwnedRestaurant();
+  if (!restaurant || menuItemIds.length === 0) return 0;
+
+  const patch: Record<string, boolean> = {};
+  if (flags.popular !== undefined) patch.popular = flags.popular;
+  if (flags.bestseller !== undefined) patch.bestseller = flags.bestseller;
+  if (Object.keys(patch).length === 0) return 0;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("menu_items")
+    .update(patch)
+    .eq("restaurant_id", restaurant.id)
+    .in("id", menuItemIds)
+    .select("id");
+
+  if (error) throw error;
+  return data?.length ?? 0;
+}
+
 /** Rename category text for all items at the active restaurant. */
 export async function renameCategory(
   from: string,
@@ -359,11 +443,24 @@ export async function upsertMenuItemsFromImport(
   const toUpdate: { id: string; patch: Record<string, unknown> }[] = [];
 
   capped.forEach((r) => {
+    const name = r.name?.trim() ?? "";
+    const price = Math.round(Number(r.price));
+    if (!name) {
+      failed += 1;
+      errors.push("Row skipped: name is required");
+      return;
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      failed += 1;
+      errors.push(`Row skipped (${name}): invalid price`);
+      return;
+    }
+
     const externalId = r.externalId?.trim() || null;
     const base: Record<string, unknown> = {
-      name: r.name.trim(),
-      category: r.category.trim() || "Popular",
-      price: Math.round(r.price),
+      name,
+      category: r.category?.trim() || "Popular",
+      price,
       description: r.description?.trim() || null,
       veg: r.veg ?? true,
       available: r.available ?? true,
@@ -414,4 +511,74 @@ export async function upsertMenuItemsFromImport(
   }
 
   return { created, updated, failed, errors };
+}
+
+/** Persist display order (0..n-1) for the active restaurant. */
+export async function reorderMenuItems(
+  orderedIds: string[]
+): Promise<boolean> {
+  const restaurant = await requireOwnedRestaurant();
+  if (!restaurant || orderedIds.length === 0) return false;
+
+  const supabase = await createClient();
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase
+        .from("menu_items")
+        .update({ sort_order: index })
+        .eq("id", id)
+        .eq("restaurant_id", restaurant.id)
+        .select("id")
+        .maybeSingle()
+    )
+  );
+
+  for (const r of results) {
+    if (r.error) throw r.error;
+  }
+  return true;
+}
+
+/** Clone an item with a “(copy)” name suffix. */
+export async function duplicateMenuItem(
+  menuItemId: string
+): Promise<string | null> {
+  const restaurant = await requireOwnedRestaurant();
+  if (!restaurant) return null;
+
+  const supabase = await createClient();
+  const { data: source, error } = await supabase
+    .from("menu_items")
+    .select(
+      "name, description, price, veg, available, category, image_url, popular, bestseller, sort_order"
+    )
+    .eq("id", menuItemId)
+    .eq("restaurant_id", restaurant.id)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!source) return null;
+
+  const baseName = source.name.replace(/\s*\(copy\)\s*$/i, "").trim();
+  const { data, error: insertError } = await supabase
+    .from("menu_items")
+    .insert({
+      restaurant_id: restaurant.id,
+      name: `${baseName} (copy)`,
+      description: source.description,
+      price: source.price,
+      veg: source.veg,
+      available: source.available,
+      category: source.category,
+      image_url: source.image_url,
+      popular: false,
+      bestseller: false,
+      sort_order: (source.sort_order ?? 0) + 1,
+      external_id: null,
+    })
+    .select("id")
+    .single();
+
+  if (insertError) throw insertError;
+  return data?.id ?? null;
 }

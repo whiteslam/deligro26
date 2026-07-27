@@ -1,8 +1,10 @@
 import "server-only";
-import { randomBytes } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { VENDOR_STATUSES, type VendorStatus } from "@/lib/vendor-status";
+import { legiblePassword } from "@/lib/utils/password";
+import { toE164 } from "@/lib/auth/phone";
+import { checkOtp } from "@/lib/data-access/otp";
 
 // Re-exported so existing importers keep working; the canonical definition lives
 // in the client-safe @/lib/vendor-status module.
@@ -79,6 +81,9 @@ export interface VendorDetail extends VendorListItem {
   tcAcceptedAt: string | null;
   tcVersion: string | null;
   menuItemCount: number;
+  /** The last admin-issued one-time login password, for re-display in Edit. */
+  tempPassword: string | null;
+  ownerPhoneVerified: boolean;
 }
 
 /** The admin-editable business fields (not slug, not status, not the account). */
@@ -143,7 +148,8 @@ const DETAIL_SELECT = `
   upi_id, bank_account_name, bank_account_number, bank_ifsc, bank_name,
   fssai_number, gst_number, pan_number,
   status, is_open, image_url, accent_tint,
-  tc_accepted_at, tc_version, created_at
+  tc_accepted_at, tc_version, created_at,
+  temp_password, owner_phone_verified
 `;
 
 interface VendorRow {
@@ -186,6 +192,8 @@ interface VendorRow {
   tc_accepted_at?: string | null;
   tc_version?: string | null;
   created_at: string;
+  temp_password?: string | null;
+  owner_phone_verified?: boolean | null;
 }
 
 /** Table missing (42P01/PGRST205) or a 0017 column missing (42703). */
@@ -253,6 +261,8 @@ function mapDetail(row: VendorRow, menuItemCount: number): VendorDetail {
     tcAcceptedAt: row.tc_accepted_at ?? null,
     tcVersion: row.tc_version ?? null,
     menuItemCount,
+    tempPassword: row.temp_password ?? null,
+    ownerPhoneVerified: row.owner_phone_verified ?? false,
   };
 }
 
@@ -497,18 +507,15 @@ export async function deleteVendor(id: string): Promise<DeleteVendorResult> {
   return { softDeleted: false };
 }
 
-/** A short, readable one-time password for a manual hand-off to the vendor. */
-function tempPassword(): string {
-  return randomBytes(9).toString("base64url");
-}
-
 export interface ResetPasswordResult {
   tempPassword: string;
 }
 
 /**
- * Reset a vendor's login password to a fresh random one and return it once, for
- * the operator to relay. Service-role, because it acts on the auth user.
+ * Reset a vendor's login password to a fresh legible one and return it, for the
+ * operator to relay. The value is also persisted to `restaurants.temp_password`
+ * so the Edit screen can re-show it (until the vendor sets their own). Service-
+ * role, because it acts on the auth user.
  */
 export async function resetVendorPassword(
   id: string
@@ -523,7 +530,7 @@ export async function resetVendorPassword(
   const ownerId = (data as { owner_id: string } | null)?.owner_id;
   if (!ownerId) throw new Error("vendor_not_found");
 
-  const password = tempPassword();
+  const password = legiblePassword();
   const admin = createAdminClient();
   const { error: upErr } = await admin.auth.admin.updateUserById(ownerId, {
     password,
@@ -531,5 +538,53 @@ export async function resetVendorPassword(
   });
   if (upErr) throw upErr;
 
+  // Remember it for re-display (best-effort — the reset itself already worked).
+  await admin.from("restaurants").update({ temp_password: password }).eq("id", id);
+
   return { tempPassword: password };
+}
+
+export interface VerifyPhoneResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Confirm a vendor's mobile with an OTP code entered later, from the Edit
+ * screen. On success the phone is stored in E.164 (so OTP login resolves this
+ * owner) and `owner_phone_verified` is flipped on. The code is validated with
+ * `checkOtp`, which never mints a session — the admin stays logged in.
+ */
+export async function verifyVendorPhone(
+  id: string,
+  phone: string,
+  code: string
+): Promise<VerifyPhoneResult> {
+  const e164 = toE164(phone);
+  if (!e164) return { ok: false, error: "invalid_phone" };
+
+  const check = await checkOtp(e164, code);
+  if (!check.ok) return { ok: false, error: check.error };
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("restaurants")
+    .select("owner_id")
+    .eq("id", id)
+    .maybeSingle();
+  const ownerId = (data as { owner_id: string } | null)?.owner_id;
+
+  const admin = createAdminClient();
+  await admin
+    .from("restaurants")
+    .update({ owner_mobile: e164, owner_phone_verified: true })
+    .eq("id", id);
+  if (ownerId) {
+    await admin.from("profiles").update({ phone: e164 }).eq("id", ownerId);
+    await admin.auth.admin
+      .updateUserById(ownerId, { phone: e164, phone_confirm: true })
+      .catch(() => {});
+  }
+
+  return { ok: true };
 }

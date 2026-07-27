@@ -6,15 +6,20 @@ import { getProfile } from "@/lib/auth";
 import {
   listOwnedRestaurants,
   setRestaurantOpen,
+  updateVendorRestaurant,
   VENDOR_RESTAURANT_COOKIE,
+  type VendorRestaurantUpdateInput,
 } from "@/lib/data-access/vendor-restaurant";
 import {
   bulkSetAvailable,
+  bulkSetFlags,
   createMenuItem,
   deleteMenuItem,
   deleteMenuItems,
+  duplicateMenuItem,
   mergeCategory,
   renameCategory,
+  reorderMenuItems,
   updateMenuItem,
   upsertMenuItemsFromImport,
   type MenuImportRow,
@@ -38,6 +43,17 @@ export async function setRestaurantOpenAction(isOpen: boolean) {
   revalidatePath("/vendor", "layout");
 }
 
+export async function updateVendorRestaurantAction(
+  input: VendorRestaurantUpdateInput
+) {
+  await requireRestaurantRole();
+  const ok = await updateVendorRestaurant(input);
+  if (!ok) throw new Error("not_found");
+  revalidatePath("/vendor", "layout");
+  revalidatePath("/vendor/profile");
+  return { ok: true as const };
+}
+
 export async function setActiveRestaurantAction(slug: string) {
   await requireRestaurantRole();
   const owned = await listOwnedRestaurants();
@@ -48,6 +64,8 @@ export async function setActiveRestaurantAction(slug: string) {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
     sameSite: "lax",
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
   });
   revalidatePath("/vendor", "layout");
 }
@@ -96,6 +114,16 @@ export async function bulkSetAvailableAction(
   return { ok: true as const, count };
 }
 
+export async function bulkSetFlagsAction(
+  menuItemIds: string[],
+  flags: { popular?: boolean; bestseller?: boolean }
+) {
+  await requireRestaurantRole();
+  const count = await bulkSetFlags(menuItemIds, flags);
+  revalidateVendorMenu();
+  return { ok: true as const, count };
+}
+
 export async function renameCategoryAction(from: string, to: string) {
   await requireRestaurantRole();
   const count = await renameCategory(from, to);
@@ -119,4 +147,31 @@ export async function importMenuCsvAction(rows: MenuImportRow[]) {
   const result = await upsertMenuItemsFromImport(rows);
   revalidateVendorMenu();
   return { ok: true as const, ...result };
+}
+
+export async function reorderMenuItemsAction(orderedIds: string[]) {
+  await requireRestaurantRole();
+  const ok = await reorderMenuItems(orderedIds);
+  if (!ok) throw new Error("not_found");
+  revalidateVendorMenu();
+  return { ok: true as const };
+}
+
+export async function duplicateMenuItemAction(menuItemId: string) {
+  await requireRestaurantRole();
+  const id = await duplicateMenuItem(menuItemId);
+  if (!id) throw new Error("not_found");
+  revalidateVendorMenu();
+  return { ok: true as const, id };
+}
+
+export async function updateMenuItemPriceAction(
+  menuItemId: string,
+  price: number
+) {
+  await requireRestaurantRole();
+  const ok = await updateMenuItem(menuItemId, { price });
+  if (!ok) throw new Error("not_found");
+  revalidateVendorMenu();
+  return { ok: true as const };
 }

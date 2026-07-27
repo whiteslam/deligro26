@@ -1,5 +1,11 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import {
+  addIstDays,
+  startOfIstDay,
+  startOfIstMonth,
+  startOfIstWeek,
+} from "@/lib/utils/ist-time";
 
 export interface OverviewDayPoint {
   day: string;
@@ -77,22 +83,15 @@ interface OrderRow {
 }
 
 function startOfDay(d: Date): Date {
-  const copy = new Date(d);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+  return startOfIstDay(d);
 }
 
 function startOfWeek(d: Date): Date {
-  const copy = new Date(d);
-  const day = copy.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  copy.setDate(copy.getDate() + diff);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+  return startOfIstWeek(d);
 }
 
 function startOfMonth(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+  return startOfIstMonth(d);
 }
 
 function changePercent(current: number, previous: number): number | null {
@@ -128,11 +127,8 @@ export async function getVendorOverviewSummary(
   const todayStart = startOfDay(now);
   const weekStart = startOfWeek(now);
   const monthStart = startOfMonth(now);
-  const lastMonthStart = startOfMonth(
-    new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  );
-  const trendStart = startOfWeek(now);
-  trendStart.setDate(trendStart.getDate() - 21);
+  const lastMonthStart = startOfMonth(addIstDays(monthStart, -1));
+  const trendStart = addIstDays(weekStart, -21);
 
   const [recentResult, lifetimeResult, pendingResult] = await Promise.all([
     supabase

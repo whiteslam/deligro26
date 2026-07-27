@@ -6,21 +6,19 @@ import {
   CheckSquare,
   Download,
   FileUp,
+  ImageOff,
   Layers,
-  Pencil,
   Plus,
   Search,
-  Square,
-  Trash2,
   UtensilsCrossed,
   X,
 } from "lucide-react";
-import { VegMark } from "@/components/shared/veg-mark";
 import { Button } from "@/components/ui/button";
-import { MenuAvailabilityToggle } from "@/components/vendor/menu-availability-toggle";
 import { MenuCategoryManager } from "@/components/vendor/menu-category-manager";
+import { MenuCustomerPreview } from "@/components/vendor/menu-customer-preview";
 import { MenuImportDialog } from "@/components/vendor/menu-import-dialog";
 import { MenuItemFormSheet } from "@/components/vendor/menu-item-form-sheet";
+import { VendorMenuItemCard } from "@/components/vendor/menu-item-card";
 import {
   VendorChip,
   VendorEmptyState,
@@ -30,28 +28,33 @@ import {
 } from "@/components/vendor/vendor-ui";
 import {
   bulkSetAvailableAction,
+  bulkSetFlagsAction,
   deleteMenuItemAction,
   deleteMenuItemsAction,
+  duplicateMenuItemAction,
+  reorderMenuItemsAction,
 } from "@/app/vendor/actions";
 import type { VendorMenuItem } from "@/lib/data-access/vendor-menu";
 import {
   downloadTextFile,
   serializeMenuCsv,
 } from "@/lib/vendor/menu-csv";
-import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
 type MenuRow = VendorMenuItem;
+type StatusFilter = "all" | "in_stock" | "sold_out" | "veg" | "no_photo";
 
 export function VendorMenuBoard({
   restaurantId,
   restaurantName,
+  restaurantSlug,
   categories,
   items: initialItems,
   live = false,
 }: {
   restaurantId: string;
   restaurantName: string;
+  restaurantSlug?: string;
   categories: string[];
   items: MenuRow[];
   live?: boolean;
@@ -60,15 +63,19 @@ export function VendorMenuBoard({
   const [items, setItems] = useState(initialItems);
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sheet, setSheet] = useState<{
     mode: "create" | "edit";
     item?: MenuRow;
   } | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<MenuRow | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
   const [pending, startTransition] = useTransition();
 
   // Adopt fresh server rows during render (new/edited items from router.refresh)
@@ -99,6 +106,8 @@ export function VendorMenuBoard({
     return map;
   }, [items]);
 
+  const missingPhotoCount = items.filter((i) => !i.image).length;
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items.filter((item) => {
@@ -107,9 +116,15 @@ export function VendorMenuBoard({
         item.name.toLowerCase().includes(q) ||
         item.category.toLowerCase().includes(q);
       const matchesCat = !activeCategory || item.category === activeCategory;
-      return matchesQuery && matchesCat;
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "in_stock" && !item.soldOut) ||
+        (statusFilter === "sold_out" && item.soldOut) ||
+        (statusFilter === "veg" && item.veg) ||
+        (statusFilter === "no_photo" && !item.image);
+      return matchesQuery && matchesCat && matchesStatus;
     });
-  }, [items, query, activeCategory]);
+  }, [items, query, activeCategory, statusFilter]);
 
   const inStock = items.filter((i) => !i.soldOut).length;
   const soldOut = items.length - inStock;
@@ -123,6 +138,83 @@ export function VendorMenuBoard({
     }))
     .filter((g) => g.items.length > 0);
 
+  const reorderEnabled =
+    live && !bulkMode && !query.trim() && statusFilter === "all";
+
+  function persistOrder(nextItems: MenuRow[]) {
+    const ids: string[] = [];
+    for (const cat of allCategories) {
+      const group = nextItems
+        .filter((i) => i.category === cat)
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+      ids.push(...group.map((i) => i.dbId));
+    }
+    if (ids.length === 0) return;
+
+    setItems((prev) =>
+      prev.map((item) => {
+        const index = ids.indexOf(item.dbId);
+        return index >= 0 ? { ...item, sortOrder: index } : item;
+      })
+    );
+
+    startTransition(async () => {
+      await reorderMenuItemsAction(ids);
+      router.refresh();
+    });
+  }
+
+  function applyCategoryOrder(category: string, orderedGroup: MenuRow[]) {
+    setItems((prev) => {
+      const others = prev.filter((i) => i.category !== category);
+      const withOrder = orderedGroup.map((item, index) => ({
+        ...item,
+        sortOrder: index,
+      }));
+      const next = [...others, ...withOrder];
+      // Defer persist so state updates first
+      queueMicrotask(() => persistOrder(next));
+      return next;
+    });
+  }
+
+  function moveInCategory(
+    item: MenuRow,
+    dir: "up" | "down"
+  ) {
+    const group = items
+      .filter((i) => i.category === item.category)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+    const idx = group.findIndex((i) => i.dbId === item.dbId);
+    if (idx < 0) return;
+    const swapWith = dir === "up" ? idx - 1 : idx + 1;
+    if (swapWith < 0 || swapWith >= group.length) return;
+    const next = [...group];
+    [next[idx], next[swapWith]] = [next[swapWith], next[idx]];
+    applyCategoryOrder(item.category, next);
+  }
+
+  function dropInCategory(targetId: string, category: string) {
+    if (!dragId || dragId === targetId) {
+      setDragId(null);
+      return;
+    }
+    const group = items
+      .filter((i) => i.category === category)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+    const fromIdx = group.findIndex((i) => i.dbId === dragId);
+    const toIdx = group.findIndex((i) => i.dbId === targetId);
+    if (fromIdx < 0 || toIdx < 0) {
+      setDragId(null);
+      return;
+    }
+    const next = [...group];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    setDragId(null);
+    applyCategoryOrder(category, next);
+  }
+
   function toggleSelect(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -132,17 +224,9 @@ export function VendorMenuBoard({
     });
   }
 
-  function selectAllFiltered() {
-    setSelected(new Set(filtered.map((i) => i.dbId)));
-  }
-
-  function clearSelection() {
-    setSelected(new Set());
-  }
-
   function exitBulk() {
     setBulkMode(false);
-    clearSelection();
+    setSelected(new Set());
   }
 
   function handleDelete(item: MenuRow) {
@@ -161,6 +245,13 @@ export function VendorMenuBoard({
     });
   }
 
+  function handleDuplicate(item: MenuRow) {
+    startTransition(async () => {
+      await duplicateMenuItemAction(item.dbId);
+      router.refresh();
+    });
+  }
+
   function handleBulkAvailable(available: boolean) {
     const ids = [...selected];
     if (ids.length === 0) return;
@@ -169,6 +260,27 @@ export function VendorMenuBoard({
       setItems((prev) =>
         prev.map((i) =>
           selected.has(i.dbId) ? { ...i, soldOut: !available } : i
+        )
+      );
+      exitBulk();
+      router.refresh();
+    });
+  }
+
+  function handleBulkFlags(flags: { popular?: boolean; bestseller?: boolean }) {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    startTransition(async () => {
+      await bulkSetFlagsAction(ids, flags);
+      setItems((prev) =>
+        prev.map((i) =>
+          selected.has(i.dbId)
+            ? {
+                ...i,
+                popular: flags.popular ?? i.popular,
+                bestseller: flags.bestseller ?? i.bestseller,
+              }
+            : i
         )
       );
       exitBulk();
@@ -196,18 +308,50 @@ export function VendorMenuBoard({
 
   function handleExport() {
     const csv = serializeMenuCsv(items);
-    const slug = restaurantName.toLowerCase().replace(/\s+/g, "-").slice(0, 40);
+    const slug = (restaurantSlug || restaurantName)
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .slice(0, 40);
     downloadTextFile(`${slug || "menu"}-export.csv`, csv);
   }
 
+  const statusChips: { id: StatusFilter; label: string; count: number }[] = [
+    { id: "all", label: "All", count: items.length },
+    { id: "in_stock", label: "In stock", count: inStock },
+    { id: "sold_out", label: "Sold out", count: soldOut },
+    {
+      id: "veg",
+      label: "Veg",
+      count: items.filter((i) => i.veg).length,
+    },
+    { id: "no_photo", label: "No photo", count: missingPhotoCount },
+  ];
+
   return (
-    <div className="space-y-4 lg:space-y-6">
+    <div className="min-w-0 space-y-4 overflow-x-hidden lg:space-y-6">
       <VendorHero
         title="Menu"
         subtitle={`${restaurantName} — dishes, pricing, stock & sheet import.`}
         action={
           live ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
+              {restaurantSlug ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="hidden sm:inline-flex"
+                  onClick={() =>
+                    window.open(
+                      `/restaurant/${restaurantSlug}`,
+                      "_blank",
+                      "noopener"
+                    )
+                  }
+                >
+                  View storefront
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
@@ -243,6 +387,7 @@ export function VendorMenuBoard({
           icon="package"
           tone="green"
           barPct={(inStock / maxStat) * 100}
+          onClick={() => setStatusFilter("in_stock")}
         />
         <VendorMetricCard
           label="Sold out"
@@ -250,6 +395,7 @@ export function VendorMenuBoard({
           icon="package-x"
           tone="muted"
           barPct={(soldOut / maxStat) * 100}
+          onClick={() => setStatusFilter("sold_out")}
         />
         <VendorMetricCard
           label="Categories"
@@ -260,6 +406,41 @@ export function VendorMenuBoard({
           onClick={live ? () => setCategoryOpen(true) : undefined}
         />
       </div>
+
+      {live && missingPhotoCount > 0 && !nudgeDismissed ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-accent/25 bg-accent/5 p-3 sm:items-center">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent/15 text-accent">
+            <ImageOff className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">
+              {missingPhotoCount} item{missingPhotoCount === 1 ? "" : "s"} missing
+              a photo
+            </p>
+            <p className="text-xs text-muted">
+              Dishes with photos convert better on the storefront.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setStatusFilter("no_photo")}
+            >
+              Review
+            </Button>
+            <button
+              type="button"
+              className="press rounded-full p-2 text-muted"
+              onClick={() => setNudgeDismissed(true)}
+              aria-label="Dismiss"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {live ? (
         <div className="flex flex-wrap gap-2 sm:hidden">
@@ -335,14 +516,29 @@ export function VendorMenuBoard({
           ) : null}
         </div>
 
+        <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
+          {statusChips.map((chip) => (
+            <VendorChip
+              key={chip.id}
+              active={statusFilter === chip.id}
+              onClick={() =>
+                setStatusFilter((s) => (s === chip.id ? "all" : chip.id))
+              }
+              count={chip.count}
+            >
+              {chip.label}
+            </VendorChip>
+          ))}
+        </div>
+
         {allCategories.length > 0 ? (
-          <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
+          <div className="no-scrollbar mt-2 flex gap-2 overflow-x-auto pb-1">
             <VendorChip
               active={activeCategory === null}
               onClick={() => setActiveCategory(null)}
               count={items.length}
             >
-              All
+              All categories
             </VendorChip>
             {allCategories.map((cat) => (
               <VendorChip
@@ -365,7 +561,12 @@ export function VendorMenuBoard({
           <span className="text-sm font-semibold">
             {selected.size} selected
           </span>
-          <Button type="button" variant="outline" size="sm" onClick={selectAllFiltered}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setSelected(new Set(filtered.map((i) => i.dbId)))}
+          >
             Select visible
           </Button>
           <Button
@@ -391,9 +592,45 @@ export function VendorMenuBoard({
             variant="outline"
             size="sm"
             disabled={pending || selected.size === 0}
+            onClick={() => handleBulkFlags({ popular: true })}
+          >
+            Mark popular
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={pending || selected.size === 0}
+            onClick={() => handleBulkFlags({ popular: false })}
+          >
+            Unmark popular
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={pending || selected.size === 0}
+            onClick={() => handleBulkFlags({ bestseller: true })}
+          >
+            Mark bestseller
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={pending || selected.size === 0}
+            onClick={() => handleBulkFlags({ bestseller: false })}
+          >
+            Unmark bestseller
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={pending || selected.size === 0}
             onClick={handleBulkDelete}
           >
-            <Trash2 className="size-4" /> Delete
+            Delete
           </Button>
         </div>
       ) : null}
@@ -424,168 +661,87 @@ export function VendorMenuBoard({
         <VendorEmptyState
           icon={Search}
           title="No matches"
-          description="Try a different search or category filter."
+          description="Try a different search or filter."
         />
       ) : (
-        byCategory.map((group) => (
-          <VendorPanel
-            key={group.cat}
-            title={group.cat}
-            subtitle={`${group.items.length} item${group.items.length === 1 ? "" : "s"}`}
-          >
-            <div className="space-y-2">
-              {group.items.map((item) => {
-                const isSelected = selected.has(item.dbId);
-                return (
+        byCategory.map((group) => {
+          const sortedGroup = [...group.items].sort(
+            (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)
+          );
+          return (
+            <VendorPanel
+              key={group.cat}
+              title={group.cat}
+              subtitle={`${group.items.length} item${group.items.length === 1 ? "" : "s"}`}
+            >
+              <div className="space-y-2">
+                {sortedGroup.map((item) => {
+                  const fullGroup = items
+                    .filter((i) => i.category === group.cat)
+                    .sort(
+                      (a, b) =>
+                        a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)
+                    );
+                  const fullIdx = fullGroup.findIndex((i) => i.dbId === item.dbId);
+                  return (
                   <div
                     key={item.dbId}
-                    className={cn(
-                      "vendor-menu-item overflow-hidden",
-                      item.soldOut && "opacity-90",
-                      isSelected && "ring-2 ring-accent/40"
-                    )}
+                    className={cn(dragId === item.dbId && "opacity-60")}
                   >
-                    <div className="flex gap-3 p-3 sm:p-4">
-                      {bulkMode ? (
-                        <button
-                          type="button"
-                          className="mt-1 shrink-0 text-accent"
-                          onClick={() => toggleSelect(item.dbId)}
-                          aria-label={
-                            isSelected ? "Deselect item" : "Select item"
-                          }
-                        >
-                          {isSelected ? (
-                            <CheckSquare className="size-5" />
-                          ) : (
-                            <Square className="size-5 text-muted" />
-                          )}
-                        </button>
-                      ) : null}
-
-                      <div className="relative shrink-0">
-                        {item.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- vendor-supplied image URL, matches the app's <img> usage
-                          <img
-                            src={item.image}
-                            alt=""
-                            className={cn(
-                              "size-16 rounded-xl object-cover sm:size-[4.5rem]",
-                              item.soldOut && "grayscale"
-                            )}
-                          />
-                        ) : (
-                          <span
-                            className={cn(
-                              "grid size-16 place-items-center rounded-xl bg-surface-2 text-2xl sm:size-[4.5rem]",
-                              item.soldOut && "grayscale opacity-70"
-                            )}
-                          >
-                            🍽️
-                          </span>
-                        )}
-                        <span className="absolute -bottom-1 -right-1 rounded-full bg-surface p-0.5 shadow-sm">
-                          <VegMark veg={item.veg} />
-                        </span>
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <p
-                                className={cn(
-                                  "font-semibold leading-snug",
-                                  item.soldOut && "text-muted"
-                                )}
-                              >
-                                {item.name}
-                              </p>
-                              {item.popular ? (
-                                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase text-accent">
-                                  Popular
-                                </span>
-                              ) : null}
-                              {item.bestseller ? (
-                                <span className="rounded-full bg-green/15 px-2 py-0.5 text-[10px] font-bold uppercase text-green">
-                                  Bestseller
-                                </span>
-                              ) : null}
-                              {item.soldOut ? (
-                                <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-bold uppercase text-muted">
-                                  Sold out
-                                </span>
-                              ) : null}
-                            </div>
-                            <p className="text-data mt-1 text-base font-bold">
-                              {formatINR(item.price)}
-                            </p>
-                          </div>
-
-                          {live && !bulkMode ? (
-                            <div className="flex shrink-0 items-center gap-1">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="size-9 p-0"
-                                onClick={() => setSheet({ mode: "edit", item })}
-                                aria-label={`Edit ${item.name}`}
-                              >
-                                <Pencil className="size-4" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="size-9 p-0"
-                                disabled={pending && deletingId === item.dbId}
-                                onClick={() => handleDelete(item)}
-                                aria-label={`Delete ${item.name}`}
-                              >
-                                <Trash2 className="size-4" />
-                              </Button>
-                            </div>
-                          ) : null}
-                        </div>
-
-                        {item.description ? (
-                          <p className="mt-1.5 line-clamp-2 text-xs text-muted">
-                            {item.description}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    {live && !bulkMode ? (
-                      <div className="border-t border-line bg-surface-2/50 px-3 py-2.5 sm:px-4">
-                        <MenuAvailabilityToggle
-                          menuItemId={item.dbId}
-                          initialAvailable={!item.soldOut}
-                          itemName={item.name}
-                          layout="row"
-                          onChange={(available) =>
-                            setItems((prev) =>
-                              prev.map((i) =>
-                                i.dbId === item.dbId
-                                  ? { ...i, soldOut: !available }
-                                  : i
-                              )
-                            )
-                          }
-                        />
-                      </div>
-                    ) : !live ? (
-                      <div className="border-t border-line px-3 py-2 text-xs font-semibold text-muted sm:px-4">
-                        {item.soldOut ? "Sold out" : "In stock"}
-                      </div>
-                    ) : null}
+                    <VendorMenuItemCard
+                      item={item}
+                      live={live}
+                      bulkMode={bulkMode}
+                      showReorder={reorderEnabled}
+                      selected={selected.has(item.dbId)}
+                      canMoveUp={reorderEnabled && fullIdx > 0}
+                      canMoveDown={
+                        reorderEnabled &&
+                        fullIdx >= 0 &&
+                        fullIdx < fullGroup.length - 1
+                      }
+                      deleting={pending && deletingId === item.dbId}
+                      onToggleSelect={() => toggleSelect(item.dbId)}
+                      onEdit={() => setSheet({ mode: "edit", item })}
+                      onDelete={() => handleDelete(item)}
+                      onDuplicate={() => handleDuplicate(item)}
+                      onPreview={() => setPreviewItem(item)}
+                      onMove={(dir) => moveInCategory(item, dir)}
+                      onAvailability={(available) =>
+                        setItems((prev) =>
+                          prev.map((i) =>
+                            i.dbId === item.dbId
+                              ? { ...i, soldOut: !available }
+                              : i
+                          )
+                        )
+                      }
+                      onPriceSaved={(price) =>
+                        setItems((prev) =>
+                          prev.map((i) =>
+                            i.dbId === item.dbId ? { ...i, price } : i
+                          )
+                        )
+                      }
+                      onDragStart={() => {
+                        if (reorderEnabled) setDragId(item.dbId);
+                      }}
+                      onDragOver={(e) => {
+                        if (!reorderEnabled) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                      }}
+                      onDrop={() => {
+                        if (reorderEnabled) dropInCategory(item.dbId, group.cat);
+                      }}
+                    />
                   </div>
-                );
-              })}
-            </div>
-          </VendorPanel>
-        ))
+                  );
+                })}
+              </div>
+            </VendorPanel>
+          );
+        })
       )}
 
       {live ? (
@@ -626,6 +782,14 @@ export function VendorMenuBoard({
         itemCounts={itemCounts}
         onClose={() => setCategoryOpen(false)}
         onChanged={() => router.refresh()}
+      />
+
+      <MenuCustomerPreview
+        open={Boolean(previewItem)}
+        item={previewItem}
+        restaurantName={restaurantName}
+        restaurantSlug={restaurantSlug}
+        onClose={() => setPreviewItem(null)}
       />
     </div>
   );

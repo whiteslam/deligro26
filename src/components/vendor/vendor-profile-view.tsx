@@ -1,34 +1,120 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import {
-  Store,
-  Mail,
-  Phone,
-  Star,
-  UtensilsCrossed,
-  Package,
+  ArrowUpRight,
+  CheckCircle2,
+  CircleDashed,
+  Clock,
   ExternalLink,
+  IndianRupee,
+  Mail,
+  MapPin,
+  Pencil,
+  Phone,
   ShieldCheck,
+  Sparkles,
+  Star,
+  Store,
+  UtensilsCrossed,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/roles/role-ui";
-import {
-  VendorMetricCard,
-  VendorPanel,
-} from "@/components/vendor/vendor-ui";
+import { LivePulse } from "@/components/vendor/vendor-ui";
+import { RestaurantOpenToggle } from "@/components/vendor/restaurant-open-toggle";
+import { RestaurantSwitcher } from "@/components/vendor/restaurant-switcher";
+import { VendorStoreEditSheet } from "@/components/vendor/vendor-store-edit-sheet";
 import { formatINR } from "@/lib/utils/format";
 import type { VendorProfileSummary } from "@/lib/data-access/vendor-profile";
 
-function DetailRow({
+function priceLabel(tier: number) {
+  return "₹".repeat(Math.min(3, Math.max(1, tier)));
+}
+
+function storeSince(iso: string | null) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString("en-IN", {
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function CompletenessRing({ score }: { score: number }) {
+  const r = 18;
+  const c = 2 * Math.PI * r;
+  const offset = c - (score / 100) * c;
+  return (
+    <div className="relative grid size-12 place-items-center">
+      <svg className="size-12 -rotate-90" viewBox="0 0 44 44" aria-hidden>
+        <circle
+          cx="22"
+          cy="22"
+          r={r}
+          fill="none"
+          stroke="var(--line)"
+          strokeWidth="4"
+        />
+        <circle
+          cx="22"
+          cy="22"
+          r={r}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          className="vendor-profile-ring"
+        />
+      </svg>
+      <span className="absolute text-[11px] font-bold tabular-nums">{score}%</span>
+    </div>
+  );
+}
+
+function Fact({
+  icon: Icon,
   label,
   value,
 }: {
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-      <span className="text-sm text-muted">{label}</span>
-      <span className="text-sm font-medium sm:text-right">{value}</span>
+    <div className="flex gap-3">
+      <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted">
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-label">{label}</p>
+        <p className="mt-0.5 text-sm font-semibold leading-snug">{value}</p>
+      </div>
     </div>
+  );
+}
+
+function QuickLink({
+  href,
+  label,
+  hint,
+}: {
+  href: string;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="vendor-profile-link press group flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5"
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">{label}</p>
+        <p className="mt-0.5 text-xs text-muted">{hint}</p>
+      </div>
+      <ArrowUpRight className="size-4 shrink-0 text-muted transition group-hover:text-accent" />
+    </Link>
   );
 }
 
@@ -39,203 +125,389 @@ export function VendorProfileView({
   profile: VendorProfileSummary;
   live: boolean;
 }) {
+  const [editing, setEditing] = useState(false);
   const r = profile.restaurant;
-  const priceLabel = r ? "₹".repeat(Math.min(3, r.priceTier)) : "—";
-
-  const maxStat = Math.max(
-    profile.stats.menuItems,
-    profile.stats.totalOrders,
-    profile.stats.lifetimeRevenue / 100,
-    1
-  );
+  const since = r ? storeSince(r.createdAt) : null;
+  const completionTone =
+    profile.completeness.score >= 85
+      ? "green"
+      : profile.completeness.score >= 50
+        ? "accent"
+        : "muted";
 
   return (
-    <div className="space-y-4 lg:space-y-6">
-      <div className="vendor-profile-cover relative overflow-hidden rounded-[var(--radius-sheet)] p-5 text-white">
-        <div className="relative flex items-end gap-4">
-          <span className="grid size-16 shrink-0 place-items-center rounded-2xl border-2 border-white/30 bg-white/20 text-2xl font-bold backdrop-blur-sm">
-            {profile.initials}
-          </span>
-          <div className="min-w-0 flex-1 pb-1">
-            <h1 className="truncate text-xl font-bold sm:text-2xl">
-              {profile.ownerName}
-            </h1>
-            <p className="mt-0.5 text-sm text-white/80">Restaurant owner</p>
-            <p className="mt-1 text-xs text-white/70">
-              Member since {profile.memberSince}
-              {profile.ownedRestaurants.length > 1
-                ? ` · ${profile.ownedRestaurants.length} stores`
-                : ""}
+    <div className="vendor-profile min-w-0 space-y-6 overflow-x-hidden pb-8 lg:space-y-8">
+      {/* Full-bleed storefront hero */}
+      <section className="vendor-profile-hero relative isolate overflow-hidden rounded-[var(--radius-sheet)]">
+        {r?.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={r.imageUrl}
+            alt=""
+            className="absolute inset-0 size-full object-cover"
+          />
+        ) : (
+          <div
+            className={`absolute inset-0 bg-gradient-to-br ${
+              r?.accentTint || "from-[var(--accent)] to-[color-mix(in_srgb,var(--accent)_45%,var(--ink))]"
+            }`}
+          />
+        )}
+        <div className="vendor-profile-hero-veil absolute inset-0" />
+        <div className="relative flex min-h-[280px] flex-col justify-end p-5 sm:min-h-[320px] sm:p-7">
+          <div className="mb-auto flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {live && r?.isOpen ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+                  <LivePulse />
+                  Accepting orders
+                </span>
+              ) : null}
+              {r?.approved ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+                  <ShieldCheck className="size-3" />
+                  Approved
+                </span>
+              ) : r ? (
+                <span className="rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-bold text-white/90 backdrop-blur-sm">
+                  Pending approval
+                </span>
+              ) : null}
+              {r?.promoted ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+                  <Sparkles className="size-3" />
+                  Promoted
+                </span>
+              ) : null}
+            </div>
+            {r ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="border-white/40 bg-white/15 text-white backdrop-blur-sm hover:bg-white/25 hover:text-white"
+                onClick={() => setEditing(true)}
+              >
+                <Pencil className="size-3.5" />
+                Edit
+              </Button>
+            ) : null}
+          </div>
+
+          <div className="animate-fade-in max-w-2xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
+              Storefront
             </p>
+            <h1 className="text-display mt-1 text-3xl font-bold leading-[1.05] tracking-tight text-white sm:text-4xl lg:text-5xl">
+              {r?.name ?? "No restaurant linked"}
+            </h1>
+            {r?.tagline ? (
+              <p className="mt-2 max-w-xl text-sm text-white/85 sm:text-base">
+                {r.tagline}
+              </p>
+            ) : r ? (
+              <p className="mt-2 text-sm text-white/65">
+                Add a tagline so customers know your vibe.
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-white/80">
+                Ask Deligro admin to link your restaurant account.
+              </p>
+            )}
+
+            {r ? (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <RestaurantOpenToggle isOpen={r.isOpen} />
+                {r.cuisines.slice(0, 4).map((c) => (
+                  <span
+                    key={c}
+                    className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm"
+                  >
+                    {c}
+                  </span>
+                ))}
+                {r.cuisines.length > 4 ? (
+                  <span className="text-[11px] font-semibold text-white/70">
+                    +{r.cuisines.length - 4}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
-      </div>
+      </section>
+
+      {r && profile.completeness.missing.length > 0 ? (
+        <section className="vendor-profile-panel animate-slide-up flex flex-col gap-4 rounded-[var(--radius-block)] border border-line bg-surface p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="flex items-center gap-3">
+            <CompletenessRing score={profile.completeness.score} />
+            <div>
+              <p className="text-sm font-bold">Storefront checklist</p>
+              <p className="mt-0.5 text-xs text-muted">
+                Complete these to look polished on the customer app.
+              </p>
+            </div>
+          </div>
+          <ul className="flex flex-wrap gap-2">
+            {profile.completeness.missing.map((item) => (
+              <li key={item}>
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="press inline-flex items-center gap-1.5 rounded-full border border-dashed border-line bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-muted"
+                >
+                  <CircleDashed className="size-3" />
+                  {item}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <Pill tone={completionTone}>{profile.completeness.score}% ready</Pill>
+        </section>
+      ) : r ? (
+        <section className="vendor-profile-panel animate-slide-up flex items-center gap-3 rounded-[var(--radius-block)] border border-green/25 bg-green/5 px-4 py-3">
+          <CheckCircle2 className="size-5 shrink-0 text-green" />
+          <p className="text-sm font-medium text-green">
+            Storefront looks complete — customers see a polished listing.
+          </p>
+        </section>
+      ) : null}
 
       {r ? (
         <>
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-            <VendorMetricCard
-              label="Menu items"
-              value={String(profile.stats.menuItems)}
-              icon="utensils"
-              tone="accent"
-              barPct={(profile.stats.menuItems / maxStat) * 100}
-            />
-            <VendorMetricCard
-              label="In stock"
-              value={String(profile.stats.menuAvailable)}
-              icon="package"
-              tone="green"
-              barPct={
-                profile.stats.menuItems > 0
-                  ? (profile.stats.menuAvailable / profile.stats.menuItems) * 100
-                  : 0
-              }
-            />
-            <VendorMetricCard
-              label="Total orders"
-              value={String(profile.stats.totalOrders)}
-              icon="shopping"
-              tone="blue"
-              barPct={(profile.stats.totalOrders / maxStat) * 100}
-            />
-            <VendorMetricCard
-              label="Lifetime revenue"
-              value={formatINR(profile.stats.lifetimeRevenue)}
-              icon="rupee"
-              tone="accent"
-              barPct={72}
-            />
-          </div>
-
-          <VendorPanel
-            title="Store details"
-            action={
-              <Pill tone={r.isOpen ? "green" : "muted"}>
-                {r.isOpen ? "Open" : "Closed"}
-              </Pill>
-            }
-            accent={r.isOpen ? "green" : "muted"}
-          >
-            <div className="divide-y divide-line">
-              <DetailRow label="Restaurant" value={r.name} />
-              <DetailRow label="Slug" value={r.slug} />
-              <DetailRow
-                label="Status"
-                value={r.approved ? "Approved" : "Pending approval"}
-              />
-              {r.tagline ? (
-                <DetailRow label="Tagline" value={r.tagline} />
-              ) : null}
-              {r.cuisines.length > 0 ? (
-                <DetailRow label="Cuisines" value={r.cuisines.join(", ")} />
-              ) : null}
-              <DetailRow
-                label="Rating"
-                value={
-                  <span className="inline-flex items-center gap-1">
-                    <Star className="size-3.5 fill-accent text-accent" />
-                    {r.rating.toFixed(1)} ({r.ratingCount})
-                  </span>
-                }
-              />
-              <DetailRow label="Price tier" value={priceLabel} />
-              {r.costForTwo ? (
-                <DetailRow
-                  label="Cost for two"
-                  value={formatINR(r.costForTwo)}
-                />
-              ) : null}
-              {r.etaMin && r.etaMax ? (
-                <DetailRow
-                  label="Delivery ETA"
-                  value={`${r.etaMin}–${r.etaMax} min`}
-                />
-              ) : null}
-              {r.offer ? <DetailRow label="Offer" value={r.offer} /> : null}
-            </div>
-            {live ? (
-              <Link
-                href={`/restaurant/${r.slug}`}
-                className="press mt-4 flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-surface-2 px-4 py-3 text-sm font-semibold"
+          {/* Snapshot metrics */}
+          <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              {
+                label: "Rating",
+                value: r.rating.toFixed(1),
+                hint: `${r.ratingCount} ratings · ${r.reviewCount} reviews`,
+              },
+              {
+                label: "Orders",
+                value: String(profile.stats.totalOrders),
+                hint: `${profile.stats.activeOrders} active now`,
+              },
+              {
+                label: "Delivered",
+                value: String(profile.stats.deliveredOrders),
+                hint: `${profile.stats.cancelledOrders} cancelled`,
+              },
+              {
+                label: "Lifetime sales",
+                value: formatINR(profile.stats.lifetimeRevenue),
+                hint: `${profile.stats.menuAvailable}/${profile.stats.menuItems} dishes live`,
+              },
+            ].map((m, i) => (
+              <div
+                key={m.label}
+                className="vendor-profile-stat animate-fade-in rounded-[var(--radius-block)] border border-line bg-surface p-4"
+                style={{ animationDelay: `${i * 60}ms` }}
               >
-                <ExternalLink className="size-4" />
-                View customer menu
-              </Link>
-            ) : null}
-          </VendorPanel>
+                <p className="text-label">{m.label}</p>
+                <p className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
+                  {m.value}
+                </p>
+                <p className="mt-1 text-[11px] text-muted">{m.hint}</p>
+              </div>
+            ))}
+          </section>
+
+          <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr] lg:gap-6">
+            {/* Listing details */}
+            <section className="vendor-profile-panel space-y-5 rounded-[var(--radius-block)] border border-line bg-surface p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold">Listing details</h2>
+                  <p className="mt-0.5 text-sm text-muted">
+                    What customers see on Deligro.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditing(true)}
+                >
+                  <Pencil className="size-3.5" />
+                  Edit
+                </Button>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Fact
+                  icon={Star}
+                  label="Customer rating"
+                  value={
+                    <span className="inline-flex items-center gap-1.5">
+                      <Star className="size-3.5 fill-accent text-accent" />
+                      {r.rating.toFixed(1)}
+                      <span className="font-normal text-muted">
+                        ({r.ratingCount})
+                      </span>
+                    </span>
+                  }
+                />
+                <Fact
+                  icon={Clock}
+                  label="Delivery ETA"
+                  value={
+                    r.etaMin != null && r.etaMax != null
+                      ? `${r.etaMin}–${r.etaMax} min`
+                      : "Not set"
+                  }
+                />
+                <Fact
+                  icon={IndianRupee}
+                  label="Price · cost for two"
+                  value={
+                    <>
+                      {priceLabel(r.priceTier)}
+                      {r.costForTwo != null
+                        ? ` · ${formatINR(r.costForTwo)}`
+                        : ""}
+                    </>
+                  }
+                />
+                <Fact
+                  icon={UtensilsCrossed}
+                  label="Cuisines"
+                  value={
+                    r.cuisines.length > 0 ? r.cuisines.join(" · ") : "Add cuisines"
+                  }
+                />
+                <Fact
+                  icon={Sparkles}
+                  label="Promo offer"
+                  value={r.offer?.trim() || "No active offer"}
+                />
+                <Fact
+                  icon={MapPin}
+                  label="Public page"
+                  value={
+                    live ? (
+                      <Link
+                        href={`/restaurant/${r.slug}`}
+                        className="inline-flex items-center gap-1 text-accent"
+                      >
+                        /restaurant/{r.slug}
+                        <ExternalLink className="size-3.5" />
+                      </Link>
+                    ) : (
+                      `/${r.slug}`
+                    )
+                  }
+                />
+              </div>
+
+              {since ? (
+                <p className="border-t border-line pt-4 text-xs text-muted">
+                  Listed on Deligro since {since}
+                  {r.promoted ? " · Featured placement active" : ""}
+                </p>
+              ) : null}
+            </section>
+
+            {/* Owner + stores */}
+            <div className="space-y-4">
+              <section className="vendor-profile-panel space-y-4 rounded-[var(--radius-block)] border border-line bg-surface p-5">
+                <div className="flex items-center gap-3">
+                  <span className="grid size-12 place-items-center rounded-2xl bg-accent/12 text-sm font-bold text-accent">
+                    {profile.initials}
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="truncate font-bold">{profile.ownerName}</h2>
+                    <p className="text-xs text-muted">
+                      Owner · since {profile.memberSince}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-3 border-t border-line pt-4">
+                  {profile.ownerEmail ? (
+                    <div className="flex items-center gap-3 text-sm">
+                      <Mail className="size-4 shrink-0 text-muted" />
+                      <span className="truncate">{profile.ownerEmail}</span>
+                    </div>
+                  ) : null}
+                  {profile.ownerPhone ? (
+                    <a
+                      href={`tel:${profile.ownerPhone.replace(/\s/g, "")}`}
+                      className="flex items-center gap-3 text-sm text-accent"
+                    >
+                      <Phone className="size-4 shrink-0" />
+                      {profile.ownerPhone}
+                    </a>
+                  ) : null}
+                  <div className="flex items-center gap-3 text-sm">
+                    <Store className="size-4 shrink-0 text-muted" />
+                    <span>
+                      {profile.ownedRestaurants.length} store
+                      {profile.ownedRestaurants.length === 1 ? "" : "s"} linked
+                    </span>
+                  </div>
+                </div>
+                {profile.ownedRestaurants.length > 1 ? (
+                  <div className="border-t border-line pt-4">
+                    <p className="mb-2 text-label">Active store</p>
+                    <RestaurantSwitcher
+                      restaurants={profile.ownedRestaurants}
+                      activeSlug={r.slug}
+                      fullWidth
+                    />
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="space-y-2">
+                <QuickLink
+                  href="/vendor/menu"
+                  label="Menu"
+                  hint={`${profile.stats.menuItems} items · manage dishes`}
+                />
+                <QuickLink
+                  href="/vendor"
+                  label="Orders"
+                  hint={`${profile.stats.activeOrders} in the kitchen`}
+                />
+                <QuickLink
+                  href="/vendor/earnings"
+                  label="Earnings"
+                  hint="Settlements & sales trends"
+                />
+                {live ? (
+                  <QuickLink
+                    href={`/restaurant/${r.slug}`}
+                    label="Customer preview"
+                    hint="See your public restaurant page"
+                  />
+                ) : null}
+              </section>
+            </div>
+          </div>
         </>
       ) : (
-        <VendorPanel>
-          <p className="text-sm text-muted">
-            No restaurant is linked to this account yet.
+        <section className="rounded-[var(--radius-block)] border border-dashed border-line bg-surface p-8 text-center">
+          <Store className="mx-auto size-8 text-muted" />
+          <p className="mt-3 font-semibold">No restaurant linked</p>
+          <p className="mt-1 text-sm text-muted">
+            Once admin assigns a store, your storefront profile will appear
+            here.
           </p>
-        </VendorPanel>
+        </section>
       )}
-
-      <VendorPanel title="Account">
-        <div className="divide-y divide-line">
-          {profile.ownerEmail ? (
-            <div className="flex items-center gap-3 py-3">
-              <Mail className="size-4 shrink-0 text-muted" />
-              <div className="min-w-0">
-                <p className="text-label">Email</p>
-                <p className="truncate text-sm font-medium">
-                  {profile.ownerEmail}
-                </p>
-              </div>
-            </div>
-          ) : null}
-          {profile.ownerPhone ? (
-            <div className="flex items-center gap-3 py-3">
-              <Phone className="size-4 shrink-0 text-muted" />
-              <div>
-                <p className="text-label">Phone</p>
-                <a
-                  href={`tel:${profile.ownerPhone.replace(/\s/g, "")}`}
-                  className="text-data text-sm font-medium text-accent"
-                >
-                  {profile.ownerPhone}
-                </a>
-              </div>
-            </div>
-          ) : null}
-          <div className="flex items-center gap-3 py-3">
-            <Store className="size-4 shrink-0 text-muted" />
-            <div>
-              <p className="text-label">Active orders</p>
-              <p className="text-sm font-medium">
-                {profile.stats.activeOrders} in kitchen pipeline
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 py-3">
-            <Package className="size-4 shrink-0 text-muted" />
-            <div>
-              <p className="text-label">Delivered</p>
-              <p className="text-sm font-medium">
-                {profile.stats.deliveredOrders} orders completed
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 py-3">
-            <UtensilsCrossed className="size-4 shrink-0 text-muted" />
-            <div>
-              <p className="text-label">Menu</p>
-              <p className="text-sm font-medium">
-                {profile.stats.menuAvailable} of {profile.stats.menuItems} items
-                in stock
-              </p>
-            </div>
-          </div>
-        </div>
-      </VendorPanel>
 
       <p className="flex items-center justify-center gap-1.5 px-2 text-center text-xs text-muted">
         <ShieldCheck className="size-3.5 shrink-0" />
-        Profile changes are managed by admin · contact support to update bank or
-        legal details.
+        Bank, GST, and legal entity details are managed by Deligro admin.
       </p>
+
+      {r && editing ? (
+        <VendorStoreEditSheet
+          open={editing}
+          restaurant={r}
+          onClose={() => setEditing(false)}
+        />
+      ) : null}
     </div>
   );
 }

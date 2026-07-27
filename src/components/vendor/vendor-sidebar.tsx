@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { RestaurantOpenToggle } from "@/components/vendor/restaurant-open-toggle";
+import { RestaurantSwitcher } from "@/components/vendor/restaurant-switcher";
 import { LivePulse } from "@/components/vendor/vendor-ui";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { cn } from "@/lib/utils/cn";
@@ -28,6 +29,8 @@ const NAV = [
 export function VendorSidebar({
   restaurantName,
   isOpen,
+  restaurants = [],
+  activeSlug = "",
   showControls,
 }: {
   restaurantName: string;
@@ -51,11 +54,28 @@ export function VendorSidebar({
               <p className="truncate text-[11px] text-muted">Partner hub</p>
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <p className="min-w-0 truncate text-sm font-semibold text-ink">
-              {restaurantName}
-            </p>
-            {showControls ? <RestaurantOpenToggle isOpen={isOpen} /> : null}
+          <div className="mt-3 space-y-2">
+            {showControls && restaurants.length > 1 && activeSlug ? (
+              <RestaurantSwitcher
+                restaurants={restaurants}
+                activeSlug={activeSlug}
+                fullWidth
+              />
+            ) : (
+              <p className="min-w-0 truncate text-sm font-semibold text-ink">
+                {restaurantName}
+              </p>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              {showControls && restaurants.length <= 1 ? (
+                <span className="text-[11px] text-muted">Store status</span>
+              ) : (
+                <span className="min-w-0 truncate text-[11px] text-muted">
+                  {restaurantName}
+                </span>
+              )}
+              {showControls ? <RestaurantOpenToggle isOpen={isOpen} /> : null}
+            </div>
           </div>
         </div>
 
@@ -73,8 +93,8 @@ export function VendorSidebar({
                     : "text-muted hover:bg-surface-2 hover:text-ink"
                 )}
               >
-                <Icon className="size-4" />
-                {label}
+                <Icon className="size-4 shrink-0" />
+                <span className="truncate">{label}</span>
               </Link>
             );
           })}
@@ -125,7 +145,7 @@ export function VendorBottomNav() {
               key={href}
               href={href}
               className={cn(
-                "press relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl px-0.5 py-1.5 text-[9px] font-semibold transition-all sm:text-[10px]",
+                "press relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl px-0.5 py-1.5 text-[10px] font-semibold transition-all sm:text-[11px]",
                 active ? "text-accent" : "text-muted"
               )}
             >

@@ -62,6 +62,7 @@ export default async function VendorOrdersPage() {
 
   let incoming: KitchenOrder[] = [];
   let preparing: KitchenOrder[] = [];
+  let ready: KitchenOrder[] = [];
   let recent: KitchenOrder[] = [];
   let cancelled: KitchenOrder[] = [];
 
@@ -69,6 +70,7 @@ export default async function VendorOrdersPage() {
     const board = await listKitchenOrders(restaurant.id);
     incoming = board.incoming;
     preparing = board.preparing;
+    ready = board.ready;
     const history = await listVendorOrderHistory(restaurant.id);
     recent = history.completed;
     cancelled = history.cancelled;
@@ -87,6 +89,7 @@ export default async function VendorOrdersPage() {
     <VendorOrdersBoard
       initialIncoming={incoming}
       initialPreparing={preparing}
+      initialReady={ready}
       initialRecent={recent}
       initialCancelled={cancelled}
       live

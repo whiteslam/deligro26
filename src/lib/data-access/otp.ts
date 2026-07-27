@@ -129,6 +129,42 @@ export async function verifyOtp(phone: string, code: string): Promise<VerifyResu
   return { ok: true, tokenHash: link.properties.hashed_token, email, isNewUser };
 }
 
+export interface CheckResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Validate a code for a phone and consume it, WITHOUT resolving a user or
+ * minting a session. Used to prove phone ownership in-place — e.g. an admin
+ * confirming a vendor's mobile during onboarding — where establishing a session
+ * for that phone would wrongly sign the admin out of their own account.
+ */
+export async function checkOtp(phone: string, code: string): Promise<CheckResult> {
+  const supabase = createAdminClient();
+
+  const { data: row } = await supabase
+    .from("otp_codes")
+    .select("id, code_hash, attempts, consumed, expires_at")
+    .eq("phone", phone)
+    .eq("consumed", false)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!row) return { ok: false, error: "no_code" };
+  if (new Date(row.expires_at).getTime() < Date.now()) return { ok: false, error: "expired" };
+  if (row.attempts >= MAX_ATTEMPTS) return { ok: false, error: "locked" };
+
+  if (row.code_hash !== hashCode(phone, code)) {
+    await supabase.from("otp_codes").update({ attempts: row.attempts + 1 }).eq("id", row.id);
+    return { ok: false, error: "invalid" };
+  }
+
+  await supabase.from("otp_codes").update({ consumed: true }).eq("id", row.id);
+  return { ok: true };
+}
+
 async function resolveUser(
   phone: string
 ): Promise<{ user: { id: string } | null; email: string; isNewUser: boolean }> {
