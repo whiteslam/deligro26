@@ -1,502 +1,366 @@
 "use client";
 
-import { SectionTitle } from "@/components/roles/role-ui";
+import { useEffect, useId, useMemo, useState, useTransition } from "react";
 import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { Download, IndianRupee } from "lucide-react";
+import { SectionTitle } from "@/components/roles/role-ui";
+import { Button } from "@/components/ui/button";
+import {
+  VendorChip,
   VendorHero,
   VendorMetricCard,
   VendorPanel,
 } from "@/components/vendor/vendor-ui";
-import type { VendorEarningsSummary } from "@/lib/data-access/vendor-earnings";
+import type {
+  EarningsRange,
+  VendorEarningsSummary,
+} from "@/lib/data-access/vendor-earnings";
 import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
-function barHeight(value: number, max: number, minPx = 6): number {
-  if (max <= 0 || value <= 0) return minPx;
-  return Math.max(minPx, Math.round((value / max) * 100));
-}
+const C = {
+  accent: "var(--accent)",
+  green: "var(--green)",
+  blue: "var(--blue)",
+  muted: "var(--muted)",
+  surface: "var(--surface)",
+  line: "var(--line)",
+} as const;
 
-function pctOf(value: number, total: number): string {
-  if (total <= 0) return "0%";
-  return `${Math.round((value / total) * 100)}%`;
-}
+const RANGES: { id: EarningsRange; label: string }[] = [
+  { id: "today", label: "Today" },
+  { id: "week", label: "This week" },
+  { id: "month", label: "This month" },
+  { id: "last_month", label: "Last month" },
+  { id: "last_30", label: "Last 30 days" },
+];
 
-function ChartLegend({
-  items,
-}: {
-  items: { color: string; label: string; value?: string }[];
-}) {
+function ChartEmpty({ label }: { label: string }) {
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-2 pt-3">
-      {items.map((item) => (
-        <span
-          key={item.label}
-          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted"
-        >
+    <div className="flex h-52 items-center justify-center rounded-xl bg-surface-2 text-sm text-muted">
+      {label}
+    </div>
+  );
+}
+
+function ChartTooltipBox({
+  active,
+  payload,
+  label,
+  valueFormatter,
+}: {
+  active?: boolean;
+  payload?: { name?: string; value?: number; color?: string }[];
+  label?: string;
+  valueFormatter?: (n: number, name?: string) => string;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-xl border border-line bg-surface px-3 py-2 shadow-lg">
+      {label ? (
+        <p className="mb-1 text-[11px] font-semibold text-muted">{label}</p>
+      ) : null}
+      {payload.map((p, i) => (
+        <p key={i} className="text-data text-sm font-bold text-ink">
           <span
-            className="size-2.5 shrink-0 rounded-sm"
-            style={{ background: item.color }}
+            className="mr-1.5 inline-block size-2 rounded-full"
+            style={{ background: p.color }}
           />
-          <span>{item.label}</span>
-          {item.value ? (
-            <span className="text-data font-semibold text-ink">{item.value}</span>
-          ) : null}
-        </span>
+          {p.name ? `${p.name}: ` : ""}
+          {valueFormatter
+            ? valueFormatter(Number(p.value) || 0, p.name)
+            : String(p.value)}
+        </p>
       ))}
     </div>
   );
 }
 
-function VerticalBarChart({
+function ChartCard({
   title,
-  subtitle,
-  totalLabel,
-  totalValue,
-  bars,
-  highlightKey,
-  accentClass = "bg-accent/85",
-  highlightClass = "bg-green",
-  emptyLabel = "No data yet",
-  formatValue = formatINR,
+  hint,
+  children,
 }: {
   title: string;
-  subtitle?: string;
-  totalLabel?: string;
-  totalValue?: number;
-  bars: { key: string; label: string; value: number }[];
-  highlightKey?: string;
-  accentClass?: string;
-  highlightClass?: string;
-  emptyLabel?: string;
-  formatValue?: (n: number) => string;
+  hint?: string;
+  children: React.ReactNode;
 }) {
-  const max = Math.max(...bars.map((b) => b.value), 0);
-  const hasData = max > 0;
-  const sum = bars.reduce((s, b) => s + b.value, 0);
-
   return (
     <section className="vendor-panel">
       <SectionTitle
         right={
-          <div className="text-right">
-            {totalLabel && totalValue !== undefined ? (
-              <p className="text-data text-sm font-bold text-ink">
-                {formatValue(totalValue)}
-              </p>
-            ) : null}
-            {subtitle ? (
-              <p className="text-[11px] font-semibold text-muted">{subtitle}</p>
-            ) : null}
-          </div>
+          hint ? (
+            <p className="max-w-[12rem] text-right text-[11px] font-medium leading-snug text-muted">
+              {hint}
+            </p>
+          ) : null
         }
       >
         {title}
       </SectionTitle>
-
-      {!hasData ? (
-        <div className="flex h-36 items-center justify-center rounded-xl bg-surface-2 text-sm text-muted">
-          {emptyLabel}
-        </div>
-      ) : (
-        <>
-          <div className="flex h-44 items-end justify-between gap-1 sm:gap-2">
-            {bars.map((bar) => {
-              const highlighted = bar.key === highlightKey && bar.value > 0;
-              return (
-                <div
-                  key={bar.key}
-                  className="flex min-w-0 flex-1 flex-col items-center gap-1"
-                >
-                  <span
-                    className={cn(
-                      "text-data truncate text-[9px] font-semibold leading-none sm:text-[10px]",
-                      highlighted ? "text-green" : "text-muted"
-                    )}
-                  >
-                    {bar.value > 0 ? formatValue(bar.value) : "—"}
-                  </span>
-                  <div className="flex w-full flex-1 items-end">
-                    <div
-                      className={cn(
-                        "w-full rounded-t-md transition-[height]",
-                        highlighted ? highlightClass : accentClass,
-                        !highlighted && accentClass.includes("accent") && "vendor-chart-bar"
-                      )}
-                      style={{ height: `${barHeight(bar.value, max)}%` }}
-                    />
-                  </div>
-                  <span className="truncate text-[10px] font-medium text-muted sm:text-[11px]">
-                    {bar.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          <ul className="mt-3 divide-y divide-line border-t border-line">
-            {bars.map((bar) => (
-              <li
-                key={`list-${bar.key}`}
-                className="flex items-center justify-between gap-2 py-2 text-sm"
-              >
-                <span className="font-medium">{bar.label}</span>
-                <span className="text-data font-semibold">
-                  {bar.value > 0 ? formatValue(bar.value) : "—"}
-                  {sum > 0 && bar.value > 0 ? (
-                    <span className="ml-1.5 text-xs font-medium text-muted">
-                      ({pctOf(bar.value, sum)})
-                    </span>
-                  ) : null}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      {children}
     </section>
   );
 }
 
-function DualBarCompare({
-  title,
-  left,
-  right,
-  formatValue = formatINR,
+function Donut({
+  data,
+  centerLabel,
+  centerValue,
+  emptyLabel,
 }: {
-  title: string;
-  left: { label: string; value: number };
-  right: { label: string; value: number };
-  formatValue?: (n: number) => string;
+  data: { name: string; value: number; color: string }[];
+  centerLabel: string;
+  centerValue: string;
+  emptyLabel: string;
 }) {
-  const max = Math.max(left.value, right.value, 1);
-  const diff = left.value - right.value;
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (total <= 0) return <ChartEmpty label={emptyLabel} />;
 
   return (
-    <section className="vendor-panel">
-      <SectionTitle
-        right={
-          diff !== 0 ? (
-            <span
-              className={cn(
-                "text-xs font-bold",
-                diff > 0 ? "text-green" : "text-red-500"
-              )}
+    <div className="w-full">
+      <div className="relative h-52 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              innerRadius="58%"
+              outerRadius="82%"
+              paddingAngle={3}
+              stroke={C.surface}
+              strokeWidth={3}
             >
-              {diff > 0 ? "+" : ""}
-              {formatValue(diff)}
-            </span>
-          ) : null
-        }
-      >
-        {title}
-      </SectionTitle>
-      <div className="grid grid-cols-2 gap-4">
-        {[left, right].map((item) => (
-          <div key={item.label} className="flex flex-col items-center gap-2">
-            <span className="text-data text-sm font-bold sm:text-base">
-              {formatValue(item.value)}
-            </span>
-            <div className="flex h-32 w-full items-end justify-center">
-              <div
-                className="w-12 max-w-full rounded-t-lg bg-accent/85 sm:w-16"
-                style={{ height: `${barHeight(item.value, max, 8)}%` }}
-              />
-            </div>
-            <span className="text-center text-xs font-semibold text-muted">
-              {item.label}
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function HorizontalBarRow({
-  label,
-  value,
-  max,
-  colorClass,
-  formatValue = formatINR,
-  suffix,
-}: {
-  label: string;
-  value: number;
-  max: number;
-  colorClass: string;
-  formatValue?: (n: number) => string;
-  suffix?: string;
-}) {
-  const width = max > 0 ? Math.max(value > 0 ? 8 : 0, (value / max) * 100) : 0;
-
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted">{label}</span>
-        <span className="text-data shrink-0 text-sm font-bold">
-          {formatValue(value)}
-          {suffix ? (
-            <span className="ml-1 text-xs font-medium text-muted">{suffix}</span>
-          ) : null}
-        </span>
-      </div>
-      <div className="h-3 overflow-hidden rounded-full bg-surface-2">
-        <div
-          className={cn("h-full rounded-full transition-[width]", colorClass)}
-          style={{ width: `${width}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function HorizontalBarChart({
-  title,
-  rows,
-  formatValue = formatINR,
-}: {
-  title: string;
-  rows: { label: string; value: number; colorClass: string; suffix?: string }[];
-  formatValue?: (n: number) => string;
-}) {
-  const max = Math.max(...rows.map((r) => r.value), 0);
-  const total = rows.reduce((s, r) => s + r.value, 0);
-
-  return (
-    <section className="vendor-panel">
-      <SectionTitle
-        right={
-          total > 0 ? (
-            <span className="text-data text-sm font-bold">{formatValue(total)}</span>
-          ) : null
-        }
-      >
-        {title}
-      </SectionTitle>
-      <div className="space-y-3">
-        {rows.map((row) => (
-          <HorizontalBarRow
-            key={row.label}
-            label={row.label}
-            value={row.value}
-            max={max}
-            colorClass={row.colorClass}
-            formatValue={formatValue}
-            suffix={row.suffix}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function StackedFlowBar({
-  title,
-  segments,
-  totalLabel,
-}: {
-  title: string;
-  segments: { label: string; value: number; color: string }[];
-  totalLabel?: string;
-}) {
-  const total = segments.reduce((s, seg) => s + seg.value, 0);
-
-  return (
-    <section className="vendor-panel">
-      <SectionTitle
-        right={
-          total > 0 ? (
-            <span className="text-data text-sm font-bold">{formatINR(total)}</span>
-          ) : null
-        }
-      >
-        {title}
-      </SectionTitle>
-      {total <= 0 ? (
-        <div className="flex h-10 items-center justify-center rounded-full bg-surface-2 text-xs text-muted">
-          No activity this week
+              {data.map((d) => (
+                <Cell key={d.name} fill={d.color} />
+              ))}
+            </Pie>
+            <Tooltip
+              content={
+                <ChartTooltipBox
+                  valueFormatter={(n) =>
+                    `${formatINR(n)} (${Math.round((n / total) * 100)}%)`
+                  }
+                />
+              }
+            />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <p className="text-data text-lg font-bold">{centerValue}</p>
+          <p className="text-[11px] font-medium text-muted">{centerLabel}</p>
         </div>
-      ) : (
-        <>
-          <div className="flex h-10 overflow-hidden rounded-full bg-surface-2">
-            {segments.map((seg) => {
-              const width = (seg.value / total) * 100;
-              if (width <= 0) return null;
-              return (
-                <div
-                  key={seg.label}
-                  className="relative flex h-full min-w-[4px] items-center justify-center transition-[width]"
-                  style={{ width: `${width}%`, background: seg.color }}
-                >
-                  {width >= 18 ? (
-                    <span className="truncate px-1 text-[10px] font-bold text-white">
-                      {pctOf(seg.value, total)}
-                    </span>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-          <ChartLegend
-            items={segments
-              .filter((s) => s.value > 0)
-              .map((s) => ({
-                color: s.color,
-                label: s.label,
-                value: `${formatINR(s.value)} · ${pctOf(s.value, total)}`,
-              }))}
-          />
-          {totalLabel ? (
-            <p className="mt-2 text-xs text-muted">{totalLabel}</p>
-          ) : null}
-        </>
-      )}
-    </section>
-  );
-}
-
-function WeekProgressRing({
-  title,
-  weekValue,
-  lifetimeValue,
-}: {
-  title: string;
-  weekValue: number;
-  lifetimeValue: number;
-}) {
-  const pct =
-    lifetimeValue > 0
-      ? Math.min(100, Math.round((weekValue / lifetimeValue) * 100))
-      : weekValue > 0
-        ? 100
-        : 0;
-
-  return (
-    <section className="vendor-panel">
-      <SectionTitle>{title}</SectionTitle>
-      <div className="flex items-center gap-4">
-        <div
-          className="relative grid size-24 shrink-0 place-items-center rounded-full sm:size-28"
-          style={{
-            background: `conic-gradient(var(--accent) ${pct * 3.6}deg, var(--surface-2) 0)`,
-          }}
-        >
-          <div className="grid size-[4.5rem] place-items-center rounded-full bg-surface text-center sm:size-20">
-            <span className="text-lg font-bold text-accent">{pct}%</span>
-          </div>
-        </div>
-        <div className="min-w-0 flex-1 space-y-3">
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs">
-              <span className="text-muted">This week</span>
-              <span className="text-data font-bold">{formatINR(weekValue)}</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-surface-2">
-              <div
-                className="h-full rounded-full bg-accent"
-                style={{ width: `${pct}%` }}
+      </div>
+      <ul className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1">
+        {data
+          .filter((d) => d.value > 0)
+          .map((d) => (
+            <li
+              key={d.name}
+              className="inline-flex items-center gap-1.5 text-[11px] text-muted"
+            >
+              <span
+                className="size-2.5 rounded-full"
+                style={{ background: d.color }}
               />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs">
-              <span className="text-muted">Lifetime</span>
-              <span className="text-data font-bold">
-                {formatINR(lifetimeValue)}
+              {d.name}{" "}
+              <span className="text-data font-semibold text-ink">
+                {formatINR(d.value)}
               </span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-surface-2">
-              <div className="h-full w-full rounded-full bg-green/40" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+            </li>
+          ))}
+      </ul>
+    </div>
   );
 }
 
-function TrendIndicator({
-  percent,
-  weekTotal,
-}: {
-  percent: number | null;
-  weekTotal: number;
-}) {
-  return (
-    <div className="text-right">
-      <p className="text-data text-sm font-bold">{formatINR(weekTotal)}</p>
-      {percent === null ? (
-        <p className="text-[10px] font-medium text-muted">This week</p>
-      ) : (
-        <p
-          className={cn(
-            "text-[10px] font-bold",
-            percent >= 0 ? "text-green" : "text-red-500"
-          )}
-        >
-          {percent >= 0 ? "▲" : "▼"} {Math.abs(percent)}% vs last week
-        </p>
-      )}
-    </div>
-  );
+function exportEarningsCsv(stats: VendorEarningsSummary) {
+  const lines = [
+    "section,label,a,b",
+    `summary,range,${JSON.stringify(stats.rangeLabel)},`,
+    `summary,revenue,${stats.periodRevenue},`,
+    `summary,orders,${stats.periodOrders},`,
+    `summary,avg_order,${stats.periodAvgOrder},`,
+    `summary,items_subtotal,${stats.itemsSubtotal},`,
+    `summary,delivery_fees,${stats.deliveryFees},`,
+    `summary,tax,${stats.taxAmount},`,
+    `summary,cancelled_value,${stats.cancelledValue},`,
+    `summary,delivered_revenue,${stats.deliveredRevenue},`,
+    "series,label,revenue,orders",
+    ...stats.series.map(
+      (p) => `series,${JSON.stringify(p.label)},${p.revenue},${p.orders}`
+    ),
+    "dish,name,qty,revenue",
+    ...stats.topDishes.map(
+      (d) => `dish,${JSON.stringify(d.name)},${d.qty},${d.revenue}`
+    ),
+  ];
+  const blob = new Blob([`${lines.join("\n")}\n`], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `earnings-${stats.range}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export function VendorEarningsCharts({
   restaurantName,
-  stats,
+  initialStats,
 }: {
   restaurantName?: string;
-  stats: VendorEarningsSummary;
+  initialStats: VendorEarningsSummary;
 }) {
-  const revenueBars = stats.daily.map((d) => ({
-    key: d.day,
-    label: d.day,
-    value: d.amount,
-  }));
+  const [stats, setStats] = useState(initialStats);
+  const [range, setRange] = useState<EarningsRange>(initialStats.range);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const gid = useId().replace(/:/g, "");
 
-  const orderBars = stats.daily.map((d) => ({
-    key: d.day,
-    label: d.day,
-    value: d.orders,
-  }));
+  useEffect(() => {
+    setStats(initialStats);
+    setRange(initialStats.range);
+  }, [initialStats]);
 
-  const bestDayKey =
-    stats.bestDayAmount > 0
-      ? stats.daily.find((d) => d.amount === stats.bestDayAmount)?.day
-      : undefined;
+  function loadRange(next: EarningsRange) {
+    if (next === range && !pending) return;
+    setRange(next);
+    setError(null);
+    startTransition(async () => {
+      try {
+        const res = await fetch(`/api/vendor/earnings?range=${next}`);
+        if (!res.ok) throw new Error("failed");
+        const data = (await res.json()) as VendorEarningsSummary;
+        setStats(data);
+      } catch {
+        setError("Could not load that period. Try again.");
+      }
+    });
+  }
 
-  const maxOrders = Math.max(...stats.daily.map((d) => d.orders), 0);
-  const bestOrderDay =
-    maxOrders > 0
-      ? stats.daily.find((d) => d.orders === maxOrders)?.day
-      : undefined;
+  const feeDonut = useMemo(
+    () =>
+      [
+        { name: "Items", value: stats.itemsSubtotal, color: C.green },
+        { name: "Delivery", value: stats.deliveryFees, color: C.blue },
+        { name: "Tax", value: stats.taxAmount, color: C.accent },
+      ].filter((d) => d.value > 0),
+    [stats.itemsSubtotal, stats.deliveryFees, stats.taxAmount]
+  );
 
-  const weekMax = Math.max(stats.weekTotal, stats.lastWeekTotal, 1);
+  const statusDonut = useMemo(
+    () =>
+      [
+        {
+          name: "Delivered",
+          value: stats.deliveredRevenue,
+          color: C.green,
+        },
+        {
+          name: "In pipeline",
+          value: stats.pendingValue,
+          color: C.accent,
+        },
+        {
+          name: "Cancelled",
+          value: stats.cancelledValue,
+          color: C.muted,
+        },
+      ].filter((d) => d.value > 0),
+    [stats.deliveredRevenue, stats.pendingValue, stats.cancelledValue]
+  );
+
+  const seriesHasData = stats.series.some((p) => p.revenue > 0 || p.orders > 0);
+  const peakHour = stats.hourly.reduce(
+    (top, h) => (h.orders > top.orders ? h : top),
+    stats.hourly[0] ?? { hour: 0, label: "—", orders: 0, revenue: 0 }
+  );
 
   return (
-    <div className="space-y-4 lg:space-y-6">
+    <div className="min-w-0 space-y-4 overflow-x-hidden lg:space-y-6">
       <VendorHero
         title="Earnings"
         subtitle={
           restaurantName
-            ? `${restaurantName} · revenue overview.`
-            : "Revenue overview."
+            ? `${restaurantName} · revenue, fees & top dishes.`
+            : "Revenue, fees & top dishes."
         }
         action={
-          <TrendIndicator
-            percent={stats.weekChangePercent}
-            weekTotal={stats.weekTotal}
-          />
+          <div className="text-right">
+            <p className="text-data text-sm font-bold">
+              {formatINR(stats.periodRevenue)}
+            </p>
+            {stats.periodChangePercent === null ? (
+              <p className="text-[10px] font-medium text-muted">
+                {stats.rangeLabel}
+              </p>
+            ) : (
+              <p
+                className={cn(
+                  "text-[10px] font-bold",
+                  stats.periodChangePercent >= 0 ? "text-green" : "text-red-500"
+                )}
+              >
+                {stats.periodChangePercent >= 0 ? "▲" : "▼"}{" "}
+                {Math.abs(stats.periodChangePercent)}% vs prior period
+              </p>
+            )}
+          </div>
         }
       />
 
+      <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+        {RANGES.map((r) => (
+          <VendorChip
+            key={r.id}
+            active={range === r.id}
+            onClick={() => loadRange(r.id)}
+          >
+            {r.label}
+          </VendorChip>
+        ))}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          onClick={() => exportEarningsCsv(stats)}
+        >
+          <Download className="size-4" /> Export CSV
+        </Button>
+      </div>
+
+      {pending ? (
+        <p className="text-xs font-medium text-muted">Updating {stats.rangeLabel.toLowerCase()}…</p>
+      ) : null}
+      {error ? <p className="text-sm text-red-500">{error}</p> : null}
+
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <VendorMetricCard
-          label="This week"
-          value={formatINR(stats.weekTotal)}
+          label={stats.rangeLabel}
+          value={formatINR(stats.periodRevenue)}
           icon="wallet"
           tone="green"
-          barPct={(stats.weekTotal / weekMax) * 100}
-          hint={`${stats.orderCount} orders`}
+          barPct={100}
+          hint={`${stats.periodOrders} orders`}
         />
         <VendorMetricCard
           label="Today"
@@ -504,210 +368,378 @@ export function VendorEarningsCharts({
           icon="calendar"
           tone="blue"
           barPct={
-            stats.weekTotal > 0
-              ? (stats.todayRevenue / stats.weekTotal) * 100
+            stats.periodRevenue > 0
+              ? (stats.todayRevenue / stats.periodRevenue) * 100
               : 0
           }
           hint={`${stats.todayOrders} orders`}
         />
         <VendorMetricCard
           label="Avg order"
-          value={formatINR(stats.avgOrderValue)}
+          value={formatINR(stats.periodAvgOrder)}
           icon="trending"
           tone="accent"
           barPct={
             stats.lifetimeAvgOrderValue > 0
-              ? (stats.avgOrderValue / stats.lifetimeAvgOrderValue) * 100
+              ? (stats.periodAvgOrder / stats.lifetimeAvgOrderValue) * 100
               : 0
           }
         />
         <VendorMetricCard
-          label="Lifetime"
+          label="Lifetime delivered"
           value={formatINR(stats.lifetimeTotal)}
           icon="rupee"
           tone="accent"
           barPct={100}
-          hint={`${stats.lifetimeOrders} delivered`}
+          hint={`${stats.lifetimeOrders} orders`}
         />
       </div>
 
-      <VerticalBarChart
-        title="Daily revenue"
-        subtitle={bestDayKey ? `Peak · ${bestDayKey}` : undefined}
-        totalLabel="Week total"
-        totalValue={stats.weekTotal}
-        bars={revenueBars}
-        highlightKey={bestDayKey}
-        accentClass="bg-accent/85"
-        highlightClass="bg-green"
-      />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChartCard
+          title="Revenue trend"
+          hint={
+            stats.bestBucketRevenue > 0
+              ? `Peak · ${stats.bestBucketLabel}`
+              : undefined
+          }
+        >
+          {!seriesHasData ? (
+            <ChartEmpty label="No revenue in this period" />
+          ) : (
+            <div className="h-56 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={stats.series}
+                  margin={{ top: 8, right: 8, left: -8, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient
+                      id={`revFill-${gid}`}
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop offset="0%" stopColor={C.green} stopOpacity={0.4} />
+                      <stop
+                        offset="100%"
+                        stopColor={C.green}
+                        stopOpacity={0.02}
+                      />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    stroke={C.line}
+                    strokeDasharray="3 6"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: C.muted, fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    tick={{ fill: C.muted, fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={40}
+                    tickFormatter={(v) =>
+                      v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)
+                    }
+                  />
+                  <Tooltip
+                    content={
+                      <ChartTooltipBox
+                        valueFormatter={(n, name) =>
+                          name === "Orders" ? String(n) : formatINR(n)
+                        }
+                      />
+                    }
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    name="Revenue"
+                    stroke={C.green}
+                    strokeWidth={2.5}
+                    fill={`url(#revFill-${gid})`}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </ChartCard>
 
-      <VerticalBarChart
-        title="Daily orders"
-        subtitle={bestOrderDay ? `Busiest · ${bestOrderDay}` : undefined}
-        totalLabel="Week orders"
-        totalValue={stats.orderCount}
-        bars={orderBars}
-        highlightKey={bestOrderDay}
-        accentClass="bg-blue/80"
-        highlightClass="bg-accent"
-        emptyLabel="No orders this week"
-        formatValue={(n) => String(n)}
-      />
+        <ChartCard title="Orders trend" hint={`${stats.periodOrders} in period`}>
+          {!seriesHasData ? (
+            <ChartEmpty label="No orders in this period" />
+          ) : (
+            <div className="h-56 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={stats.series}
+                  margin={{ top: 8, right: 8, left: -18, bottom: 0 }}
+                >
+                  <CartesianGrid
+                    stroke={C.line}
+                    strokeDasharray="3 6"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: C.muted, fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fill: C.muted, fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={28}
+                  />
+                  <Tooltip
+                    content={
+                      <ChartTooltipBox
+                        valueFormatter={(n) => `${n} orders`}
+                      />
+                    }
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="orders"
+                    name="Orders"
+                    stroke={C.blue}
+                    strokeWidth={2.5}
+                    dot={{ r: 3, fill: C.blue, strokeWidth: 0 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </ChartCard>
+      </div>
 
-      <DualBarCompare
-        title="Week comparison"
-        left={{ label: "This week", value: stats.weekTotal }}
-        right={{ label: "Last week", value: stats.lastWeekTotal }}
-      />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChartCard
+          title="Fee breakdown"
+          hint="How order totals split in this period"
+        >
+          <Donut
+            data={feeDonut}
+            centerLabel="gross"
+            centerValue={formatINR(stats.periodRevenue)}
+            emptyLabel="No fee data yet"
+          />
+        </ChartCard>
+        <ChartCard
+          title="Money flow"
+          hint="Period delivered/cancelled · pipeline is all open orders"
+        >
+          <Donut
+            data={statusDonut}
+            centerLabel="tracked"
+            centerValue={formatINR(
+              stats.deliveredRevenue +
+                stats.pendingValue +
+                stats.cancelledValue
+            )}
+            emptyLabel="No flow yet"
+          />
+        </ChartCard>
+      </div>
 
-      <HorizontalBarChart
-        title="This week breakdown"
-        rows={[
-          {
-            label: "Revenue",
-            value: stats.weekTotal,
-            colorClass: "bg-green",
-          },
-          {
-            label: "Avg order",
-            value: stats.avgOrderValue,
-            colorClass: "bg-accent",
-          },
-          {
-            label: "Today",
-            value: stats.todayRevenue,
-            colorClass: "bg-blue/80",
-            suffix: `(${stats.todayOrders})`,
-          },
-        ]}
-      />
-
-      <StackedFlowBar
-        title="Order flow this week"
-        totalLabel={`${stats.pendingCount} in pipeline · ${stats.cancelledCount} cancelled`}
-        segments={[
-          {
-            label: "Revenue",
-            value: stats.weekTotal,
-            color: "var(--green)",
-          },
-          {
-            label: "Pipeline",
-            value: stats.pendingValue,
-            color: "var(--accent)",
-          },
-          {
-            label: "Cancelled",
-            value: stats.cancelledValue,
-            color: "var(--muted)",
-          },
-        ]}
-      />
-
-      <HorizontalBarChart
-        title="Lifetime vs pipeline"
-        rows={[
-          {
-            label: "Lifetime delivered",
-            value: stats.lifetimeTotal,
-            colorClass: "bg-accent",
-            suffix: `(${stats.lifetimeOrders})`,
-          },
-          {
-            label: "In pipeline",
-            value: stats.pendingValue,
-            colorClass: "bg-blue/80",
-            suffix: `(${stats.pendingCount})`,
-          },
-          {
-            label: "Lost (cancelled)",
-            value: stats.cancelledValue,
-            colorClass: "bg-line",
-            suffix: `(${stats.cancelledCount})`,
-          },
-        ]}
-      />
-
-      <WeekProgressRing
-        title="Week vs lifetime"
-        weekValue={stats.weekTotal}
-        lifetimeValue={stats.lifetimeTotal}
-      />
-
-      <VendorPanel
-        title="Orders volume"
-        action={
-          <span className="text-data text-sm font-bold">
-            {stats.orderCount} this week
-          </span>
+      <ChartCard
+        title="Peak hours"
+        hint={
+          peakHour.orders > 0
+            ? `Busiest · ${peakHour.label} (${peakHour.orders} orders)`
+            : undefined
         }
       >
-        <div className="space-y-3">
-          {[
-            { label: "This week", value: stats.orderCount, color: "bg-green" },
-            {
-              label: "Last week",
-              value: stats.lastWeekOrders,
-              color: "bg-accent/80",
-            },
-            {
-              label: "Delivered (lifetime)",
-              value: stats.lifetimeOrders,
-              color: "bg-blue/80",
-            },
-            {
-              label: "In pipeline",
-              value: stats.pendingCount,
-              color: "bg-accent",
-            },
-            {
-              label: "Cancelled",
-              value: stats.cancelledCount,
-              color: "bg-line",
-            },
-          ].map((row) => (
-            <HorizontalBarRow
-              key={row.label}
-              label={row.label}
-              value={row.value}
-              max={Math.max(
-                stats.orderCount,
-                stats.lastWeekOrders,
-                stats.lifetimeOrders,
-                stats.pendingCount,
-                stats.cancelledCount,
-                1
-              )}
-              colorClass={row.color}
-              formatValue={(n) => String(n)}
-            />
-          ))}
-        </div>
-        <ChartLegend
-          items={[
-            {
-              color: "var(--green)",
-              label: "Completed",
-              value: String(stats.lifetimeOrders),
-            },
-            {
-              color: "var(--accent)",
-              label: "Active",
-              value: String(stats.pendingCount),
-            },
-            {
-              color: "var(--muted)",
-              label: "Cancelled",
-              value: String(stats.cancelledCount),
-            },
-          ]}
-        />
-      </VendorPanel>
+        {stats.hourly.every((h) => h.orders === 0) ? (
+          <ChartEmpty label="No hourly pattern yet" />
+        ) : (
+          <div className="h-48 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={stats.hourly}
+                margin={{ top: 8, right: 8, left: -18, bottom: 0 }}
+              >
+                <CartesianGrid
+                  stroke={C.line}
+                  strokeDasharray="3 6"
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="hour"
+                  tick={{ fill: C.muted, fontSize: 9 }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={2}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fill: C.muted, fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={28}
+                />
+                <Tooltip
+                  content={
+                    <ChartTooltipBox
+                      valueFormatter={(n, name) =>
+                        name === "Revenue" ? formatINR(n) : `${n} orders`
+                      }
+                    />
+                  }
+                />
+                <Area
+                  type="monotone"
+                  dataKey="orders"
+                  name="Orders"
+                  stroke={C.accent}
+                  fill={C.accent}
+                  fillOpacity={0.25}
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </ChartCard>
 
-      <p className="px-2 text-center text-xs text-muted">
-        Payout history will appear here once payouts are configured.
-      </p>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <VendorPanel
+          title="Top dishes"
+          subtitle="By revenue in this period"
+          action={
+            <span className="text-data text-xs font-bold">
+              {stats.topDishes.length} items
+            </span>
+          }
+        >
+          {stats.topDishes.length === 0 ? (
+            <div className="flex h-28 items-center justify-center rounded-xl bg-surface-2 text-sm text-muted">
+              No dish sales in this period
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {stats.topDishes.map((d, i) => {
+                const max = stats.topDishes[0]?.revenue || 1;
+                const width = Math.max(8, (d.revenue / max) * 100);
+                return (
+                  <li key={d.name} className="space-y-1">
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="truncate font-medium">
+                        <span className="text-muted">{i + 1}. </span>
+                        {d.name}
+                      </span>
+                      <span className="text-data shrink-0 font-bold">
+                        {formatINR(d.revenue)}
+                        <span className="ml-1 text-xs font-medium text-muted">
+                          · {d.qty} sold
+                        </span>
+                      </span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-surface-2">
+                      <div
+                        className="h-full rounded-full bg-accent"
+                        style={{ width: `${width}%` }}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </VendorPanel>
+
+        <VendorPanel
+          title="Highest orders"
+          subtitle="Top tickets in this period"
+        >
+          {stats.recentOrders.length === 0 ? (
+            <div className="flex h-28 items-center justify-center rounded-xl bg-surface-2 text-sm text-muted">
+              No orders in this period
+            </div>
+          ) : (
+            <ul className="divide-y divide-line">
+              {stats.recentOrders.map((o) => (
+                <li
+                  key={o.id}
+                  className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">{o.code}</p>
+                    <p className="text-[11px] text-muted">{o.placedLabel}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-data text-sm font-bold">
+                      {formatINR(o.total)}
+                    </p>
+                    <p className="text-[10px] font-semibold uppercase text-muted">
+                      {o.status.replace(/_/g, " ")}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </VendorPanel>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <VendorPanel title="Prior period">
+          <p className="text-data text-xl font-bold">
+            {formatINR(stats.prevPeriodRevenue)}
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            {stats.prevPeriodOrders} orders
+          </p>
+        </VendorPanel>
+        <VendorPanel title="Delivered (period)">
+          <p className="text-data text-xl font-bold text-green">
+            {formatINR(stats.deliveredRevenue)}
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            {stats.deliveredOrders} completed
+          </p>
+        </VendorPanel>
+        <VendorPanel title="Refunds">
+          <p className="text-data text-xl font-bold text-muted">
+            {formatINR(stats.refundsPending + stats.refundsApproved)}
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            Managed by Deligro admin · not shown to partners yet
+          </p>
+        </VendorPanel>
+        <VendorPanel title="Settlement">
+          <p className="text-sm leading-relaxed text-muted">
+            Payouts land after delivered orders clear. Bank settlement is
+            configured by Deligro ops.
+          </p>
+        </VendorPanel>
+      </div>
+
+      <VendorPanel
+        title="Settlement note"
+        subtitle="Bank payouts are not configured in Deligro yet"
+        action={<IndianRupee className="size-4 text-muted" />}
+      >
+        <p className="text-sm text-muted">
+          Delivered revenue in this period is{" "}
+          <span className="text-data font-bold text-ink">
+            {formatINR(stats.deliveredRevenue)}
+          </span>
+          . Use this as your settlement estimate until payouts go live. Export
+          CSV for your accountant.
+        </p>
+      </VendorPanel>
     </div>
   );
 }

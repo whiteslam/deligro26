@@ -2,8 +2,10 @@ import { VendorPageHeader } from "@/components/vendor/vendor-page-header";
 import { VendorEarningsCharts } from "@/components/vendor/vendor-earnings-charts";
 import { getProfile } from "@/lib/auth";
 import { resolveVendorRestaurant } from "@/lib/data-access/vendor-restaurant";
-import { getVendorEarningsSummary } from "@/lib/data-access/vendor-earnings";
-import type { VendorEarningsSummary } from "@/lib/data-access/vendor-earnings";
+import {
+  getVendorEarningsSummary,
+  type VendorEarningsSummary,
+} from "@/lib/data-access/vendor-earnings";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +61,7 @@ export default async function RestaurantEarningsPage() {
 
   let summary: VendorEarningsSummary;
   try {
-    summary = await getVendorEarningsSummary(restaurant.id);
+    summary = await getVendorEarningsSummary(restaurant.id, "week");
   } catch {
     return (
       <div className="space-y-6">
@@ -72,6 +74,9 @@ export default async function RestaurantEarningsPage() {
   }
 
   return (
-    <VendorEarningsCharts restaurantName={restaurant.name} stats={summary} />
+    <VendorEarningsCharts
+      restaurantName={restaurant.name}
+      initialStats={summary}
+    />
   );
 }

@@ -94,3 +94,59 @@ export async function setRestaurantOpen(isOpen: boolean): Promise<boolean> {
   if (error) throw error;
   return Boolean(data?.id);
 }
+
+export interface VendorRestaurantUpdateInput {
+  name?: string;
+  tagline?: string | null;
+  cuisines?: string[];
+  offer?: string | null;
+  imageUrl?: string | null;
+  accentTint?: string | null;
+  etaMin?: number | null;
+  etaMax?: number | null;
+  costForTwo?: number | null;
+  priceTier?: number;
+}
+
+/** Update storefront fields for the active restaurant. */
+export async function updateVendorRestaurant(
+  input: VendorRestaurantUpdateInput
+): Promise<boolean> {
+  const restaurant = await resolveVendorRestaurant();
+  if (!restaurant) return false;
+
+  const patch: Record<string, unknown> = {};
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) throw new Error("name_required");
+    patch.name = name;
+  }
+  if (input.tagline !== undefined)
+    patch.tagline = input.tagline?.trim() || null;
+  if (input.cuisines !== undefined) patch.cuisines = input.cuisines;
+  if (input.offer !== undefined) patch.offer = input.offer?.trim() || null;
+  if (input.imageUrl !== undefined)
+    patch.image_url = input.imageUrl?.trim() || null;
+  if (input.accentTint !== undefined)
+    patch.accent_tint = input.accentTint?.trim() || null;
+  if (input.etaMin !== undefined) patch.eta_min = input.etaMin;
+  if (input.etaMax !== undefined) patch.eta_max = input.etaMax;
+  if (input.costForTwo !== undefined) patch.cost_for_two = input.costForTwo;
+  if (input.priceTier !== undefined) {
+    const tier = Math.min(3, Math.max(1, Math.round(input.priceTier)));
+    patch.price_tier = tier;
+  }
+
+  if (Object.keys(patch).length === 0) return false;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("restaurants")
+    .update(patch)
+    .eq("id", restaurant.id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data?.id);
+}

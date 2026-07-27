@@ -1,34 +1,79 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { shortOrderId } from "@/lib/utils/order-map";
+import {
+  addIstDays,
+  startOfIstDay,
+  startOfIstMonth,
+  startOfIstWeek,
+} from "@/lib/utils/ist-time";
 
-export interface VendorEarningsDay {
-  day: string;
-  amount: number;
+export type EarningsRange =
+  | "today"
+  | "week"
+  | "month"
+  | "last_month"
+  | "last_30";
+
+export interface EarningsSeriesPoint {
+  key: string;
+  label: string;
+  revenue: number;
   orders: number;
 }
 
+export interface EarningsTopDish {
+  name: string;
+  qty: number;
+  revenue: number;
+}
+
+export interface EarningsRecentOrder {
+  id: string;
+  code: string;
+  total: number;
+  status: string;
+  createdAt: string;
+  placedLabel: string;
+}
+
 export interface VendorEarningsSummary {
-  weekTotal: number;
-  orderCount: number;
-  daily: VendorEarningsDay[];
-  lifetimeTotal: number;
-  lifetimeOrders: number;
-  avgOrderValue: number;
-  lifetimeAvgOrderValue: number;
-  todayRevenue: number;
-  todayOrders: number;
-  lastWeekTotal: number;
-  lastWeekOrders: number;
-  weekChangePercent: number | null;
+  range: EarningsRange;
+  rangeLabel: string;
+  /** Selected period */
+  periodRevenue: number;
+  periodOrders: number;
+  periodAvgOrder: number;
+  periodChangePercent: number | null;
+  prevPeriodRevenue: number;
+  prevPeriodOrders: number;
+  /** Fee mix in period (revenue statuses) */
+  itemsSubtotal: number;
+  deliveryFees: number;
+  taxAmount: number;
   cancelledCount: number;
   cancelledValue: number;
   pendingCount: number;
   pendingValue: number;
-  bestDay: string;
-  bestDayAmount: number;
+  deliveredRevenue: number;
+  deliveredOrders: number;
+  /** Lifetime */
+  lifetimeTotal: number;
+  lifetimeOrders: number;
+  lifetimeAvgOrderValue: number;
+  todayRevenue: number;
+  todayOrders: number;
+  series: EarningsSeriesPoint[];
+  topDishes: EarningsTopDish[];
+  hourly: { hour: number; label: string; orders: number; revenue: number }[];
+  recentOrders: EarningsRecentOrder[];
+  refundsPending: number;
+  refundsPendingCount: number;
+  refundsApproved: number;
+  refundsApprovedCount: number;
+  bestBucketLabel: string;
+  bestBucketRevenue: number;
 }
-
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 const REVENUE_STATUSES = [
   "kitchen",
@@ -39,89 +84,243 @@ const REVENUE_STATUSES = [
 
 const PENDING_STATUSES = ["placed", "kitchen", "ready", "on_the_way"] as const;
 
-function startOfWeek(d: Date): Date {
-  const copy = new Date(d);
-  const day = copy.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  copy.setDate(copy.getDate() + diff);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+interface OrderRow {
+  id: string;
+  total: number;
+  delivery_fee: number | null;
+  tax_amount: number | null;
+  status: string;
+  created_at: string;
 }
 
 function startOfDay(d: Date): Date {
-  const copy = new Date(d);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+  return startOfIstDay(d);
 }
 
-function sumOrders(
-  rows: { total: number }[] | null | undefined
-): { total: number; count: number } {
-  let total = 0;
-  let count = 0;
-  for (const row of rows ?? []) {
-    total += Number(row.total) || 0;
-    count += 1;
-  }
-  return { total, count };
+function startOfWeek(d: Date): Date {
+  return startOfIstWeek(d);
 }
 
-function weekChangePercent(
-  current: number,
-  previous: number
-): number | null {
+function startOfMonth(d: Date): Date {
+  return startOfIstMonth(d);
+}
+
+function changePercent(current: number, previous: number): number | null {
   if (previous === 0) return current > 0 ? 100 : null;
   return Math.round(((current - previous) / previous) * 100);
 }
 
-/** Aggregate order totals for the current calendar week (Mon–Sun) plus key metrics. */
+function isRevenue(status: string): boolean {
+  return (REVENUE_STATUSES as readonly string[]).includes(status);
+}
+
+export function resolveEarningsWindow(
+  range: EarningsRange,
+  now = new Date()
+): {
+  start: Date;
+  end: Date;
+  prevStart: Date;
+  prevEnd: Date;
+  label: string;
+} {
+  const today = startOfDay(now);
+  const end = new Date(now);
+  end.setMilliseconds(end.getMilliseconds() + 1);
+
+  if (range === "today") {
+    const start = today;
+    const prevStart = addIstDays(today, -1);
+    return {
+      start,
+      end,
+      prevStart,
+      prevEnd: start,
+      label: "Today",
+    };
+  }
+
+  if (range === "week") {
+    const start = startOfWeek(now);
+    const weekEnd = addIstDays(start, 7);
+    const prevStart = addIstDays(start, -7);
+    return {
+      start,
+      end: weekEnd > end ? end : weekEnd,
+      prevStart,
+      prevEnd: start,
+      label: "This week",
+    };
+  }
+
+  if (range === "month") {
+    const start = startOfMonth(now);
+    const prevStart = startOfMonth(addIstDays(start, -1));
+    return {
+      start,
+      end,
+      prevStart,
+      prevEnd: start,
+      label: "This month",
+    };
+  }
+
+  if (range === "last_month") {
+    const monthEnd = startOfMonth(now);
+    const start = startOfMonth(addIstDays(monthEnd, -1));
+    const prevStart = startOfMonth(addIstDays(start, -1));
+    return {
+      start,
+      end: monthEnd,
+      prevStart,
+      prevEnd: start,
+      label: "Last month",
+    };
+  }
+
+  // last_30
+  const start = addIstDays(today, -29);
+  const prevStart = addIstDays(start, -30);
+  return {
+    start,
+    end,
+    prevStart,
+    prevEnd: start,
+    label: "Last 30 days",
+  };
+}
+
+function formatPlaced(iso: string): string {
+  return new Date(iso).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function sumRevenue(rows: OrderRow[]): {
+  revenue: number;
+  orders: number;
+  items: number;
+  delivery: number;
+  tax: number;
+} {
+  let revenue = 0;
+  let orders = 0;
+  let items = 0;
+  let delivery = 0;
+  let tax = 0;
+  for (const row of rows) {
+    if (!isRevenue(row.status)) continue;
+    const total = Number(row.total) || 0;
+    const fee = Number(row.delivery_fee) || 0;
+    const taxAmt = Number(row.tax_amount) || 0;
+    revenue += total;
+    orders += 1;
+    delivery += fee;
+    tax += taxAmt;
+    items += Math.max(0, total - fee - taxAmt);
+  }
+  return { revenue, orders, items, delivery, tax };
+}
+
+function buildDailySeries(
+  rows: OrderRow[],
+  start: Date,
+  end: Date
+): EarningsSeriesPoint[] {
+  const points: EarningsSeriesPoint[] = [];
+  const cursor = startOfDay(start);
+  const endDay = startOfDay(new Date(end.getTime() - 1));
+
+  while (cursor <= endDay) {
+    const key = cursor.toISOString().slice(0, 10);
+    const label = cursor.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+    });
+    points.push({ key, label, revenue: 0, orders: 0 });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  const index = new Map(points.map((p, i) => [p.key, i]));
+  for (const row of rows) {
+    if (!isRevenue(row.status)) continue;
+    const key = startOfDay(new Date(row.created_at)).toISOString().slice(0, 10);
+    const i = index.get(key);
+    if (i === undefined) continue;
+    points[i].revenue += Number(row.total) || 0;
+    points[i].orders += 1;
+  }
+  return points;
+}
+
+function buildHourlySeries(rows: OrderRow[]): VendorEarningsSummary["hourly"] {
+  const hours = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    label: `${hour.toString().padStart(2, "0")}:00`,
+    orders: 0,
+    revenue: 0,
+  }));
+  for (const row of rows) {
+    if (!isRevenue(row.status)) continue;
+    const h = new Date(row.created_at).getHours();
+    hours[h].orders += 1;
+    hours[h].revenue += Number(row.total) || 0;
+  }
+  return hours;
+}
+
+function buildWeekdaySeries(rows: OrderRow[]): EarningsSeriesPoint[] {
+  const buckets = [1, 2, 3, 4, 5, 6, 0].map((dayIdx) => ({
+    key: DAY_LABELS[dayIdx],
+    label: DAY_LABELS[dayIdx],
+    revenue: 0,
+    orders: 0,
+  }));
+  const index = new Map(buckets.map((b, i) => [b.key, i]));
+  for (const row of rows) {
+    if (!isRevenue(row.status)) continue;
+    const label = DAY_LABELS[new Date(row.created_at).getDay()];
+    const i = index.get(label);
+    if (i === undefined) continue;
+    buckets[i].revenue += Number(row.total) || 0;
+    buckets[i].orders += 1;
+  }
+  return buckets;
+}
+
+/** Full earnings dashboard for a restaurant + range. */
 export async function getVendorEarningsSummary(
-  restaurantId: string
+  restaurantId: string,
+  range: EarningsRange = "week"
 ): Promise<VendorEarningsSummary> {
   const supabase = await createClient();
   const now = new Date();
-  const weekStart = startOfWeek(now);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 7);
-  const lastWeekStart = new Date(weekStart);
-  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const window = resolveEarningsWindow(range, now);
   const todayStart = startOfDay(now);
 
+  const fetchFrom = window.prevStart.toISOString();
+  const fetchTo = window.end.toISOString();
+
   const [
-    weekResult,
-    lastWeekResult,
-    todayResult,
-    cancelledResult,
+    ordersResult,
     pendingResult,
     lifetimeResult,
+    todayResult,
+    itemsResult,
+    refundsResult,
   ] = await Promise.all([
     supabase
       .from("orders")
-      .select("total, created_at, status")
+      .select("id, total, delivery_fee, tax_amount, status, created_at")
       .eq("restaurant_id", restaurantId)
-      .in("status", [...REVENUE_STATUSES])
-      .gte("created_at", weekStart.toISOString())
-      .lt("created_at", weekEnd.toISOString()),
-    supabase
-      .from("orders")
-      .select("total")
-      .eq("restaurant_id", restaurantId)
-      .in("status", [...REVENUE_STATUSES])
-      .gte("created_at", lastWeekStart.toISOString())
-      .lt("created_at", weekStart.toISOString()),
-    supabase
-      .from("orders")
-      .select("total")
-      .eq("restaurant_id", restaurantId)
-      .in("status", [...REVENUE_STATUSES])
-      .gte("created_at", todayStart.toISOString()),
-    supabase
-      .from("orders")
-      .select("total")
-      .eq("restaurant_id", restaurantId)
-      .eq("status", "cancelled")
-      .gte("created_at", weekStart.toISOString())
-      .lt("created_at", weekEnd.toISOString()),
+      .gte("created_at", fetchFrom)
+      .lt("created_at", fetchTo)
+      .order("created_at", { ascending: false }),
     supabase
       .from("orders")
       .select("total")
@@ -132,66 +331,191 @@ export async function getVendorEarningsSummary(
       .select("total")
       .eq("restaurant_id", restaurantId)
       .eq("status", "delivered"),
+    supabase
+      .from("orders")
+      .select("total")
+      .eq("restaurant_id", restaurantId)
+      .in("status", [...REVENUE_STATUSES])
+      .gte("created_at", todayStart.toISOString()),
+    supabase
+      .from("order_items")
+      .select("name, qty, price, orders!inner(restaurant_id, status, created_at)")
+      .eq("orders.restaurant_id", restaurantId)
+      .in("orders.status", [...REVENUE_STATUSES])
+      .gte("orders.created_at", window.start.toISOString())
+      .lt("orders.created_at", window.end.toISOString()),
+    supabase
+      .from("refunds")
+      .select("amount, status, orders!inner(restaurant_id, created_at)")
+      .eq("orders.restaurant_id", restaurantId)
+      .gte("orders.created_at", window.start.toISOString())
+      .lt("orders.created_at", window.end.toISOString()),
   ]);
 
-  if (weekResult.error) throw weekResult.error;
+  if (ordersResult.error) throw ordersResult.error;
 
-  const amountBuckets = new Map<number, number>();
-  const orderBuckets = new Map<number, number>();
-  for (let i = 0; i < 7; i++) {
-    amountBuckets.set(i, 0);
-    orderBuckets.set(i, 0);
+  const allRows = (ordersResult.data ?? []) as OrderRow[];
+  const periodRows = allRows.filter((r) => {
+    const t = new Date(r.created_at).getTime();
+    return t >= window.start.getTime() && t < window.end.getTime();
+  });
+  const prevRows = allRows.filter((r) => {
+    const t = new Date(r.created_at).getTime();
+    return t >= window.prevStart.getTime() && t < window.prevEnd.getTime();
+  });
+
+  const period = sumRevenue(periodRows);
+  const prev = sumRevenue(prevRows);
+
+  let cancelledCount = 0;
+  let cancelledValue = 0;
+  let deliveredRevenue = 0;
+  let deliveredOrders = 0;
+  for (const row of periodRows) {
+    if (row.status === "cancelled") {
+      cancelledCount += 1;
+      cancelledValue += Number(row.total) || 0;
+    }
+    if (row.status === "delivered") {
+      deliveredOrders += 1;
+      deliveredRevenue += Number(row.total) || 0;
+    }
   }
 
-  let weekTotal = 0;
-  let orderCount = 0;
-
-  for (const row of weekResult.data ?? []) {
-    const created = new Date(row.created_at);
-    const idx = created.getDay();
-    const total = Number(row.total) || 0;
-    amountBuckets.set(idx, (amountBuckets.get(idx) ?? 0) + total);
-    orderBuckets.set(idx, (orderBuckets.get(idx) ?? 0) + 1);
-    weekTotal += total;
-    orderCount += 1;
+  const pendingRows = pendingResult.data ?? [];
+  let pendingCount = 0;
+  let pendingValue = 0;
+  for (const r of pendingRows) {
+    pendingCount += 1;
+    pendingValue += Number(r.total) || 0;
   }
 
-  const daily: VendorEarningsDay[] = [1, 2, 3, 4, 5, 6, 0].map((dayIdx) => ({
-    day: DAY_LABELS[dayIdx],
-    amount: amountBuckets.get(dayIdx) ?? 0,
-    orders: orderBuckets.get(dayIdx) ?? 0,
-  }));
+  const lifetimeRows = lifetimeResult.data ?? [];
+  let lifetimeTotal = 0;
+  let lifetimeOrders = 0;
+  for (const r of lifetimeRows) {
+    lifetimeOrders += 1;
+    lifetimeTotal += Number(r.total) || 0;
+  }
 
-  const best = daily.reduce(
-    (top, d) => (d.amount > top.amount ? d : top),
-    daily[0] ?? { day: "—", amount: 0, orders: 0 }
+  const todayRows = todayResult.data ?? [];
+  let todayRevenue = 0;
+  let todayOrders = 0;
+  for (const r of todayRows) {
+    todayOrders += 1;
+    todayRevenue += Number(r.total) || 0;
+  }
+
+  const series =
+    range === "today"
+      ? buildHourlySeries(periodRows).map((h) => ({
+          key: h.label,
+          label: h.label,
+          revenue: h.revenue,
+          orders: h.orders,
+        }))
+      : range === "week"
+        ? buildWeekdaySeries(periodRows)
+        : buildDailySeries(periodRows, window.start, window.end);
+
+  const hourly = buildHourlySeries(periodRows);
+
+  const dishMap = new Map<string, EarningsTopDish>();
+  if (!itemsResult.error) {
+    for (const row of itemsResult.data ?? []) {
+      const name = (row.name as string)?.trim() || "Item";
+      const qty = Number(row.qty) || 0;
+      const price = Number(row.price) || 0;
+      const existing = dishMap.get(name) ?? { name, qty: 0, revenue: 0 };
+      existing.qty += qty;
+      existing.revenue += qty * price;
+      dishMap.set(name, existing);
+    }
+  }
+  const topDishes = [...dishMap.values()]
+    .sort((a, b) => b.revenue - a.revenue || b.qty - a.qty)
+    .slice(0, 8);
+
+  let refundsPending = 0;
+  let refundsPendingCount = 0;
+  let refundsApproved = 0;
+  let refundsApprovedCount = 0;
+  // Refunds RLS is customer/admin-only today — fail soft for vendors.
+  if (!refundsResult.error) {
+    for (const row of refundsResult.data ?? []) {
+      const amount = Number(row.amount) || 0;
+      if (row.status === "pending") {
+        refundsPending += amount;
+        refundsPendingCount += 1;
+      } else if (row.status === "approved") {
+        refundsApproved += amount;
+        refundsApprovedCount += 1;
+      }
+    }
+  }
+
+  const recentOrders: EarningsRecentOrder[] = periodRows
+    .filter((r) => isRevenue(r.status))
+    .sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0))
+    .slice(0, 8)
+    .map((r) => ({
+      id: r.id,
+      code: `#${shortOrderId(r.id)}`,
+      total: Number(r.total) || 0,
+      status: r.status,
+      createdAt: r.created_at,
+      placedLabel: formatPlaced(r.created_at),
+    }));
+
+  const best = series.reduce(
+    (top, p) => (p.revenue > top.revenue ? p : top),
+    series[0] ?? { key: "—", label: "—", revenue: 0, orders: 0 }
   );
 
-  const lastWeek = sumOrders(lastWeekResult.data);
-  const today = sumOrders(todayResult.data);
-  const cancelled = sumOrders(cancelledResult.data);
-  const pending = sumOrders(pendingResult.data);
-  const lifetime = sumOrders(lifetimeResult.data);
-
   return {
-    weekTotal,
-    orderCount,
-    daily,
-    lifetimeTotal: lifetime.total,
-    lifetimeOrders: lifetime.count,
-    avgOrderValue: orderCount > 0 ? Math.round(weekTotal / orderCount) : 0,
+    range,
+    rangeLabel: window.label,
+    periodRevenue: period.revenue,
+    periodOrders: period.orders,
+    periodAvgOrder:
+      period.orders > 0 ? Math.round(period.revenue / period.orders) : 0,
+    periodChangePercent: changePercent(period.revenue, prev.revenue),
+    prevPeriodRevenue: prev.revenue,
+    prevPeriodOrders: prev.orders,
+    itemsSubtotal: period.items,
+    deliveryFees: period.delivery,
+    taxAmount: period.tax,
+    cancelledCount,
+    cancelledValue,
+    pendingCount,
+    pendingValue,
+    deliveredRevenue,
+    deliveredOrders,
+    lifetimeTotal,
+    lifetimeOrders,
     lifetimeAvgOrderValue:
-      lifetime.count > 0 ? Math.round(lifetime.total / lifetime.count) : 0,
-    todayRevenue: today.total,
-    todayOrders: today.count,
-    lastWeekTotal: lastWeek.total,
-    lastWeekOrders: lastWeek.count,
-    weekChangePercent: weekChangePercent(weekTotal, lastWeek.total),
-    cancelledCount: cancelled.count,
-    cancelledValue: cancelled.total,
-    pendingCount: pending.count,
-    pendingValue: pending.total,
-    bestDay: best.day,
-    bestDayAmount: best.amount,
+      lifetimeOrders > 0 ? Math.round(lifetimeTotal / lifetimeOrders) : 0,
+    todayRevenue,
+    todayOrders,
+    series,
+    topDishes,
+    hourly,
+    recentOrders,
+    refundsPending,
+    refundsPendingCount,
+    refundsApproved,
+    refundsApprovedCount,
+    bestBucketLabel: best.label,
+    bestBucketRevenue: best.revenue,
   };
+}
+
+export function isEarningsRange(value: string): value is EarningsRange {
+  return (
+    value === "today" ||
+    value === "week" ||
+    value === "month" ||
+    value === "last_month" ||
+    value === "last_30"
+  );
 }

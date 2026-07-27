@@ -14,11 +14,14 @@ export interface VendorRestaurantDetail extends OwnedRestaurant {
   ratingCount: number;
   offer: string | null;
   imageUrl: string | null;
+  accentTint: string | null;
   etaMin: number | null;
   etaMax: number | null;
   costForTwo: number | null;
   priceTier: number;
   promoted: boolean;
+  createdAt: string | null;
+  reviewCount: number;
 }
 
 export interface VendorProfileSummary {
@@ -35,7 +38,12 @@ export interface VendorProfileSummary {
     totalOrders: number;
     activeOrders: number;
     deliveredOrders: number;
+    cancelledOrders: number;
     lifetimeRevenue: number;
+  };
+  completeness: {
+    score: number;
+    missing: string[];
   };
 }
 
@@ -45,6 +53,28 @@ function initialsFrom(name: string, phone: string | null): string {
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
   const digits = (phone ?? "").replace(/\D/g, "");
   return digits.slice(-2) || "VR";
+}
+
+function computeCompleteness(r: VendorRestaurantDetail | null): {
+  score: number;
+  missing: string[];
+} {
+  if (!r) return { score: 0, missing: ["Link a restaurant"] };
+  const checks: { ok: boolean; label: string }[] = [
+    { ok: Boolean(r.name?.trim()), label: "Store name" },
+    { ok: Boolean(r.tagline?.trim()), label: "Tagline" },
+    { ok: Boolean(r.imageUrl?.trim()), label: "Cover photo" },
+    { ok: r.cuisines.length > 0, label: "Cuisines" },
+    { ok: Boolean(r.offer?.trim()), label: "Promo offer" },
+    { ok: r.etaMin != null && r.etaMax != null, label: "Delivery ETA" },
+    { ok: r.costForTwo != null && r.costForTwo > 0, label: "Cost for two" },
+    { ok: r.approved, label: "Admin approval" },
+  ];
+  const missing = checks.filter((c) => !c.ok).map((c) => c.label);
+  const score = Math.round(
+    ((checks.length - missing.length) / checks.length) * 100
+  );
+  return { score, missing };
 }
 
 /** Full vendor + active restaurant profile for `/vendor/profile`. */
@@ -67,8 +97,14 @@ export async function getVendorProfileSummary(): Promise<VendorProfileSummary | 
   const ownerName = profile?.full_name?.trim() || "Restaurant Owner";
   const ownerPhone = profile?.phone ?? user.phone ?? null;
   const memberSince = profile?.created_at
-    ? new Date(profile.created_at).getFullYear().toString()
-    : new Date(user.created_at).getFullYear().toString();
+    ? new Date(profile.created_at).toLocaleDateString("en-IN", {
+        month: "short",
+        year: "numeric",
+      })
+    : new Date(user.created_at).toLocaleDateString("en-IN", {
+        month: "short",
+        year: "numeric",
+      });
 
   const active = await resolveVendorRestaurant();
   let restaurant: VendorRestaurantDetail | null = null;
@@ -78,17 +114,24 @@ export async function getVendorProfileSummary(): Promise<VendorProfileSummary | 
     totalOrders: 0,
     activeOrders: 0,
     deliveredOrders: 0,
+    cancelledOrders: 0,
     lifetimeRevenue: 0,
   };
 
   if (active) {
-    const { data: row } = await supabase
-      .from("restaurants")
-      .select(
-        "id, slug, name, tagline, is_open, approved, cuisines, rating, rating_count, offer, image_url, eta_min, eta_max, cost_for_two, price_tier, promoted"
-      )
-      .eq("id", active.id)
-      .maybeSingle();
+    const [{ data: row }, reviewsCount] = await Promise.all([
+      supabase
+        .from("restaurants")
+        .select(
+          "id, slug, name, tagline, is_open, approved, cuisines, rating, rating_count, offer, image_url, accent_tint, eta_min, eta_max, cost_for_two, price_tier, promoted, created_at"
+        )
+        .eq("id", active.id)
+        .maybeSingle(),
+      supabase
+        .from("reviews")
+        .select("id", { count: "exact", head: true })
+        .eq("restaurant_id", active.id),
+    ]);
 
     if (row) {
       restaurant = {
@@ -103,18 +146,25 @@ export async function getVendorProfileSummary(): Promise<VendorProfileSummary | 
         ratingCount: row.rating_count,
         offer: row.offer,
         imageUrl: row.image_url,
+        accentTint: row.accent_tint,
         etaMin: row.eta_min,
         etaMax: row.eta_max,
         costForTwo: row.cost_for_two,
         priceTier: row.price_tier,
         promoted: row.promoted,
+        createdAt: row.created_at,
+        reviewCount: reviewsCount.count ?? 0,
       };
     }
 
     const [
       { count: menuItems },
       { count: menuAvailable },
-      { data: orders },
+      { count: totalOrders },
+      { count: activeOrders },
+      { count: deliveredOrders },
+      { count: cancelledOrders },
+      { data: deliveredTotals },
     ] = await Promise.all([
       supabase
         .from("menu_items")
@@ -127,22 +177,41 @@ export async function getVendorProfileSummary(): Promise<VendorProfileSummary | 
         .eq("available", true),
       supabase
         .from("orders")
-        .select("status, total")
+        .select("id", { count: "exact", head: true })
         .eq("restaurant_id", active.id),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("restaurant_id", active.id)
+        .in("status", ["placed", "kitchen", "ready", "on_the_way"]),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("restaurant_id", active.id)
+        .eq("status", "delivered"),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("restaurant_id", active.id)
+        .eq("status", "cancelled"),
+      supabase
+        .from("orders")
+        .select("total")
+        .eq("restaurant_id", active.id)
+        .eq("status", "delivered"),
     ]);
 
-    const rows = orders ?? [];
     stats = {
       menuItems: menuItems ?? 0,
       menuAvailable: menuAvailable ?? 0,
-      totalOrders: rows.length,
-      activeOrders: rows.filter((o) =>
-        ["placed", "kitchen", "ready", "on_the_way"].includes(o.status)
-      ).length,
-      deliveredOrders: rows.filter((o) => o.status === "delivered").length,
-      lifetimeRevenue: rows
-        .filter((o) => o.status === "delivered")
-        .reduce((s, o) => s + Number(o.total), 0),
+      totalOrders: totalOrders ?? 0,
+      activeOrders: activeOrders ?? 0,
+      deliveredOrders: deliveredOrders ?? 0,
+      cancelledOrders: cancelledOrders ?? 0,
+      lifetimeRevenue: (deliveredTotals ?? []).reduce(
+        (s, o) => s + Number(o.total),
+        0
+      ),
     };
   }
 
@@ -155,5 +224,6 @@ export async function getVendorProfileSummary(): Promise<VendorProfileSummary | 
     ownedRestaurants: owned,
     restaurant,
     stats,
+    completeness: computeCompleteness(restaurant),
   };
 }

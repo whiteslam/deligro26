@@ -71,6 +71,7 @@ export default async function RestaurantMenuPage() {
     <VendorMenuBoard
       restaurantId={menu?.restaurantId ?? restaurant.id}
       restaurantName={menu?.restaurantName ?? restaurant.name}
+      restaurantSlug={restaurant.slug}
       categories={menu?.categories ?? []}
       items={menu?.items ?? []}
       live

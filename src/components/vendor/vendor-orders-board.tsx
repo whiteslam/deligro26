@@ -13,6 +13,7 @@ import {
   Phone,
   Sparkles,
   User,
+  UtensilsCrossed,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,7 @@ import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 import type { KitchenOrder } from "@/lib/roles-data";
 
-type OrderTab = "new" | "prep" | "cancelled" | "done";
+type OrderTab = "new" | "prep" | "ready" | "cancelled" | "done";
 
 function statusLabel(status: string) {
   if (status === "delivered") return "Delivered";
@@ -76,10 +77,10 @@ function ItemThumb({
     <span
       className={cn(
         dim,
-        "grid shrink-0 place-items-center rounded-xl bg-surface-2 text-lg"
+        "grid shrink-0 place-items-center rounded-xl bg-surface-2 text-muted"
       )}
     >
-      🍽️
+      <UtensilsCrossed className="size-5" />
     </span>
   );
 }
@@ -227,7 +228,7 @@ function IncomingList({
       <VendorEmptyState
         icon={Sparkles}
         title="All caught up"
-        description="New orders will appear here instantly with a sound-free pulse."
+        description="New orders will appear here the moment a customer places one."
       />
     );
   }
@@ -272,7 +273,7 @@ function PreparingList({
       <VendorEmptyState
         icon={ChefHat}
         title="Kitchen clear"
-        description="Accepted orders land here until you mark them ready."
+        description="Accepted orders stay here while you cook."
       />
     );
   }
@@ -296,6 +297,43 @@ function PreparingList({
             onClick={() => onPatch(o, "ready")}
           >
             <Bell className="size-4" /> Ready
+          </Button>
+        </OrderCard>
+      ))}
+    </div>
+  );
+}
+
+function ReadyList({
+  orders,
+  busy,
+  onPatch,
+}: {
+  orders: KitchenOrder[];
+  busy: string | null;
+  onPatch: (o: KitchenOrder, s: "kitchen" | "ready" | "cancelled") => void;
+}) {
+  if (orders.length === 0) {
+    return (
+      <VendorEmptyState
+        icon={Bell}
+        title="Nothing waiting"
+        description="Mark prep orders Ready when food is packed for pickup."
+      />
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {orders.map((o) => (
+        <OrderCard key={o.id} order={o}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="col-span-2 w-full"
+            disabled={busy === o.id}
+            onClick={() => onPatch(o, "cancelled")}
+          >
+            <X className="size-4" /> Cancel order
           </Button>
         </OrderCard>
       ))}
@@ -484,6 +522,7 @@ function HistoryList({
 export function VendorOrdersBoard({
   initialIncoming,
   initialPreparing,
+  initialReady = [],
   initialRecent = [],
   initialCancelled = [],
   live,
@@ -491,6 +530,7 @@ export function VendorOrdersBoard({
 }: {
   initialIncoming: KitchenOrder[];
   initialPreparing: KitchenOrder[];
+  initialReady?: KitchenOrder[];
   initialRecent?: KitchenOrder[];
   initialCancelled?: KitchenOrder[];
   live: boolean;
@@ -498,10 +538,11 @@ export function VendorOrdersBoard({
 }) {
   const [incoming, setIncoming] = useState(initialIncoming);
   const [preparing, setPreparing] = useState(initialPreparing);
+  const [ready, setReady] = useState(initialReady);
   const [recent, setRecent] = useState(initialRecent);
   const [cancelled, setCancelled] = useState(initialCancelled);
-  const [readyCount, setReadyCount] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<OrderTab>("new");
   const [historyDialog, setHistoryDialog] = useState<
     null | "cancelled" | "completed"
@@ -511,15 +552,32 @@ export function VendorOrdersBoard({
     if (live) {
       setIncoming(initialIncoming);
       setPreparing(initialPreparing);
+      setReady(initialReady);
       setRecent(initialRecent);
       setCancelled(initialCancelled);
     }
-  }, [live, initialIncoming, initialPreparing, initialRecent, initialCancelled]);
+  }, [
+    live,
+    initialIncoming,
+    initialPreparing,
+    initialReady,
+    initialRecent,
+    initialCancelled,
+  ]);
 
   async function patchStatus(
     order: KitchenOrder,
     status: "kitchen" | "ready" | "cancelled"
   ) {
+    if (status === "cancelled") {
+      const label =
+        order.status === "placed" || !order.status ? "Reject" : "Cancel";
+      const ok = window.confirm(
+        `${label} order ${order.code}? This cannot be undone from the board.`
+      );
+      if (!ok) return;
+    }
+
     if (!live) {
       if (status === "kitchen") acceptLocal(order);
       else if (status === "cancelled") rejectLocal(order);
@@ -528,17 +586,30 @@ export function VendorOrdersBoard({
     }
 
     setBusy(order.id);
+    setActionError(null);
     try {
       const res = await fetch(`/api/orders/${order.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setActionError(
+          body?.error === "invalid_transition"
+            ? "That status change is no longer valid. Refreshing…"
+            : "Could not update order. Try again."
+        );
+        return;
+      }
 
       if (status === "kitchen") acceptLocal(order);
       else if (status === "cancelled") rejectLocal(order);
       else readyLocal(order);
+    } catch {
+      setActionError("Network error. Check your connection.");
     } finally {
       setBusy(null);
     }
@@ -546,46 +617,75 @@ export function VendorOrdersBoard({
 
   function acceptLocal(o: KitchenOrder) {
     setIncoming((prev) => prev.filter((x) => x.id !== o.id));
-    setPreparing((prev) => [o, ...prev]);
+    setPreparing((prev) => [{ ...o, status: "kitchen" }, ...prev]);
     setMobileTab("prep");
   }
   function rejectLocal(o: KitchenOrder) {
     setIncoming((prev) => prev.filter((x) => x.id !== o.id));
     setPreparing((prev) => prev.filter((x) => x.id !== o.id));
+    setReady((prev) => prev.filter((x) => x.id !== o.id));
     setCancelled((prev) => [{ ...o, status: "cancelled" }, ...prev]);
     setMobileTab("cancelled");
   }
   function readyLocal(o: KitchenOrder) {
     setPreparing((prev) => prev.filter((x) => x.id !== o.id));
-    setReadyCount((c) => c + 1);
+    setReady((prev) => [{ ...o, status: "ready" }, ...prev]);
+    setMobileTab("ready");
   }
 
   const mobileTabs: { id: OrderTab; label: string; count: number }[] = [
     { id: "new", label: "New", count: incoming.length },
     { id: "prep", label: "Prep", count: preparing.length },
+    { id: "ready", label: "Ready", count: ready.length },
     ...(live
       ? [
-          { id: "cancelled" as const, label: "Cancelled", count: cancelled.length },
+          {
+            id: "cancelled" as const,
+            label: "Cancel",
+            count: cancelled.length,
+          },
           { id: "done" as const, label: "Done", count: recent.length },
         ]
       : []),
   ];
 
-  const maxQueue = Math.max(incoming.length, preparing.length, readyCount, 1);
+  const maxQueue = Math.max(
+    incoming.length,
+    preparing.length,
+    ready.length,
+    cancelled.length,
+    1
+  );
 
   return (
-    <div className="space-y-4 lg:space-y-6">
-      {live ? <AutoRefresh interval={4000} /> : null}
+    <div className="min-w-0 space-y-4 overflow-x-hidden lg:space-y-6">
+      {live ? <AutoRefresh interval={8000} /> : null}
 
       <VendorHero
         live={live}
         title="Live orders"
         subtitle={
           restaurantName
-            ? `Managing ${restaurantName} — accept, prep, and dispatch.`
+            ? `Managing ${restaurantName} — accept, prep, and hand off.`
             : "Your restaurant order board."
         }
       />
+
+      {actionError ? (
+        <div
+          role="alert"
+          className="flex items-start justify-between gap-3 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-sm text-red-600"
+        >
+          <p className="min-w-0">{actionError}</p>
+          <button
+            type="button"
+            className="shrink-0 font-semibold underline"
+            onClick={() => setActionError(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <VendorMetricCard
@@ -603,11 +703,11 @@ export function VendorOrdersBoard({
           barPct={(preparing.length / maxQueue) * 100}
         />
         <VendorMetricCard
-          label="Ready today"
-          value={String(readyCount)}
+          label="Ready"
+          value={String(ready.length)}
           icon="bell"
           tone="green"
-          barPct={(readyCount / maxQueue) * 100}
+          barPct={(ready.length / maxQueue) * 100}
         />
         <VendorMetricCard
           label="Cancelled"
@@ -630,6 +730,9 @@ export function VendorOrdersBoard({
         {mobileTab === "prep" ? (
           <PreparingList orders={preparing} busy={busy} onPatch={patchStatus} />
         ) : null}
+        {mobileTab === "ready" ? (
+          <ReadyList orders={ready} busy={busy} onPatch={patchStatus} />
+        ) : null}
         {mobileTab === "cancelled" && live ? (
           <HistoryList
             orders={cancelled}
@@ -648,12 +751,15 @@ export function VendorOrdersBoard({
         ) : null}
       </div>
 
-      <div className="hidden gap-4 lg:grid lg:grid-cols-2">
+      <div className="hidden gap-4 lg:grid lg:grid-cols-3">
         <VendorKanbanColumn title="New orders" count={incoming.length} tone="accent">
           <IncomingList orders={incoming} busy={busy} onPatch={patchStatus} />
         </VendorKanbanColumn>
         <VendorKanbanColumn title="Preparing" count={preparing.length} tone="blue">
           <PreparingList orders={preparing} busy={busy} onPatch={patchStatus} />
+        </VendorKanbanColumn>
+        <VendorKanbanColumn title="Ready" count={ready.length} tone="green">
+          <ReadyList orders={ready} busy={busy} onPatch={patchStatus} />
         </VendorKanbanColumn>
       </div>
 

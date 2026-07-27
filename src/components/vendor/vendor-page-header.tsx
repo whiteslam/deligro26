@@ -90,16 +90,19 @@ export function VendorSegmentedTabs<T extends string>({
 
   return (
     <div
-      className="sticky top-[var(--vendor-top-offset,52px)] z-20 md:static"
+      className="sticky top-[var(--vendor-top-offset,52px)] z-20 -mx-1 min-w-0 md:static md:mx-0"
       role="tablist"
     >
       <div
         ref={containerRef}
         className={cn(
-          "vendor-segment relative grid gap-0.5",
+          "vendor-segment relative gap-0.5",
+          tabs.length >= 5
+            ? "flex overflow-x-auto no-scrollbar px-1"
+            : "grid",
           tabs.length === 2 && "grid-cols-2",
           tabs.length === 3 && "grid-cols-3",
-          tabs.length >= 4 && "grid-cols-4"
+          tabs.length === 4 && "grid-cols-4"
         )}
       >
         <span
@@ -119,6 +122,7 @@ export function VendorSegmentedTabs<T extends string>({
               onClick={() => onChange(tab.id)}
               className={cn(
                 "vendor-segment-btn press min-h-11 rounded-xl px-2 py-2 text-center text-xs font-semibold transition-colors sm:text-sm",
+                tabs.length >= 5 && "min-w-[4.5rem] shrink-0 flex-1",
                 selected ? "text-ink" : "text-muted hover:text-ink"
               )}
             >

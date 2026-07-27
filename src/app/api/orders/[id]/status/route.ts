@@ -5,7 +5,7 @@ import { updateKitchenOrderStatus } from "@/lib/data-access/vendor-orders";
 
 const ALLOWED = new Set(["kitchen", "ready", "cancelled"]);
 
-/** PATCH /api/orders/:id/status — vendor status transitions (RLS-enforced). */
+/** PATCH /api/orders/:id/status — restaurant kitchen transitions only. */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -25,6 +25,16 @@ export async function PATCH(
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profile?.role !== "restaurant") {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   let body: { status?: string };
@@ -47,7 +57,17 @@ export async function PATCH(
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "server_error";
+    if (message === "forbidden") {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    if (message === "invalid_transition") {
+      return NextResponse.json(
+        { error: "invalid_transition" },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }
 }
