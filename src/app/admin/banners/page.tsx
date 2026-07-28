@@ -1,8 +1,21 @@
 import Link from "next/link";
-import { Plus, Megaphone } from "lucide-react";
+import {
+  Eye,
+  Megaphone,
+  MousePointerClick,
+  Plus,
+  Radio,
+  ReceiptText,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { listAllBanners, bannersBackendReady } from "@/lib/banners";
 import type { Banner, BannerStatus } from "@/types";
+import {
+  AdminHero,
+  EmptyState,
+  PreviewNotice,
+  StatCard,
+} from "@/components/admin/admin-ui";
 import { BannerRowActions } from "./banner-row-actions";
 
 export const dynamic = "force-dynamic";
@@ -37,50 +50,69 @@ export default async function AdminBannersPage() {
   const ctr = totals.impressions > 0 ? totals.clicks / totals.impressions : 0;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-[26px] font-extrabold tracking-tight">Campaigns</h1>
-          <p className="mt-0.5 text-sm text-muted">Banners &amp; sponsored ads</p>
-        </div>
-        <Link href="/admin/banners/new" className="shrink-0">
-          <Button size="sm">
-            <Plus className="size-4" /> New
-          </Button>
-        </Link>
-      </div>
+    <div className="space-y-5">
+      <AdminHero
+        title="Campaigns"
+        subtitle="Banners &amp; sponsored ads"
+        action={
+          <Link href="/admin/banners/new">
+            <Button size="sm">
+              <Plus className="size-4" /> New
+            </Button>
+          </Link>
+        }
+      />
 
       {!backendReady ? (
-        <p className="rounded-2xl border border-pop/40 bg-pop/10 px-3.5 py-3 text-sm font-medium text-ink">
+        <PreviewNotice>
           Preview mode — apply{" "}
-          <code className="rounded bg-surface-2 px-1 text-xs">0014_banners.sql</code>{" "}
+          <code className="rounded bg-surface-2 px-1 text-xs">
+            0014_banners.sql
+          </code>{" "}
           to persist campaigns.
-        </p>
+        </PreviewNotice>
       ) : null}
 
       <div className="grid grid-cols-2 gap-2.5">
-        <MiniStat label="Live" value={String(live.length)} />
-        <MiniStat
+        <StatCard
+          icon={<Radio className="size-4" />}
+          tone="green"
+          label="Live"
+          value={live.length}
+        />
+        <StatCard
+          icon={<Eye className="size-4" />}
+          tone="blue"
           label="Impressions"
           value={totals.impressions.toLocaleString("en-IN")}
         />
-        <MiniStat label="Avg CTR" value={pct(ctr)} />
-        <MiniStat label="Orders" value={String(totals.orders)} />
+        <StatCard
+          icon={<MousePointerClick className="size-4" />}
+          tone="accent"
+          label="Avg CTR"
+          value={pct(ctr)}
+        />
+        <StatCard
+          icon={<ReceiptText className="size-4" />}
+          tone="muted"
+          label="Orders"
+          value={totals.orders}
+        />
       </div>
 
       {banners.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-10 text-center">
-          <Megaphone className="size-8 text-muted" />
-          <p className="font-semibold">No campaigns yet</p>
-          <p className="text-sm text-muted">
-            Create a banner and it shows in the customer app.
-          </p>
-          <Link href="/admin/banners/new">
-            <Button size="sm">
-              <Plus className="size-4" /> New campaign
-            </Button>
-          </Link>
-        </div>
+        <EmptyState
+          icon={Megaphone}
+          title="No campaigns yet"
+          description="Create a banner and it shows in the customer app."
+          action={
+            <Link href="/admin/banners/new">
+              <Button size="sm">
+                <Plus className="size-4" /> New campaign
+              </Button>
+            </Link>
+          }
+        />
       ) : (
         <ul className="space-y-2.5">
           {banners.map((b) => (
@@ -92,21 +124,10 @@ export default async function AdminBannersPage() {
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-line bg-surface p-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-        {label}
-      </p>
-      <p className="text-data mt-1 text-lg font-bold">{value}</p>
-    </div>
-  );
-}
-
 function BannerCard({ banner: b }: { banner: Banner }) {
   const a = b.analytics;
   return (
-    <li className="rounded-2xl border border-line bg-surface p-3.5">
+    <li className="rounded-2xl border border-line bg-surface p-3.5 transition-shadow hover:shadow-[var(--shadow-md)]">
       <div className="flex gap-3">
         <div
           className="grid size-11 shrink-0 place-items-center rounded-xl text-lg"

@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
 import { getBanner } from "@/lib/banners";
+import { AdminHero } from "@/components/admin/admin-ui";
 import { BannerForm } from "../banner-form";
 
 export const dynamic = "force-dynamic";
@@ -17,15 +16,12 @@ export default async function EditBannerPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link
-          href="/admin/banners"
-          className="press inline-flex items-center gap-1 text-sm font-semibold text-muted"
-        >
-          <ChevronLeft className="size-4" /> Campaigns
-        </Link>
-        <h1 className="text-heading mt-1">Edit · {banner.name}</h1>
-      </div>
+      <AdminHero
+        backHref="/admin/banners"
+        backLabel="Campaigns"
+        title={`Edit · ${banner.name}`}
+        subtitle="Update creative, placement & status"
+      />
       <BannerForm banner={banner} />
     </div>
   );

@@ -80,6 +80,6 @@ export async function saveSettingsAction(
 
   // Fees, availability and support text are read across the app — rebuild it.
   revalidatePath("/", "layout");
-  revalidatePath("/admin/settings");
+  revalidatePath("/admin/settings/platform");
   return { ok: true };
 }

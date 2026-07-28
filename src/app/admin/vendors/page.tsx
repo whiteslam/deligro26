@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { Plus, Store, Tags } from "lucide-react";
+import {
+  Ban,
+  CheckCircle2,
+  Clock,
+  PauseCircle,
+  Plus,
+  Store,
+  Tags,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   getVendorCounts,
@@ -9,6 +17,12 @@ import {
   type VendorStatus,
 } from "@/lib/data-access/admin-vendors";
 import { listCategories } from "@/lib/data-access/vendor-categories";
+import {
+  AdminHero,
+  EmptyState,
+  PreviewNotice,
+  StatCard,
+} from "@/components/admin/admin-ui";
 import { VendorSearchBar } from "./vendor-search-bar";
 import { VendorRowActions } from "./vendor-row-actions";
 
@@ -60,6 +74,7 @@ export default async function AdminVendorsPage({
 
   const totalPages = Math.max(1, Math.ceil(result.total / pageSize));
   const categoryNames = categories.map((c) => c.name);
+  const filtered = Boolean(q || status || category);
 
   const pageHref = (n: number) => {
     const usp = new URLSearchParams();
@@ -73,65 +88,91 @@ export default async function AdminVendorsPage({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-[26px] font-extrabold tracking-tight">Vendors</h1>
-          <p className="mt-0.5 text-sm text-muted">Onboard &amp; manage shops</p>
-        </div>
-        <Link href="/admin/vendors/new" className="shrink-0">
-          <Button size="sm">
-            <Plus className="size-4" /> Add
-          </Button>
-        </Link>
-      </div>
+    <div className="space-y-5">
+      <AdminHero
+        title="Vendors"
+        subtitle="Onboard &amp; manage shops"
+        action={
+          <Link href="/admin/vendors/new">
+            <Button size="sm">
+              <Plus className="size-4" /> Add
+            </Button>
+          </Link>
+        }
+      />
 
       {!backendReady ? (
-        <p className="rounded-2xl border border-pop/40 bg-pop/10 px-3.5 py-3 text-sm font-medium text-ink">
+        <PreviewNotice>
           Preview mode — apply{" "}
           <code className="rounded bg-surface-2 px-1 text-xs">
             0017_vendor_management.sql
           </code>{" "}
           to load vendors.
-        </p>
+        </PreviewNotice>
       ) : null}
 
       {/* Overview cards */}
-      <div className="grid grid-cols-3 gap-2">
-        <StatCard label="Total" value={counts.total} />
-        <StatCard label="Active" value={counts.active} tone="green" />
-        <StatCard label="Pending" value={counts.pending} tone="accent" />
-        <StatCard label="Inactive" value={counts.inactive} />
-        <StatCard label="Suspended" value={counts.suspended} tone="deal" />
+      <div className="grid grid-cols-3 gap-2.5">
         <StatCard
+          icon={<Store className="size-4" />}
+          tone="accent"
+          label="Total"
+          value={counts.total}
+        />
+        <StatCard
+          icon={<CheckCircle2 className="size-4" />}
+          tone="green"
+          label="Active"
+          value={counts.active}
+        />
+        <StatCard
+          icon={<Clock className="size-4" />}
+          tone="accent"
+          label="Pending"
+          value={counts.pending}
+        />
+        <StatCard
+          icon={<PauseCircle className="size-4" />}
+          tone="muted"
+          label="Inactive"
+          value={counts.inactive}
+        />
+        <StatCard
+          icon={<Ban className="size-4" />}
+          tone="deal"
+          label="Suspended"
+          value={counts.suspended}
+        />
+        <StatCard
+          icon={<Tags className="size-4" />}
+          tone="blue"
           label="Categories"
           value={counts.categories}
           href="/admin/vendors/categories"
-          icon={<Tags className="size-3.5" />}
         />
       </div>
 
       <VendorSearchBar categories={categoryNames} />
 
       {result.items.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-10 text-center">
-          <Store className="size-8 text-muted" />
-          <p className="font-semibold">
-            {q || status || category ? "No vendors match" : "No vendors yet"}
-          </p>
-          <p className="text-sm text-muted">
-            {q || status || category
+        <EmptyState
+          icon={Store}
+          title={filtered ? "No vendors match" : "No vendors yet"}
+          description={
+            filtered
               ? "Try a different search or filter."
-              : "Add your first shop to start taking orders."}
-          </p>
-          {!q && !status && !category ? (
-            <Link href="/admin/vendors/new">
-              <Button size="sm">
-                <Plus className="size-4" /> Add vendor
-              </Button>
-            </Link>
-          ) : null}
-        </div>
+              : "Add your first shop to start taking orders."
+          }
+          action={
+            !filtered ? (
+              <Link href="/admin/vendors/new">
+                <Button size="sm">
+                  <Plus className="size-4" /> Add vendor
+                </Button>
+              </Link>
+            ) : null
+          }
+        />
       ) : (
         <>
           <p className="text-xs text-muted">
@@ -174,50 +215,9 @@ export default async function AdminVendorsPage({
   );
 }
 
-function StatCard({
-  label,
-  value,
-  tone,
-  href,
-  icon,
-}: {
-  label: string;
-  value: number;
-  tone?: "green" | "accent" | "deal";
-  href?: string;
-  icon?: React.ReactNode;
-}) {
-  const valueClass =
-    tone === "green"
-      ? "text-green"
-      : tone === "accent"
-        ? "text-accent"
-        : tone === "deal"
-          ? "text-deal"
-          : "text-ink";
-  const inner = (
-    <div className="rounded-2xl border border-line bg-surface p-2.5">
-      <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
-        {icon}
-        {label}
-      </p>
-      <p className={`text-data mt-1 text-xl font-extrabold leading-none ${valueClass}`}>
-        {value}
-      </p>
-    </div>
-  );
-  return href ? (
-    <Link href={href} className="press block">
-      {inner}
-    </Link>
-  ) : (
-    inner
-  );
-}
-
 function VendorCard({ vendor: v }: { vendor: VendorListItem }) {
   return (
-    <li className="rounded-2xl border border-line bg-surface p-3.5">
+    <li className="rounded-2xl border border-line bg-surface p-3.5 transition-shadow hover:shadow-[var(--shadow-md)]">
       <div className="flex gap-3">
         <div
           className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-cover bg-center text-lg font-bold text-white"

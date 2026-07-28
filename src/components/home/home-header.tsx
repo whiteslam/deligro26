@@ -88,7 +88,7 @@ export function HomeHeader({
               className="press flex min-w-0 flex-1 items-center gap-2 text-left"
               aria-label="Change delivery location"
             >
-              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface-2 text-ink">
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-blue/12 text-blue">
                 {detecting ? (
                   <LoaderCircle className="size-4 animate-spin" />
                 ) : detected ? (
@@ -116,14 +116,14 @@ export function HomeHeader({
             <Link
               href="/profile/notifications"
               aria-label="Notifications"
-              className="press grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-ink"
+              className="press grid size-9 shrink-0 place-items-center rounded-full bg-accent/12 text-accent"
             >
               <Bell className="size-[18px]" />
             </Link>
             <Link
               href="/profile"
               aria-label="Profile"
-              className="press grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-ink"
+              className="press grid size-9 shrink-0 place-items-center rounded-full bg-violet-500/15 text-violet-500"
             >
               <User className="size-[18px]" />
             </Link>

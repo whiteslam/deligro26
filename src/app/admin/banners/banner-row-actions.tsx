@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { BannerStatus } from "@/types";
+import { cn } from "@/lib/utils/cn";
 import {
   deleteBannerAction,
   duplicateBannerAction,
@@ -39,14 +40,23 @@ export function BannerRowActions({
       router.refresh();
     });
 
-  const btn =
-    "press grid size-9 place-items-center rounded-full bg-surface-2 text-muted hover:text-ink disabled:opacity-50";
+  // Base chip + a per-action colour, so the controls read as colourful as the
+  // rest of the admin section. Each keeps its own hue with a matching hover tint.
+  const base =
+    "press grid size-9 place-items-center rounded-full bg-surface-2 transition-colors disabled:opacity-50";
+  const tone = {
+    blue: "text-blue hover:bg-blue/15",
+    accent: "text-accent hover:bg-accent/15",
+    green: "text-green hover:bg-green/15",
+    violet: "text-violet-500 hover:bg-violet-500/15",
+    deal: "text-deal hover:bg-deal/15",
+  } as const;
 
   return (
     <div className="flex items-center gap-1.5">
       <Link
         href={`/admin/banners/${id}`}
-        className={btn}
+        className={cn(base, tone.blue)}
         aria-label="Edit campaign"
         title="Edit"
       >
@@ -56,7 +66,7 @@ export function BannerRowActions({
       {status === "active" ? (
         <button
           type="button"
-          className={btn}
+          className={cn(base, tone.accent)}
           disabled={pending}
           title="Pause"
           aria-label="Pause campaign"
@@ -67,7 +77,7 @@ export function BannerRowActions({
       ) : (
         <button
           type="button"
-          className={btn}
+          className={cn(base, tone.green)}
           disabled={pending}
           title="Set live"
           aria-label="Activate campaign"
@@ -79,7 +89,7 @@ export function BannerRowActions({
 
       <button
         type="button"
-        className={btn}
+        className={cn(base, tone.violet)}
         disabled={pending}
         title="Duplicate"
         aria-label="Duplicate campaign"
@@ -91,7 +101,7 @@ export function BannerRowActions({
       {status !== "archived" ? (
         <button
           type="button"
-          className={btn}
+          className={cn(base, tone.blue)}
           disabled={pending}
           title="Archive"
           aria-label="Archive campaign"
@@ -103,7 +113,7 @@ export function BannerRowActions({
 
       <button
         type="button"
-        className={`${btn} hover:bg-deal/10 hover:text-deal`}
+        className={cn(base, tone.deal)}
         disabled={pending}
         title="Delete"
         aria-label="Delete campaign"

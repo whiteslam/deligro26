@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Pencil, Power, PowerOff, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { cn } from "@/lib/utils/cn";
 import { deleteCategoryAction, setCategoryEnabledAction } from "../actions";
 
 export function CategoryRowActions({
@@ -35,14 +36,22 @@ export function CategoryRowActions({
       router.refresh();
     });
 
-  const btn =
-    "press grid size-9 place-items-center rounded-full bg-surface-2 text-muted hover:text-ink disabled:opacity-50";
+  // Same per-action colours as the vendor & campaign row controls:
+  // blue = edit, green = enable, orange = disable, red = delete.
+  const base =
+    "press grid size-9 place-items-center rounded-full bg-surface-2 transition-colors disabled:opacity-50";
+  const tone = {
+    blue: "text-blue hover:bg-blue/15",
+    green: "text-green hover:bg-green/15",
+    accent: "text-accent hover:bg-accent/15",
+    deal: "text-deal hover:bg-deal/15",
+  } as const;
 
   return (
     <div className="flex items-center gap-1.5">
       <button
         type="button"
-        className={btn}
+        className={cn(base, enabled ? tone.accent : tone.green)}
         disabled={pending}
         title={enabled ? "Disable" : "Enable"}
         aria-label={enabled ? "Disable category" : "Enable category"}
@@ -52,7 +61,7 @@ export function CategoryRowActions({
       </button>
       <Link
         href={`/admin/vendors/categories/${id}`}
-        className={btn}
+        className={cn(base, tone.blue)}
         title="Edit"
         aria-label="Edit category"
       >
@@ -60,7 +69,7 @@ export function CategoryRowActions({
       </Link>
       <button
         type="button"
-        className={`${btn} hover:bg-deal/10 hover:text-deal`}
+        className={cn(base, tone.deal)}
         disabled={pending}
         title="Delete"
         aria-label="Delete category"

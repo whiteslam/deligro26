@@ -36,24 +36,28 @@ export default async function HelpPage() {
       label: "Call us",
       value: s.supportPhone,
       href: `tel:${digits(s.supportPhone)}`,
+      tone: "bg-blue/12 text-blue",
     },
     s.supportWhatsapp && {
       icon: MessageCircle,
       label: "WhatsApp",
       value: s.supportWhatsapp,
       href: `https://wa.me/${digits(s.supportWhatsapp)}`,
+      tone: "bg-green/12 text-green",
     },
     s.supportEmail && {
       icon: Mail,
       label: "Email",
       value: s.supportEmail,
       href: `mailto:${s.supportEmail}`,
+      tone: "bg-accent/12 text-accent",
     },
   ].filter(Boolean) as {
     icon: typeof Phone;
     label: string;
     value: string;
     href: string;
+    tone: string;
   }[];
 
   return (
@@ -80,7 +84,9 @@ export default async function HelpPage() {
                 href={c.href}
                 className="press flex items-center gap-3 rounded-xl border border-line bg-surface p-3.5"
               >
-                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-ink">
+                <span
+                  className={`grid size-9 shrink-0 place-items-center rounded-full ${c.tone}`}
+                >
                   <Icon className="size-4" />
                 </span>
                 <span className="min-w-0">

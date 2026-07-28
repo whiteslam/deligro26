@@ -23,12 +23,28 @@ import { ProfileAvatar } from "@/components/profile/profile-avatar";
 // Per-request: reads the auth cookie to show the signed-in user's own data.
 export const dynamic = "force-dynamic";
 
-const OTHER = [
-  { icon: MapPin, label: "Saved addresses", href: "/profile/addresses" },
-  { icon: Bell, label: "Notifications", href: "/profile/notifications" },
-  { icon: CircleHelp, label: "Help & support", href: "/profile/help" },
-  { icon: ShieldCheck, label: "Privacy & security", href: "/profile/help" },
-  { icon: Info, label: "About Deligro", href: "/profile/about" },
+/** Toned icon chips, matching the admin section and the bottom nav. */
+const ICON_TONE = {
+  accent: "bg-accent/12 text-accent",
+  green: "bg-green/12 text-green",
+  blue: "bg-blue/12 text-blue",
+  deal: "bg-deal/12 text-deal",
+  violet: "bg-violet-500/15 text-violet-500",
+} as const;
+
+type IconTone = keyof typeof ICON_TONE;
+
+const OTHER: {
+  icon: typeof MapPin;
+  label: string;
+  href: string;
+  tone: IconTone;
+}[] = [
+  { icon: MapPin, label: "Saved addresses", href: "/profile/addresses", tone: "blue" },
+  { icon: Bell, label: "Notifications", href: "/profile/notifications", tone: "accent" },
+  { icon: CircleHelp, label: "Help & support", href: "/profile/help", tone: "green" },
+  { icon: ShieldCheck, label: "Privacy & security", href: "/profile/help", tone: "violet" },
+  { icon: Info, label: "About Deligro", href: "/profile/about", tone: "blue" },
 ];
 
 // Change this to the developers' inbox. Powers the "Contact developers" row.
@@ -143,7 +159,7 @@ export default async function ProfilePage() {
           row states it rather than inviting a tap that does nothing. */}
       <SectionHead title="Payment" />
       <div className="flex items-center gap-3 border-b border-line pb-4">
-        <span className="grid size-9 place-items-center rounded-lg bg-surface-2 text-ink">
+        <span className="grid size-9 place-items-center rounded-lg bg-green/12 text-green">
           <Wallet className="size-[18px]" />
         </span>
         <span className="flex-1 text-[15px] font-semibold">
@@ -175,9 +191,13 @@ export default async function ProfilePage() {
             <Link
               key={item.label}
               href={item.href}
-              className="press flex w-full items-center gap-3 py-3.5 text-left"
+              className="press flex w-full items-center gap-3 py-3 text-left"
             >
-              <Icon className="size-5 shrink-0 text-ink" />
+              <span
+                className={`grid size-9 shrink-0 place-items-center rounded-xl ${ICON_TONE[item.tone]}`}
+              >
+                <Icon className="size-[18px]" />
+              </span>
               <span className="flex-1 text-[15px] font-medium">{item.label}</span>
               <ChevronRight className="size-5 shrink-0 text-muted" />
             </Link>
@@ -185,9 +205,13 @@ export default async function ProfilePage() {
         })}
         <a
           href={`mailto:${DEVELOPER_EMAIL}?subject=${encodeURIComponent("Deligro app feedback")}`}
-          className="press flex w-full items-center gap-3 py-3.5 text-left"
+          className="press flex w-full items-center gap-3 py-3 text-left"
         >
-          <Code2 className="size-5 shrink-0 text-ink" />
+          <span
+            className={`grid size-9 shrink-0 place-items-center rounded-xl ${ICON_TONE.deal}`}
+          >
+            <Code2 className="size-[18px]" />
+          </span>
           <span className="flex-1 text-[15px] font-medium">
             Contact developers
           </span>

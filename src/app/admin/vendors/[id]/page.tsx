@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BackLink } from "@/components/admin/admin-ui";
 import {
   getVendorDetail,
   type VendorDetail,
@@ -77,45 +78,44 @@ export default async function VendorDetailPage({
 
   return (
     <div className="space-y-4">
-      <Link
-        href="/admin/vendors"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"
-      >
-        <ArrowLeft className="size-4" /> Vendors
-      </Link>
-
-      {/* Header */}
-      <div className="rounded-2xl border border-line bg-surface p-3.5">
-        <div className="flex gap-3">
-          <div
-            className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-cover bg-center text-xl font-bold text-white"
-            style={
-              vendor.imageUrl
-                ? { backgroundImage: `url(${vendor.imageUrl})` }
-                : { background: vendor.accentTint ?? "var(--accent)" }
-            }
-          >
-            {vendor.imageUrl ? "" : vendor.name.charAt(0).toUpperCase()}
+      {/* Header — gradient hero to match the rest of the admin section */}
+      <div className="vendor-hero relative overflow-hidden rounded-[var(--radius-sheet)] border border-line p-4">
+        <div className="vendor-hero-glow pointer-events-none absolute inset-0" />
+        <div className="relative">
+          <div className="mb-3">
+            <BackLink href="/admin/vendors">Vendors</BackLink>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <h1 className="truncate text-lg font-extrabold tracking-tight">
-                {vendor.name}
-              </h1>
-              <span className={STATUS_PILL[vendor.status]}>{vendor.status}</span>
+          <div className="flex gap-3">
+            <div
+              className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-cover bg-center text-xl font-bold text-white"
+              style={
+                vendor.imageUrl
+                  ? { backgroundImage: `url(${vendor.imageUrl})` }
+                  : { background: vendor.accentTint ?? "var(--accent)" }
+              }
+            >
+              {vendor.imageUrl ? "" : vendor.name.charAt(0).toUpperCase()}
             </div>
-            <p className="mt-0.5 truncate text-xs text-muted">
-              /{vendor.slug} · {vendor.category ?? "Uncategorised"}
-            </p>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <h1 className="truncate text-lg font-extrabold tracking-tight">
+                  {vendor.name}
+                </h1>
+                <span className={STATUS_PILL[vendor.status]}>{vendor.status}</span>
+              </div>
+              <p className="mt-0.5 truncate text-xs text-muted">
+                /{vendor.slug} · {vendor.category ?? "Uncategorised"}
+              </p>
+            </div>
+            <Link href={`/admin/vendors/${id}/edit`} className="shrink-0 self-start">
+              <Button size="sm" variant="secondary">
+                <Pencil className="size-4" /> Edit
+              </Button>
+            </Link>
           </div>
-          <Link href={`/admin/vendors/${id}/edit`} className="shrink-0 self-start">
-            <Button size="sm" variant="secondary">
-              <Pencil className="size-4" /> Edit
-            </Button>
-          </Link>
-        </div>
-        <div className="mt-3 flex justify-end border-t border-line pt-3">
-          <VendorRowActions id={vendor.id} name={vendor.name} status={vendor.status} />
+          <div className="mt-3 flex justify-end border-t border-line pt-3">
+            <VendorRowActions id={vendor.id} name={vendor.name} status={vendor.status} />
+          </div>
         </div>
       </div>
 

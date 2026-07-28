@@ -221,7 +221,8 @@ export function RegistrationWizard({
   const onReview = step === STEPS.length - 1;
 
   return (
-    <div className="space-y-4">
+    // Bottom padding clears the fixed action bar so the last field is reachable.
+    <div className="space-y-4 pb-24">
       {/* Progress */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -262,8 +263,9 @@ export function RegistrationWizard({
       {step === 6 ? <TermsStep data={data} update={update} /> : null}
       {step === 7 ? <ReviewStep data={data} goTo={setStep} /> : null}
 
-      {/* Action footer — three evenly balanced controls (Back · Draft · Next). */}
-      <div className="sticky bottom-[84px] z-20 -mx-4 flex items-center justify-between gap-2 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur">
+      {/* Action footer — three evenly balanced controls (Back · Draft · Next),
+          docked just above the tab bar. See `.action-dock` for why it's fixed. */}
+      <div className="action-dock flex items-center justify-between gap-2 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur">
         {step > 0 ? (
           <Button type="button" variant="secondary" size="sm" onClick={goPrev}>
             <ArrowLeft className="size-4" /> Back

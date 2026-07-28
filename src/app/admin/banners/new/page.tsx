@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { AdminHero } from "@/components/admin/admin-ui";
 import { BannerForm } from "../banner-form";
 
 export const dynamic = "force-dynamic";
@@ -7,15 +6,12 @@ export const dynamic = "force-dynamic";
 export default function NewBannerPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <Link
-          href="/admin/banners"
-          className="press inline-flex items-center gap-1 text-sm font-semibold text-muted"
-        >
-          <ChevronLeft className="size-4" /> Campaigns
-        </Link>
-        <h1 className="text-heading mt-1">New campaign</h1>
-      </div>
+      <AdminHero
+        backHref="/admin/banners"
+        backLabel="Campaigns"
+        title="New campaign"
+        subtitle="Design a banner or sponsored ad for the customer app"
+      />
       <BannerForm />
     </div>
   );

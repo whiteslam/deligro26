@@ -81,7 +81,7 @@ export function SettingsForm({ settings }: { settings: PlatformSettings }) {
   );
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} className="space-y-6 pb-24">
       {state.error ? (
         <p className="rounded-xl border border-deal/30 bg-deal/10 px-3.5 py-3 text-sm font-medium text-deal">
           {state.error}
@@ -280,7 +280,7 @@ export function SettingsForm({ settings }: { settings: PlatformSettings }) {
         </div>
       </Section>
 
-      <div className="sticky bottom-0 flex items-center gap-3 bg-bg/80 py-3 backdrop-blur">
+      <div className="action-dock flex items-center gap-3 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : "Save settings"}
         </Button>

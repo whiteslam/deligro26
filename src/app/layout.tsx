@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { InlineScript } from "@/components/shared/inline-script";
 import "./globals.css";
 
 const inter = Inter({
@@ -50,7 +51,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
+        <InlineScript html={themeBootstrap} />
       </head>
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}

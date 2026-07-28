@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { getVendorDetail } from "@/lib/data-access/admin-vendors";
 import { listCategories } from "@/lib/data-access/vendor-categories";
+import { AdminHero } from "@/components/admin/admin-ui";
 import { VendorForm } from "./vendor-form";
 import { VendorCredentials } from "./vendor-credentials";
 
@@ -22,13 +21,12 @@ export default async function EditVendorPage({
 
   return (
     <div className="space-y-4">
-      <Link
-        href={`/admin/vendors/${id}`}
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"
-      >
-        <ArrowLeft className="size-4" /> {vendor.name}
-      </Link>
-      <h1 className="text-[22px] font-extrabold tracking-tight">Edit vendor</h1>
+      <AdminHero
+        backHref={`/admin/vendors/${id}`}
+        backLabel={vendor.name}
+        title="Edit vendor"
+        subtitle="Update shop details, credentials & status"
+      />
       <VendorCredentials
         id={vendor.id}
         tempPassword={vendor.tempPassword}

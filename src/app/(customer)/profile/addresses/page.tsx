@@ -68,7 +68,7 @@ export default function ProfileAddressesPage() {
           </p>
         ) : addresses.length === 0 && !showAdd ? (
           <div className="card p-6 text-center">
-            <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-accent-soft text-accent-ink">
+            <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-blue/12 text-blue">
               <MapPin className="size-7" />
             </span>
             <p className="mt-4 text-[15px] font-bold">No saved addresses</p>
@@ -88,7 +88,7 @@ export default function ProfileAddressesPage() {
             {addresses.map((a) => (
               <li key={a.id} className="card p-4">
                 <div className="flex items-start gap-3">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-ink">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue/12 text-blue">
                     <MapPin className="size-5" />
                   </span>
                   <div className="min-w-0 flex-1">

@@ -1,3 +1,4 @@
+import { ReceiptText } from "lucide-react";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { formatINR } from "@/lib/utils/format";
 import { ADMIN_ORDERS, type AdminOrderRow } from "@/lib/roles-data";
@@ -7,6 +8,7 @@ import {
   type PendingRestaurant,
 } from "@/lib/data-access/admin-stats";
 import { PendingApprovals } from "@/components/admin/pending-approvals";
+import { AdminHero, EmptyState } from "@/components/admin/admin-ui";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const STATUS: Record<
@@ -32,31 +34,39 @@ export default async function AdminOrdersPage() {
 
 function renderOrders(orders: AdminOrderRow[], pending: PendingRestaurant[]) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {isSupabaseConfigured ? <AutoRefresh interval={4000} /> : null}
+
+      <AdminHero
+        title="Orders"
+        subtitle="Live &amp; recent, across every restaurant"
+        live
+        action={
+          <div className="text-right">
+            <p className="text-data text-xl font-bold leading-none">
+              {orders.length}
+            </p>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
+              orders
+            </p>
+          </div>
+        }
+      />
 
       <PendingApprovals pending={pending} />
 
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-[26px] font-extrabold tracking-tight">Orders</h1>
-          <p className="mt-0.5 text-sm text-muted">Live &amp; recent</p>
-        </div>
-        <span className="text-xs font-semibold text-muted">
-          {orders.length}
-        </span>
-      </div>
-
       {orders.length === 0 ? (
-        <p className="rounded-2xl border border-line bg-surface px-4 py-8 text-center text-sm text-muted">
-          No orders yet.
-        </p>
+        <EmptyState
+          icon={ReceiptText}
+          title="No orders yet"
+          description="New orders land here in real time as customers check out."
+        />
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-2.5">
           {orders.map((o) => (
             <li
               key={o.code}
-              className="rounded-2xl border border-line bg-surface p-3.5"
+              className="rounded-2xl border border-line bg-surface p-3.5 transition-shadow hover:shadow-[var(--shadow-md)]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">

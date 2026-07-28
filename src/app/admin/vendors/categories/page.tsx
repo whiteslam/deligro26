@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ArrowLeft, Plus, Tags } from "lucide-react";
+import { Plus, Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { listCategories } from "@/lib/data-access/vendor-categories";
+import { AdminHero, EmptyState } from "@/components/admin/admin-ui";
 import { CategoryRowActions } from "./category-row-actions";
 
 export const dynamic = "force-dynamic";
@@ -11,39 +12,34 @@ export default async function VendorCategoriesPage() {
   const categories = await listCategories(true);
 
   return (
-    <div className="space-y-4">
-      <Link
-        href="/admin/vendors"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"
-      >
-        <ArrowLeft className="size-4" /> Vendors
-      </Link>
-
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-[26px] font-extrabold tracking-tight">Categories</h1>
-          <p className="mt-0.5 text-sm text-muted">Vendor category taxonomy</p>
-        </div>
-        <Link href="/admin/vendors/categories/new" className="shrink-0">
-          <Button size="sm">
-            <Plus className="size-4" /> Add
-          </Button>
-        </Link>
-      </div>
-
-      {categories.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-10 text-center">
-          <Tags className="size-8 text-muted" />
-          <p className="font-semibold">No categories yet</p>
-          <p className="text-sm text-muted">
-            Add categories like Restaurant, Café or Grocery.
-          </p>
+    <div className="space-y-5">
+      <AdminHero
+        backHref="/admin/vendors"
+        backLabel="Vendors"
+        title="Categories"
+        subtitle="Vendor category taxonomy"
+        action={
           <Link href="/admin/vendors/categories/new">
             <Button size="sm">
-              <Plus className="size-4" /> Add category
+              <Plus className="size-4" /> Add
             </Button>
           </Link>
-        </div>
+        }
+      />
+
+      {categories.length === 0 ? (
+        <EmptyState
+          icon={Tags}
+          title="No categories yet"
+          description="Add categories like Restaurant, Café or Grocery."
+          action={
+            <Link href="/admin/vendors/categories/new">
+              <Button size="sm">
+                <Plus className="size-4" /> Add category
+              </Button>
+            </Link>
+          }
+        />
       ) : (
         <ul className="space-y-2.5">
           {categories.map((c) => (

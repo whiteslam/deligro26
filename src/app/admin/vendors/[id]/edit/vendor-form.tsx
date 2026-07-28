@@ -44,7 +44,7 @@ export function VendorForm({
     : [...(vendor.category ? [vendor.category] : []), ...categories];
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-4 pb-24">
       {state.error ? (
         <p className="rounded-xl border border-deal/30 bg-deal/10 px-3.5 py-3 text-sm font-medium text-deal">
           {state.error}
@@ -249,7 +249,7 @@ export function VendorForm({
         </div>
       </Section>
 
-      <div className="sticky bottom-[84px] -mx-4 flex items-center gap-3 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur">
+      <div className="action-dock flex items-center gap-3 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : "Save changes"}
         </Button>

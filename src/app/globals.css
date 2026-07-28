@@ -158,10 +158,31 @@ h6 {
   font-weight: 700;
   color: var(--muted);
 }
-.text-data {
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 0.8125rem; /* 13px */
-  letter-spacing: -0.01em;
+/* Layered so a Tailwind text-size utility (text-2xl, text-[34px], …) sitting on
+   the same element overrides the 13px default. Unlayered, this rule would beat
+   every `@layer utilities` size and silently clamp every data number to 13px. */
+@layer components {
+  .text-data {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.8125rem; /* 13px default — used when no size utility is set */
+    letter-spacing: -0.01em;
+  }
+}
+
+/* ---------- Docked action bar ----------
+   A Save/Next-style bar pinned just above the tab bar, shared across the
+   mock-phone portals. It uses position: fixed (NOT sticky): the mock phone's
+   `zoom` transform breaks sticky bottom-offset math and floats the bar in
+   mid-screen. `.app-shell` sets a transform, so it — not the window — is the
+   containing block, and left/right resolve to the phone's edges. `bottom`
+   clears the ~64px tab bar. Screens that use it add matching bottom padding
+   (pb-24) so the last field isn't hidden behind the bar. */
+.action-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  z-index: 20;
 }
 
 /* ---------- Surfaces ----------
@@ -455,7 +476,9 @@ button.card:active {
     place-items: safe center;
     min-height: 100dvh;
     padding: 24px;
-    background: #ffffff;
+    /* Soft, theme-aware matte around the phone frame — not glaring white, and
+       no longer stuck white in dark mode. */
+    background: var(--surface-2);
   }
 
   /* ---------- iPhone 16 Pro frame ----------

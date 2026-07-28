@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { ConfirmDialog, Modal } from "@/components/ui/confirm-dialog";
 import type { VendorStatus } from "@/lib/vendor-status";
+import { cn } from "@/lib/utils/cn";
 import {
   deleteVendorAction,
   resetVendorPasswordAction,
@@ -95,17 +96,32 @@ export function VendorRowActions({
     }
   };
 
-  const btn =
-    "press grid size-9 place-items-center rounded-full bg-surface-2 text-muted hover:text-ink disabled:opacity-50";
+  // Base chip + a per-action colour, shared with the other admin row controls:
+  // blue = edit, violet = view/secondary, green = enable, orange = disable,
+  // red = delete.
+  const base =
+    "press grid size-9 place-items-center rounded-full bg-surface-2 transition-colors disabled:opacity-50";
+  const tone = {
+    blue: "text-blue hover:bg-blue/15",
+    violet: "text-violet-500 hover:bg-violet-500/15",
+    green: "text-green hover:bg-green/15",
+    accent: "text-accent hover:bg-accent/15",
+    deal: "text-deal hover:bg-deal/15",
+  } as const;
 
   return (
     <div className="flex items-center gap-1.5">
-      <Link href={`/admin/vendors/${id}`} className={btn} title="View" aria-label="View vendor">
+      <Link
+        href={`/admin/vendors/${id}`}
+        className={cn(base, tone.violet)}
+        title="View"
+        aria-label="View vendor"
+      >
         <Eye className="size-4" />
       </Link>
       <Link
         href={`/admin/vendors/${id}/edit`}
-        className={btn}
+        className={cn(base, tone.blue)}
         title="Edit"
         aria-label="Edit vendor"
       >
@@ -113,7 +129,7 @@ export function VendorRowActions({
       </Link>
       <button
         type="button"
-        className={btn}
+        className={cn(base, enabled ? tone.accent : tone.green)}
         disabled={pending}
         title={enabled ? "Disable" : "Enable"}
         aria-label={enabled ? "Disable vendor" : "Enable vendor"}
@@ -123,7 +139,7 @@ export function VendorRowActions({
       </button>
       <button
         type="button"
-        className={btn}
+        className={cn(base, tone.violet)}
         disabled={pending}
         title="Reset password"
         aria-label="Reset vendor password"
@@ -133,7 +149,7 @@ export function VendorRowActions({
       </button>
       <button
         type="button"
-        className={`${btn} hover:bg-deal/10 hover:text-deal`}
+        className={cn(base, tone.deal)}
         disabled={pending}
         title="Delete"
         aria-label="Delete vendor"

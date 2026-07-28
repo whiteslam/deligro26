@@ -12,19 +12,22 @@ export function ProfileAccountRows({ summary }: { summary: ProfileSummary }) {
     <div className="relative">
       <div className="divide-y divide-line">
         <EditRow
-          icon={<User className="size-5" />}
+          icon={<User className="size-[18px]" />}
+          tone="bg-blue/12 text-blue"
           value={summary.name}
           onEdit={() => setEditField("name")}
         />
         {summary.phone ? (
           <EditRow
-            icon={<Phone className="size-5" />}
+            icon={<Phone className="size-[18px]" />}
+            tone="bg-green/12 text-green"
             value={summary.phone}
             onEdit={() => setEditField("phone")}
           />
         ) : (
           <EditRow
-            icon={<Phone className="size-5" />}
+            icon={<Phone className="size-[18px]" />}
+            tone="bg-green/12 text-green"
             value="Add phone number"
             muted
             onEdit={() => setEditField("phone")}
@@ -50,11 +53,13 @@ export function ProfileAccountRows({ summary }: { summary: ProfileSummary }) {
 
 function EditRow({
   icon,
+  tone,
   value,
   onEdit,
   muted,
 }: {
   icon: React.ReactNode;
+  tone: string;
   value: string;
   onEdit: () => void;
   muted?: boolean;
@@ -63,9 +68,13 @@ function EditRow({
     <button
       type="button"
       onClick={onEdit}
-      className="press flex w-full items-center gap-3 py-3.5 text-left"
+      className="press flex w-full items-center gap-3 py-3 text-left"
     >
-      <span className="shrink-0 text-ink">{icon}</span>
+      <span
+        className={`grid size-9 shrink-0 place-items-center rounded-xl ${tone}`}
+      >
+        {icon}
+      </span>
       <span
         className={`min-w-0 flex-1 truncate text-[15px] font-medium${
           muted ? " text-muted" : ""

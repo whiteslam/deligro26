@@ -1,5 +1,15 @@
 import { cn } from "@/lib/utils/cn";
 
+/** Toned icon badges, shared with the rest of the app's coloured icons. */
+const TONES = {
+  muted: "bg-surface-2 text-muted",
+  accent: "bg-accent/12 text-accent",
+  green: "bg-green/12 text-green",
+  blue: "bg-blue/12 text-blue",
+  deal: "bg-deal/12 text-deal",
+  violet: "bg-violet-500/15 text-violet-500",
+} as const;
+
 /**
  * P3 — Design the empty state first. Every empty state is an invitation,
  * never a shrug.
@@ -10,12 +20,14 @@ export function EmptyState({
   description,
   action,
   className,
+  tone = "muted",
 }: {
   icon?: React.ReactNode;
   title: string;
   description?: string;
   action?: React.ReactNode;
   className?: string;
+  tone?: keyof typeof TONES;
 }) {
   return (
     <div
@@ -25,7 +37,12 @@ export function EmptyState({
       )}
     >
       {icon ? (
-        <div className="mb-4 grid size-16 place-items-center rounded-2xl bg-surface-2 text-muted">
+        <div
+          className={cn(
+            "mb-4 grid size-16 place-items-center rounded-2xl",
+            TONES[tone]
+          )}
+        >
           {icon}
         </div>
       ) : null}

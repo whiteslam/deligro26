@@ -55,6 +55,7 @@ export default async function OrdersPage() {
         <EmptyState
           className="mt-12"
           icon={<ReceiptText className="size-7" />}
+          tone="violet"
           title="No orders yet"
           description="Your orders will appear here — track live and reorder in a tap."
           action={
