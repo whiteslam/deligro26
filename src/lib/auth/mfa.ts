@@ -6,16 +6,16 @@ import type { Role } from "@/lib/auth";
 
 /**
  * Roles for which MFA is MANDATORY — enforced on every portal entry, cannot be
- * disabled or opted out of. Admin only.
+ * disabled or opted out of. Currently none: admin MFA is opt-in (see below).
  */
-export const MFA_REQUIRED_ROLES: readonly Role[] = ["admin"];
+export const MFA_REQUIRED_ROLES: readonly Role[] = [];
 
 /**
  * Roles for which MFA is OPTIONAL — the operator opts in from their settings.
  * Once enrolled they are challenged on entry like a required role; if they
  * never enroll (or later disable it) they are let in at aal1.
  */
-export const MFA_OPTIONAL_ROLES: readonly Role[] = ["restaurant", "driver"];
+export const MFA_OPTIONAL_ROLES: readonly Role[] = ["admin", "restaurant", "driver"];
 
 export function roleNeedsMfa(role: Role): boolean {
   return (MFA_REQUIRED_ROLES as readonly string[]).includes(role);

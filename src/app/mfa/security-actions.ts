@@ -16,6 +16,11 @@ export interface MfaActionResult {
   error?: string;
 }
 
+/** Where to revalidate after an MFA change — each operator has its own settings. */
+function settingsPathFor(role: string): string {
+  return role === "admin" ? "/admin/settings" : "/vendor/settings";
+}
+
 /**
  * Turn MFA OFF for an optional operator (vendor/restaurant/driver).
  *
@@ -74,7 +79,7 @@ export async function disableMfaAction(
     return { ok: false, error: "Couldn't disable MFA. Try again." };
   }
 
-  revalidatePath("/vendor/settings");
+  revalidatePath(settingsPathFor(profile.role));
   return { ok: true };
 }
 
@@ -100,7 +105,7 @@ export async function generateRecoveryCodesAction(): Promise<
 
   try {
     const codes = await generateRecoveryCodes(profile.id);
-    revalidatePath("/vendor/settings");
+    revalidatePath(settingsPathFor(profile.role));
     return { ok: true, codes };
   } catch {
     return { ok: false, error: "Couldn't generate recovery codes. Try again." };

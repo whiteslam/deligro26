@@ -8,15 +8,22 @@ import {
   ArrowRight,
   Check,
   Copy,
+  Download,
+  FileSpreadsheet,
+  ImageIcon,
   Loader2,
   Plus,
   Save,
   Trash2,
+  Upload,
 } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Field, Toggle, fieldCls, labelCls } from "@/components/ui/field";
 import { Modal } from "@/components/ui/confirm-dialog";
 import { MapPicker } from "@/components/location/map-picker";
+import { PhoneOtpVerify } from "@/components/admin/phone-otp-verify";
+import { DISH_CATEGORIES } from "@/lib/menu-categories";
 import { isMapsConfigured } from "@/lib/maps/config";
 import type {
   VendorDraftData,
@@ -28,10 +35,33 @@ import {
   createCategoryInlineAction,
 } from "../actions";
 
-export const TC_VERSION = "2026-07-v1";
+export const TC_VERSION = "2026-07-v2";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** A time-input variant that can shrink inside a 2-col grid without overflowing
+ *  (native time controls have a wide intrinsic min-width; min-w-0 lets it flex). */
+const timeCls =
+  "w-full min-w-0 rounded-xl bg-surface-2 px-3 py-3 text-[15px] text-ink outline-none focus:ring-2 focus:ring-accent/30";
+
+/** Verify the vendor's mobile via the admin verify-phone route (no session mint). */
+async function verifyWizardPhone(
+  phone: string,
+  code: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch("/api/admin/vendors/verify-phone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, code }),
+    });
+    const data = await res.json();
+    return { ok: res.ok && data.ok === true, error: data.error };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
 
 const STEPS = [
   "Basic info",
@@ -228,12 +258,12 @@ export function RegistrationWizard({
       {step === 2 ? <LocationStep data={data} update={update} /> : null}
       {step === 3 ? <PaymentStep data={data} update={update} /> : null}
       {step === 4 ? <LegalStep data={data} update={update} /> : null}
-      {step === 5 ? <MenuStep data={data} update={update} cats={cats} /> : null}
+      {step === 5 ? <MenuStep data={data} update={update} /> : null}
       {step === 6 ? <TermsStep data={data} update={update} /> : null}
       {step === 7 ? <ReviewStep data={data} goTo={setStep} /> : null}
 
-      {/* Action footer */}
-      <div className="sticky bottom-[84px] z-20 -mx-4 flex items-center gap-2 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur">
+      {/* Action footer — three evenly balanced controls (Back · Draft · Next). */}
+      <div className="sticky bottom-[84px] z-20 -mx-4 flex items-center justify-between gap-2 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur">
         {step > 0 ? (
           <Button type="button" variant="secondary" size="sm" onClick={goPrev}>
             <ArrowLeft className="size-4" /> Back
@@ -255,7 +285,6 @@ export function RegistrationWizard({
         >
           <Save className="size-4" /> Draft
         </Button>
-        <div className="flex-1" />
         {onReview ? (
           <Button type="button" size="sm" onClick={submit} disabled={submitting}>
             {submitting ? (
@@ -283,7 +312,7 @@ export function RegistrationWizard({
           Share this one-time login password now — it won&apos;t be shown again.
         </p>
         <div className="mt-3 flex items-center gap-2 rounded-xl bg-surface-2 p-2.5">
-          <code className="text-data flex-1 truncate px-1 text-[15px] font-semibold text-ink">
+          <code className="text-data flex-1 break-all px-1 text-[15px] font-semibold text-ink">
             {result?.password}
           </code>
           <button
@@ -350,7 +379,8 @@ function BasicStep({ data, update }: StepProps) {
             className={fieldCls}
             inputMode="tel"
             value={data.mobile ?? ""}
-            onChange={(e) => update({ mobile: e.target.value })}
+            // Editing the number invalidates any prior OTP verification.
+            onChange={(e) => update({ mobile: e.target.value, phoneVerified: false })}
           />
         </Field>
         <Field label="Alt. mobile">
@@ -361,6 +391,18 @@ function BasicStep({ data, update }: StepProps) {
             onChange={(e) => update({ altMobile: e.target.value })}
           />
         </Field>
+      </div>
+      <div className="-mt-1 flex items-center justify-between gap-2">
+        <p className="text-[11px] text-muted">
+          Verify the mobile now, or later from the vendor&apos;s Edit screen.
+        </p>
+        <PhoneOtpVerify
+          phone={data.mobile ?? ""}
+          verified={data.phoneVerified ?? false}
+          disabled={!data.mobile?.trim()}
+          onVerified={() => update({ phoneVerified: true })}
+          verify={verifyWizardPhone}
+        />
       </div>
       <Field label="Email" required>
         <input
@@ -388,19 +430,100 @@ function BasicStep({ data, update }: StepProps) {
           />
         </Field>
       </div>
-      <Field label="Logo image URL">
-        <input
-          className={fieldCls}
-          placeholder="https://…"
-          value={data.logoUrl ?? ""}
-          onChange={(e) => update({ logoUrl: e.target.value })}
-        />
-      </Field>
+      <LogoUpload data={data} update={update} />
       <p className="text-xs text-muted">
         The password isn&apos;t stored in the draft — re-enter it (or leave blank
-        to auto-generate) before creating the vendor.
+        to auto-generate) before creating the vendor. It&apos;s shown once on
+        creation and stays available on the Edit screen.
       </p>
     </Card>
+  );
+}
+
+function LogoUpload({ data, update }: StepProps) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/admin/vendors/logo", {
+        method: "POST",
+        body: form,
+      });
+      const json = await res.json();
+      if (!res.ok || !json.url) {
+        setError(
+          json.error === "too_large"
+            ? "Image is too large (max 5 MB)."
+            : json.error === "invalid_type"
+              ? "Use a JPG, PNG or WebP image."
+              : "Upload failed. Try again."
+        );
+        return;
+      }
+      update({ logoUrl: json.url });
+    } catch {
+      setError("Upload failed. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <span className={labelCls}>Shop logo</span>
+      <div className="flex items-center gap-3">
+        <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-surface-2 text-muted">
+          {data.logoUrl ? (
+            <Image
+              src={data.logoUrl}
+              alt="Logo preview"
+              width={64}
+              height={64}
+              className="size-16 object-cover"
+              unoptimized
+            />
+          ) : (
+            <ImageIcon className="size-6" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <label className="press inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-accent-soft px-3.5 py-2 text-xs font-bold text-accent">
+            {busy ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Upload className="size-3.5" />
+            )}
+            {data.logoUrl ? "Replace logo" : "Upload logo"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={onFile}
+              disabled={busy}
+            />
+          </label>
+          {data.logoUrl ? (
+            <button
+              type="button"
+              onClick={() => update({ logoUrl: undefined })}
+              className="press ml-2 text-xs font-semibold text-muted hover:text-deal"
+            >
+              Remove
+            </button>
+          ) : null}
+          <p className="mt-1 text-[11px] text-muted">JPG, PNG or WebP · up to 5 MB.</p>
+        </div>
+      </div>
+      {error ? <p className="text-xs font-medium text-deal">{error}</p> : null}
+    </div>
   );
 }
 
@@ -471,10 +594,10 @@ function BusinessStep({
           onChange={(e) => update({ description: e.target.value })}
         />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         <Field label="Opening time">
           <input
-            className={fieldCls}
+            className={timeCls}
             type="time"
             value={data.openingTime ?? ""}
             onChange={(e) => update({ openingTime: e.target.value })}
@@ -482,7 +605,7 @@ function BusinessStep({
         </Field>
         <Field label="Closing time">
           <input
-            className={fieldCls}
+            className={timeCls}
             type="time"
             value={data.closingTime ?? ""}
             onChange={(e) => update({ closingTime: e.target.value })}
@@ -687,11 +810,7 @@ function LegalStep({ data, update }: StepProps) {
   );
 }
 
-function MenuStep({
-  data,
-  update,
-  cats,
-}: StepProps & { cats: string[] }) {
+function MenuStep({ data, update }: StepProps) {
   const items = data.menuItems ?? [];
   const setItem = (i: number, patch: Partial<DraftMenuItem>) =>
     update({ menuItems: items.map((m, idx) => (idx === i ? { ...m, ...patch } : m)) });
@@ -699,7 +818,7 @@ function MenuStep({
     update({
       menuItems: [
         ...items,
-        { name: "", price: 0, veg: true, available: true, category: cats[0] ?? null },
+        { name: "", price: 0, veg: true, available: true, category: null },
       ],
     });
   const removeItem = (i: number) =>
@@ -708,8 +827,18 @@ function MenuStep({
   return (
     <Card>
       <p className="text-xs text-muted">
-        Add a few dishes now, or skip and manage the full menu later.
+        Add a few dishes now, or skip and manage the full menu later. Category
+        here is the dish section (e.g. Starters, Desserts) — not the shop type.
       </p>
+
+      <MenuBulkImport data={data} update={update} />
+
+      <datalist id="dish-categories">
+        {DISH_CATEGORIES.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
+
       {items.length === 0 ? (
         <p className="rounded-xl bg-surface-2 px-3.5 py-4 text-center text-sm text-muted">
           No items yet.
@@ -745,18 +874,13 @@ function MenuStep({
                     value={m.price}
                     onChange={(e) => setItem(i, { price: Number(e.target.value) })}
                   />
-                  <select
+                  <input
                     className={fieldCls}
+                    list="dish-categories"
+                    placeholder="Dish category"
                     value={m.category ?? ""}
                     onChange={(e) => setItem(i, { category: e.target.value || null })}
-                  >
-                    <option value="">No category</option>
-                    {cats.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -792,23 +916,190 @@ function MenuStep({
   );
 }
 
+/** Column order for the wizard menu template (also the keys read back). */
+const MENU_COLUMNS = ["Name", "Category", "Description", "Price", "Veg (Yes/No)", "Available (Yes/No)"];
+
+function menuTruthy(v: unknown, fallback = true): boolean {
+  const s = String(v ?? "").trim().toLowerCase();
+  if (!s) return fallback;
+  return /^(y|yes|true|1|veg|available|on)$/.test(s);
+}
+
+function menuNumber(v: unknown): number {
+  const s = String(v ?? "").replace(/[^0-9.]/g, "");
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Bulk-add dishes from an .xlsx sheet straight into the draft (no DB yet). */
+function MenuBulkImport({ data, update }: StepProps) {
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function downloadTemplate() {
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.aoa_to_sheet([
+      MENU_COLUMNS,
+      ["Paneer Tikka", "Starters", "Char-grilled", 220, "Yes", "Yes"],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Menu");
+    XLSX.writeFile(wb, "menu-template.xlsx");
+  }
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setNote(null);
+    setBusy(true);
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+
+      const parsed: DraftMenuItem[] = raw
+        .map((r) => ({
+          name: String(r["Name"] ?? "").trim(),
+          category: String(r["Category"] ?? "").trim() || null,
+          description: String(r["Description"] ?? "").trim() || null,
+          price: menuNumber(r["Price"]),
+          veg: menuTruthy(r["Veg (Yes/No)"], true),
+          available: menuTruthy(r["Available (Yes/No)"], true),
+        }))
+        .filter((m) => m.name.length > 0);
+
+      if (parsed.length === 0) {
+        setNote("No named rows found in that sheet.");
+        return;
+      }
+      update({ menuItems: [...(data.menuItems ?? []), ...parsed] });
+      setNote(`Added ${parsed.length} item${parsed.length === 1 ? "" : "s"} from the sheet.`);
+    } catch {
+      setNote("Couldn't read that file. Use the .xlsx template.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-dashed border-line p-3">
+      <div className="flex items-center gap-2">
+        <FileSpreadsheet className="size-4 text-accent" />
+        <span className="text-xs font-semibold text-ink">Bulk upload (Excel)</span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="secondary" onClick={downloadTemplate}>
+          <Download className="size-4" /> Template
+        </Button>
+        <label className="press inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-accent-soft px-3.5 py-2 text-xs font-bold text-accent">
+          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+          Upload .xlsx
+          <input
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={onFile}
+            disabled={busy}
+          />
+        </label>
+      </div>
+      {note ? <p className="mt-2 text-[11px] font-medium text-muted">{note}</p> : null}
+    </div>
+  );
+}
+
+function LegalClause({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="font-semibold text-ink">
+        {n}. {title}
+      </p>
+      <p className="mt-0.5">{children}</p>
+    </div>
+  );
+}
+
 function TermsStep({ data, update }: StepProps) {
   return (
     <Card>
-      <h2 className="text-heading text-[15px]">Vendor agreement</h2>
-      <div className="max-h-48 overflow-y-auto rounded-xl bg-surface-2 p-3 text-xs leading-relaxed text-muted">
-        <p>
-          By onboarding to the platform, the vendor agrees to: honour listed
-          prices and availability; prepare orders promptly and hygienically;
-          accept the stated admin commission on each order; keep licences (FSSAI,
-          GST as applicable) valid; and comply with platform policies on refunds,
-          cancellations and customer conduct. The platform may suspend or remove a
-          vendor for repeated violations. Payouts are settled to the payment
-          details provided, net of commission and applicable charges.
+      <div>
+        <h2 className="text-heading text-[15px]">Vendor Partner Agreement</h2>
+        <p className="mt-0.5 text-xs text-muted">
+          Version {TC_VERSION} · This Agreement is entered into between Deligro
+          (&quot;the Platform&quot;) and the vendor named in this registration
+          (&quot;the Vendor&quot;).
         </p>
-        <p className="mt-2">Agreement version {TC_VERSION}.</p>
       </div>
-      <label className="flex items-start gap-2.5 rounded-xl bg-surface-2 px-3.5 py-3">
+      <div className="max-h-72 space-y-3 overflow-y-auto rounded-xl border border-line bg-surface-2 p-3.5 text-xs leading-relaxed text-muted">
+        <LegalClause n={1} title="Appointment & Scope">
+          The Vendor is onboarded as an independent partner to list and sell food
+          and beverage items through the Platform. Nothing in this Agreement
+          creates an employment, partnership, agency, or joint-venture
+          relationship between the parties.
+        </LegalClause>
+        <LegalClause n={2} title="Listings, Pricing & Availability">
+          The Vendor warrants that all menu items, prices, taxes, images, and
+          availability it publishes are accurate and current, and undertakes to
+          honour every order placed at the listed price and to keep unavailable
+          items marked as such.
+        </LegalClause>
+        <LegalClause n={3} title="Food Safety & Compliance">
+          The Vendor shall prepare, package, and store all items hygienically and
+          in compliance with the Food Safety and Standards Act, 2006, and all
+          applicable laws. The Vendor shall hold and keep valid a FSSAI licence,
+          GST registration (where applicable), and any other statutory permits,
+          and shall furnish proof on request.
+        </LegalClause>
+        <LegalClause n={4} title="Commission & Settlement">
+          The Vendor authorises the Platform to deduct the agreed commission (as
+          recorded on this registration) plus applicable taxes and payment-gateway
+          charges from the value of each order. Net payouts are remitted to the
+          bank account or UPI ID provided, on the Platform&apos;s standard
+          settlement cycle.
+        </LegalClause>
+        <LegalClause n={5} title="Orders, Cancellations & Refunds">
+          The Vendor agrees to accept and prepare confirmed orders promptly and to
+          abide by the Platform&apos;s cancellation and refund policies. Refunds
+          arising from Vendor error, delay, or quality issues may be recovered from
+          the Vendor&apos;s settlement.
+        </LegalClause>
+        <LegalClause n={6} title="Conduct & Quality">
+          The Vendor shall deal fairly and professionally with customers and
+          delivery partners, and shall not engage in fraudulent, unsafe, or
+          discriminatory conduct. Repeated quality complaints may affect the
+          Vendor&apos;s visibility on the Platform.
+        </LegalClause>
+        <LegalClause n={7} title="Suspension & Termination">
+          The Platform may suspend or terminate the Vendor&apos;s account, with or
+          without notice, for breach of this Agreement, statutory
+          non-compliance, or conduct that harms customers or the Platform&apos;s
+          reputation. Either party may terminate on written notice; sums accrued up
+          to termination remain payable.
+        </LegalClause>
+        <LegalClause n={8} title="Liability & Indemnity">
+          The Vendor is solely responsible for the quality, safety, and legality of
+          its products and shall indemnify the Platform against claims, penalties,
+          or losses arising from the Vendor&apos;s items, acts, or omissions.
+        </LegalClause>
+        <LegalClause n={9} title="Data & Confidentiality">
+          Each party shall keep the other&apos;s non-public information
+          confidential and process customer data only as needed to fulfil orders
+          and in line with the Platform&apos;s privacy policy and applicable data
+          protection law.
+        </LegalClause>
+        <LegalClause n={10} title="Governing Law">
+          This Agreement is governed by the laws of India, and the courts at the
+          Platform&apos;s registered office shall have exclusive jurisdiction.
+        </LegalClause>
+        <p className="pt-1 text-[11px]">
+          Acceptance is recorded with the operator&apos;s identity, a timestamp,
+          and this version number for audit.
+        </p>
+      </div>
+      <label className="flex items-start gap-2.5 rounded-xl border border-line bg-surface-2 px-3.5 py-3">
         <input
           type="checkbox"
           checked={data.tcAccepted ?? false}
@@ -821,7 +1112,8 @@ function TermsStep({ data, update }: StepProps) {
           className="mt-0.5 size-5 shrink-0 accent-accent"
         />
         <span className="text-sm font-medium text-ink">
-          The vendor has read and accepted the terms &amp; conditions above.
+          I confirm the Vendor has read, understood, and agreed to this Vendor
+          Partner Agreement ({TC_VERSION}).
         </span>
       </label>
     </Card>

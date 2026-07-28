@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { getVendorDetail } from "@/lib/data-access/admin-vendors";
 import { listCategories } from "@/lib/data-access/vendor-categories";
 import { VendorForm } from "./vendor-form";
+import { VendorCredentials } from "./vendor-credentials";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,12 @@ export default async function EditVendorPage({
         <ArrowLeft className="size-4" /> {vendor.name}
       </Link>
       <h1 className="text-[22px] font-extrabold tracking-tight">Edit vendor</h1>
+      <VendorCredentials
+        id={vendor.id}
+        tempPassword={vendor.tempPassword}
+        ownerMobile={vendor.ownerMobile}
+        ownerPhoneVerified={vendor.ownerPhoneVerified}
+      />
       <VendorForm vendor={vendor} categories={categories.map((c) => c.name)} />
     </div>
   );

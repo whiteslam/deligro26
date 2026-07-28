@@ -9,6 +9,7 @@ import {
   setVendorStatus,
   deleteVendor,
   resetVendorPassword,
+  verifyVendorPhone,
   VENDOR_STATUSES,
   type VendorInput,
   type VendorStatus,
@@ -176,12 +177,38 @@ export async function resetVendorPasswordAction(
   if (!isSupabaseConfigured) return { ok: false, error: DEMO };
   try {
     const { tempPassword } = await resetVendorPassword(id);
+    revalidatePath(`/admin/vendors/${id}/edit`);
+    revalidatePath(`/admin/vendors/${id}`);
     return { ok: true, tempPassword };
   } catch {
     return {
       ok: false,
       error: "Couldn't reset the password. Check the vendor has a login account.",
     };
+  }
+}
+
+/**
+ * Confirm a vendor's mobile with an OTP code from the Edit screen. Returns the
+ * raw error code so the shared OTP widget can map it to a message. On success the
+ * phone is stored in E.164 and marked verified.
+ */
+export async function verifyVendorPhoneAction(
+  id: string,
+  phone: string,
+  code: string
+): Promise<{ ok: boolean; error?: string }> {
+  await requireRole("admin");
+  if (!isSupabaseConfigured) return { ok: false, error: "backend_not_configured" };
+  try {
+    const res = await verifyVendorPhone(id, phone, code);
+    if (res.ok) {
+      revalidatePath(`/admin/vendors/${id}/edit`);
+      revalidatePath(`/admin/vendors/${id}`);
+    }
+    return res;
+  } catch {
+    return { ok: false, error: "server_error" };
   }
 }
 

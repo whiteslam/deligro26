@@ -574,6 +574,9 @@ export async function verifyVendorPhone(
     .maybeSingle();
   const ownerId = (data as { owner_id: string } | null)?.owner_id;
 
+  // Store E.164 on the row + profile so OTP login resolves this owner. We don't
+  // touch auth.users.phone (globally unique — a customer's OTP number could
+  // collide); resolveUser() keys off profiles.phone.
   const admin = createAdminClient();
   await admin
     .from("restaurants")
@@ -581,9 +584,6 @@ export async function verifyVendorPhone(
     .eq("id", id);
   if (ownerId) {
     await admin.from("profiles").update({ phone: e164 }).eq("id", ownerId);
-    await admin.auth.admin
-      .updateUserById(ownerId, { phone: e164, phone_confirm: true })
-      .catch(() => {});
   }
 
   return { ok: true };

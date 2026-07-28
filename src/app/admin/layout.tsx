@@ -10,7 +10,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   await requireRole("admin");
-  await requireOperatorMfa("/admin", "admin"); // mandatory — cannot be disabled
+  await requireOperatorMfa("/admin", "admin"); // opt-in: challenges enrolled admins, lets others through
 
   return (
     <div className="device">

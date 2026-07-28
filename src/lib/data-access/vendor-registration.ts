@@ -276,12 +276,14 @@ export async function createVendorAccount(
   // vendor would land in a blank customer account instead of their portal).
   const mobileE164 = data.mobile ? toE164(data.mobile) : null;
 
+  // Note: we deliberately do NOT set `phone` on the auth user. OTP login resolves
+  // a vendor by `profiles.phone` (set below), and auth.users.phone is globally
+  // unique — a mobile previously used for a customer OTP would collide here and
+  // fail the whole account creation.
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email,
     password,
-    phone: mobileE164 ?? undefined,
     email_confirm: true,
-    phone_confirm: Boolean(mobileE164 && data.phoneVerified),
     user_metadata: { full_name: data.ownerName ?? data.shopName },
   });
   if (createErr) throw createErr;

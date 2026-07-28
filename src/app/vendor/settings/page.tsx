@@ -1,6 +1,6 @@
 import { getOwnedRestaurantFromDb } from "@/lib/data-access/restaurants";
 import { ShopLocationForm } from "@/components/vendor/shop-location-form";
-import { MfaSettings } from "@/components/vendor/mfa-settings";
+import { MfaSettings } from "@/components/auth/mfa-settings";
 import { getMfaStatus } from "@/lib/data-access/mfa";
 
 export const dynamic = "force-dynamic";

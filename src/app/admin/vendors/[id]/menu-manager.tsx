@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, fieldCls, labelCls } from "@/components/ui/field";
+import { DISH_CATEGORIES } from "@/lib/menu-categories";
 import type { AdminMenuItem, MenuItemInput } from "@/lib/data-access/admin-menu";
 import { ExcelImport } from "./excel-import";
 import {
@@ -192,19 +193,19 @@ export function MenuManager({
               />
             </Field>
           </div>
-          <Field label="Category">
-            <select
+          <Field label="Category" hint="Dish section, e.g. Starters — not the shop type.">
+            <input
               className={fieldCls}
+              list="dish-categories-manager"
+              placeholder="Dish category"
               value={form.category}
               onChange={(e) => set({ category: e.target.value })}
-            >
-              <option value="">No category</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
+            />
+            <datalist id="dish-categories-manager">
+              {DISH_CATEGORIES.map((c) => (
+                <option key={c} value={c} />
               ))}
-            </select>
+            </datalist>
           </Field>
           <Field label="Description">
             <textarea

@@ -16,16 +16,21 @@ import type { MfaStatus } from "@/lib/data-access/mfa";
 import {
   disableMfaAction,
   generateRecoveryCodesAction,
-} from "@/app/vendor/settings/security-actions";
-
-const NEXT = "/vendor/settings";
+} from "@/app/mfa/security-actions";
 
 /**
- * Vendor / restaurant MFA control. MFA is optional for these accounts: this is
- * the opt-in / opt-out surface. Enabling routes to the shared TOTP setup;
- * disabling requires a password re-check; recovery codes are shown once.
+ * Operator MFA control (admin / restaurant / driver). MFA is optional for these
+ * accounts: this is the opt-in / opt-out surface. Enabling routes to the shared
+ * TOTP setup; disabling requires a password re-check; recovery codes are shown
+ * once. `next` is where the setup flow returns to for the calling portal.
  */
-export function MfaSettings({ status }: { status: MfaStatus }) {
+export function MfaSettings({
+  status,
+  next = "/vendor/settings",
+}: {
+  status: MfaStatus;
+  next?: string;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -98,14 +103,14 @@ export function MfaSettings({ status }: { status: MfaStatus }) {
           <p className="mt-1 text-sm text-muted">
             {status.enrolled
               ? "Your account asks for an authenticator code at sign-in."
-              : "Add a second step at sign-in with an authenticator app. Optional for restaurant accounts."}
+              : "Add a second step at sign-in with an authenticator app. Optional — you can turn it off anytime."}
           </p>
         </div>
       </div>
 
       {/* Primary action: enable (link to setup) or disable (re-auth). */}
       {!status.enrolled ? (
-        <Link href={`/mfa/setup?next=${encodeURIComponent(NEXT)}`}>
+        <Link href={`/mfa/setup?next=${encodeURIComponent(next)}`}>
           <Button size="sm">
             <KeyRound className="size-4" /> Enable MFA
           </Button>
