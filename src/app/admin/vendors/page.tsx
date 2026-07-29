@@ -12,19 +12,14 @@ import { Button } from "@/components/ui/button";
 import {
   getVendorCounts,
   listVendors,
-  vendorsBackendReady,
   type VendorListItem,
   type VendorStatus,
 } from "@/lib/data-access/admin-vendors";
 import { listCategories } from "@/lib/data-access/vendor-categories";
-import {
-  AdminHero,
-  EmptyState,
-  PreviewNotice,
-  StatCard,
-} from "@/components/admin/admin-ui";
+import { AdminHero, EmptyState, StatCard } from "@/components/admin/admin-ui";
 import { VendorSearchBar } from "./vendor-search-bar";
 import { VendorRowActions } from "./vendor-row-actions";
+import { VendorPositionSelect } from "./vendor-position-select";
 
 export const dynamic = "force-dynamic";
 
@@ -65,10 +60,9 @@ export default async function AdminVendorsPage({
   const page = Math.max(1, Number(one(sp.page) ?? "1") || 1);
   const pageSize = 20;
 
-  const [counts, result, backendReady, categories] = await Promise.all([
+  const [counts, result, categories] = await Promise.all([
     getVendorCounts(),
     listVendors({ q, status, category, sort, page, pageSize }),
-    vendorsBackendReady(),
     listCategories(),
   ]);
 
@@ -100,16 +94,6 @@ export default async function AdminVendorsPage({
           </Link>
         }
       />
-
-      {!backendReady ? (
-        <PreviewNotice>
-          Preview mode — apply{" "}
-          <code className="rounded bg-surface-2 px-1 text-xs">
-            0017_vendor_management.sql
-          </code>{" "}
-          to load vendors.
-        </PreviewNotice>
-      ) : null}
 
       {/* Overview cards */}
       <div className="grid grid-cols-3 gap-2.5">
@@ -247,9 +231,12 @@ function VendorCard({ vendor: v }: { vendor: VendorListItem }) {
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3">
-        <span className="text-[11px] text-muted">
-          {dateFmt.format(new Date(v.createdAt))}
-        </span>
+        <div className="flex min-w-0 items-center gap-2">
+          <VendorPositionSelect id={v.id} position={v.sortPosition} />
+          <span className="truncate text-[11px] text-muted">
+            {dateFmt.format(new Date(v.createdAt))}
+          </span>
+        </div>
         <VendorRowActions id={v.id} name={v.name} status={v.status} />
       </div>
     </li>

@@ -141,6 +141,27 @@ export function RegistrationWizard({
     null
   );
   const [copied, setCopied] = useState(false);
+  // The draft id we last synced our form state from — lets us detect a resume.
+  const [hydratedFor, setHydratedFor] = useState<string | undefined>(
+    initialDraftId
+  );
+
+  // A client-side navigation from the drafts list to `?draft=<id>` stays on the
+  // same route segment, so React reuses this component and `useState`'s initial
+  // value goes stale — the resumed form would otherwise render blank. Re-sync
+  // from the incoming draft *during render* (React's supported "adjust state
+  // when a prop changes" pattern) whenever the URL points at a DIFFERENT draft
+  // than the one we're already editing. The `!== draftId` guard skips our own
+  // first save, which stamps the URL with the id we just created, so it never
+  // wipes in-memory fields like the password.
+  if (initialDraftId !== hydratedFor) {
+    setHydratedFor(initialDraftId);
+    if (initialDraftId && initialDraftId !== draftId) {
+      setData(initialData);
+      setStep(Math.min(initialStep, STEPS.length - 1));
+      setDraftId(initialDraftId);
+    }
+  }
 
   const update = (patch: Partial<WizardData>) =>
     setData((d) => ({ ...d, ...patch }));

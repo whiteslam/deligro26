@@ -5,6 +5,7 @@ import { VENDOR_STATUSES, type VendorStatus } from "@/lib/vendor-status";
 import { legiblePassword } from "@/lib/utils/password";
 import { toE164 } from "@/lib/auth/phone";
 import { checkOtp } from "@/lib/data-access/otp";
+import { getVendorPositions } from "@/lib/data-access/vendor-positions";
 
 // Re-exported so existing importers keep working; the canonical definition lives
 // in the client-safe @/lib/vendor-status module.
@@ -51,6 +52,8 @@ export interface VendorListItem {
   imageUrl: string | null;
   accentTint: string | null;
   createdAt: string;
+  /** Manual featured slot 1–10, or null when unranked (migration 0021). */
+  sortPosition: number | null;
 }
 
 export interface VendorDetail extends VendorListItem {
@@ -228,6 +231,8 @@ function mapListItem(row: VendorRow): VendorListItem {
     imageUrl: row.image_url,
     accentTint: row.accent_tint,
     createdAt: row.created_at,
+    // Filled in by the caller from the resilient positions read (0021).
+    sortPosition: null,
   };
 }
 
@@ -263,6 +268,8 @@ function mapDetail(row: VendorRow, menuItemCount: number): VendorDetail {
     menuItemCount,
     tempPassword: row.temp_password ?? null,
     ownerPhoneVerified: row.owner_phone_verified ?? false,
+    // Attached by getVendorDetail from the resilient positions read (0021).
+    sortPosition: null,
   };
 }
 
@@ -331,12 +338,12 @@ export async function listVendors(
     throw error;
   }
 
-  return {
-    items: (data as VendorRow[] | null ?? []).map(mapListItem),
-    total: count ?? 0,
-    page,
-    pageSize,
-  };
+  const items = (data as VendorRow[] | null ?? []).map(mapListItem);
+  // Attach manual featured slots (0021); resilient if the column is absent.
+  const { byId } = await getVendorPositions();
+  for (const item of items) item.sortPosition = byId.get(item.id) ?? null;
+
+  return { items, total: count ?? 0, page, pageSize };
 }
 
 /** The six dashboard cards. A failing sub-count reads as 0, never blank. */
@@ -400,7 +407,10 @@ export async function getVendorDetail(id: string): Promise<VendorDetail | null> 
     .select("id", { count: "exact", head: true })
     .eq("restaurant_id", id);
 
-  return mapDetail(data as VendorRow, count ?? 0);
+  const detail = mapDetail(data as VendorRow, count ?? 0);
+  const { byId } = await getVendorPositions();
+  detail.sortPosition = byId.get(id) ?? null;
+  return detail;
 }
 
 /** Input → DB columns. `updated_at` isn't on restaurants, so it isn't written. */

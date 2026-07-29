@@ -1,6 +1,10 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getMenuPopularity, type Popularity } from "@/lib/data-access/menu-popularity";
+import {
+  applyVendorOrder,
+  getVendorPositions,
+} from "@/lib/data-access/vendor-positions";
 import type { Cuisine, MenuItem, PriceTier, Restaurant } from "@/types";
 
 interface DbMenuItem {
@@ -171,7 +175,11 @@ export async function listRestaurantsFromDb(): Promise<Restaurant[]> {
       .overrideTypes<DbRestaurantRow[]>()
   );
 
-  return (rows ?? []).map((row) => mapRestaurant(row));
+  const list = (rows ?? []).map((row) => mapRestaurant(row));
+  // Float any admin-pinned shops (migration 0021) to the top in slot order;
+  // resilient — an un-migrated database just keeps the default order.
+  const { bySlug } = await getVendorPositions();
+  return applyVendorOrder(list, bySlug, (r) => r.slug);
 }
 
 /**

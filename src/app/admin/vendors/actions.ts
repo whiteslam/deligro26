@@ -21,6 +21,7 @@ import {
   deleteCategory,
   type VendorCategoryInput,
 } from "@/lib/data-access/vendor-categories";
+import { setVendorPosition } from "@/lib/data-access/vendor-positions";
 import {
   saveDraft,
   deleteDraft,
@@ -145,6 +146,17 @@ export async function setVendorStatusAction(id: string, status: VendorStatus) {
     return { ok: false, error: "Unknown status." };
   }
   return mutate(() => setVendorStatus(id, status));
+}
+
+/** Pin a vendor to a customer-feed slot 1–10, or null to unrank it. */
+export async function setVendorPositionAction(
+  id: string,
+  position: number | null
+): Promise<ActionResult> {
+  if (position != null && (position < 1 || position > 10)) {
+    return { ok: false, error: "Position must be between 1 and 10." };
+  }
+  return mutate(() => setVendorPosition(id, position));
 }
 
 export interface DeleteVendorActionResult extends ActionResult {
