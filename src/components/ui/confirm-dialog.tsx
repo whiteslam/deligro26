@@ -32,6 +32,13 @@ export function Modal({
   // Dialogs always open from a client interaction; guard SSR for safety.
   if (!open || typeof document === "undefined") return null;
 
+  // Portal into the phone shell, not <body>. `.app-shell` is the containing
+  // block for `position: fixed` descendants (it carries a transform — see
+  // globals.css), so a fixed overlay placed inside it stays within the phone
+  // frame on desktop instead of spanning the whole browser window. Fall back to
+  // <body> for non-framed layouts (e.g. the vendor dashboard).
+  const container = document.querySelector(".app-shell") ?? document.body;
+
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
@@ -48,7 +55,7 @@ export function Modal({
         <div className="mt-3">{children}</div>
       </div>
     </div>,
-    document.body
+    container
   );
 }
 
