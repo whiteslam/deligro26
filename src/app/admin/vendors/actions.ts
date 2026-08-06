@@ -26,6 +26,8 @@ import {
   saveDraft,
   deleteDraft,
   createVendorAccount,
+  lookupProfileByPhone,
+  attachVendorToExistingUser,
   EmailTakenError,
   PhoneTakenError,
   type VendorDraftData,
@@ -357,6 +359,13 @@ function validateFullDraft(d: VendorDraftData): string | null {
 export interface CreateVendorActionResult extends ActionResult {
   vendorId?: string;
   password?: string;
+  /**
+   * Set (with ok:false) when the mobile already belongs to a customer. The wizard
+   * prompts "also make them a vendor?" and, on Yes, calls convertCustomerToVendorAction.
+   */
+  existingCustomer?: { id: string; name: string };
+  /** True when the shop was attached to an existing account (no new password). */
+  existing?: boolean;
 }
 
 /**
@@ -372,6 +381,27 @@ export async function createVendorAccountAction(
 
   const problem = validateFullDraft(data);
   if (problem) return { ok: false, error: problem };
+
+  // If this mobile is already registered, decide how to proceed instead of
+  // failing on the unique-phone constraint:
+  //   - a customer  → offer conversion (the wizard shows a Yes/No popup)
+  //   - an operator → hard stop (can't re-home a vendor/driver/admin number)
+  if (data.mobile?.trim()) {
+    const owner = await lookupProfileByPhone(data.mobile);
+    if (owner && owner.role === "customer") {
+      return {
+        ok: false,
+        existingCustomer: { id: owner.id, name: owner.fullName ?? "this customer" },
+      };
+    }
+    if (owner) {
+      return {
+        ok: false,
+        error:
+          "This mobile number is already registered to another operator account. Use a different number.",
+      };
+    }
+  }
 
   try {
     const { restaurantId, password } = await createVendorAccount(data, profile.id);
@@ -406,5 +436,45 @@ export async function createVendorAccountAction(
       };
     }
     return { ok: false, error: "Couldn't create the vendor. Try again." };
+  }
+}
+
+/**
+ * "Stay both": the operator confirmed that the mobile's existing CUSTOMER should
+ * also become a vendor. Attach a shop to their existing account — no new login,
+ * their role stays `customer` so they keep shopping, and vendor access comes from
+ * owning the shop. Only reachable from the admin wizard's confirm popup.
+ */
+export async function convertCustomerToVendorAction(
+  data: VendorDraftData,
+  customerId: string,
+  draftId?: string
+): Promise<CreateVendorActionResult> {
+  const profile = await requireRole("admin");
+  if (!isSupabaseConfigured) return { ok: false, error: DEMO };
+
+  const problem = validateFullDraft(data);
+  if (problem) return { ok: false, error: problem };
+
+  try {
+    const { restaurantId } = await attachVendorToExistingUser(
+      customerId,
+      data,
+      profile.id
+    );
+    if (draftId) await deleteDraft(draftId).catch(() => {});
+    revalidatePath("/admin/vendors");
+    revalidatePath("/", "layout");
+    return { ok: true, vendorId: restaurantId, existing: true };
+  } catch (err) {
+    console.error("[convertCustomerToVendor] failed:", err);
+    const code = (err as { code?: string })?.code;
+    if (code === "23505") {
+      return {
+        ok: false,
+        error: "That shop name conflicts with an existing one. Try a different name.",
+      };
+    }
+    return { ok: false, error: "Couldn't add the vendor to that account. Try again." };
   }
 }

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/data-access/vendor-categories";
 import { legiblePassword } from "@/lib/utils/password";
 import { toE164 } from "@/lib/auth/phone";
+import type { Role } from "@/lib/auth";
 
 /**
  * The vendor registration wizard's backend (migration 0018). Drafts are stored
@@ -255,6 +256,154 @@ export interface CreateVendorResult {
 }
 
 /**
+ * Insert the restaurant row (status='pending') and any seed menu for `ownerId`,
+ * from a completed draft. Shared by both onboarding paths — creating a brand-new
+ * vendor account, and attaching a shop to an existing customer's account — so the
+ * shop is written identically either way. The caller owns the profile/role
+ * decision; this function only writes the shop.
+ */
+async function insertVendorRestaurant(
+  admin: AdminClient,
+  ownerId: string,
+  data: VendorDraftData,
+  operatorId: string
+): Promise<string> {
+  const email = data.email?.trim() ?? null;
+  const mobileE164 = data.mobile ? toE164(data.mobile) : null;
+
+  const slug = await uniqueRestaurantSlug(admin, slugify(data.shopName ?? ""));
+  const { data: rest, error: restErr } = await admin
+    .from("restaurants")
+    .insert({
+      owner_id: ownerId,
+      slug,
+      name: (data.shopName ?? "").trim(),
+      description: data.description ?? null,
+      category: data.category ?? null,
+      image_url: data.logoUrl ?? null,
+      is_open: true,
+      status: "pending",
+      owner_name: data.ownerName ?? null,
+      owner_mobile: mobileE164 ?? data.mobile ?? null,
+      owner_alt_mobile: data.altMobile ?? null,
+      owner_email: email,
+      owner_phone_verified: Boolean(mobileE164 && data.phoneVerified),
+      // The password is returned to the wizard once, for hand-off, and is not
+      // stored: Supabase Auth already holds the bcrypt hash, and a plaintext
+      // copy here would be a live credential sitting in a table row.
+      password_reset_at: new Date().toISOString(),
+      commission_pct: Math.min(100, Math.max(0, data.commissionPct ?? 0)),
+      min_order: Math.max(0, Math.trunc(data.minOrder ?? 0)),
+      delivery_available: data.deliveryAvailable ?? true,
+      self_pickup: data.selfPickup ?? false,
+      opening_time: data.openingTime || null,
+      closing_time: data.closingTime || null,
+      weekly_off: data.weeklyOff ?? [],
+      address: data.address ?? null,
+      landmark: data.landmark ?? null,
+      pincode: data.pincode ?? null,
+      lat: data.lat ?? null,
+      lng: data.lng ?? null,
+      upi_id: data.upiId ?? null,
+      bank_account_name: data.bankAccountName ?? null,
+      bank_name: data.bankName ?? null,
+      bank_account_number: data.bankAccountNumber ?? null,
+      bank_ifsc: data.bankIfsc ?? null,
+      fssai_number: data.fssaiNumber ?? null,
+      gst_number: data.gstNumber ?? null,
+      pan_number: data.panNumber ?? null,
+      tc_accepted_at: new Date().toISOString(),
+      tc_accepted_by: operatorId,
+      tc_version: data.tcVersion ?? null,
+    })
+    .select("id")
+    .single();
+  if (restErr) throw restErr;
+  const restaurantId = rest.id as string;
+
+  // Optional seed menu. Best-effort — a bad row shouldn't fail the whole
+  // onboarding; the operator can fix the menu from the vendor later.
+  const items = (data.menuItems ?? []).filter((m) => m.name?.trim());
+  if (items.length > 0) {
+    await admin.from("menu_items").insert(
+      items.map((m) => ({
+        restaurant_id: restaurantId,
+        name: m.name.trim(),
+        description: m.description ?? null,
+        price: Math.max(0, Math.trunc(m.price ?? 0)),
+        veg: m.veg ?? true,
+        available: m.available ?? true,
+        category: m.category ?? null,
+      }))
+    );
+  }
+
+  return restaurantId;
+}
+
+export interface PhoneOwner {
+  id: string;
+  role: Role;
+  fullName: string | null;
+}
+
+/**
+ * Who, if anyone, already owns this mobile number (in E.164). Used by the vendor
+ * wizard to offer "this number is a customer — also make them a vendor?" instead
+ * of failing on the unique-phone constraint. Service-role: it must see profiles
+ * other than the caller's.
+ */
+export async function lookupProfileByPhone(
+  phone: string
+): Promise<PhoneOwner | null> {
+  const e164 = toE164(phone) ?? phone.trim();
+  if (!e164) return null;
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("profiles")
+    .select("id, role, full_name")
+    .eq("phone", e164)
+    .maybeSingle();
+  if (!data) return null;
+  const row = data as { id: string; role: Role; full_name: string | null };
+  return { id: row.id, role: row.role, fullName: row.full_name };
+}
+
+/**
+ * Attach a shop to an EXISTING customer's account (the "stay both" path). Their
+ * profile is left as `customer` on purpose — order-insert RLS requires that role,
+ * so they keep the ability to shop — and vendor access is granted by restaurant
+ * ownership. No auth user is created (they already have one and sign in with
+ * their existing number via OTP), so there is no phone-uniqueness collision.
+ */
+export async function attachVendorToExistingUser(
+  customerId: string,
+  data: VendorDraftData,
+  operatorId: string
+): Promise<{ restaurantId: string }> {
+  const admin = createAdminClient();
+
+  // Defensive: only ever attach onto a real customer profile.
+  const { data: prof } = await admin
+    .from("profiles")
+    .select("id, role")
+    .eq("id", customerId)
+    .maybeSingle();
+  if (!prof) throw new Error("customer_not_found");
+  if ((prof as { role: Role }).role !== "customer") {
+    throw new Error("not_a_customer");
+  }
+
+  const restaurantId = await insertVendorRestaurant(
+    admin,
+    customerId,
+    data,
+    operatorId
+  );
+  return { restaurantId };
+}
+
+/**
  * Turn a completed draft into a live vendor: an auth user (role='restaurant'),
  * its restaurant row (status='pending'), and any menu items. Auth + SQL aren't
  * one transaction, so the auth user is created first and deleted again if the
@@ -324,72 +473,12 @@ export async function createVendorAccount(
     );
     if (profErr) throw profErr;
 
-    const slug = await uniqueRestaurantSlug(admin, slugify(data.shopName));
-    const { data: rest, error: restErr } = await admin
-      .from("restaurants")
-      .insert({
-        owner_id: ownerId,
-        slug,
-        name: data.shopName.trim(),
-        description: data.description ?? null,
-        category: data.category ?? null,
-        image_url: data.logoUrl ?? null,
-        is_open: true,
-        status: "pending",
-        owner_name: data.ownerName ?? null,
-        owner_mobile: mobileE164 ?? data.mobile ?? null,
-        owner_alt_mobile: data.altMobile ?? null,
-        owner_email: email,
-        owner_phone_verified: Boolean(mobileE164 && data.phoneVerified),
-        // The password is returned to the wizard once, for hand-off, and is not
-        // stored: Supabase Auth already holds the bcrypt hash, and a plaintext
-        // copy here would be a live credential sitting in a table row.
-        password_reset_at: new Date().toISOString(),
-        commission_pct: Math.min(100, Math.max(0, data.commissionPct ?? 0)),
-        min_order: Math.max(0, Math.trunc(data.minOrder ?? 0)),
-        delivery_available: data.deliveryAvailable ?? true,
-        self_pickup: data.selfPickup ?? false,
-        opening_time: data.openingTime || null,
-        closing_time: data.closingTime || null,
-        weekly_off: data.weeklyOff ?? [],
-        address: data.address ?? null,
-        landmark: data.landmark ?? null,
-        pincode: data.pincode ?? null,
-        lat: data.lat ?? null,
-        lng: data.lng ?? null,
-        upi_id: data.upiId ?? null,
-        bank_account_name: data.bankAccountName ?? null,
-        bank_name: data.bankName ?? null,
-        bank_account_number: data.bankAccountNumber ?? null,
-        bank_ifsc: data.bankIfsc ?? null,
-        fssai_number: data.fssaiNumber ?? null,
-        gst_number: data.gstNumber ?? null,
-        pan_number: data.panNumber ?? null,
-        tc_accepted_at: new Date().toISOString(),
-        tc_accepted_by: operatorId,
-        tc_version: data.tcVersion ?? null,
-      })
-      .select("id")
-      .single();
-    if (restErr) throw restErr;
-    const restaurantId = rest.id as string;
-
-    // Optional seed menu. Best-effort — a bad row shouldn't fail the whole
-    // onboarding; the operator can fix the menu from the vendor later.
-    const items = (data.menuItems ?? []).filter((m) => m.name?.trim());
-    if (items.length > 0) {
-      await admin.from("menu_items").insert(
-        items.map((m) => ({
-          restaurant_id: restaurantId,
-          name: m.name.trim(),
-          description: m.description ?? null,
-          price: Math.max(0, Math.trunc(m.price ?? 0)),
-          veg: m.veg ?? true,
-          available: m.available ?? true,
-          category: m.category ?? null,
-        }))
-      );
-    }
+    const restaurantId = await insertVendorRestaurant(
+      admin,
+      ownerId,
+      data,
+      operatorId
+    );
 
     return { restaurantId, ownerId, password };
   } catch (err) {

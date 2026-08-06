@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth";
+import { requireVendorAccess } from "@/lib/auth/vendor-access";
 import { updateMenuItemAvailability } from "@/lib/data-access/restaurants";
 
 export interface SetMenuAvailabilityResult {
@@ -18,7 +18,7 @@ export async function setMenuItemAvailability(input: {
   available: boolean;
   restaurantSlug?: string;
 }): Promise<SetMenuAvailabilityResult> {
-  await requireRole("restaurant");
+  await requireVendorAccess();
 
   const itemId = input.itemId?.trim();
   if (!itemId) return { ok: false, error: "Missing dish." };

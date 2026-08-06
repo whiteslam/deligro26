@@ -3,7 +3,7 @@ import {
   VendorBottomNav,
   VendorSidebar,
 } from "@/components/vendor/vendor-sidebar";
-import { requireRole } from "@/lib/auth";
+import { requireVendorAccess } from "@/lib/auth/vendor-access";
 import { requireOperatorMfa } from "@/lib/auth/mfa";
 import {
   listOwnedRestaurants,
@@ -16,7 +16,8 @@ export default async function RestaurantLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireRole("restaurant"); // vendor accounts only
+  // Vendor accounts OR any shop owner (a customer who also runs a shop).
+  await requireVendorAccess();
   // Optional for vendors: only challenged if they opted in from settings.
   await requireOperatorMfa("/vendor", "restaurant");
 

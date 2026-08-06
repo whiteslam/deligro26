@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { getProfile } from "@/lib/auth";
+import { hasVendorAccess } from "@/lib/auth/vendor-access";
 import {
   listOwnedRestaurants,
   setRestaurantOpen,
@@ -28,8 +29,9 @@ import {
 
 async function requireRestaurantRole() {
   const profile = await getProfile();
-  if (!profile || profile.role !== "restaurant") throw new Error("forbidden");
-  return profile;
+  // Restaurant role, admin, or any shop owner (customer who also runs a shop).
+  if (!(await hasVendorAccess(profile))) throw new Error("forbidden");
+  return profile!;
 }
 
 function revalidateVendorMenu() {

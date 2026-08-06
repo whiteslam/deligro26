@@ -1,6 +1,7 @@
 import { VendorMenuBoard } from "@/components/vendor/vendor-menu-board";
 import { VendorPageHeader } from "@/components/vendor/vendor-page-header";
 import { getProfile } from "@/lib/auth";
+import { hasVendorAccess } from "@/lib/auth/vendor-access";
 import { listOwnedMenuItems } from "@/lib/data-access/vendor-menu";
 import { resolveVendorRestaurant } from "@/lib/data-access/vendor-restaurant";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -20,7 +21,7 @@ export default async function RestaurantMenuPage() {
   }
 
   const profile = await getProfile();
-  if (profile?.role !== "restaurant") {
+  if (!(await hasVendorAccess(profile))) {
     return (
       <div className="space-y-6">
         <VendorPageHeader title="Menu" subtitle="Restaurant access required." />

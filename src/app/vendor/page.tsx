@@ -1,6 +1,7 @@
 import { VendorOrdersBoard } from "@/components/vendor/vendor-orders-board";
 import { VendorPageHeader } from "@/components/vendor/vendor-page-header";
 import { getProfile } from "@/lib/auth";
+import { hasVendorAccess } from "@/lib/auth/vendor-access";
 import {
   listKitchenOrders,
   listVendorOrderHistory,
@@ -24,7 +25,7 @@ export default async function VendorOrdersPage() {
   }
 
   const profile = await getProfile();
-  if (profile?.role !== "restaurant") {
+  if (!(await hasVendorAccess(profile))) {
     return (
       <div className="space-y-6">
         <VendorPageHeader

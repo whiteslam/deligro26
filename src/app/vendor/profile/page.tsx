@@ -1,6 +1,7 @@
 import { VendorProfileView } from "@/components/vendor/vendor-profile-view";
 import { VendorPageHeader } from "@/components/vendor/vendor-page-header";
 import { getProfile } from "@/lib/auth";
+import { hasVendorAccess } from "@/lib/auth/vendor-access";
 import { getVendorProfileSummary } from "@/lib/data-access/vendor-profile";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -19,7 +20,7 @@ export default async function VendorProfilePage() {
   }
 
   const role = await getProfile();
-  if (role?.role !== "restaurant") {
+  if (!(await hasVendorAccess(role))) {
     return (
       <div className="space-y-6">
         <VendorPageHeader

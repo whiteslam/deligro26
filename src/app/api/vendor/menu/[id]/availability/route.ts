@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { ownsAnyRestaurant } from "@/lib/auth/vendor-access";
 import { setMenuItemAvailable } from "@/lib/data-access/vendor-menu";
 
 /** PATCH /api/vendor/menu/:id/availability — owner toggles menu_items.available */
@@ -31,7 +32,12 @@ export async function PATCH(
     .eq("id", user.id)
     .single();
 
-  if (profile?.role !== "restaurant") {
+  const role = profile?.role;
+  if (
+    role !== "restaurant" &&
+    role !== "admin" &&
+    !(await ownsAnyRestaurant(user.id))
+  ) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

@@ -20,7 +20,7 @@ import {
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Field, Toggle, fieldCls, labelCls } from "@/components/ui/field";
-import { Modal } from "@/components/ui/confirm-dialog";
+import { Modal, ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { MapPicker } from "@/components/location/map-picker";
 import { PhoneOtpVerify } from "@/components/admin/phone-otp-verify";
 import { DISH_CATEGORIES } from "@/lib/menu-categories";
@@ -32,6 +32,7 @@ import type {
 import {
   saveDraftAction,
   createVendorAccountAction,
+  convertCustomerToVendorAction,
   createCategoryInlineAction,
 } from "../actions";
 
@@ -137,10 +138,19 @@ export function RegistrationWizard({
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ vendorId: string; password: string } | null>(
-    null
-  );
+  const [result, setResult] = useState<{
+    vendorId: string;
+    password?: string;
+    existing?: boolean;
+  } | null>(null);
   const [copied, setCopied] = useState(false);
+  // When the mobile is already a customer, the wizard asks whether to also make
+  // them a vendor (attaching a shop to their existing account) instead of failing.
+  const [confirmCustomer, setConfirmCustomer] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [converting, setConverting] = useState(false);
   // The draft id we last synced our form state from — lets us detect a resume.
   const [hydratedFor, setHydratedFor] = useState<string | undefined>(
     initialDraftId
@@ -222,11 +232,35 @@ export function RegistrationWizard({
     void _cpw;
     const res = await createVendorAccountAction(payload, draftId);
     setSubmitting(false);
+    // The mobile already belongs to a customer — ask before attaching a shop.
+    if (res.existingCustomer) {
+      setConfirmCustomer(res.existingCustomer);
+      return;
+    }
     if (!res.ok || !res.vendorId || !res.password) {
       setError(res.error ?? "Couldn't create the vendor.");
       return;
     }
     setResult({ vendorId: res.vendorId, password: res.password });
+  }
+
+  async function convertToVendor() {
+    if (!confirmCustomer) return;
+    setConverting(true);
+    const { confirmPassword: _cpw, ...payload } = data;
+    void _cpw;
+    const res = await convertCustomerToVendorAction(
+      payload,
+      confirmCustomer.id,
+      draftId
+    );
+    setConverting(false);
+    setConfirmCustomer(null);
+    if (!res.ok || !res.vendorId) {
+      setError(res.error ?? "Couldn't add the vendor to that account.");
+      return;
+    }
+    setResult({ vendorId: res.vendorId, existing: true });
   }
 
   async function addCategory(name: string) {
@@ -324,37 +358,66 @@ export function RegistrationWizard({
         )}
       </div>
 
+      {/* "Number is a customer — also make them a vendor?" */}
+      <ConfirmDialog
+        open={confirmCustomer !== null}
+        title="Number is already a customer"
+        message={
+          <>
+            <b className="text-ink">{confirmCustomer?.name}</b> is registered as a
+            customer with this number. Also make them a vendor? Their customer
+            account stays as-is and this shop is added to it — they keep shopping
+            and sign in to their shop with the same number.
+          </>
+        }
+        confirmLabel="Yes, add vendor"
+        cancelLabel="No"
+        busy={converting}
+        onConfirm={convertToVendor}
+        onClose={() => setConfirmCustomer(null)}
+      />
+
       {/* Completion */}
       <Modal
         open={result !== null}
         onClose={() => result && router.push(`/admin/vendors/${result.vendorId}`)}
-        title="Vendor created"
+        title={result?.existing ? "Vendor added" : "Vendor created"}
       >
-        <p className="text-sm text-muted">
-          The account is live with status <b className="text-ink">pending</b>.
-          Share this one-time login password now — it won&apos;t be shown again.
-        </p>
-        <div className="mt-3 flex items-center gap-2 rounded-xl bg-surface-2 p-2.5">
-          <code className="text-data flex-1 break-all px-1 text-[15px] font-semibold text-ink">
-            {result?.password}
-          </code>
-          <button
-            type="button"
-            onClick={async () => {
-              if (!result) return;
-              try {
-                await navigator.clipboard.writeText(result.password);
-                setCopied(true);
-              } catch {
-                /* clipboard blocked */
-              }
-            }}
-            className="press grid size-9 shrink-0 place-items-center rounded-lg bg-surface text-muted hover:text-ink"
-            aria-label="Copy password"
-          >
-            {copied ? <Check className="size-4 text-green" /> : <Copy className="size-4" />}
-          </button>
-        </div>
+        {result?.existing ? (
+          <p className="text-sm text-muted">
+            The shop is live with status <b className="text-ink">pending</b>, added
+            to the customer&apos;s existing account. They sign in with their
+            registered mobile number (OTP) — no new password needed.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-muted">
+              The account is live with status <b className="text-ink">pending</b>.
+              Share this one-time login password now — it won&apos;t be shown again.
+            </p>
+            <div className="mt-3 flex items-center gap-2 rounded-xl bg-surface-2 p-2.5">
+              <code className="text-data flex-1 break-all px-1 text-[15px] font-semibold text-ink">
+                {result?.password}
+              </code>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!result?.password) return;
+                  try {
+                    await navigator.clipboard.writeText(result.password);
+                    setCopied(true);
+                  } catch {
+                    /* clipboard blocked */
+                  }
+                }}
+                className="press grid size-9 shrink-0 place-items-center rounded-lg bg-surface text-muted hover:text-ink"
+                aria-label="Copy password"
+              >
+                {copied ? <Check className="size-4 text-green" /> : <Copy className="size-4" />}
+              </button>
+            </div>
+          </>
+        )}
         <div className="mt-4 flex justify-end">
           <Button
             size="sm"

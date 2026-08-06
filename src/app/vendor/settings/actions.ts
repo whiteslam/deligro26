@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth";
+import { requireVendorAccess } from "@/lib/auth/vendor-access";
 import { updateShopLocation } from "@/lib/data-access/restaurants";
 
 export interface SaveShopLocationResult {
@@ -15,7 +15,7 @@ export async function saveShopLocation(input: {
   lng: number;
   address: string;
 }): Promise<SaveShopLocationResult> {
-  await requireRole("restaurant");
+  await requireVendorAccess();
 
   if (!Number.isFinite(input.lat) || !Number.isFinite(input.lng)) {
     return { ok: false, error: "Drop a pin on the map first." };

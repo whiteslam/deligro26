@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getProfile } from "@/lib/auth";
+import { hasVendorAccess } from "@/lib/auth/vendor-access";
 import {
   listVendorOrderArchive,
   type VendorHistoryKind,
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
   }
 
   const profile = await getProfile();
-  if (profile?.role !== "restaurant") {
+  if (!(await hasVendorAccess(profile))) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
