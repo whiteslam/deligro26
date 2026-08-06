@@ -84,8 +84,11 @@ export interface VendorDetail extends VendorListItem {
   tcAcceptedAt: string | null;
   tcVersion: string | null;
   menuItemCount: number;
-  /** The last admin-issued one-time login password, for re-display in Edit. */
-  tempPassword: string | null;
+  /**
+   * When an admin last issued a one-time login password. The password itself is
+   * shown once, at generation, and never stored — see resetVendorPassword.
+   */
+  passwordResetAt: string | null;
   ownerPhoneVerified: boolean;
 }
 
@@ -152,7 +155,7 @@ const DETAIL_SELECT = `
   fssai_number, gst_number, pan_number,
   status, is_open, image_url, accent_tint,
   tc_accepted_at, tc_version, created_at,
-  temp_password, owner_phone_verified
+  password_reset_at, owner_phone_verified
 `;
 
 interface VendorRow {
@@ -195,7 +198,7 @@ interface VendorRow {
   tc_accepted_at?: string | null;
   tc_version?: string | null;
   created_at: string;
-  temp_password?: string | null;
+  password_reset_at?: string | null;
   owner_phone_verified?: boolean | null;
 }
 
@@ -266,7 +269,7 @@ function mapDetail(row: VendorRow, menuItemCount: number): VendorDetail {
     tcAcceptedAt: row.tc_accepted_at ?? null,
     tcVersion: row.tc_version ?? null,
     menuItemCount,
-    tempPassword: row.temp_password ?? null,
+    passwordResetAt: row.password_reset_at ?? null,
     ownerPhoneVerified: row.owner_phone_verified ?? false,
     // Attached by getVendorDetail from the resilient positions read (0021).
     sortPosition: null,
@@ -308,7 +311,9 @@ export async function listVendors(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  const supabase = await createClient();
+  // LIST_SELECT includes owner_mobile, which 0022 revokes from `authenticated`
+  // along with the rest of the vendor PII. Service-role; admin-gated upstream.
+  const supabase = createAdminClient();
   let query = supabase
     .from("restaurants")
     .select(LIST_SELECT, { count: "exact" });
@@ -389,7 +394,13 @@ export async function getVendorCounts(): Promise<VendorCounts> {
 }
 
 export async function getVendorDetail(id: string): Promise<VendorDetail | null> {
-  const supabase = await createClient();
+  // DETAIL_SELECT reaches the payout / KYC columns (bank account, IFSC, PAN,
+  // GST). Migration 0022 revokes column-level SELECT on those from `anon` and
+  // `authenticated` — `restaurants` is publicly readable by row (the storefront
+  // needs it) and RLS cannot filter columns, so privilege is the only lever.
+  // That means the cookie-bound client can no longer read them and this must go
+  // through the service role. The caller is already requireRole("admin")-gated.
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("restaurants")
     .select(DETAIL_SELECT)
@@ -446,7 +457,9 @@ function toRow(input: VendorInput) {
 }
 
 export async function updateVendor(id: string, input: VendorInput): Promise<void> {
-  const supabase = await createClient();
+  // Writes the payout / KYC columns, which 0022 revokes from `authenticated`
+  // (see getVendorDetail). Service-role; the calling action re-gates on admin.
+  const supabase = createAdminClient();
   const { error } = await supabase
     .from("restaurants")
     .update(toRow(input))
@@ -523,9 +536,16 @@ export interface ResetPasswordResult {
 
 /**
  * Reset a vendor's login password to a fresh legible one and return it, for the
- * operator to relay. The value is also persisted to `restaurants.temp_password`
- * so the Edit screen can re-show it (until the vendor sets their own). Service-
- * role, because it acts on the auth user.
+ * operator to relay. Service-role, because it acts on the auth user.
+ *
+ * The value is returned ONCE and is never persisted. It used to be written to
+ * `restaurants.temp_password` so the Edit screen could re-show it, which meant
+ * the row carried the vendor's live credential in plaintext — defeating the
+ * bcrypt hashing Supabase Auth does, and turning any DB backup, read-replica or
+ * over-broad policy into a set of working logins. Nothing ever cleared it
+ * either, despite the "temp" in the name. If an operator loses the value they
+ * press "Generate new password" again; that is cheap, and a rotated credential
+ * is the correct answer to a mislaid one.
  */
 export async function resetVendorPassword(
   id: string
@@ -548,8 +568,12 @@ export async function resetVendorPassword(
   });
   if (upErr) throw upErr;
 
-  // Remember it for re-display (best-effort — the reset itself already worked).
-  await admin.from("restaurants").update({ temp_password: password }).eq("id", id);
+  // Record THAT a reset happened, for the audit trail — never the secret.
+  // Best-effort: the reset itself already succeeded.
+  await admin
+    .from("restaurants")
+    .update({ password_reset_at: new Date().toISOString() })
+    .eq("id", id);
 
   return { tempPassword: password };
 }
@@ -593,7 +617,19 @@ export async function verifyVendorPhone(
     .update({ owner_mobile: e164, owner_phone_verified: true })
     .eq("id", id);
   if (ownerId) {
-    await admin.from("profiles").update({ phone: e164 }).eq("id", ownerId);
+    const { error: profErr } = await admin
+      .from("profiles")
+      .update({ phone: e164 })
+      .eq("id", ownerId);
+    // profiles.phone is globally unique (0005). Without this check a collision
+    // would be discarded and we'd report success while the number was never
+    // stored — leaving OTP login for this owner silently broken.
+    if (profErr) {
+      if ((profErr as { code?: string }).code === "23505") {
+        return { ok: false, error: "phone_taken" };
+      }
+      throw profErr;
+    }
   }
 
   return { ok: true };

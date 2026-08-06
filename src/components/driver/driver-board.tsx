@@ -35,12 +35,23 @@ export function DriverBoard({
   const { available, active, today } = initial;
   const [otp, setOtp] = useState("");
   const [otpError, setOtpError] = useState<string | null>(null);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
 
   function accept(orderId: string) {
     setBusyId(orderId);
+    setAcceptError(null);
     startTransition(async () => {
       try {
-        await acceptDeliveryAction(orderId);
+        const result = await acceptDeliveryAction(orderId);
+        if (result && !result.ok) {
+          setAcceptError(
+            result.error === "already_taken"
+              ? "Another rider just grabbed this order."
+              : "Couldn't accept the order. Try again."
+          );
+        }
+        // Refresh either way: on success the job becomes active; on a lost race
+        // it leaves the available pool.
         router.refresh();
       } finally {
         setBusyId(null);
@@ -243,7 +254,13 @@ export function DriverBoard({
             description="Hang tight — orders marked ready by kitchens appear here."
           />
         ) : (
-          <div className="space-y-3">
+          <>
+            {acceptError ? (
+              <p className="mb-3 rounded-xl bg-deal-soft px-3 py-2 text-sm font-medium text-deal">
+                {acceptError}
+              </p>
+            ) : null}
+            <div className="space-y-3">
             {available.map((job) => (
               <div key={job.id} className="card p-4">
                 <div className="flex items-center justify-between gap-2">
@@ -282,7 +299,8 @@ export function DriverBoard({
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          </>
         )}
       </section>
 

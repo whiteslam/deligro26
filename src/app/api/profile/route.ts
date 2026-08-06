@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { updateProfile } from "@/lib/data-access/profile";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 /** PATCH /api/profile — update name or phone for the signed-in user. */
 export async function PATCH(request: Request) {
@@ -17,7 +18,11 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  let body: { fullName?: string; phone?: string };
+  // A phone change now consumes an OTP, so this also bounds guessing at the code.
+  const limit = await rateLimit(`profile-update:${user.id}`, 20, 60_000);
+  if (!limit.ok) return tooManyRequests(limit);
+
+  let body: { fullName?: string; phone?: string; phoneOtp?: string };
   try {
     body = await request.json();
   } catch {
@@ -29,8 +34,16 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "server_error";
-    if (message === "invalid_name" || message === "invalid_phone") {
+    if (
+      message === "invalid_name" ||
+      message === "invalid_phone" ||
+      message === "otp_required" ||
+      message === "otp_invalid"
+    ) {
       return NextResponse.json({ error: message }, { status: 400 });
+    }
+    if (message === "phone_taken") {
+      return NextResponse.json({ error: "phone_taken" }, { status: 409 });
     }
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { listAddresses, createAddress } from "@/lib/data-access/addresses";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -9,6 +10,12 @@ async function requireUser() {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
+}
+
+/** Bound how fast one account can churn address rows. */
+async function throttle(userId: string, limit = 30): Promise<Response | null> {
+  const result = await rateLimit(`addresses:${userId}`, limit, 60_000);
+  return result.ok ? null : tooManyRequests(result);
 }
 
 /** GET /api/addresses — the signed-in user's saved addresses. */
@@ -25,7 +32,11 @@ export async function GET() {
 /** POST /api/addresses — add an address. */
 export async function POST(request: Request) {
   if (!isSupabaseConfigured) return NextResponse.json({ error: "backend_not_configured" }, { status: 503 });
-  if (!(await requireUser())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const user = await requireUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const limited = await throttle(user.id);
+  if (limited) return limited;
 
   let body: { label?: string; line?: string; lat?: number; lng?: number; isDefault?: boolean };
   try {

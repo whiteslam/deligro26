@@ -1,10 +1,23 @@
 import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createClient } from "@/lib/supabase/server";
 import { submitReview } from "@/lib/data-access/reviews";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 /** POST /api/reviews  { orderId, rating, comment? } */
 export async function POST(request: Request) {
   if (!isSupabaseConfigured) return NextResponse.json({ error: "backend_not_configured" }, { status: 503 });
+
+  // submitReview re-checks ownership; this only stops one account hammering the
+  // endpoint to probe which order ids exist.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    const limit = await rateLimit(`reviews:${user.id}`, 20, 60_000);
+    if (!limit.ok) return tooManyRequests(limit);
+  }
 
   let body: { orderId?: string; rating?: number; comment?: string };
   try {

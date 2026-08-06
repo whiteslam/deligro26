@@ -3,12 +3,19 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { toE164 } from "@/lib/auth/phone";
 import { createOtp } from "@/lib/data-access/otp";
 import { sendOtpSms } from "@/lib/sms/renflair";
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 /** POST /api/auth/otp/request  { phone } → sends a code via Renflair. */
 export async function POST(request: Request) {
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: "backend_not_configured" }, { status: 503 });
   }
+
+  // createOtp caps 6/hour per NUMBER, which does nothing about one client
+  // walking a list of numbers — each send costs real money at the SMS gateway,
+  // so cap the caller too (classic SMS-pumping / toll-fraud shape).
+  const ipLimit = await rateLimit(`otp-request-ip:${clientIp(request)}`, 15, 60 * 60_000);
+  if (!ipLimit.ok) return tooManyRequests(ipLimit);
 
   let body: { phone?: string };
   try {

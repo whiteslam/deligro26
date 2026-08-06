@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronDown, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { resolveLanding } from "@/lib/auth/landing";
 import { cn } from "@/lib/utils/cn";
 
 type Step = "phone" | "code";
@@ -106,12 +107,17 @@ export function OtpLogin({
         return;
       }
 
+      // Route by the account's real role, not a hardcoded "/". The destination
+      // is resolved once and reused for the MFA hop so the user lands in their
+      // own portal (a vendor → /vendor, never the customer shell).
+      const dest = await resolveLanding(next);
+
       const { data: aal } =
         await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if (aal?.currentLevel !== "aal2" && aal?.nextLevel === "aal2") {
-        router.push(`/mfa?next=${encodeURIComponent(next)}`);
+        router.push(`/mfa?next=${encodeURIComponent(dest)}`);
       } else {
-        router.push(next);
+        router.push(dest);
       }
       router.refresh();
     } catch {

@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { assertRealType } from "@/lib/utils/file-signature";
 
 /**
  * Vendor legal documents (migration 0019). The bucket is private, so every
@@ -52,11 +53,19 @@ const ALLOWED_MIME = new Set([
 ]);
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
+/** Extension for the storage key. */
 function extFor(mime: string, fileName: string): string {
   const fromName = fileName.includes(".") ? fileName.split(".").pop()! : "";
-  if (fromName && fromName.length <= 5) return fromName.toLowerCase();
+  // The filename is attacker-controlled. Accept it only when it is plainly a
+  // bare extension — anything with a slash, dot or other punctuation is
+  // discarded in favour of the (already byte-verified) MIME type, so nothing
+  // from the client can shape the storage path.
+  if (/^[a-z0-9]{2,5}$/i.test(fromName)) return fromName.toLowerCase();
   return mime === "application/pdf" ? "pdf" : mime.split("/")[1] || "bin";
 }
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function listVendorDocuments(
   restaurantId: string
@@ -101,6 +110,18 @@ export async function addVendorDocument(
 ): Promise<void> {
   if (!ALLOWED_MIME.has(file.type)) throw new Error("invalid_type");
   if (file.size > MAX_BYTES) throw new Error("too_large");
+
+  // restaurantId comes straight off the route param and is the first path
+  // segment of the storage key; pin it to a UUID so it can't shape the path.
+  if (!UUID_RE.test(restaurantId)) throw new Error("invalid_type");
+
+  // ALLOWED_MIME only checks what the client claimed. Check the bytes.
+  await assertRealType(file, [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "application/pdf",
+  ]);
 
   const admin = createAdminClient();
   const key = randomBytes(6).toString("hex");

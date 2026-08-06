@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { recordBannerEvent } from "@/lib/data-access/banners";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/banners/track — log a banner impression or click.
@@ -14,6 +15,16 @@ import { recordBannerEvent } from "@/lib/data-access/banners";
 export async function POST(request: Request) {
   // 202-style ack even without a backend — nothing to persist, nothing to fail.
   if (!isSupabaseConfigured) {
+    return NextResponse.json({ ok: true, recorded: false });
+  }
+
+  // This is now the ONLY way to reach bump_banner_stat (0022 revoked the RPC
+  // from anon), which makes it the single choke point for counter inflation.
+  // Unauthenticated by necessity — guests see banners — so key on the caller.
+  // A quiet 200 rather than a 429: the client is a sendBeacon that cannot act
+  // on an error, and telemetry is not worth surfacing a failure for.
+  const limit = await rateLimit(`banner-track:${clientIp(request)}`, 120, 60_000);
+  if (!limit.ok) {
     return NextResponse.json({ ok: true, recorded: false });
   }
 

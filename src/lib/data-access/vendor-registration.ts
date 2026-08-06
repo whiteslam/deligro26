@@ -240,6 +240,13 @@ export class EmailTakenError extends Error {
   }
 }
 
+export class PhoneTakenError extends Error {
+  constructor() {
+    super("phone_taken");
+    this.name = "PhoneTakenError";
+  }
+}
+
 export interface CreateVendorResult {
   restaurantId: string;
   ownerId: string;
@@ -275,6 +282,22 @@ export async function createVendorAccount(
   // looks the phone up in E.164; a raw 10-digit value would never match and the
   // vendor would land in a blank customer account instead of their portal).
   const mobileE164 = data.mobile ? toE164(data.mobile) : null;
+
+  // profiles.phone is globally unique (migration 0005). The owner is very often
+  // already a *customer* (they ordered before we onboarded their shop), and a
+  // second profile row with their number fails the upsert below with a 23505
+  // that surfaces only as the generic "couldn't create" error. Check up front so
+  // the operator gets an actionable message and we don't create-then-delete an
+  // auth user. `phoneVerified` is irrelevant here — uniqueness is absolute.
+  const ownerPhone = mobileE164 ?? data.mobile?.trim() ?? null;
+  if (ownerPhone) {
+    const { data: phoneClash } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("phone", ownerPhone)
+      .maybeSingle();
+    if (phoneClash) throw new PhoneTakenError();
+  }
 
   // Note: we deliberately do NOT set `phone` on the auth user. OTP login resolves
   // a vendor by `profiles.phone` (set below), and auth.users.phone is globally
@@ -318,7 +341,10 @@ export async function createVendorAccount(
         owner_alt_mobile: data.altMobile ?? null,
         owner_email: email,
         owner_phone_verified: Boolean(mobileE164 && data.phoneVerified),
-        temp_password: password,
+        // The password is returned to the wizard once, for hand-off, and is not
+        // stored: Supabase Auth already holds the bcrypt hash, and a plaintext
+        // copy here would be a live credential sitting in a table row.
+        password_reset_at: new Date().toISOString(),
         commission_pct: Math.min(100, Math.max(0, data.commissionPct ?? 0)),
         min_order: Math.max(0, Math.trunc(data.minOrder ?? 0)),
         delivery_available: data.deliveryAvailable ?? true,

@@ -12,8 +12,9 @@ async function requireDriverId(): Promise<string> {
 
 export async function acceptDeliveryAction(orderId: string) {
   const driverId = await requireDriverId();
-  await acceptDelivery(driverId, orderId);
+  const result = await acceptDelivery(driverId, orderId);
   revalidatePath("/driver");
+  return result;
 }
 
 export async function advanceDeliveryAction(orderId: string, otp?: string) {

@@ -35,8 +35,42 @@ function getRedis(): Redis | null {
   const token =
     process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN ?? "";
 
+  // The memory fallback is per-lambda, and lambdas scale with load — so under
+  // exactly the traffic a limiter exists to absorb, the effective limit
+  // multiplies by the instance count. That is acceptable locally and useless in
+  // production, so production must have a shared store.
+  if ((!url || !token) && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "UPSTASH_REDIS_REST_URL / _TOKEN (or KV_REST_API_URL / _TOKEN) are " +
+        "required in production: the in-memory rate limiter is per-instance " +
+        "and provides no real limit across serverless workers."
+    );
+  }
+
   redis = url && token ? new Redis({ url, token }) : null;
   return redis;
+}
+
+/**
+ * Rate-limit key for a caller with no session (OTP request/verify, coupon
+ * validation, banner beacons). Falls back to a single shared bucket rather than
+ * a per-request unique one, so an absent header throttles instead of exempting.
+ */
+export function clientIp(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const first = forwarded.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return request.headers.get("x-real-ip")?.trim() || "unknown";
+}
+
+/** 429 with the Retry-After the limiter computed. */
+export function tooManyRequests(result: RateLimitResult): Response {
+  return Response.json(
+    { error: "rate_limited" },
+    { status: 429, headers: { "Retry-After": String(result.retryAfter) } }
+  );
 }
 
 function memoryRateLimit(

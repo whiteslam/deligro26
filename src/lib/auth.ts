@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { GUEST_COOKIE } from "@/lib/auth/guest";
 
-export type Role = "customer" | "restaurant" | "driver" | "admin";
+export type Role = "customer" | "restaurant" | "driver" | "admin" | "manager";
 
 export interface Profile {
   id: string;
@@ -53,9 +53,26 @@ export async function getAccess(): Promise<{
   return { profile: null, state: (await isGuest()) ? "guest" : "anon" };
 }
 
+/**
+ * Demo mode hands back a synthetic profile so the static UI renders without
+ * Supabase keys. That is a dev-only convenience: in production, "no keys" means
+ * the credentials failed to load, and answering that with a free pass would turn
+ * a config outage into an authorization bypass. config.ts already refuses to
+ * boot in that state; this is the second lock, so the bypass stays unreachable
+ * even if that guard is ever relaxed.
+ */
+function assertDemoModeAllowed(): void {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("backend_not_configured");
+  }
+}
+
 /** Require a signed-in user, else send to login. */
 export async function requireUser(): Promise<Profile> {
-  if (!isSupabaseConfigured) return DEMO_PROFILE("customer");
+  if (!isSupabaseConfigured) {
+    assertDemoModeAllowed();
+    return DEMO_PROFILE("customer");
+  }
   const profile = await getProfile();
   if (!profile) redirect("/login");
   return profile;
@@ -70,7 +87,10 @@ export async function requireUser(): Promise<Profile> {
  */
 export async function requireRole(role: Role | Role[]): Promise<Profile> {
   const allowed = Array.isArray(role) ? role : [role];
-  if (!isSupabaseConfigured) return DEMO_PROFILE(allowed[0]);
+  if (!isSupabaseConfigured) {
+    assertDemoModeAllowed();
+    return DEMO_PROFILE(allowed[0]);
+  }
 
   const profile = await requireUser();
   if (!allowed.includes(profile.role)) {

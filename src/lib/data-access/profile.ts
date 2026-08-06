@@ -1,6 +1,9 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { countFavorites } from "@/lib/data-access/favorites";
+import { checkOtp } from "@/lib/data-access/otp";
+import { toE164 } from "@/lib/auth/phone";
+import { assertRealType } from "@/lib/utils/file-signature";
 import { isDeveloperPhone } from "@/lib/developers";
 
 /**
@@ -23,6 +26,8 @@ export interface ProfileSummary {
 export interface ProfileUpdateInput {
   fullName?: string;
   phone?: string;
+  /** OTP delivered to the NEW number — proves the caller controls it. */
+  phoneOtp?: string;
 }
 
 function initialsFrom(name: string, phone: string | null): string {
@@ -85,9 +90,33 @@ export async function updateProfile(input: ProfileUpdateInput): Promise<boolean>
     patch.full_name = name.slice(0, 80);
   }
   if (input.phone !== undefined) {
-    const phone = input.phone.trim();
-    if (phone.length < 10) throw new Error("invalid_phone");
-    patch.phone = phone.slice(0, 20);
+    // Re-saving the number you already have is a no-op, not a claim, so the
+    // profile sheet can submit the whole form without demanding a pointless OTP.
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("phone")
+      .eq("id", user.id)
+      .maybeSingle();
+    const currentPhone = (existing?.phone as string | null) ?? null;
+
+    // Normalise before anything else. OTP login writes E.164, so storing a raw
+    // "9876543210" here creates a row the partial unique index can't collapse
+    // and that resolveUser()'s lookup silently misses.
+    const phone = toE164(input.phone);
+    if (!phone) throw new Error("invalid_phone");
+
+    // profiles.phone is not a display field: otp.ts resolves *which account a
+    // phone signs into* from it. Claiming a number is therefore an identity
+    // claim, and an unverified one lets an attacker capture the victim's next
+    // OTP login into their own account. Require proof of control — the same
+    // check an admin passes when verifying a vendor's mobile.
+    if (phone !== currentPhone) {
+      if (!input.phoneOtp) throw new Error("otp_required");
+      const check = await checkOtp(phone, input.phoneOtp.replace(/\D/g, ""));
+      if (!check.ok) throw new Error("otp_invalid");
+    }
+
+    patch.phone = phone;
   }
 
   if (!Object.keys(patch).length) return true;
@@ -96,7 +125,16 @@ export async function updateProfile(input: ProfileUpdateInput): Promise<boolean>
     .from("profiles")
     .update(patch)
     .eq("id", user.id);
-  if (error) throw error;
+  if (error) {
+    // profiles.phone is globally unique (0005): this number is already another
+    // account's login identity. The RLS-scoped client can't see that row to
+    // pre-check it, so we surface the update's own unique violation instead of a
+    // 500. OTP proved control of the number, but it's still attached elsewhere.
+    if ((error as { code?: string }).code === "23505") {
+      throw new Error("phone_taken");
+    }
+    throw error;
+  }
   return true;
 }
 
@@ -138,6 +176,10 @@ export async function uploadAvatar(file: File): Promise<string> {
   if (!ext) throw new Error("invalid_type");
   if (file.size > MAX_AVATAR_BYTES) throw new Error("too_large");
   if (file.size === 0) throw new Error("invalid_type");
+
+  // file.type is client-declared; check the bytes actually are the image they
+  // claim to be before this lands in a public, CDN-fronted bucket.
+  await assertRealType(file, ["image/jpeg", "image/png", "image/webp"]);
 
   const stale = await listOwnAvatars(supabase, user.id);
   if (stale.length) {

@@ -29,7 +29,7 @@ export default async function EditVendorPage({
       />
       <VendorCredentials
         id={vendor.id}
-        tempPassword={vendor.tempPassword}
+        passwordResetAt={vendor.passwordResetAt}
         ownerMobile={vendor.ownerMobile}
         ownerPhoneVerified={vendor.ownerPhoneVerified}
       />

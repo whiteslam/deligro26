@@ -33,9 +33,29 @@ export function bannerHref(banner: Banner): string {
     case "category":
       return value ? `/search?category=${encodeURIComponent(value)}` : "/search";
     case "external":
-      return value ?? "/";
+      return safeExternalHref(value);
     default:
       return "/";
+  }
+}
+
+/**
+ * Banner targets are admin-authored, but "trusted author" is not a scheme
+ * allowlist: a `javascript:` or `data:` value here renders as a live link on
+ * every customer's home carousel, which is stored XSS that the CSP cannot catch
+ * (javascript: URIs are governed by script-src, and ours still allows
+ * 'unsafe-inline'). Only ever emit an absolute http(s) URL.
+ */
+export function safeExternalHref(value: string | null | undefined): string {
+  if (!value) return "/";
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.href
+      : "/";
+  } catch {
+    // Not an absolute URL — so not an external campaign. Don't guess.
+    return "/";
   }
 }
 

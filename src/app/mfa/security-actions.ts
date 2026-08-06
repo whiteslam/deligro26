@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient as createIsolatedClient } from "@supabase/supabase-js";
 import { requireUser } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 import { roleNeedsMfa, roleAllowsMfa } from "@/lib/auth/mfa";
@@ -40,6 +41,19 @@ export async function disableMfaAction(
   }
   if (!password.trim()) {
     return { ok: false, error: "Enter your password to confirm." };
+  }
+
+  // signInWithPassword below is a password oracle, and because the call
+  // originates server-side Supabase's own per-IP throttle sees our server for
+  // every user — so it neither bounds this endpoint nor tells attackers apart.
+  // Bound it per account: someone with a hijacked session should not be able to
+  // grind the password here and then switch MFA off.
+  const attempt = await rateLimit(`mfa-disable:${profile.id}`, 5, 15 * 60_000);
+  if (!attempt.ok) {
+    return {
+      ok: false,
+      error: "Too many attempts. Try again in a few minutes.",
+    };
   }
 
   const supabase = await createClient();

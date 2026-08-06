@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { updateAddress, deleteAddress } from "@/lib/data-access/addresses";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -11,10 +12,19 @@ async function requireUser() {
   return user;
 }
 
+/** RLS scopes the row; this only bounds how fast one account can churn. */
+async function throttle(userId: string): Promise<Response | null> {
+  const result = await rateLimit(`addresses:${userId}`, 30, 60_000);
+  return result.ok ? null : tooManyRequests(result);
+}
+
 /** PATCH /api/addresses/:id — edit or set default. */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!isSupabaseConfigured) return NextResponse.json({ error: "backend_not_configured" }, { status: 503 });
-  if (!(await requireUser())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const user = await requireUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const limited = await throttle(user.id);
+  if (limited) return limited;
   const { id } = await params;
 
   let body: { label?: string; line?: string; lat?: number; lng?: number; isDefault?: boolean };
@@ -36,7 +46,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 /** DELETE /api/addresses/:id */
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!isSupabaseConfigured) return NextResponse.json({ error: "backend_not_configured" }, { status: 503 });
-  if (!(await requireUser())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const user = await requireUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const limited = await throttle(user.id);
+  if (limited) return limited;
   const { id } = await params;
   try {
     const ok = await deleteAddress(id);

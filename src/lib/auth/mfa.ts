@@ -6,16 +6,62 @@ import type { Role } from "@/lib/auth";
 
 /**
  * Roles for which MFA is MANDATORY — enforced on every portal entry, cannot be
- * disabled or opted out of. Currently none: admin MFA is opt-in (see below).
+ * disabled or opted out of.
+ *
+ * Admin is here because the admin panel is the one place from which every
+ * vendor's payout details and every customer record are reachable; a password
+ * alone is not an acceptable guard on that. This list was previously empty,
+ * which silently contradicted SECURITY.md, 0016_mfa.sql and the doc comment on
+ * requireOperatorMfa below — all three already claimed admin MFA was enforced.
  */
-export const MFA_REQUIRED_ROLES: readonly Role[] = [];
+export const MFA_REQUIRED_ROLES: readonly Role[] = ["admin"];
 
 /**
  * Roles for which MFA is OPTIONAL — the operator opts in from their settings.
  * Once enrolled they are challenged on entry like a required role; if they
  * never enroll (or later disable it) they are let in at aal1.
  */
-export const MFA_OPTIONAL_ROLES: readonly Role[] = ["admin", "restaurant", "driver"];
+export const MFA_OPTIONAL_ROLES: readonly Role[] = [
+  "restaurant",
+  "driver",
+  "manager",
+];
+
+/**
+ * The seeded QA logins (scripts/seed-users.ts, scripts/qa/idor-suite.ts). They
+ * must stay reachable with a password alone or the automated suites can't run.
+ */
+const DEMO_ACCOUNTS = [
+  "admin@deligro.demo",
+  "vendor@deligro.demo",
+  "driver@deligro.demo",
+];
+
+/**
+ * Accounts allowed past a MANDATORY MFA gate at aal1.
+ *
+ * Outside production the demo trio is exempt automatically, so `npm run test:*`
+ * and local admin work need no setup. In production nothing is exempt unless
+ * named explicitly in MFA_EXEMPT_EMAILS — an exemption there is then a
+ * deliberate, reviewable act rather than an accident of NODE_ENV. Leave that
+ * variable unset on the live environment.
+ */
+function mfaExemptEmails(): Set<string> {
+  const fromEnv = (process.env.MFA_EXEMPT_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+
+  const builtIn = process.env.NODE_ENV === "production" ? [] : DEMO_ACCOUNTS;
+
+  return new Set([...builtIn, ...fromEnv]);
+}
+
+/** True when this address may enter an MFA-gated portal without a factor. */
+export function isMfaExempt(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return mfaExemptEmails().has(email.toLowerCase());
+}
 
 export function roleNeedsMfa(role: Role): boolean {
   return (MFA_REQUIRED_ROLES as readonly string[]).includes(role);
@@ -81,6 +127,8 @@ export async function requireOperatorMfa(
   const next = encodeURIComponent(safeNextPath(nextPath));
 
   // Enrolled but not yet verified this session → challenge, for every role.
+  // An exempt account that chose to enroll is still challenged: the exemption
+  // excuses you from *having* a factor, not from using one you set up.
   if (gate.reason === "challenge") {
     redirect(`/mfa?next=${next}`);
   }
@@ -88,6 +136,14 @@ export async function requireOperatorMfa(
   // reason === "setup" (no verified factor). Mandatory roles must enroll now;
   // optional roles are simply let through — they haven't opted in.
   if (roleNeedsMfa(role)) {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    // The seeded QA logins sign in with a password only; forcing enrollment
+    // would lock the automated suites out of the admin portal. See isMfaExempt.
+    if (isMfaExempt(user?.email)) return;
+
     redirect(`/mfa/setup?next=${next}`);
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 /**
  * Save the signed-in user's OneSignal player id to their profile.
@@ -29,6 +30,9 @@ export async function POST(req: Request) {
   if (!user) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
+
+  const limit = await rateLimit(`push-register:${user.id}`, 20, 60_000);
+  if (!limit.ok) return tooManyRequests(limit);
 
   const { error } = await supabase
     .from("profiles")

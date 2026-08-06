@@ -9,6 +9,7 @@ import { StatusBar } from "@/components/layout/status-bar";
 import { SplashScreen } from "@/components/shared/splash-screen";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { OtpLogin } from "@/components/auth/otp-login";
+import { resolveLanding } from "@/lib/auth/landing";
 import { continueAsGuest } from "@/lib/auth/guest-actions";
 
 /**
@@ -107,22 +108,26 @@ function LoginForm() {
       return;
     }
 
+    // Route by the account's real role, resolved once and reused for the MFA hop.
+    const dest = await resolveLanding(next);
+
     // If this account already has TOTP, promote to aal2 before the portal gate.
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     setBusy(false);
 
     if (aal?.currentLevel !== "aal2" && aal?.nextLevel === "aal2") {
-      router.push(`/mfa?next=${encodeURIComponent(next)}`);
+      router.push(`/mfa?next=${encodeURIComponent(dest)}`);
       router.refresh();
       return;
     }
 
-    router.push(next);
+    router.push(dest);
     router.refresh();
   }
 
   return (
-    <form onSubmit={onSubmit} className="w-full max-w-sm">
+    <div className="w-full max-w-sm">
+      <form onSubmit={onSubmit}>
       <h1 className="text-center text-[26px] font-extrabold tracking-tight">
         Sign in
       </h1>
@@ -184,9 +189,12 @@ function LoginForm() {
       >
         <Smartphone className="size-5" /> Login with OTP
       </button>
+      </form>
 
+      {/* Sibling of the sign-in form, not a child — a <form> inside a <form> is
+          invalid HTML and throws a hydration error. */}
       {guest}
-    </form>
+    </div>
   );
 }
 

@@ -6,26 +6,28 @@ import { toE164 } from "@/lib/auth/phone";
 /**
  * Platform staff accounts, created by an operator from Settings → Team.
  *
- * The app's `user_role` enum has no "manager" — a manager IS a platform admin.
- * So the two UI roles map onto the real profile roles: manager → admin (full
- * admin panel) and driver → driver (delivery portal). Account creation reaches
- * for the service-role client because it must create an auth user and set a
- * privileged role past the `lock_role` trigger, which RLS can't express.
+ * A "manager" is now a real, scoped `manager` profile role (migrations 0022/0023)
+ * — an operational sub-admin (phone orders, dispatch, order status) WITHOUT
+ * finance, system config, or vendor management. It is no longer an alias for
+ * `admin`. The two UI roles map 1:1 onto real profile roles: manager → manager
+ * and driver → driver. Account creation reaches for the service-role client
+ * because it must create an auth user and set a privileged role past the
+ * `lock_role` trigger, which RLS can't express.
  */
 
 export type EmployeeRole = "manager" | "driver";
 
 export const EMPLOYEE_ROLES: readonly EmployeeRole[] = ["manager", "driver"];
 
-/** UI role → real profile role. Manager == platform admin. */
-const TO_PROFILE_ROLE: Record<EmployeeRole, "admin" | "driver"> = {
-  manager: "admin",
+/** UI role → real profile role (1:1 now that `manager` is a real role). */
+const TO_PROFILE_ROLE: Record<EmployeeRole, "manager" | "driver"> = {
+  manager: "manager",
   driver: "driver",
 };
 
 /** Real profile role → UI role, for listing existing staff. */
 function toEmployeeRole(role: string): EmployeeRole {
-  return role === "admin" ? "manager" : "driver";
+  return role === "manager" ? "manager" : "driver";
 }
 
 export interface EmployeeInput {
@@ -166,13 +168,14 @@ export async function createEmployee(
   }
 }
 
-/** Every manager (admin) and driver on the platform, newest first. */
+/** Every manager and driver on the platform, newest first. (Super-admins are a
+ * separate concern and are not listed as staff.) */
 export async function listEmployees(): Promise<EmployeeListItem[]> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("profiles")
     .select("id, role, full_name, phone, created_at")
-    .in("role", ["admin", "driver"])
+    .in("role", ["manager", "driver"])
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map((r) => {

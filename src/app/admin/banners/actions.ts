@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
+import { safeExternalHref } from "@/lib/banner-href";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   createBanner,
@@ -102,6 +103,15 @@ function validate(input: BannerInput): string | null {
     !input.targetValue
   ) {
     return "This target type needs a value (slug or URL).";
+  }
+
+  // Reject non-http(s) schemes at the write end so a javascript:/data: target
+  // never reaches the database. bannerHref() also filters on read — this is the
+  // pair, so a bad value can neither be stored nor rendered.
+  if (input.targetType === "external" && input.targetValue) {
+    if (safeExternalHref(input.targetValue) === "/") {
+      return "External campaigns need a full http:// or https:// URL.";
+    }
   }
   return null;
 }

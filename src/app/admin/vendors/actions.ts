@@ -27,6 +27,7 @@ import {
   deleteDraft,
   createVendorAccount,
   EmailTakenError,
+  PhoneTakenError,
   type VendorDraftData,
 } from "@/lib/data-access/vendor-registration";
 
@@ -250,8 +251,13 @@ export async function saveCategoryAction(
   try {
     if (id) await updateCategory(id, input);
     else await createCategory(input);
-  } catch {
-    return { ok: false, error: "Couldn't save the category. The name may already exist." };
+  } catch (err) {
+    // uniqueSlug already de-dupes the slug, so a 23505 here is the unique NAME
+    // constraint (vendor_categories_name_key) — a definite duplicate, not a guess.
+    if ((err as { code?: string })?.code === "23505") {
+      return { ok: false, error: `A category named “${input.name}” already exists.` };
+    }
+    return { ok: false, error: "Couldn't save the category. Try again." };
   }
 
   revalidatePath("/admin/vendors/categories");
@@ -286,8 +292,11 @@ export async function createCategoryInlineAction(
       sortOrder: 100,
       enabled: true,
     });
-  } catch {
-    return { ok: false, error: "Couldn't add the category. It may already exist." };
+  } catch (err) {
+    if ((err as { code?: string })?.code === "23505") {
+      return { ok: false, error: `A category named “${clean}” already exists.` };
+    }
+    return { ok: false, error: "Couldn't add the category. Try again." };
   }
   revalidatePath("/admin/vendors");
   revalidatePath("/admin/vendors/categories");
@@ -375,6 +384,25 @@ export async function createVendorAccountAction(
       return {
         ok: false,
         error: "An account with this email already exists. Use a different email.",
+      };
+    }
+    if (err instanceof PhoneTakenError) {
+      return {
+        ok: false,
+        error:
+          "This mobile number is already registered (often the owner's own customer account). Use a different number, or convert that existing account to a vendor.",
+      };
+    }
+    // Surface the real cause server-side; the generic message stays in the UI.
+    console.error("[createVendorAccount] failed:", err);
+    // Belt-and-suspenders: a unique violation that slipped past the pre-checks
+    // (e.g. a phone claimed between check and insert) still reads clearly.
+    const code = (err as { code?: string })?.code;
+    if (code === "23505") {
+      return {
+        ok: false,
+        error:
+          "That mobile or email is already used by another account. Use a different one.",
       };
     }
     return { ok: false, error: "Couldn't create the vendor. Try again." };

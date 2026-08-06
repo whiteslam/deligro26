@@ -8,24 +8,29 @@ import { PhoneOtpVerify } from "@/components/admin/phone-otp-verify";
 import { resetVendorPasswordAction, verifyVendorPhoneAction } from "../../actions";
 
 /**
- * Login & credentials block on the Edit screen: shows the current one-time
- * password (stored on the vendor so it survives a page close, per admin request),
- * lets an operator generate a fresh one, and lets them verify the vendor's mobile
- * by OTP later. Reset/verify run through admin-gated server actions.
+ * Login & credentials block on the Edit screen: generates a one-time login
+ * password to hand off, and lets an operator verify the vendor's mobile by OTP
+ * later. Reset/verify run through admin-gated server actions.
+ *
+ * The generated password is shown ONCE, in this component's state, and is never
+ * persisted — it used to be kept in `restaurants.temp_password` so it survived a
+ * page close, which meant every vendor's live credential sat in the database in
+ * plaintext. There is nothing to re-display on load; if the operator loses it,
+ * they generate another.
  */
 export function VendorCredentials({
   id,
-  tempPassword,
+  passwordResetAt,
   ownerMobile,
   ownerPhoneVerified,
 }: {
   id: string;
-  tempPassword: string | null;
+  passwordResetAt: string | null;
   ownerMobile: string | null;
   ownerPhoneVerified: boolean;
 }) {
   const router = useRouter();
-  const [pw, setPw] = useState<string | null>(tempPassword);
+  const [pw, setPw] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verified, setVerified] = useState(ownerPhoneVerified);
@@ -74,7 +79,9 @@ export function VendorCredentials({
           </div>
         ) : (
           <p className="rounded-xl bg-surface-2 px-3.5 py-3 text-xs text-muted">
-            No password on record. Generate one to hand off to the vendor.
+            {passwordResetAt
+              ? `A password was last issued ${new Date(passwordResetAt).toLocaleDateString()}. It isn't stored — generate a new one to hand off.`
+              : "No password issued yet. Generate one to hand off to the vendor."}
           </p>
         )}
         <button
@@ -94,7 +101,7 @@ export function VendorCredentials({
         </button>
         <p className="text-[11px] text-muted">
           Regenerating immediately replaces the vendor&apos;s current login
-          password. It&apos;s stored here until the vendor sets their own.
+          password. Copy it now — it is shown once and never saved.
         </p>
         {error ? <p className="text-xs font-medium text-deal">{error}</p> : null}
       </div>

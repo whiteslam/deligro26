@@ -1,6 +1,23 @@
 import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createClient } from "@/lib/supabase/server";
 import { removeAvatar, uploadAvatar } from "@/lib/data-access/profile";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
+
+/**
+ * Each accepted upload is up to 5 MB into a public bucket, so an unbounded loop
+ * here is storage and egress spend. The data layer owns authz; this only caps
+ * the rate. Anonymous callers fall through — uploadAvatar throws `unauthorized`.
+ */
+async function throttle(): Promise<Response | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const limit = await rateLimit(`avatar:${user.id}`, 12, 60_000);
+  return limit.ok ? null : tooManyRequests(limit);
+}
 
 /**
  * Profile photo for the signed-in user.
@@ -27,6 +44,9 @@ export async function POST(request: Request) {
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: "backend_not_configured" }, { status: 503 });
   }
+
+  const limited = await throttle();
+  if (limited) return limited;
 
   let file: FormDataEntryValue | null;
   try {

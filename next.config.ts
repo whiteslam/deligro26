@@ -60,7 +60,21 @@ const nextConfig: NextConfig = {
   },
   outputFileTracingRoot: projectRoot,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      {
+        // Every /api response is either user-scoped or an auth step. Next does
+        // not cache route handlers by default, but nothing here says so out
+        // loud — and a CDN or reverse proxy added later would happily serve one
+        // customer's /api/me or /api/orders to the next visitor. Make it
+        // explicit at the edge rather than relying on a framework default.
+        source: "/api/:path*",
+        headers: [
+          { key: "Cache-Control", value: "no-store, max-age=0, must-revalidate" },
+          { key: "Pragma", value: "no-cache" },
+        ],
+      },
+    ];
   },
 };
 

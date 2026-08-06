@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 /**
  * POST /api/orders/:id/cancel — a customer cancels their own order, but only
@@ -20,6 +21,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // The lookup below runs on the service-role client, so it sees every order
+  // regardless of RLS. Ownership is checked immediately after — but cap the
+  // rate anyway so this can't be driven as an order-id probe.
+  const limit = await rateLimit(`order-cancel:${user.id}`, 20, 60_000);
+  if (!limit.ok) return tooManyRequests(limit);
 
   const admin = createAdminClient();
   const { data: order } = await admin

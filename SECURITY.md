@@ -48,14 +48,43 @@ Referrer-Policy, Permissions-Policy — `next.config.ts`), and **app-level rate
 limiting** (`src/lib/rate-limit.ts` via Upstash/Vercel KV, applied to the orders
 API; in-memory fallback when KV env vars are unset).
 
-**Still to wire when you go live:** payment webhook signature verification, a
-nonce-based CSP to drop `'unsafe-inline'` from `script-src`, and swapping any
-remaining portal mocks for the RLS-backed data layer.
+Migration **0022** additionally closes the findings from the first full audit:
+column-level SELECT on `restaurants` (RLS filters rows, not columns — and 0017
+/ 0020 had added payout, KYC and plaintext-credential columns to a publicly
+readable table), admin-only vendor creation and approval, a column guard so a
+vendor cannot rewrite an order's `total`, explicit `order_items` visibility, and
+`bump_banner_stat` off the anon grant. Application-side: fail-closed config,
+mandatory admin MFA, OTP-verified phone changes, scrypt OTP hashing, magic-byte
+upload checks, and rate limits on every write endpoint.
 
-**MFA (admin / restaurant):** Supabase TOTP. Layouts call `requireOperatorMfa()`
-so sessions must be `aal2`. First visit enrolls at `/mfa/setup`; later sign-ins
-challenge at `/mfa`. Enable MFA in the Supabase dashboard
-(**Authentication → Providers / Multi-Factor → TOTP**).
+**Still to wire when you go live:** payment webhook signature verification,
+applying coupon discounts at order creation (the endpoint validates but nothing
+consumes the result yet), and swapping any remaining portal mocks for the
+RLS-backed data layer.
+
+**Deliberately not done — a nonce-based CSP.** Dropping `'unsafe-inline'` from
+`script-src` requires a per-request nonce, and per the Next 16 CSP guide that
+forces *every* page to render dynamically: no static generation, no ISR, no CDN
+caching, and PPR becomes incompatible. That is a real cost for a storefront, so
+it is a product decision rather than a default. The exploitable vector it would
+have covered (a `javascript:` banner target) is closed directly instead, at both
+the write and read ends. Tracked in `docs/SECURITY_AUDIT.md` under accepted risks.
+
+**MFA:** Supabase TOTP. Layouts call `requireOperatorMfa()`.
+
+- **Admin — mandatory** (`MFA_REQUIRED_ROLES` in `src/lib/auth/mfa.ts`). Not
+  enrolled → forced to `/mfa/setup`; enrolled but `aal1` → challenged at `/mfa`.
+  Cannot be switched off from settings.
+- **Restaurant / driver / manager — optional.** Opt in from settings; once
+  enrolled they are challenged like a required role.
+
+Enable TOTP in the Supabase dashboard (**Authentication → Providers /
+Multi-Factor → TOTP**).
+
+*Exemption:* the seeded QA logins (`admin`/`vendor`/`driver@deligro.demo`) skip
+the mandatory gate outside production, so `npm run test:*` can reach the admin
+portal. In production nothing is exempt unless named in `MFA_EXEMPT_EMAILS`,
+which must be left unset on the live environment.
 
 ### CSP note
 The CSP in `next.config.ts` allows `'unsafe-inline'` for scripts because of the

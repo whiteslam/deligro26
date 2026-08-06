@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   Banner,
   BannerKind,
@@ -330,13 +331,20 @@ export async function deleteBanner(id: string): Promise<void> {
 /**
  * Log an impression/click and bump the row counter. Fire-and-forget: a tracking
  * failure must never break the page, so it returns rather than throws.
+ *
+ * Runs on the service-role client because migration 0022 revokes
+ * `bump_banner_stat` from anon/authenticated. That RPC is SECURITY DEFINER, so
+ * granting it to anon made the counters an unauthenticated write API anyone
+ * could drive in a loop — inflating the numbers a campaign is judged (and
+ * possibly billed) on. Funnelling it through here means the only way to reach
+ * it is /api/banners/track, which is rate limited and validates the payload.
  */
 export async function recordBannerEvent(
   bannerId: string,
   kind: "impression" | "click" | "conversion" | "order",
   meta?: { placement?: string; city?: string }
 ): Promise<void> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase.from("banner_events").insert({
     banner_id: bannerId,
     kind,

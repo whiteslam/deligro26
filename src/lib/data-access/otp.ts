@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash, randomInt } from "node:crypto";
+import { randomInt, scryptSync, timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { phoneToSyntheticEmail } from "@/lib/auth/phone";
 
@@ -33,10 +33,32 @@ function pepper(): string {
   return value;
 }
 
-function hashCode(phone: string, code: string): string {
-  return createHash("sha256")
-    .update(`${code}:${phone}:${pepper()}`)
-    .digest("hex");
+/**
+ * scrypt, not a bare SHA-256. The plaintext space is a million six-digit
+ * strings, so a fast hash means that anyone who obtains both the `otp_codes`
+ * table and the pepper recovers every live code in microseconds — and those two
+ * live in the same infrastructure, so that is one breach, not two. scrypt puts
+ * a real per-guess cost in the way. The phone doubles as the salt, so two
+ * numbers holding the same code never share a digest.
+ */
+function hashCode(phone: string, code: string): Buffer {
+  return scryptSync(`${code}:${phone}:${pepper()}`, `deligro:${phone}`, 32);
+}
+
+/**
+ * Compare a stored hex digest against a freshly computed one without leaking
+ * position-of-first-difference through timing. Lengths are compared first
+ * because timingSafeEqual throws on a mismatch.
+ */
+function hashMatches(storedHex: string, computed: Buffer): boolean {
+  let stored: Buffer;
+  try {
+    stored = Buffer.from(storedHex, "hex");
+  } catch {
+    return false;
+  }
+  if (stored.length !== computed.length) return false;
+  return timingSafeEqual(stored, computed);
 }
 
 export interface RequestResult {
@@ -72,7 +94,7 @@ export async function createOtp(phone: string): Promise<RequestResult> {
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   const { error } = await supabase.from("otp_codes").insert({
     phone,
-    code_hash: hashCode(phone, code),
+    code_hash: hashCode(phone, code).toString("hex"),
     expires_at: new Date(now + CODE_TTL_MS).toISOString(),
   });
   if (error) return { ok: false, error: "db_error" };
@@ -105,7 +127,7 @@ export async function verifyOtp(phone: string, code: string): Promise<VerifyResu
   if (new Date(row.expires_at).getTime() < Date.now()) return { ok: false, error: "expired" };
   if (row.attempts >= MAX_ATTEMPTS) return { ok: false, error: "locked" };
 
-  if (row.code_hash !== hashCode(phone, code)) {
+  if (!hashMatches(row.code_hash, hashCode(phone, code))) {
     await supabase.from("otp_codes").update({ attempts: row.attempts + 1 }).eq("id", row.id);
     return { ok: false, error: "invalid" };
   }
@@ -156,13 +178,35 @@ export async function checkOtp(phone: string, code: string): Promise<CheckResult
   if (new Date(row.expires_at).getTime() < Date.now()) return { ok: false, error: "expired" };
   if (row.attempts >= MAX_ATTEMPTS) return { ok: false, error: "locked" };
 
-  if (row.code_hash !== hashCode(phone, code)) {
+  if (!hashMatches(row.code_hash, hashCode(phone, code))) {
     await supabase.from("otp_codes").update({ attempts: row.attempts + 1 }).eq("id", row.id);
     return { ok: false, error: "invalid" };
   }
 
   await supabase.from("otp_codes").update({ consumed: true }).eq("id", row.id);
   return { ok: true };
+}
+
+/**
+ * Find an auth user by exact email, paging until found. Supabase's admin API
+ * has no direct get-by-email, so we walk pages — but we walk *all* of them
+ * instead of assuming everyone fits on the first.
+ */
+async function findUserByEmail(email: string): Promise<{ id: string } | null> {
+  const supabase = createAdminClient();
+  const target = email.toLowerCase();
+  const perPage = 200;
+
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+    if (error || !data?.users?.length) return null;
+
+    const hit = data.users.find((u) => u.email?.toLowerCase() === target);
+    if (hit) return { id: hit.id };
+
+    if (data.users.length < perPage) return null; // last page
+  }
+  return null;
 }
 
 async function resolveUser(
@@ -194,9 +238,11 @@ async function resolveUser(
   });
 
   if (error) {
-    // Likely already exists — look it up by listing (small scale) then match email.
-    const { data: list } = await supabase.auth.admin.listUsers({ perPage: 200 });
-    const found = list?.users.find((u) => u.email === email);
+    // Almost certainly "already registered". Look the account up directly
+    // rather than paging the user list — the previous `listUsers({perPage: 200})`
+    // silently stopped finding anyone past the 200th user, turning a normal
+    // repeat login into an unexplained failure once the app grew.
+    const found = await findUserByEmail(email);
     if (found) {
       await supabase.from("profiles").update({ phone }).eq("id", found.id);
       return { user: { id: found.id }, email, isNewUser: false };

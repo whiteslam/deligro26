@@ -166,6 +166,8 @@ function errorText(code?: string): string {
       return "Too many requests. Try again later.";
     case "sms_unavailable":
       return "SMS isn't available right now.";
+    case "phone_taken":
+      return "That number is already registered to another account.";
     default:
       return "Something went wrong. Try again.";
   }

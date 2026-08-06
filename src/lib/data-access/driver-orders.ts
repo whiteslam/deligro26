@@ -216,7 +216,10 @@ export async function getDriverBoard(driverId: string): Promise<DriverBoardData>
 }
 
 /** Claim a ready order: create the delivery row assigned to this driver. */
-export async function acceptDelivery(driverId: string, orderId: string): Promise<void> {
+export async function acceptDelivery(
+  driverId: string,
+  orderId: string
+): Promise<{ ok: boolean; error?: string }> {
   const supabase = createAdminClient();
 
   // Guard against a double-claim race.
@@ -226,7 +229,7 @@ export async function acceptDelivery(driverId: string, orderId: string): Promise
     .eq("order_id", orderId)
     .in("status", ["assigned", "picked_up", "delivered"])
     .maybeSingle();
-  if (existing) throw new Error("already_taken");
+  if (existing) return { ok: false, error: "already_taken" };
 
   const { error } = await supabase.from("deliveries").insert({
     order_id: orderId,
@@ -237,7 +240,16 @@ export async function acceptDelivery(driverId: string, orderId: string): Promise
     driver_lng: 81.5335 - 0.008,
     driver_location_at: new Date().toISOString(),
   });
-  if (error) throw error;
+  if (error) {
+    // deliveries.order_id is unique (0001): when two riders tap Accept at once
+    // both pass the check above and the loser's insert raises 23505. That's not
+    // something the rider can fix — someone simply got there first.
+    if ((error as { code?: string }).code === "23505") {
+      return { ok: false, error: "already_taken" };
+    }
+    throw error;
+  }
+  return { ok: true };
 }
 
 /**

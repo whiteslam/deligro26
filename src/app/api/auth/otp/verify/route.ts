@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { toE164 } from "@/lib/auth/phone";
 import { verifyOtp } from "@/lib/data-access/otp";
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 /**
  * POST /api/auth/otp/verify  { phone, code }
@@ -12,6 +13,12 @@ export async function POST(request: Request) {
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: "backend_not_configured" }, { status: 503 });
   }
+
+  // The per-row MAX_ATTEMPTS lock is per code: request a fresh code and the
+  // counter resets, so a patient attacker still gets unlimited guesses at a
+  // 6-digit space. Cap the caller so the whole flow is bounded, not each code.
+  const ipLimit = await rateLimit(`otp-verify-ip:${clientIp(request)}`, 20, 60 * 60_000);
+  if (!ipLimit.ok) return tooManyRequests(ipLimit);
 
   let body: { phone?: string; code?: string };
   try {
