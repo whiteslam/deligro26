@@ -265,7 +265,7 @@ async function main() {
   console.log(`Shop scope: ${shopScope}\n`);
   if (assetsBase) console.log(`Assets base: ${assetsBase}\n`);
   else if (imageOpts.usePexels) {
-    console.log("Images: Pexels CDN (images.pexels.com)\n");
+    console.log("Images: Unsplash CDN (images.unsplash.com)\n");
   } else {
     console.log("Images: disabled (no legacy base URL, USE_PEXELS_IMAGES=0)\n");
   }

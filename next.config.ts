@@ -22,7 +22,7 @@ const csp = [
   `script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://maps.googleapis.com https://maps.gstatic.com${isDev ? " 'unsafe-eval'" : ""}`,
   // Google Maps injects a stylesheet + Roboto webfont.
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "img-src 'self' data: blob: https://images.pexels.com https://*.supabase.co https://*.onesignal.com https://onesignal.com https://*.googleapis.com https://*.gstatic.com https://*.google.com",
+  "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://*.onesignal.com https://onesignal.com https://*.googleapis.com https://*.gstatic.com https://*.google.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   // OneSignal over WSS/HTTPS; Google Maps tiles/geocode/places over HTTPS.
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.onesignal.com https://onesignal.com wss://*.onesignal.com https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com",

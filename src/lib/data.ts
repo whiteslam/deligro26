@@ -10,13 +10,53 @@ import type {
 /* ============================================================
    Static mock data — Phase 1 (UI/UX only, no backend).
    Food photography "supplies the color". Images are served from
-   Pexels; the per-restaurant gradient tint stays underneath as the
+   Unsplash; the per-restaurant gradient tint stays underneath as the
    backdrop while each photo loads.
    ============================================================ */
 
-/** Build a Pexels CDN image URL from a photo id. */
+/**
+ * The mock catalog was authored against Pexels photo ids. Rather than rewrite
+ * every call site, map each legacy id to a verified Unsplash slug so the mock
+ * and the seeded database share one image source (images.unsplash.com, allowed
+ * by the CSP). Banners/store tiles that aren't dishes map to a fitting non-food
+ * photo (pharmacy, courier). Unknown ids fall back to a generic food shot.
+ */
+const UNSPLASH_BY_LEGACY_ID: Record<number, string> = {
+  208512: "photo-1587854692152-cbe660dbde88", // pharmacy banner
+  291528: "photo-1668236543090-82eba5ee5976", // dosa
+  376464: "photo-1544145945-f90425340c7e", // beverage
+  461198: "photo-1601050690597-df0568f70950", // bread / naan
+  616404: "photo-1585032226651-759b368d7246", // chinese
+  825661: "photo-1601050690117-94f5f6fa8bd7", // samosa
+  958545: "photo-1666190092159-3171cf0fbb12", // samosa / starters
+  1109197: "photo-1610057099443-fde8c4d50f91", // chicken
+  1146760: "photo-1513104890138-7c749659a591", // pizza
+  1213710: "photo-1585937421612-70a008356fbe", // thali
+  1279330: "photo-1631452180519-c014fe946bc7", // paneer
+  1639557: "photo-1568901346375-23c9450c58cd", // burger
+  1640777: "photo-1512621776951-a57141f2eefd", // salad
+  1907098: "photo-1476224203421-9ac39bcb3327", // generic spread
+  2280545: "photo-1571091718767-18b5b1457add", // burger
+  2456435: "photo-1551024506-0bccd828d307", // dessert
+  3026808: "photo-1574071318508-1cdbab80d002", // pizza
+  4110251: "photo-1578985545062-69928b1d9587", // gelato / bakery
+  4198015: "photo-1526367790999-0150786686a2", // pick & drop / courier
+  4391470: "photo-1576602976047-174e57a47881", // pharmacy banner
+  5175551: "photo-1569718212165-3a8278d5f624", // chinese
+  5410400: "photo-1604382354936-07c5d9983bd3", // pizza
+  6412834: "photo-1630383249896-424e482df921", // dosa
+  7625056: "photo-1563379091339-03b21ab4a4f8", // biryani
+  9095802: "photo-1461023058943-07fcbe16d735", // beverage
+  9797126: "photo-1567188040759-fb8a883dc6d8", // paneer
+  12737656: "photo-1631515243349-e0cb75fb8d3a", // biryani
+  15913441: "photo-1578985545062-69928b1d9587", // dessert
+};
+
+const DEFAULT_UNSPLASH = "photo-1504674900247-0877df9cc836";
+
+/** Build an Unsplash CDN image URL from the legacy id used across the mock data. */
 const px = (id: number, w = 800) =>
-  `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=${w}`;
+  `https://images.unsplash.com/${UNSPLASH_BY_LEGACY_ID[id] ?? DEFAULT_UNSPLASH}?w=${w}&q=80&auto=format&fit=crop`;
 
 export const CATEGORIES: Category[] = [
   { id: "biryani", label: "Biryani", emoji: "🍚" },

@@ -3,7 +3,10 @@
  */
 
 import { readFileSync } from "node:fs";
-import { pexelsForMenuItem, pexelsForRestaurant } from "./pexels-images";
+import {
+  unsplashForMenuItem,
+  unsplashForRestaurant,
+} from "./unsplash-images";
 
 export interface LegacyShop {
   id: string;
@@ -460,12 +463,16 @@ export function productsForShop(
 export interface SeedImageOptions {
   /** If set, relative legacy paths resolve against this base URL. */
   assetsBaseUrl?: string;
-  /** Use Pexels when legacy paths are missing or unresolved (default true). */
+  /**
+   * Fill missing images with a curated Unsplash stock photo (default true). The
+   * field keeps its legacy name (and the USE_PEXELS_IMAGES env var) for
+   * compatibility; the stock source is now Unsplash, see ./unsplash-images.
+   */
   usePexels?: boolean;
 }
 
 /**
- * Restaurant image: legacy file (if base URL + path exist) else Pexels.
+ * Restaurant image: legacy file (if base URL + path exist) else Unsplash.
  */
 export function resolveRestaurantSeedImage(
   shop: LegacyShop,
@@ -480,7 +487,7 @@ export function resolveRestaurantSeedImage(
     shop.simage
   );
   if (legacy) return legacy;
-  if (usePexels) return pexelsForRestaurant(shop.sname, cuisines, shop.famous);
+  if (usePexels) return unsplashForRestaurant(shop.sname, cuisines, shop.famous);
   return "";
 }
 
@@ -491,7 +498,7 @@ export interface MenuSeedImageInput {
 }
 
 /**
- * Menu item image: legacy file else Pexels by category + name (+ description hint).
+ * Menu item image: legacy file else Unsplash by category + name (+ description hint).
  */
 export function resolveMenuSeedImage(
   category: string,
@@ -507,7 +514,7 @@ export function resolveMenuSeedImage(
   );
   if (fromFile) return fromFile;
   if (usePexels) {
-    return pexelsForMenuItem(
+    return unsplashForMenuItem(
       category,
       itemName,
       legacy.description?.trim() ?? ""

@@ -1,40 +1,85 @@
 /**
- * Pexels CDN URLs for legacy catalog seeding.
- * Same format as src/lib/data.ts — allowed by CSP (images.pexels.com).
+ * Unsplash CDN URLs for legacy catalog seeding.
+ * Same format as src/lib/data.ts — allowed by CSP (images.unsplash.com).
+ *
+ * Keyless hotlinking: every id below is a real, verified Unsplash photo slug
+ * (`photo-<timestamp>-<hash>`) served straight from images.unsplash.com with
+ * on-the-fly resizing (`?w=&q=&auto=format&fit=crop`). No API key, no attribution
+ * fetch — the same deterministic, curated-pool approach the Pexels version used.
  *
  * Matching priority: item NAME first (most specific dish wins), then category.
  * e.g. "Chicken Momo" → momo photo, not chicken curry.
  */
 
-export function pexelsUrl(id: number, w = 800): string {
-  return `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=${w}`;
+export function unsplashUrl(id: string, w = 800): string {
+  return `https://images.unsplash.com/${id}?w=${w}&q=80&auto=format&fit=crop`;
 }
 
-/** Curated Pexels ids — one pool per dish family. */
+/** Curated Unsplash photo ids — one pool per dish family. */
 const PHOTOS = {
-  momo: [36173262, 32938725, 7363674],
-  biryani: [12737656, 7625056],
-  dosa: [291528, 6412834],
-  pizza: [1146760, 3026808, 5410400],
-  burger: [1639557, 2280545],
-  bread: [461198, 2456435],
-  samosa: [958545, 825661],
-  chinese: [5175551, 616404, 9095802],
-  soup: [5175551, 616404],
-  salad: [1640777, 825661],
-  beverage: [376464, 9095802],
-  paneer: [9797126, 1279330],
-  chicken: [1109197, 1279330],
-  fish: [7252875, 1109197],
-  egg: [20858362, 1109197],
-  dessert: [15913441, 2456435, 376464],
-  thali: [958545, 825661, 1213710],
-  roll: [8846006, 5175551],
-  curry: [9797126, 1109197, 1279330],
-  default: [958545, 825661, 1213710, 1907098],
+  momo: [
+    "photo-1496116218417-1a781b1c416c",
+    "photo-1626074353765-517a681e40be",
+    "photo-1563245372-f21724e3856d",
+  ],
+  biryani: [
+    "photo-1563379091339-03b21ab4a4f8",
+    "photo-1631515243349-e0cb75fb8d3a",
+    "photo-1589302168068-964664d93dc0",
+  ],
+  dosa: ["photo-1668236543090-82eba5ee5976", "photo-1630383249896-424e482df921"],
+  pizza: [
+    "photo-1513104890138-7c749659a591",
+    "photo-1574071318508-1cdbab80d002",
+    "photo-1604382354936-07c5d9983bd3",
+  ],
+  burger: [
+    "photo-1568901346375-23c9450c58cd",
+    "photo-1571091718767-18b5b1457add",
+    "photo-1550547660-d9450f859349",
+  ],
+  bread: ["photo-1601050690597-df0568f70950", "photo-1633945274405-b6c8069047b0"],
+  samosa: ["photo-1601050690117-94f5f6fa8bd7", "photo-1666190092159-3171cf0fbb12"],
+  chinese: [
+    "photo-1585032226651-759b368d7246",
+    "photo-1569718212165-3a8278d5f624",
+    "photo-1512058564366-18510be2db19",
+  ],
+  soup: ["photo-1547592166-23ac45744acd", "photo-1543353071-873f17a7a088"],
+  salad: ["photo-1512621776951-a57141f2eefd", "photo-1540420773420-3366772f4999"],
+  beverage: ["photo-1544145945-f90425340c7e", "photo-1461023058943-07fcbe16d735"],
+  paneer: ["photo-1631452180519-c014fe946bc7", "photo-1567188040759-fb8a883dc6d8"],
+  chicken: [
+    "photo-1610057099443-fde8c4d50f91",
+    "photo-1567620832903-9fc6debc209f",
+    "photo-1598515214211-89d3c73ae83b",
+  ],
+  fish: [
+    "photo-1519708227418-c8fd9a32b7a2",
+    "photo-1580476262798-bddd9f4b7369",
+    "photo-1535140728325-a4d3707eee61",
+  ],
+  egg: [
+    "photo-1482049016688-2d3e1b311543",
+    "photo-1525351484163-7529414344d8",
+    "photo-1608039829572-78524f79c4c7",
+  ],
+  dessert: ["photo-1578985545062-69928b1d9587", "photo-1551024506-0bccd828d307"],
+  thali: ["photo-1585937421612-70a008356fbe", "photo-1596797038530-2c107229654b"],
+  roll: [
+    "photo-1541014741259-de529411b96a",
+    "photo-1606525437679-037aca74a3e9",
+    "photo-1544025162-d76694265947",
+  ],
+  curry: ["photo-1585937421612-70a008356fbe", "photo-1631452180519-c014fe946bc7"],
+  default: [
+    "photo-1504674900247-0877df9cc836",
+    "photo-1476224203421-9ac39bcb3327",
+    "photo-1555939594-58d7cb561ad1",
+  ],
 } as const;
 
-type PhotoPool = readonly number[];
+type PhotoPool = readonly string[];
 
 interface DishRule {
   /** Higher = checked first among rules in the same pass. */
@@ -47,7 +92,7 @@ function normalize(text: string): string {
   return text
     .toLowerCase()
     .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -61,7 +106,7 @@ function hashKey(value: string): number {
   return Math.abs(h);
 }
 
-function pickPool(pool: PhotoPool, key: string): number {
+function pickPool(pool: PhotoPool, key: string): string {
   return pool[hashKey(key) % pool.length]!;
 }
 
@@ -268,17 +313,17 @@ function resolvePool(
 }
 
 /** Menu item cover — matched to the dish name first. */
-export function pexelsForMenuItem(
+export function unsplashForMenuItem(
   category: string,
   itemName: string,
   hint = ""
 ): string {
   const pool = resolvePool(category, itemName, hint);
-  return pexelsUrl(pickPool(pool, `${category}:${itemName}`), 600);
+  return unsplashUrl(pickPool(pool, `${category}:${itemName}`), 600);
 }
 
 /** Restaurant hero — matched from shop name + cuisines. */
-export function pexelsForRestaurant(
+export function unsplashForRestaurant(
   name: string,
   cuisines: string[],
   famous?: string
@@ -288,7 +333,7 @@ export function pexelsForRestaurant(
     firstMatch(text, NAME_RULES) ??
     firstMatch(text, CATEGORY_RULES) ??
     PHOTOS.default;
-  return pexelsUrl(pickPool(pool, `restaurant:${name}`), 1200);
+  return unsplashUrl(pickPool(pool, `restaurant:${name}`), 1200);
 }
 
 /** @internal — exposed for quick sanity checks in scripts. */
