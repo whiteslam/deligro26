@@ -17,6 +17,12 @@ const STATUS: Record<
 > = {
   PLACED: { label: "Placed", cls: "pill-accent" },
   KITCHEN: { label: "Preparing", cls: "pill-accent" },
+  // READY is its own stage now (0026 / OrderStatus). It used to be folded into
+  // KITCHEN, which is why an operator could not tell a kitchen that was still
+  // cooking from one whose food had been sitting on the pass. Given a bare
+  // `Record`, a missing key is not a blank cell — `STATUS[o.status].cls` throws
+  // and takes the whole orders screen down with it.
+  READY: { label: "Ready for pickup", cls: "pill-accent" },
   ON_THE_WAY: { label: "On the way", cls: "pill-accent" },
   DELIVERED: { label: "Delivered", cls: "pill-green" },
   CANCELLED: { label: "Cancelled", cls: "pill-muted" },
