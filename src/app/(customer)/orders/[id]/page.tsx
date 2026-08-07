@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { ACTIVE_ORDER, PAST_ORDERS } from "@/lib/data";
 import { getOrderForTracking } from "@/lib/orders-ui";
+import { getOrderEta } from "@/lib/data-access/order-tracking";
 import { getDeliveryOtp } from "@/lib/data-access/handover";
 import { TrackingView } from "@/components/orders/tracking-view";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -19,7 +20,18 @@ export default async function OrderTrackingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const order = await getOrderForTracking(id);
+
+  // Fetched alongside the order rather than after it, so the honest ETA costs
+  // no extra round trip. `getOrderEta` is RLS-scoped and returns null for an
+  // order this caller may not see, which is the same answer it gives for one
+  // that doesn't exist — but the order read below is what actually decides
+  // whether this page is a 404.
+  const [order, initialEta] = await Promise.all([
+    getOrderForTracking(id),
+    isSupabaseConfigured
+      ? getOrderEta(id).catch(() => null)
+      : Promise.resolve(null),
+  ]);
   if (!order) notFound();
 
   let deliveryOtp: string | null = null;
@@ -33,7 +45,11 @@ export default async function OrderTrackingPage({
 
   return (
     <Suspense>
-      <TrackingView order={order} deliveryOtp={deliveryOtp} />
+      <TrackingView
+        order={order}
+        deliveryOtp={deliveryOtp}
+        initialEta={initialEta}
+      />
     </Suspense>
   );
 }

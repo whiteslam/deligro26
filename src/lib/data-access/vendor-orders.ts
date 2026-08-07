@@ -4,9 +4,21 @@ import type { KitchenOrder } from "@/lib/roles-data";
 import type {
   VendorHistoryQuery,
 } from "@/types/vendor-orders";
+import type { PaymentMethod, PaymentStatus } from "@/types";
 import { shortOrderId } from "@/lib/utils/order-map";
 import { formatRelativeTime } from "@/lib/utils/relative-time";
 import { addIstDays, startOfIstMonth } from "@/lib/utils/ist-time";
+import {
+  notifyOrderAccepted,
+  notifyOrderCancelled,
+  notifyOrderReady,
+} from "@/lib/notifications/order-events";
+import { queueRefundForOrder } from "@/lib/data-access/refunds";
+import {
+  columnKnownMissing,
+  isMissingColumn,
+  rememberColumn,
+} from "@/lib/data-access/schema-probe";
 
 export type {
   VendorHistoryKind,
@@ -35,10 +47,139 @@ interface VendorOrderRow {
     | { full_name: string | null; phone: string | null }
     | { full_name: string | null; phone: string | null }[]
     | null;
+  /**
+   * Migration 0025. Optional rather than nullable on purpose: the columns are
+   * NOT NULL in the database, so `undefined` here means only one thing — this
+   * database predates 0025 and cannot answer the question. That is not the same
+   * as "cash", and the board must not render it as such.
+   */
+  payment_method?: PaymentMethod | null;
+  payment_status?: PaymentStatus | null;
+  /**
+   * Migration 0026, stamped by `stamp_order_lifecycle()` on the transition
+   * itself. Null until the order reaches that stage; absent entirely before the
+   * migration lands.
+   */
+  accepted_at?: string | null;
+  ready_at?: string | null;
 }
 
-const SELECT =
-  "id, status, total, created_at, address, order_items(name, qty, price, menu_items(description, image_url)), customer:profiles!orders_customer_id_fkey(full_name, phone)";
+/** Payment columns arrive together in migration 0025 — see schema-probe. */
+const PAYMENT_COLUMNS = "orders.payment_method";
+/**
+ * Lifecycle timestamps arrive together in 0026. Probed separately from the
+ * payment group because the two migrations land independently: a database can
+ * have money columns and no clock, and losing the "in kitchen" line is no
+ * reason to lose the cash badge with it.
+ */
+const LIFECYCLE_COLUMNS = "orders.accepted_at";
+
+interface SelectFlags {
+  /** `payment_method` / `payment_status` only exist from 0025. */
+  payment: boolean;
+  /** `accepted_at` / `ready_at` only exist from 0026. */
+  lifecycle: boolean;
+}
+
+function select(flags: SelectFlags): string {
+  return [
+    "id, status, total, created_at, address",
+    flags.payment ? ", payment_method, payment_status" : "",
+    flags.lifecycle ? ", accepted_at, ready_at" : "",
+    ", order_items(name, qty, price, menu_items(description, image_url))",
+    ", customer:profiles!orders_customer_id_fkey(full_name, phone)",
+  ].join("");
+}
+
+/**
+ * "Either it's cash on delivery, or the money is already in."
+ *
+ * An online order exists from the moment it is placed, but the customer may
+ * still be inside the Razorpay modal — or may have closed it. Cooking on the
+ * strength of an unpaid order is how a kitchen ends up eating the cost, so the
+ * board only shows work that is actually owed. The order isn't hidden from the
+ * customer; it simply doesn't reach the vendor until it settles.
+ */
+const PAID_OR_COD = "payment_method.eq.cod,payment_status.eq.paid";
+
+interface PaymentFilterable {
+  or: (filter: string) => unknown;
+}
+
+/**
+ * Apply the paid-or-COD filter, unless this database predates 0025.
+ *
+ * Before that migration every order is COD by definition, so dropping the
+ * filter shows exactly the same rows — the un-migrated case loses nothing.
+ *
+ * The caller passes the flag rather than this consulting `columnKnownMissing`
+ * itself: during a probe the payment group may have just been turned off for
+ * this very attempt, and filtering on a column we have already dropped from the
+ * select would fail the retry for exactly the reason the retry exists.
+ */
+function withPaymentFilter<T extends PaymentFilterable>(
+  query: T,
+  enabled: boolean
+): T {
+  if (!enabled) return query;
+  return query.or(PAID_OR_COD) as T;
+}
+
+interface QueryResult<T> {
+  data: T | null;
+  error: { code?: string } | null;
+  count?: number | null;
+}
+
+/**
+ * Run a vendor-order query, narrowing the column list on a database that
+ * predates 0025 or 0026.
+ *
+ * Asking PostgREST for a column that doesn't exist is a hard 400, not a null,
+ * so a single un-applied migration would otherwise blank the entire kitchen
+ * board — the one screen a shop cannot work without. Each optional group is
+ * dropped independently and the outcome remembered, so the retry cost is paid
+ * once per process and an environment missing one migration still gets
+ * everything the other provides.
+ */
+async function selectVendorOrders<T>(
+  run: (columns: string, flags: SelectFlags) => PromiseLike<QueryResult<T>>
+): Promise<{ data: T | null; count: number | null }> {
+  const flags: SelectFlags = {
+    payment: !columnKnownMissing(PAYMENT_COLUMNS),
+    lifecycle: !columnKnownMissing(LIFECYCLE_COLUMNS),
+  };
+
+  // `isMissingColumn` doesn't say WHICH column is missing, so drop the newest
+  // migration's group first and re-probe rather than guessing. At most one
+  // attempt per still-optimistic group, plus the final bare one.
+  const groups: Array<{ key: keyof SelectFlags; column: string }> = [
+    { key: "lifecycle", column: LIFECYCLE_COLUMNS },
+    { key: "payment", column: PAYMENT_COLUMNS },
+  ];
+
+  for (const { key, column } of groups) {
+    if (!flags[key]) continue;
+
+    const { data, error, count } = await run(select(flags), flags);
+    if (!error) {
+      for (const g of groups) if (flags[g.key]) rememberColumn(g.column, true);
+      return { data, count: count ?? null };
+    }
+    if (!isMissingColumn(error)) throw error;
+
+    rememberColumn(column, false);
+    flags[key] = false;
+  }
+
+  const { data, error, count } = await run(select(flags), flags);
+  if (error) throw error;
+  return { data, count: count ?? null };
+}
+
+function rowsOf(data: Record<string, unknown>[] | null): VendorOrderRow[] {
+  return (data ?? []) as unknown as VendorOrderRow[];
+}
 
 function customerInitials(name: string, phone: string | null): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
@@ -99,6 +240,13 @@ function mapKitchenOrder(row: VendorOrderRow): KitchenOrder {
     lines: (row.order_items ?? []).map(mapOrderItem),
     total: row.total,
     status: row.status,
+    // Left undefined when the column isn't there, so the UI can stay silent
+    // instead of guessing. A kitchen told "CASH" about a prepaid order sends a
+    // rider to collect money the customer has already paid.
+    paymentMethod: row.payment_method ?? undefined,
+    paymentStatus: row.payment_status ?? undefined,
+    acceptedAt: row.accepted_at,
+    readyAt: row.ready_at,
   };
 }
 
@@ -109,16 +257,21 @@ export async function listKitchenOrders(restaurantId: string): Promise<{
   ready: KitchenOrder[];
 }> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("orders")
-    .select(SELECT)
-    .eq("restaurant_id", restaurantId)
-    .in("status", ["placed", "kitchen", "ready"])
-    .order("created_at", { ascending: false });
 
-  if (error) throw error;
+  const { data } = await selectVendorOrders<Record<string, unknown>[]>(
+    (columns, flags) => {
+      const base = supabase
+        .from("orders")
+        .select(columns)
+        .eq("restaurant_id", restaurantId)
+        .in("status", ["placed", "kitchen", "ready"]);
+      return withPaymentFilter(base, flags.payment)
+        .order("created_at", { ascending: false })
+        .overrideTypes<Record<string, unknown>[]>();
+    }
+  );
 
-  const rows = (data ?? []) as VendorOrderRow[];
+  const rows = rowsOf(data);
   const incoming = rows
     .filter((r) => r.status === "placed")
     .map(mapKitchenOrder);
@@ -138,33 +291,30 @@ export async function listVendorOrderHistory(
   limit = 6
 ): Promise<{ completed: KitchenOrder[]; cancelled: KitchenOrder[] }> {
   const supabase = await createClient();
+
+  // History is deliberately NOT payment-filtered: an online order that was
+  // cancelled before it settled is exactly the row a vendor comes here to look
+  // up, and hiding it would make the cancelled tab lie about what happened.
+  const byStatus = (status: string) =>
+    selectVendorOrders<Record<string, unknown>[]>((columns) =>
+      supabase
+        .from("orders")
+        .select(columns)
+        .eq("restaurant_id", restaurantId)
+        .eq("status", status)
+        .order("created_at", { ascending: false })
+        .limit(limit)
+        .overrideTypes<Record<string, unknown>[]>()
+    );
+
   const [completedRes, cancelledRes] = await Promise.all([
-    supabase
-      .from("orders")
-      .select(SELECT)
-      .eq("restaurant_id", restaurantId)
-      .eq("status", "delivered")
-      .order("created_at", { ascending: false })
-      .limit(limit),
-    supabase
-      .from("orders")
-      .select(SELECT)
-      .eq("restaurant_id", restaurantId)
-      .eq("status", "cancelled")
-      .order("created_at", { ascending: false })
-      .limit(limit),
+    byStatus("delivered"),
+    byStatus("cancelled"),
   ]);
 
-  if (completedRes.error) throw completedRes.error;
-  if (cancelledRes.error) throw cancelledRes.error;
-
   return {
-    completed: ((completedRes.data ?? []) as VendorOrderRow[]).map(
-      mapKitchenOrder
-    ),
-    cancelled: ((cancelledRes.data ?? []) as VendorOrderRow[]).map(
-      mapKitchenOrder
-    ),
+    completed: rowsOf(completedRes.data).map(mapKitchenOrder),
+    cancelled: rowsOf(cancelledRes.data).map(mapKitchenOrder),
   };
 }
 
@@ -204,36 +354,42 @@ export async function listVendorOrderArchive(
       ? (["cancelled"] as const)
       : (["delivered"] as const);
 
-  let q = supabase
-    .from("orders")
-    .select(SELECT, { count: "exact" })
-    .eq("restaurant_id", query.restaurantId)
-    .in("status", [...statuses])
-    .order("created_at", { ascending: false });
-
-  const range = query.range ?? "all";
-  if (range === "this_month") {
-    const { start, end } = monthBounds(0);
-    q = q.gte("created_at", start.toISOString()).lt("created_at", end.toISOString());
-  } else if (range === "previous_month") {
-    const { start, end } = monthBounds(-1);
-    q = q.gte("created_at", start.toISOString()).lt("created_at", end.toISOString());
-  } else if (range === "date" && query.date) {
-    const bounds = dayBounds(query.date);
-    if (bounds) {
-      q = q
-        .gte("created_at", bounds.start.toISOString())
-        .lt("created_at", bounds.end.toISOString());
-    }
-  }
-
   const limit = Math.min(Math.max(query.limit ?? 100, 1), 200);
-  q = q.limit(limit);
+  const range = query.range ?? "all";
 
-  const { data, error, count } = await q;
-  if (error) throw error;
+  const { data, count } = await selectVendorOrders<Record<string, unknown>[]>(
+    (columns) => {
+      let q = supabase
+        .from("orders")
+        .select(columns, { count: "exact" })
+        .eq("restaurant_id", query.restaurantId)
+        .in("status", [...statuses])
+        .order("created_at", { ascending: false });
 
-  let orders = ((data ?? []) as VendorOrderRow[]).map(mapKitchenOrder);
+      if (range === "this_month") {
+        const { start, end } = monthBounds(0);
+        q = q
+          .gte("created_at", start.toISOString())
+          .lt("created_at", end.toISOString());
+      } else if (range === "previous_month") {
+        const { start, end } = monthBounds(-1);
+        q = q
+          .gte("created_at", start.toISOString())
+          .lt("created_at", end.toISOString());
+      } else if (range === "date" && query.date) {
+        const bounds = dayBounds(query.date);
+        if (bounds) {
+          q = q
+            .gte("created_at", bounds.start.toISOString())
+            .lt("created_at", bounds.end.toISOString());
+        }
+      }
+
+      return q.limit(limit).overrideTypes<Record<string, unknown>[]>();
+    }
+  );
+
+  let orders = rowsOf(data).map(mapKitchenOrder);
 
   const search = query.search?.trim().toLowerCase();
   if (search) {
@@ -278,8 +434,69 @@ const KITCHEN_TRANSITIONS: Record<
 };
 
 /**
+ * Tell both sides of the order what just happened.
+ *
+ * Pushes are fire-and-forget by contract (order-events swallows its own
+ * failures) and are therefore not awaited: the transition is already committed,
+ * and a push outage must never undo a status the database has accepted.
+ *
+ * The refund IS awaited, because whether the money is coming back is part of
+ * the sentence we are about to send the customer.
+ */
+async function announceKitchenTransition(
+  orderId: string,
+  status: "kitchen" | "ready" | "cancelled",
+  restaurantName: string | undefined,
+  actorId: string
+): Promise<void> {
+  if (status === "kitchen") {
+    void notifyOrderAccepted(orderId, restaurantName);
+    return;
+  }
+
+  if (status === "ready") {
+    void notifyOrderReady(orderId);
+    return;
+  }
+
+  // A vendor rejecting a PAID online order used to leave the customer's money
+  // exactly where it was: no refund row, no admin queue entry, nothing anyone
+  // could act on. queueRefundForOrder is idempotent (0026 allows one pending
+  // refund per order) and answers queued:false for an order that was never
+  // paid — a COD rejection costs one cheap round trip and claims nothing.
+  let refundQueued = false;
+  try {
+    const result = await queueRefundForOrder(orderId, {
+      origin: "vendor_rejected",
+      requestedBy: actorId,
+    });
+    refundQueued = result.queued;
+  } catch (err) {
+    // The cancellation is already committed. Throwing here would tell the
+    // vendor their rejection failed and invite a retry that can now only ever
+    // return invalid_transition — so surface it in the logs, and say nothing to
+    // the customer about a refund we did not actually manage to queue.
+    console.error(
+      `[vendor-orders] refund could not be queued for ${orderId}`,
+      err
+    );
+  }
+
+  void notifyOrderCancelled(orderId, { byVendor: true, refundQueued });
+}
+
+/**
  * Vendor kitchen status update — requires restaurant ownership and a valid
  * transition from the order's current status.
+ *
+ * This is also where the transition gets announced. Every path that moves a
+ * kitchen order goes through here, so putting the notifications in the route
+ * handler would only mean the next caller forgets them — and a transition
+ * nobody is told about is the bug the customer experiences as silence.
+ *
+ * `accepted_at` / `ready_at` / `cancelled_at` are deliberately NOT written:
+ * 0026 stamps them from a trigger, and guard_order_update() rejects any update
+ * that touches them.
  */
 export async function updateKitchenOrderStatus(
   orderId: string,
@@ -293,7 +510,7 @@ export async function updateKitchenOrderStatus(
 
   const { data: order, error: loadError } = await supabase
     .from("orders")
-    .select("id, status, restaurant_id, restaurants!inner(owner_id)")
+    .select("id, status, restaurant_id, restaurants!inner(owner_id, name)")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -321,5 +538,14 @@ export async function updateKitchenOrderStatus(
     .maybeSingle();
 
   if (error) throw error;
-  return Boolean(data?.id);
+  // The `.eq("status", order.status)` above is the optimistic lock: no row back
+  // means somebody else moved this order between our read and our write, so
+  // nothing transitioned here and there is nothing to announce.
+  if (!data?.id) return false;
+
+  const restaurantName =
+    typeof restaurant.name === "string" ? restaurant.name : undefined;
+  await announceKitchenTransition(orderId, status, restaurantName, user.id);
+
+  return true;
 }

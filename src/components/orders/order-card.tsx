@@ -5,7 +5,7 @@ import { RotateCcw, ChevronRight } from "lucide-react";
 import type { Order } from "@/types";
 import { useCart } from "@/stores/cart-store";
 import { useUI } from "@/stores/ui-store";
-import { STATUS_META } from "@/lib/utils/order-status";
+import { STATUS_META, isOrderInFlight } from "@/lib/utils/order-status";
 import { orderLinesToCartLines } from "@/lib/utils/cart";
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { formatINR } from "@/lib/utils/format";
@@ -18,7 +18,12 @@ export function OrderCard({ order }: { order: Order }) {
   const openCart = useUI((s) => s.openCart);
 
   const meta = STATUS_META[order.status];
-  const live = order.status === "ON_THE_WAY" || order.status === "KITCHEN";
+  // Every stage that hasn't finished, from one shared definition. The old
+  // literal list named only KITCHEN and ON_THE_WAY, so an order that was still
+  // waiting on the restaurant — or was packed and waiting for a rider, once
+  // READY stopped being disguised as KITCHEN — was offered "Order again"
+  // instead of a way to track the one already on its way.
+  const live = isOrderInFlight(order.status);
   const cancelled = order.status === "CANCELLED";
   const tint =
     order.restaurantAccent ??

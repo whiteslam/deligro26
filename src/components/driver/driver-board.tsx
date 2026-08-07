@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
+  Banknote,
   Bike,
   MapPin,
   Package,
@@ -10,7 +12,11 @@ import {
   Phone,
   CheckCircle2,
   IndianRupee,
+  KeyRound,
   Loader2,
+  LocateFixed,
+  LocateOff,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatCard, SectionTitle, Pill } from "@/components/roles/role-ui";
@@ -19,6 +25,193 @@ import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { formatINR } from "@/lib/utils/format";
 import type { DriverBoardData } from "@/lib/data-access/driver-orders";
 import { acceptDeliveryAction, advanceDeliveryAction } from "@/app/driver/actions";
+
+/**
+ * One position posted per this many milliseconds, however fast the device
+ * produces fixes. A phone on a moving bike emits a reading roughly every second;
+ * the customer's map is not more truthful for being told sixty times a minute,
+ * and the rider's data plan and battery are real costs.
+ */
+const LOCATION_REPORT_INTERVAL_MS = 10_000;
+
+type ReportingState =
+  | "off" // nothing in flight, or the server said the delivery is over
+  | "starting" // watching, no fix accepted yet
+  | "reporting" // the server has our position
+  | "denied" // the device refused, and will not be asked again
+  | "unavailable"; // no geolocation here at all
+
+/**
+ * The device's standing answer about geolocation, before we subscribe to
+ * anything. Same helper — and same caveat, that plenty of mobile browsers just
+ * don't answer — as src/stores/location-store.ts.
+ */
+async function geolocationPermission(): Promise<PermissionState | null> {
+  try {
+    const status = await navigator.permissions?.query({ name: "geolocation" });
+    return status?.state ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Report this device's position for as long as a delivery is in flight.
+ *
+ * Not `useLocation` (src/stores/location-store.ts). That store answers a
+ * different question — "which area is this person shopping from" — and answers
+ * it once: best single fix, reverse-geocoded to a place name, cached in
+ * localStorage, wired to an explainer sheet. A rider needs the opposite
+ * lifecycle: a continuous watch, no label, no cache, and no UI in the way of
+ * someone holding a bag of food. What is worth borrowing is borrowed — the
+ * permission probe above, the secure-origin guard (on plain http the browser
+ * reports PERMISSION_DENIED without ever prompting, which reads as a refusal
+ * the user never made), and the rule that a real refusal is final and silent.
+ *
+ * The reported state is *derived* from the delivery it belongs to, so a new job
+ * starts from "starting" without the effect having to reset anything. Every
+ * write to it comes from a callback — a fetch settling, the device objecting —
+ * never from the body of the effect.
+ */
+function useLocationReporting(activeOrderId: string | null): ReportingState {
+  const [tracked, setTracked] = useState<{
+    orderId: string;
+    state: ReportingState;
+  } | null>(null);
+
+  const state: ReportingState = !activeOrderId
+    ? "off"
+    : tracked?.orderId === activeOrderId
+      ? tracked.state
+      : "starting";
+
+  useEffect(() => {
+    if (!activeOrderId) return;
+
+    let watchId: number | null = null;
+    let lastSentAt = 0;
+    let inFlight = false;
+    let cancelled = false; // the effect was torn down
+    let done = false; // we have stopped watching on purpose
+
+    const clearWatch = () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+    };
+
+    const settle = (next: ReportingState) => {
+      if (!cancelled) setTracked({ orderId: activeOrderId, state: next });
+    };
+
+    /** Stop watching for good, and say why. */
+    const finish = (next: ReportingState) => {
+      if (done) return;
+      done = true;
+      clearWatch();
+      settle(next);
+    };
+
+    const send = async (position: GeolocationPosition) => {
+      const now = Date.now();
+      // Throttled on the way out rather than by asking the device for fewer
+      // fixes: a sparse watch takes longer to notice the rider has moved.
+      if (
+        cancelled ||
+        done ||
+        inFlight ||
+        now - lastSentAt < LOCATION_REPORT_INTERVAL_MS
+      ) {
+        return;
+      }
+      inFlight = true;
+      lastSentAt = now;
+
+      try {
+        const response = await fetch("/api/driver/location", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          }),
+        });
+        if (cancelled || done) return;
+
+        if (response.status === 401 || response.status === 403) {
+          // The session ended, or the role changed under us. Neither is fixed by
+          // trying again, so stop rather than hammer.
+          finish("off");
+          return;
+        }
+
+        if (response.ok) {
+          const body = (await response.json().catch(() => null)) as {
+            active?: boolean;
+          } | null;
+          if (cancelled || done) return;
+          if (body?.active === false) {
+            // Delivery closed somewhere else — completed on another device, or
+            // reassigned by an operator. Nothing left to report.
+            finish("off");
+            return;
+          }
+          settle("reporting");
+        }
+        // Anything else (429, 5xx, a rejected fix) is transient from here: keep
+        // the watch and let the next position try again.
+      } catch {
+        // Offline, or the request was dropped mid-ride. Normal on a bike.
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const start = async () => {
+      const permission = await geolocationPermission();
+      if (cancelled) return;
+
+      if (!("geolocation" in navigator) || !window.isSecureContext) {
+        finish("unavailable");
+        return;
+      }
+
+      if (permission === "denied") {
+        // Already refused in device settings. Subscribing would produce a watch
+        // that silently never fires; say so instead.
+        finish("denied");
+        return;
+      }
+
+      watchId = navigator.geolocation.watchPosition(
+        (position) => void send(position),
+        (error) => {
+          if (error.code === error.PERMISSION_DENIED) {
+            // Final, and silent. The OS will not prompt again from here, there
+            // is no dialog we could raise that would change that, and a rider
+            // halfway through a delivery should not be arguing with a popup. We
+            // report nothing at all rather than anything invented; the
+            // customer's map falls back to an interpolated position and says so.
+            finish("denied");
+          }
+          // POSITION_UNAVAILABLE and TIMEOUT are weather, not answers — a
+          // tunnel, a basement, a cold GPS chip. Keep watching.
+        },
+        { enableHighAccuracy: true, maximumAge: 5_000, timeout: 20_000 }
+      );
+    };
+
+    void start();
+
+    return () => {
+      cancelled = true;
+      clearWatch();
+    };
+  }, [activeOrderId]);
+
+  return state;
+}
 
 export function DriverBoard({
   initial,
@@ -37,6 +230,10 @@ export function DriverBoard({
   const [otpError, setOtpError] = useState<string | null>(null);
   const [acceptError, setAcceptError] = useState<string | null>(null);
 
+  // Tied to the delivery, not to the online toggle: a rider carrying someone's
+  // dinner is on duty whether or not a switch on this screen says so.
+  const reporting = useLocationReporting(live && active ? active.job.id : null);
+
   function accept(orderId: string) {
     setBusyId(orderId);
     setAcceptError(null);
@@ -47,7 +244,9 @@ export function DriverBoard({
           setAcceptError(
             result.error === "already_taken"
               ? "Another rider just grabbed this order."
-              : "Couldn't accept the order. Try again."
+              : result.error === "rate_limited"
+                ? "Too many attempts — wait a minute and try again."
+                : "Couldn't accept the order. Try again."
           );
         }
         // Refresh either way: on success the job becomes active; on a lost race
@@ -66,7 +265,13 @@ export function DriverBoard({
       try {
         const result = await advanceDeliveryAction(orderId, code);
         if (result && !result.ok) {
-          setOtpError(result.error === "bad_otp" ? "Wrong code — ask the customer again." : "Couldn't update. Try again.");
+          setOtpError(
+            result.error === "bad_otp"
+              ? "Wrong code — ask the customer again."
+              : result.error === "rate_limited"
+                ? "Too many attempts — wait a minute and try again."
+                : "Couldn't update. Try again."
+          );
           return;
         }
         setOtp("");
@@ -132,20 +337,79 @@ export function DriverBoard({
             Active delivery
           </SectionTitle>
           <div className="card overflow-hidden">
-            <div className="relative h-32 bg-surface-2">
-              <div
-                className="absolute inset-0 opacity-70"
-                style={{
-                  backgroundImage:
-                    "radial-gradient(circle at 30% 40%, var(--accent-soft), transparent 45%), linear-gradient(120deg, var(--surface-2), var(--surface))",
-                }}
-              />
-              <div className="absolute inset-0 grid place-items-center">
-                <span className="text-label">Live map</span>
-              </div>
+            {/* This strip used to be a 128px gradient captioned "Live map". There
+                was no map, and there was nothing live about it. It now carries the
+                one piece of live information the rider needs from this app about
+                the customer's view: whether the customer can actually see them. */}
+            <div className="flex items-center justify-center gap-2 border-b border-line bg-surface-2 px-4 py-3 text-center">
+              {reporting === "reporting" ? (
+                <>
+                  <LocateFixed className="size-4 shrink-0 text-green" />
+                  <span className="text-sm font-semibold text-green">
+                    Sharing your location with the customer
+                  </span>
+                </>
+              ) : reporting === "starting" ? (
+                <>
+                  <LocateFixed className="size-4 shrink-0 text-muted" />
+                  <span className="text-sm text-muted">Finding your position…</span>
+                </>
+              ) : (
+                <>
+                  <LocateOff className="size-4 shrink-0 text-muted" />
+                  <span className="text-sm text-muted">
+                    {reporting === "denied"
+                      ? "Location off — the customer sees an estimate, not you"
+                      : reporting === "unavailable"
+                        ? "This device can't share its location"
+                        : "Not sharing your location"}
+                  </span>
+                </>
+              )}
             </div>
 
             <div className="space-y-4 p-4">
+              {/* Money first, and unmissably. A rider glances at this card once,
+                  at the door, with a bag in one hand. */}
+              {active.payment.instruction === "collect" ? (
+                <div className="rounded-xl border-2 border-deal bg-deal-soft px-4 py-3 text-center">
+                  <p className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-deal">
+                    <Banknote className="size-4" /> Collect cash
+                  </p>
+                  <p className="text-data mt-1 text-3xl font-extrabold text-deal">
+                    {formatINR(active.payment.collectAmount)}
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-deal">
+                    Take the full amount before handing the order over.
+                  </p>
+                </div>
+              ) : active.payment.instruction === "prepaid" ? (
+                <div className="flex items-center gap-2.5 rounded-xl border border-green bg-green-soft px-4 py-3">
+                  <ShieldCheck className="size-5 shrink-0 text-green" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-green">
+                      Prepaid — collect nothing
+                    </p>
+                    <p className="text-xs text-muted">
+                      Already paid online. Do not ask for money.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 rounded-xl border border-accent bg-accent-soft px-4 py-3">
+                  <AlertTriangle className="size-5 shrink-0 text-accent" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-accent">
+                      Payment not confirmed
+                    </p>
+                    <p className="text-xs text-muted">
+                      Placed as an online payment that hasn&apos;t settled. Don&apos;t
+                      collect cash — check with support before handing over.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 grid size-9 place-items-center rounded-full bg-accent-soft text-accent">
                   <MapPin className="size-4" />
@@ -208,18 +472,35 @@ export function DriverBoard({
                   </Button>
                 </div>
               ) : (
-                <Button
-                  className="w-full"
-                  size="lg"
-                  disabled={pending}
-                  onClick={() => advance(active.job.id)}
-                >
-                  {pending && busyId === active.job.id ? (
-                    <><Loader2 className="size-5 animate-spin" /> Updating…</>
-                  ) : (
-                    <><Package className="size-5" /> Picked up — start delivery</>
-                  )}
-                </Button>
+                <div className="space-y-3">
+                  {/* The other half of the handover. The customer reads their code
+                      to the rider at the door; the rider reads this one to the
+                      counter, so the kitchen knows it is releasing the food to the
+                      courier the order was actually assigned to. */}
+                  {active.pickupOtp ? (
+                    <div className="rounded-xl border border-line bg-surface-2 px-4 py-3 text-center">
+                      <p className="text-label flex items-center justify-center gap-1.5">
+                        <KeyRound className="size-3.5" /> Read this to the restaurant
+                      </p>
+                      <p className="text-data mt-1.5 text-3xl font-bold tracking-[0.35em]">
+                        {active.pickupOtp}
+                      </p>
+                    </div>
+                  ) : null}
+                  {otpError ? <p className="text-sm text-accent">{otpError}</p> : null}
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    disabled={pending}
+                    onClick={() => advance(active.job.id)}
+                  >
+                    {pending && busyId === active.job.id ? (
+                      <><Loader2 className="size-5 animate-spin" /> Updating…</>
+                    ) : (
+                      <><Package className="size-5" /> Picked up — start delivery</>
+                    )}
+                  </Button>
+                </div>
               )}
               <p className="text-center text-xs text-muted">
                 Order {active.job.code} · payout {formatINR(active.job.payout)}

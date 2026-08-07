@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, X, LoaderCircle } from "lucide-react";
+import { Check, X, LoaderCircle, Banknote, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/roles/role-ui";
 import { formatINR } from "@/lib/utils/format";
@@ -9,17 +9,50 @@ import { decideRefundAction } from "@/app/admin/actions";
 import type { RefundRow } from "@/lib/data-access/refunds";
 import { shortOrderId } from "@/lib/utils/order-map";
 
-/** One refund. Approve/Deny hit the database — see app/admin/actions.ts. */
+/**
+ * One refund. Approve/Deny hit the database — see app/admin/actions.ts.
+ *
+ * The card says what it is asking the admin to decide, because approving is no
+ * longer only a status change: on an order paid online it moves real money
+ * through Razorpay, and on a cash order it moves none at all and leaves a human
+ * to hand it back. Those are different jobs and the button used to look
+ * identical for both.
+ */
+
+const ORIGIN_LABELS: Record<RefundRow["origin"], string> = {
+  customer: "Customer asked",
+  vendor_rejected: "Restaurant declined the order",
+  admin: "Raised by an admin",
+  system: "Raised automatically",
+};
+
 export function RefundCard({ refund: r }: { refund: RefundRow }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const decide = (decision: "approved" | "rejected") =>
+  const decide = (decision: "approved" | "denied") =>
     startTransition(async () => {
       setError(null);
       const result = await decideRefundAction(r.id, decision);
       if (!result.ok) setError(result.error ?? "Failed");
     });
+
+  // Only a captured online payment can come back through the gateway. Anything
+  // else — cash, an unpaid online order, a database that predates 0025 and
+  // cannot say — is settled off-platform by hand.
+  const paidOnline = r.paymentMethod === "online" && r.paymentStatus === "paid";
+  const partial = r.orderTotal !== null && r.amount !== r.orderTotal;
+
+  // Deliberately four cases, not two. "Cash order" on a row where we simply
+  // don't know how it was paid is a guess about money, and this screen exists
+  // because someone acted on one of those.
+  const paymentLabel = paidOnline
+    ? "Paid online"
+    : r.paymentMethod === "online"
+      ? "Online · unpaid"
+      : r.paymentMethod === "cod"
+        ? "Cash order"
+        : "Payment method not recorded";
 
   return (
     <div className="rounded-2xl border border-line bg-surface p-3.5">
@@ -39,10 +72,51 @@ export function RefundCard({ refund: r }: { refund: RefundRow }) {
             {r.restaurantName ? ` · ${r.restaurantName}` : ""}
           </p>
         </div>
-        <span className="text-data shrink-0 font-semibold">
-          {formatINR(r.amount)}
+        <div className="shrink-0 text-right">
+          <span className="text-data font-semibold">{formatINR(r.amount)}</span>
+          {/* Only shown when the two differ — repeating the same number twice
+              teaches an admin to stop reading it. */}
+          {partial ? (
+            <p className="text-xs text-muted">
+              of {formatINR(r.orderTotal as number)}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
+        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-muted">
+          {ORIGIN_LABELS[r.origin] ?? ORIGIN_LABELS.customer}
+        </span>
+        <span
+          className={
+            paidOnline
+              ? "inline-flex items-center gap-1 rounded-full bg-green/15 px-2 py-0.5 text-green"
+              : "inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-muted"
+          }
+        >
+          {paidOnline ? (
+            <CreditCard className="size-3" />
+          ) : (
+            <Banknote className="size-3" />
+          )}
+          {paymentLabel}
         </span>
       </div>
+
+      <p className="mt-2 text-xs leading-relaxed text-muted">
+        {r.status === "pending"
+          ? paidOnline
+            ? `Approving returns ${formatINR(r.amount)} to the customer through Razorpay.`
+            : "No online payment to reverse — approving records the decision, the money still goes back by hand."
+          : r.status === "denied"
+            ? "Denied. Nothing was returned."
+            : r.settledAt
+              ? `Refunded through Razorpay${r.providerRefundId ? ` · ${r.providerRefundId}` : ""}.`
+              : r.providerRefundId
+                ? `Sent to Razorpay and not settled yet · ${r.providerRefundId}.`
+                : "Approved. Settle this one off-platform — nothing was sent to a gateway."}
+      </p>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
         {error ? (
@@ -65,7 +139,7 @@ export function RefundCard({ refund: r }: { refund: RefundRow }) {
               variant="outline"
               size="sm"
               disabled={pending}
-              onClick={() => decide("rejected")}
+              onClick={() => decide("denied")}
             >
               <X className="size-4" /> Deny
             </Button>

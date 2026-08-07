@@ -6,16 +6,24 @@ import {
   computeRiderPosition,
   type TrackPoint,
 } from "@/lib/tracking/rider-position";
+import type { OrderEta } from "@/lib/orders/eta";
+import type { RiderPositionSource } from "@/lib/data-access/order-tracking";
 import { DEFAULT_CENTER } from "@/lib/maps/config";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export interface LiveTrackingState {
   status: OrderStatus;
-  etaMinutes: number;
+  /**
+   * The server's estimate, recomputed on every poll. Null until the first one
+   * lands (or forever, on a mock order) — the view falls back to the
+   * restaurant's advertised band and says nothing it can't support.
+   */
+  eta: OrderEta | null;
   rider: Rider | null;
   restaurant: TrackPoint;
   destination: TrackPoint;
   riderPosition: TrackPoint | null;
+  riderPositionSource: RiderPositionSource;
 }
 
 interface TrackingInterp {
@@ -24,20 +32,22 @@ interface TrackingInterp {
   assignedAt: string | null;
   pickedUpAt: string | null;
   storedRider: (TrackPoint & { at: string | null }) | null;
+  /** The road leg, in minutes — how long the pin should take to cross it. */
+  rideMinutes: number;
 }
 
 export function useLiveTracking(
   orderId: string,
   initial: {
     status: OrderStatus;
-    etaMinutes?: number;
+    eta?: OrderEta | null;
     rider?: Rider | null;
   }
 ) {
   const isUuid = /^[0-9a-f-]{36}$/i.test(orderId);
   const [tracking, setTracking] = useState<LiveTrackingState>({
     status: initial.status,
-    etaMinutes: initial.etaMinutes ?? 25,
+    eta: initial.eta ?? null,
     rider: initial.rider ?? null,
     restaurant: {
       lat: DEFAULT_CENTER.lat + 0.012,
@@ -45,6 +55,8 @@ export function useLiveTracking(
     },
     destination: DEFAULT_CENTER,
     riderPosition: null,
+    // Nothing has been reported yet, and there is no pin to describe.
+    riderPositionSource: "none",
   });
   const [interp, setInterp] = useState<TrackingInterp | null>(null);
   // Seeded with the current time rather than 0, so the very first render can
@@ -64,11 +76,14 @@ export function useLiveTracking(
         const t = data.tracking;
         setTracking({
           status: t.status,
-          etaMinutes: t.etaMinutes,
+          eta: t.eta ?? null,
           rider: t.rider,
           restaurant: t.restaurant,
           destination: t.destination,
           riderPosition: t.riderPosition,
+          // Absent means an older payload, which we must read as "not proven
+          // live" rather than as a claim of GPS.
+          riderPositionSource: t.riderPositionSource ?? "estimated",
         });
         if (t.interp) setInterp(t.interp);
       }
@@ -117,13 +132,26 @@ export function useLiveTracking(
           restaurant: tracking.restaurant,
           destination: tracking.destination,
           storedRider: interp.storedRider,
-          etaMinutes: tracking.etaMinutes,
+          // The road leg, not the door-to-door promise — see order-tracking.ts.
+          etaMinutes: interp.rideMinutes,
           now: tick,
         })
       : tracking.riderPosition;
 
+  const riderPosition = animatedRider ?? tracking.riderPosition;
+
   return {
     ...tracking,
-    riderPosition: animatedRider ?? tracking.riderPosition,
+    riderPosition,
+    // The server decided this label against the same 45s window
+    // `computeRiderPosition` uses, and we re-poll every 3s — so it can only ever
+    // be a few seconds behind the pin it describes, and only in the direction of
+    // claiming GPS a moment after the fix went stale. Any position we have
+    // invented locally, without a snapshot to back it, is never "gps".
+    riderPositionSource: riderPosition
+      ? tracking.riderPositionSource === "none"
+        ? "estimated"
+        : tracking.riderPositionSource
+      : "none",
   };
 }

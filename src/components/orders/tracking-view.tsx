@@ -12,13 +12,20 @@ import {
   ShieldCheck,
   XCircle,
   Loader2,
+  Navigation,
+  Clock,
 } from "lucide-react";
-import type { Order } from "@/types";
 import { PageHeader } from "@/components/layout/page-header";
 import { TrackingMap } from "@/components/orders/tracking-map";
+import { RefundRequest } from "@/components/orders/refund-request";
 import { useLiveTracking } from "@/hooks/use-live-tracking";
-import { trackingSteps, statusIndex } from "@/lib/utils/order-status";
-import { shortOrderId } from "@/lib/utils/order-map";
+import {
+  trackingSteps,
+  statusIndex,
+  canCustomerCancel,
+} from "@/lib/utils/order-status";
+import { shortOrderId, isOrderPaid, type UiOrder } from "@/lib/utils/order-map";
+import type { OrderEta } from "@/lib/orders/eta";
 import { formatINR } from "@/lib/utils/format";
 import { DEFAULT_CENTER } from "@/lib/maps/config";
 import { cn } from "@/lib/utils/cn";
@@ -30,12 +37,43 @@ function callablePhone(phone: string | undefined): string | null {
   return digits.startsWith("91") ? `+${digits}` : `+91${digits.slice(-10)}`;
 }
 
+/** "1 minute" / "12 minutes" — the lateness line reads as a sentence. */
+function minutesLabel(n: number): string {
+  return `${n} minute${n === 1 ? "" : "s"}`;
+}
+
+/**
+ * What to call the total.
+ *
+ * This line used to be `Total {delivered ? "paid" : "(Cash)"}` — written before
+ * migration 0025 existed, when cash was the only way to pay. It told a customer
+ * who had already paid by card that they owed cash, and told a customer whose
+ * online payment had failed that the bill was settled the moment it was marked
+ * delivered.
+ */
+function totalLabel(order: UiOrder, delivered: boolean): string {
+  if (order.paymentStatus === "refunded") return "Total refunded";
+  if (isOrderPaid(order)) return "Total paid";
+  // Online and not marked paid means the money has not landed, whatever the
+  // delivery state claims — only a verified signature moves `payment_status`.
+  if (order.paymentMethod === "online") return "Total (online, unpaid)";
+  // Cash, or a database before 0025 where cash was the only option. Handed over
+  // at the door, so it is owed until the order is delivered and settled after.
+  return delivered ? "Total paid (Cash)" : "Total (Cash)";
+}
+
 export function TrackingView({
   order,
   deliveryOtp,
+  initialEta,
 }: {
-  order: Order;
+  order: UiOrder;
   deliveryOtp?: string | null;
+  /**
+   * Computed server-side for the first paint, so the headline is not a
+   * per-restaurant constant for the frame before the first poll answers.
+   */
+  initialEta?: OrderEta | null;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -52,19 +90,32 @@ export function TrackingView({
   const isUuid = /^[0-9a-f-]{36}$/i.test(order.id);
   const live = useLiveTracking(order.id, {
     status: order.status,
-    etaMinutes: order.etaMinutes,
+    eta: initialEta,
     rider: order.rider ?? null,
   });
 
   const displayStatus = isUuid ? live.status : order.status;
-  const displayEta = isUuid ? live.etaMinutes : order.etaMinutes;
   const displayRider = isUuid ? (live.rider ?? order.rider) : order.rider;
 
+  const steps = trackingSteps({
+    restaurantName: order.restaurantName,
+    riderName: displayRider?.name,
+  });
   const current = statusIndex(displayStatus);
   const delivered = displayStatus === "DELIVERED";
   const cancelled = displayStatus === "CANCELLED";
-  const canCancel =
-    displayStatus === "PLACED" || displayStatus === "KITCHEN";
+  // Mirrors the CANCELLABLE set in /api/orders/[id]/cancel. Offering it any
+  // wider produces a 409 the customer reads as "the kitchen already started" —
+  // which is what every `ready` order got, back when `ready` was displayed as
+  // KITCHEN and this condition was written against the display value.
+  const canCancel = canCustomerCancel(displayStatus);
+  const paid = isOrderPaid(order);
+
+  // A real countdown once the backend is live; the restaurant's advertised
+  // number is all a mock order has, and it is labelled as an estimate below
+  // rather than dressed up as a live one.
+  const eta = isUuid ? live.eta : null;
+  const minutesRemaining = eta?.minutesRemaining ?? null;
 
   const mockRestaurant = useMemo(
     () => ({
@@ -77,11 +128,17 @@ export function TrackingView({
 
   const restaurant = isUuid ? live.restaurant : mockRestaurant;
   const destination = isUuid ? live.destination : mockDestination;
+  // READY belongs here now that it is its own status: the courier is often
+  // already assigned and on their way to the shop while the food waits on the
+  // pass. It used to be included by accident, because `ready` displayed as
+  // KITCHEN.
   const showRiderOnMap =
     !delivered &&
     !cancelled &&
     Boolean(displayRider) &&
-    (displayStatus === "ON_THE_WAY" || displayStatus === "KITCHEN");
+    (displayStatus === "ON_THE_WAY" ||
+      displayStatus === "READY" ||
+      displayStatus === "KITCHEN");
   const riderOnMap = isUuid
     ? live.riderPosition
     : showRiderOnMap
@@ -90,6 +147,15 @@ export function TrackingView({
           lng: mockRestaurant.lng + (mockDestination.lng - mockRestaurant.lng) * 0.55,
         }
       : null;
+
+  // The dot is only a rider's location when a rider's device said so
+  // (deliveries.driver_location_source = 'gps', migration 0026). Anything else
+  // — a database without the column, a courier not sharing, a fix gone stale —
+  // is a point drawn from the route and the clock, and the mock path is not
+  // even that. Showing it is still useful; presenting it as live is not ours to
+  // do, so the caption below says which it is.
+  const riderPositionEstimated =
+    Boolean(riderOnMap) && (!isUuid || live.riderPositionSource !== "gps");
 
   const riderTel = callablePhone(displayRider?.phone);
 
@@ -135,13 +201,27 @@ export function TrackingView({
     }
   }
 
+  /*
+   * The big number.
+   *
+   * `minutesRemaining` is already floored at zero in `lib/orders/eta.ts`, so a
+   * blown estimate reads "Arriving now" and the lateness line below carries the
+   * actual news — rather than the countdown silently going negative, or worse,
+   * sticking at a number the food passed twenty minutes ago.
+   */
   const headline = delivered
     ? "Delivered"
     : cancelled
       ? "Cancelled"
-      : displayEta
-        ? `${displayEta} min`
-        : "Arriving";
+      : minutesRemaining !== null
+        ? minutesRemaining > 0
+          ? `${minutesRemaining} min`
+          : "Arriving now"
+        : order.etaMinutes
+          ? `~${order.etaMinutes} min`
+          : "Arriving";
+
+  const showLateness = !delivered && !cancelled && Boolean(eta?.late);
 
   return (
     <div className="relative">
@@ -188,6 +268,16 @@ export function TrackingView({
           </p>
         </div>
 
+        {/* No cause is offered, because we do not know one. A late order is a
+            fact about the clock; guessing at traffic or a busy kitchen would be
+            inventing the one part of this screen we have no evidence for. */}
+        {showLateness && eta ? (
+          <p className="flex items-center justify-center gap-2 rounded-2xl bg-deal-soft px-3 py-2.5 text-center text-sm font-bold text-deal">
+            <Clock className="size-4 shrink-0" />
+            Running about {minutesLabel(eta.lateByMinutes)} late
+          </p>
+        ) : null}
+
         {delivered ? (
           <div className="rounded-2xl bg-green-soft p-5 text-center">
             <p className="text-[15px] font-bold">
@@ -214,13 +304,10 @@ export function TrackingView({
           </div>
         ) : cancelled ? null : (
           <ol className="pl-1">
-            {trackingSteps({
-              restaurantName: order.restaurantName,
-              riderName: displayRider?.name,
-            }).map((step, i) => {
+            {steps.map((step, i) => {
               const done = i < current;
               const active = i === current;
-              const last = i === 3;
+              const last = i === steps.length - 1;
               return (
                 <li key={step.key} className="flex gap-3.5">
                   <div className="flex flex-col items-center">
@@ -264,6 +351,23 @@ export function TrackingView({
             })}
           </ol>
         )}
+
+        {/* The map draws the same confident green dot whether or not anybody
+            reported a position, so the correction has to be made in words. The
+            pin still earns its place — it shows progress along the route, which
+            is real — but calling it the rider's location when
+            `driver_location_source` says otherwise is the claim this caption
+            takes back. It disappears of its own accord the moment a rider's
+            device starts reporting. */}
+        {showRiderOnMap && riderPositionEstimated ? (
+          <p className="flex items-start gap-2 rounded-2xl bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-muted">
+            <Navigation className="mt-0.5 size-3.5 shrink-0" />
+            <span>
+              The courier pin is an estimate along the route — this rider
+              isn&apos;t sharing a live location.
+            </span>
+          </p>
+        ) : null}
 
         {deliveryOtp && !delivered && !cancelled ? (
           <div className="flex items-center gap-3 rounded-2xl bg-accent-soft p-4">
@@ -345,12 +449,23 @@ export function TrackingView({
             ))}
           </ul>
           <div className="mt-3 flex justify-between border-t border-line pt-3">
-            <span className="font-extrabold">Total {delivered ? "paid" : "(Cash)"}</span>
+            <span className="font-extrabold">{totalLabel(order, delivered)}</span>
             <span className="text-data text-base font-extrabold">
               {formatINR(order.total)}
             </span>
           </div>
         </div>
+
+        {/* Once an order is finished — delivered or cancelled — asking for money
+            back is the only thing left to do with it. Mock orders are excluded
+            because there is no row behind them to refund. */}
+        {isUuid && (delivered || cancelled) ? (
+          <RefundRequest
+            orderId={order.id}
+            orderTotal={order.total}
+            paid={paid}
+          />
+        ) : null}
 
         {canCancel ? (
           <div className="space-y-1">

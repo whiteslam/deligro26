@@ -1,11 +1,26 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { getProfile } from "@/lib/auth";
+import { hasVendorAccess } from "@/lib/auth/vendor-access";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { updateKitchenOrderStatus } from "@/lib/data-access/vendor-orders";
 
 const ALLOWED = new Set(["kitchen", "ready", "cancelled"]);
 
-/** PATCH /api/orders/:id/status — restaurant kitchen transitions only. */
+/**
+ * PATCH /api/orders/:id/status — restaurant kitchen transitions only.
+ *
+ * The gate is vendor *access*, not the `restaurant` role. Since commit be36941
+ * a person can run a shop while their profile stays `customer` ("stay both" —
+ * their role has to remain customer for order-insert RLS to let them shop), and
+ * a role check refused every one of them: they passed the /vendor layout gate,
+ * saw their orders on the board, and got a 403 on both Accept and Reject. The
+ * board was decorative for that entire class of vendor.
+ *
+ * This is the cheap first door, not the lock. `updateKitchenOrderStatus`
+ * re-checks `restaurants.owner_id` against the caller for this specific order,
+ * so passing here still gets you nowhere near somebody else's kitchen.
+ */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -19,21 +34,20 @@ export async function PATCH(
     );
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const profile = await getProfile();
+  if (!profile) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
+  // Throttled between authentication and authorization on purpose: the vendor
+  // check below is itself a database round trip for a shop-owning customer, so
+  // bounding the caller first keeps an authenticated flood from turning into
+  // two queries per request. A kitchen moves orders by hand, so a minute's
+  // worth of human work sits comfortably under this ceiling.
+  const limit = await rateLimit(`order-status:${profile.id}`, 60, 60_000);
+  if (!limit.ok) return tooManyRequests(limit);
 
-  if (profile?.role !== "restaurant") {
+  if (!(await hasVendorAccess(profile))) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

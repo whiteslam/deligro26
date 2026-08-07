@@ -1,17 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
+  Banknote,
   Bell,
   Check,
   ChefHat,
   ChevronDown,
   Clock,
   ClipboardList,
+  CreditCard,
   ExternalLink,
   MapPin,
   Phone,
   Sparkles,
+  Timer,
   User,
   UtensilsCrossed,
   X,
@@ -53,6 +56,126 @@ function orderDescription(order: KitchenOrder): string {
   return `${customer} · ${order.area}`;
 }
 
+const BADGE =
+  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide";
+
+/**
+ * How this order is paid, in the two words a kitchen actually needs.
+ *
+ * The board had nothing here at all, which was survivable while every order was
+ * cash and became dangerous the moment online payment shipped: the person
+ * packing the bag and the rider taking it both have to know whether ₹420 is
+ * still owed at the door, and neither had any way to find out.
+ *
+ * Renders nothing when `paymentMethod` is undefined — a database that predates
+ * 0025 cannot answer the question, and inventing "CASH" for an order we cannot
+ * classify is the exact failure that has a rider asking a prepaid customer to
+ * pay twice. Silence is recoverable; a confident wrong answer is not.
+ */
+function PaymentBadge({ order }: { order: KitchenOrder }) {
+  if (!order.paymentMethod) return null;
+
+  if (order.paymentMethod === "cod") {
+    return (
+      <span className={cn(BADGE, "bg-pop/25 text-ink")}>
+        <Banknote className="size-3" />
+        Cash {formatINR(order.total)}
+      </span>
+    );
+  }
+
+  if (order.paymentStatus === "paid") {
+    return (
+      <span className={cn(BADGE, "bg-green/15 text-green")}>
+        <CreditCard className="size-3" />
+        Paid online
+      </span>
+    );
+  }
+
+  if (order.paymentStatus === "refunded") {
+    return (
+      <span className={cn(BADGE, "bg-surface-2 text-muted")}>
+        <CreditCard className="size-3" />
+        Refunded
+      </span>
+    );
+  }
+
+  // Everything else — pending, failed, and deliberately also `authorized`,
+  // which is Razorpay's captured-but-not-settled state. 0025 keeps it distinct
+  // from `paid` so a manual-capture account never reads as settled, and this
+  // badge honours that: not paid yet is not paid.
+  return (
+    <span className={cn(BADGE, "bg-red-500/10 text-red-500")}>
+      <CreditCard className="size-3" />
+      Online · unpaid
+    </span>
+  );
+}
+
+/**
+ * The wall clock, as an external store.
+ *
+ * Elapsed time is the one thing on this board that changes without React being
+ * told, so it is subscribed to rather than kept in state — and the server
+ * snapshot being null is the point: the markup Node renders and the markup the
+ * browser hydrates agree on "nothing here yet", and the figure appears on the
+ * first tick afterwards. Reading Date.now() during render instead would make
+ * "14 min" on the server and "15 min" in the browser a hydration error every
+ * time the two land either side of a minute boundary.
+ */
+const CLOCK_TICK_MS = 20_000;
+let clockNow = 0;
+
+function subscribeToClock(onChange: () => void): () => void {
+  clockNow = Date.now();
+  const timer = window.setInterval(() => {
+    clockNow = Date.now();
+    onChange();
+  }, CLOCK_TICK_MS);
+  return () => window.clearInterval(timer);
+}
+
+function getClockNow(): number {
+  return clockNow;
+}
+
+function getServerClockNow(): number {
+  return 0;
+}
+
+/** Current time on the client, or null before the first subscription lands. */
+function useClockNow(): number | null {
+  const now = useSyncExternalStore(
+    subscribeToClock,
+    getClockNow,
+    getServerClockNow
+  );
+  return now === 0 ? null : now;
+}
+
+/**
+ * How long this order has been on the stove. Stated, not judged — this system
+ * has no promised prep time, so the card reports what the clock says and leaves
+ * "is that too long?" to the person who knows the kitchen.
+ */
+function KitchenTimer({ since }: { since?: string | null }) {
+  const now = useClockNow();
+  if (!since || now === null) return null;
+
+  const startedAt = new Date(since).getTime();
+  if (Number.isNaN(startedAt)) return null;
+  const minutes = Math.max(0, Math.floor((now - startedAt) / 60_000));
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Timer className="size-3.5 shrink-0" />
+      {minutes < 1 ? "just accepted" : `${minutes} min in kitchen`}
+    </span>
+  );
+}
+
 function ItemThumb({
   src,
   name,
@@ -88,10 +211,13 @@ function ItemThumb({
 function OrderCard({
   order,
   variant = "default",
+  meta,
   children,
 }: {
   order: KitchenOrder;
   variant?: "new" | "default";
+  /** Extra line-of-facts for the header row, e.g. the in-kitchen clock. */
+  meta?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(variant === "new");
@@ -122,6 +248,7 @@ function OrderCard({
                 New
               </span>
             ) : null}
+            <PaymentBadge order={order} />
           </div>
           <p className="mt-0.5 line-clamp-1 text-sm font-bold leading-snug">
             {title}
@@ -135,6 +262,7 @@ function OrderCard({
             <span className="text-data font-bold text-ink">
               {formatINR(order.total)}
             </span>
+            {meta}
           </div>
         </div>
         <ChevronDown
@@ -280,7 +408,11 @@ function PreparingList({
   return (
     <div className="space-y-3">
       {orders.map((o) => (
-        <OrderCard key={o.id} order={o}>
+        <OrderCard
+          key={o.id}
+          order={o}
+          meta={<KitchenTimer since={o.acceptedAt} />}
+        >
           <Button
             variant="outline"
             size="sm"
@@ -380,6 +512,10 @@ function HistoryOrderCard({
                 ? "Cancelled"
                 : statusLabel(order.status ?? "delivered")}
             </span>
+            {/* Also here, not just on the live board: "was this one paid?" is
+                the first question asked of a cancelled order, and the answer
+                decides whether a refund is owed. */}
+            <PaymentBadge order={order} />
           </div>
           <p className="mt-1 line-clamp-1 text-sm font-bold leading-snug">
             {title}
@@ -631,6 +767,10 @@ export function VendorOrdersBoard({
 
   function acceptLocal(o: KitchenOrder) {
     setIncoming((prev) => prev.filter((x) => x.id !== o.id));
+    // `acceptedAt` is left alone on purpose: the database stamps it from the
+    // transition trigger, so the in-kitchen clock stays blank for the few
+    // seconds until the next refresh brings back the real time rather than
+    // starting from a guess made in the browser.
     setPreparing((prev) => [{ ...o, status: "kitchen" }, ...prev]);
     setMobileTab("prep");
   }

@@ -11,6 +11,15 @@ export default async function AdminRefundsPage() {
   const pending = refunds.filter((r) => r.status === "pending");
   const pendingAmount = pending.reduce((sum, r) => sum + (r.amount ?? 0), 0);
 
+  // Which of the waiting decisions the gateway can actually carry out. The rest
+  // are cash (or an online order nobody paid for), and approving one of those
+  // obliges a person to hand money back — worth knowing before opening the
+  // queue, not after approving twenty of them.
+  const gatewayCount = pending.filter(
+    (r) => r.paymentMethod === "online" && r.paymentStatus === "paid"
+  ).length;
+  const manualCount = pending.length - gatewayCount;
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -27,7 +36,7 @@ export default async function AdminRefundsPage() {
         <EmptyState
           icon={RotateCcw}
           title="No refund requests"
-          description="When a customer requests a refund it lands here for your review."
+          description="When a customer requests a refund — or an order they paid for is cancelled — it lands here for your review."
         />
       ) : (
         <>
@@ -37,6 +46,7 @@ export default async function AdminRefundsPage() {
               tone="accent"
               label="Awaiting"
               value={pending.length}
+              hint={manualCount > 0 ? `${manualCount} by hand` : undefined}
             />
             <StatCard
               icon={<Wallet className="size-4" />}
@@ -45,6 +55,17 @@ export default async function AdminRefundsPage() {
               value={formatINR(pendingAmount)}
             />
           </div>
+
+          {/* Says what Approve does, because it does two different things. A
+              screen that implies the gateway handles every refund is how a cash
+              refund gets marked settled and never paid. */}
+          <p className="rounded-xl border border-line bg-surface px-3.5 py-3 text-sm leading-relaxed text-muted">
+            Approving an order that was <strong className="text-ink">paid
+            online</strong> returns the money through Razorpay and records the
+            gateway&apos;s refund id. A <strong className="text-ink">cash
+            order</strong> has nothing to reverse: approving records your
+            decision, and the money is settled off-platform by hand.
+          </p>
 
           <div className="space-y-2.5">
             {refunds.map((r) => (

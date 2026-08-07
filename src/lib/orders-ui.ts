@@ -10,12 +10,17 @@ import {
   ACTIVE_DB_STATUSES,
   dbStatusToUi,
   mapDbOrderRow,
+  type UiOrder,
 } from "@/lib/utils/order-map";
-import type { Order } from "@/types";
 
+/**
+ * `UiOrder` rather than `Order`: a live row carries its payment state and its
+ * raw `created_at`, and the tracking screen needs both. A `UiOrder` is an
+ * `Order`, so the mock orders below and every list consumer are unaffected.
+ */
 export interface OrdersPageData {
-  active: Order | null;
-  past: Order[];
+  active: UiOrder | null;
+  past: UiOrder[];
   /** True when showing mock orders (no backend). */
   isDemo: boolean;
 }
@@ -65,7 +70,7 @@ export async function getOrdersPageData(): Promise<OrdersPageData> {
 }
 
 /** Single order for tracking — live DB only when Supabase is on. */
-export async function getOrderForTracking(id: string): Promise<Order | null> {
+export async function getOrderForTracking(id: string): Promise<UiOrder | null> {
   if (isSupabaseConfigured) {
     try {
       const row = await getOrderById(id);
@@ -81,7 +86,7 @@ export async function getOrderForTracking(id: string): Promise<Order | null> {
 }
 
 /** Active order strip on home — null when none. */
-export async function getActiveOrderForHome(): Promise<Order | null> {
+export async function getActiveOrderForHome(): Promise<UiOrder | null> {
   const { active } = await getOrdersPageData();
   return active;
 }
