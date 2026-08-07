@@ -74,7 +74,14 @@ function Toggle({
   );
 }
 
-export function SettingsForm({ settings }: { settings: PlatformSettings }) {
+export function SettingsForm({
+  settings,
+  razorpayConfigured = false,
+}: {
+  settings: PlatformSettings;
+  /** Are the Razorpay keys present in this environment? */
+  razorpayConfigured?: boolean;
+}) {
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(
     saveSettingsAction,
     { ok: false }
@@ -228,6 +235,45 @@ export function SettingsForm({ settings }: { settings: PlatformSettings }) {
             defaultChecked={settings.featurePickDrop}
           />
         </div>
+      </Section>
+
+      <Section
+        title="Payments"
+        desc="Cash on delivery is always available. Online payment is off until you turn it on here."
+      >
+        <Toggle
+          name="featureOnlinePayment"
+          label="Online payment (Razorpay)"
+          desc={
+            razorpayConfigured
+              ? "UPI, cards, netbanking and wallets at checkout."
+              : "Razorpay keys are not set in this environment — customers keep seeing “Available soon” until they are, whether or not this is on."
+          }
+          defaultChecked={settings.featureOnlinePayment}
+        />
+        {!razorpayConfigured ? (
+          <p className="rounded-xl border border-line bg-surface-2 px-3.5 py-3 text-xs text-muted">
+            Set <code className="rounded bg-surface px-1">RAZORPAY_KEY_ID</code>,{" "}
+            <code className="rounded bg-surface px-1">RAZORPAY_KEY_SECRET</code>{" "}
+            and{" "}
+            <code className="rounded bg-surface px-1">
+              RAZORPAY_WEBHOOK_SECRET
+            </code>{" "}
+            (plus{" "}
+            <code className="rounded bg-surface px-1">
+              NEXT_PUBLIC_RAZORPAY_KEY_ID
+            </code>{" "}
+            for the browser checkout), then point a Razorpay webhook at{" "}
+            <code className="rounded bg-surface px-1">
+              /api/payments/razorpay/webhook
+            </code>
+            . Migration{" "}
+            <code className="rounded bg-surface px-1">
+              0025_payments_razorpay.sql
+            </code>{" "}
+            must be applied too.
+          </p>
+        ) : null}
       </Section>
 
       <Section

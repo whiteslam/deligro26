@@ -12,6 +12,8 @@ import {
   AlertTriangle,
   Trash2,
   Bike,
+  Banknote,
+  CreditCard,
 } from "lucide-react";
 import { useCart } from "@/stores/cart-store";
 import { ACTIVE_ORDER } from "@/lib/data";
@@ -25,8 +27,13 @@ import { useSavedAddresses } from "@/hooks/use-saved-addresses";
 import { cn } from "@/lib/utils/cn";
 import { formatINR } from "@/lib/utils/format";
 import { computeChargesWith, TIP_OPTIONS } from "@/lib/pricing";
+import {
+  openRazorpayCheckout,
+  RazorpayDismissedError,
+} from "@/lib/payments/razorpay-checkout";
+import type { PaymentMethod } from "@/types";
 
-type CheckoutStatus = "ready" | "processing" | "placed";
+type CheckoutStatus = "ready" | "processing" | "paying" | "placed";
 
 /** Live platform config from the Admin Settings tab — the same values billed. */
 export interface CheckoutConfig {
@@ -36,6 +43,13 @@ export interface CheckoutConfig {
   minOrder: number;
   acceptingOrders: boolean;
   maintenanceMessage: string;
+  /**
+   * Whether online payment is actually on offer — the admin toggle AND the
+   * Razorpay keys, resolved server-side. False renders the option as
+   * "Available soon" and leaves COD as the only choice, which is the state the
+   * feature ships in.
+   */
+  onlinePayments: boolean;
 }
 
 export function CheckoutView({ config }: { config: CheckoutConfig }) {
@@ -75,6 +89,12 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   const [courierInstructions, setCourierInstructions] = useState("");
 
   const [tip, setTip] = useState(0);
+
+  // COD is the only method until the server says otherwise. Never initialised
+  // from the config: an admin turning payments off mid-session must not leave a
+  // stale "online" selection that the order API will refuse.
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+  const payOnline = config.onlinePayments && paymentMethod === "online";
 
   // One definition of what an order costs, from the live platform settings the
   // server bills with — so the quote here equals the charge.
@@ -141,6 +161,69 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
     router.back();
   }
 
+  /**
+   * Take payment for an order that already exists and is already priced.
+   *
+   * Returns true only once the server has verified the signature. Anything else
+   * — dismissal, gateway failure, a signature that doesn't check out — leaves
+   * the order in place and unpaid, which is the honest outcome: the customer
+   * can retry from the order screen, and the kitchen doesn't see it meanwhile.
+   */
+  async function payForOrder(orderId: string): Promise<boolean> {
+    const openRes = await fetch("/api/payments/razorpay/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId }),
+    });
+    const handoff = (await openRes.json()) as {
+      keyId?: string;
+      providerOrderId?: string;
+      amountPaise?: number;
+      currency?: string;
+      error?: string;
+    };
+
+    if (!openRes.ok || !handoff.keyId || !handoff.providerOrderId) {
+      setError(
+        handoff.error === "payments_unavailable"
+          ? "Online payment isn't available right now — your order is saved, pay cash on delivery or retry from your orders."
+          : "Couldn't start the payment. Your order is saved — you can retry from your orders."
+      );
+      return false;
+    }
+
+    const result = await openRazorpayCheckout({
+      keyId: handoff.keyId,
+      providerOrderId: handoff.providerOrderId,
+      amountPaise: handoff.amountPaise ?? 0,
+      currency: handoff.currency ?? "INR",
+      name: restaurantName ?? "Deligro",
+      description: `Order ${orderId.slice(0, 8)}`,
+    });
+
+    const verifyRes = await fetch("/api/payments/razorpay/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId,
+        razorpayOrderId: result.razorpayOrderId,
+        razorpayPaymentId: result.razorpayPaymentId,
+        signature: result.signature,
+      }),
+    });
+
+    if (!verifyRes.ok) {
+      // The money may still have left their account — Razorpay's webhook is the
+      // authority and will settle it. Say so rather than claiming failure.
+      setError(
+        "We couldn't confirm the payment yet. If you were charged, your order will update shortly."
+      );
+      return false;
+    }
+
+    return true;
+  }
+
   const placeOrder = async () => {
     setError(null);
 
@@ -188,6 +271,9 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
             // The tip is money: the server re-derives the total including it,
             // rather than us telling it what to charge.
             tip,
+            // A request, not an instruction — the server re-checks that online
+            // payment is on offer and refuses the order if it isn't.
+            paymentMethod: payOnline ? "online" : "cod",
             address: {
               label: selectedAddress.label,
               line: [
@@ -219,10 +305,35 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
               ? "Something in your cart is no longer available."
               : data.error === "tip_unsupported"
                 ? "Tipping isn't available right now — set the tip to “No tip” to place your order."
-                : "Could not place the order. Try again."
+                : data.error === "online_payments_unavailable"
+                  ? "Online payment isn't available yet — switch to Cash on delivery to place your order."
+                  : "Could not place the order. Try again."
           );
           setStatus("ready");
           return;
+        }
+
+        // The order exists and is priced; now collect the money for it. An
+        // unpaid online order stays off the kitchen board until it settles.
+        if (payOnline) {
+          setStatus("paying");
+          try {
+            const paid = await payForOrder(data.order.id);
+            if (!paid) {
+              // payForOrder has already explained what happened. The cart is
+              // kept so nothing is lost if they want to start over.
+              setStatus("ready");
+              return;
+            }
+          } catch (err) {
+            setError(
+              err instanceof RazorpayDismissedError
+                ? "Payment cancelled — your order is saved and unpaid. Retry from your orders."
+                : "The payment didn't go through. Your order is saved — you can retry from your orders."
+            );
+            setStatus("ready");
+            return;
+          }
         }
 
         setStatus("placed");
@@ -401,6 +512,38 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
           ) : null}
         </section>
 
+        <section className="card overflow-hidden">
+          <div className="border-b border-line px-4 py-3">
+            <h2 className="text-[15px] font-bold">Payment</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              {config.onlinePayments
+                ? "Pay now by UPI or card, or pay the courier on delivery."
+                : "Cash on delivery. Online payment is on the way."}
+            </p>
+          </div>
+          <div className="space-y-2 p-4">
+            <PaymentOption
+              icon={<Banknote className="size-5" />}
+              label="Cash on delivery"
+              desc="Pay the courier when your order arrives."
+              selected={!payOnline}
+              onSelect={() => setPaymentMethod("cod")}
+            />
+            <PaymentOption
+              icon={<CreditCard className="size-5" />}
+              label="Pay online"
+              desc="UPI, cards, netbanking and wallets."
+              selected={payOnline}
+              // The single source of truth for whether this is on offer. When
+              // false the input is genuinely disabled, not merely styled that
+              // way — and the server refuses an online order regardless.
+              disabled={!config.onlinePayments}
+              badge={config.onlinePayments ? undefined : "Available soon"}
+              onSelect={() => setPaymentMethod("online")}
+            />
+          </div>
+        </section>
+
         <section className="card p-4">
           <div className="flex gap-4">
             <div className="grid size-20 shrink-0 place-items-center rounded-2xl bg-accent-soft">
@@ -460,11 +603,15 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
             <span className="mx-auto flex items-center gap-2">
               <Loader2 className="size-5 animate-spin" /> Placing order…
             </span>
+          ) : status === "paying" ? (
+            <span className="mx-auto flex items-center gap-2">
+              <Loader2 className="size-5 animate-spin" /> Waiting for payment…
+            </span>
           ) : ordersClosed ? (
             <span className="mx-auto">Orders paused</span>
           ) : (
             <>
-              <span>Place order</span>
+              <span>{payOnline ? "Pay & place order" : "Place order"}</span>
               <span>{formatINR(payTotal)}</span>
             </>
           )}
@@ -480,6 +627,78 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
         onAddNew={() => setAddFormRequested(true)}
       />
     </div>
+  );
+}
+
+function PaymentOption({
+  icon,
+  label,
+  desc,
+  selected,
+  disabled,
+  badge,
+  onSelect,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  desc: string;
+  selected: boolean;
+  disabled?: boolean;
+  badge?: string;
+  onSelect: () => void;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex items-start gap-3 rounded-xl border px-3.5 py-3 transition-colors",
+        disabled
+          ? "cursor-not-allowed border-line bg-surface-2 opacity-60"
+          : "cursor-pointer",
+        selected && !disabled
+          ? "border-accent bg-accent-soft"
+          : "border-line bg-surface-2"
+      )}
+    >
+      <input
+        type="radio"
+        name="paymentMethod"
+        className="sr-only"
+        checked={selected}
+        disabled={disabled}
+        onChange={onSelect}
+      />
+      <span
+        className={cn(
+          "mt-0.5 shrink-0",
+          selected && !disabled ? "text-accent-ink" : "text-muted"
+        )}
+        aria-hidden
+      >
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="text-[15px] font-semibold">{label}</span>
+          {badge ? (
+            <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+              {badge}
+            </span>
+          ) : null}
+        </span>
+        <span className="mt-0.5 block text-xs text-muted">{desc}</span>
+      </span>
+      <span
+        className={cn(
+          "mt-1 grid size-[18px] shrink-0 place-items-center rounded-full border-2",
+          selected && !disabled ? "border-accent" : "border-line"
+        )}
+        aria-hidden
+      >
+        {selected && !disabled ? (
+          <span className="size-2 rounded-full bg-accent" />
+        ) : null}
+      </span>
+    </label>
   );
 }
 

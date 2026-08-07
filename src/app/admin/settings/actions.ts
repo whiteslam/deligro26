@@ -51,6 +51,7 @@ function parse(form: FormData): PlatformSettings {
     featureGrocery: bool(form, "featureGrocery"),
     featurePharmacy: bool(form, "featurePharmacy"),
     featurePickDrop: bool(form, "featurePickDrop"),
+    featureOnlinePayment: bool(form, "featureOnlinePayment"),
 
     defaultPrepMinutes: int(form.get("defaultPrepMinutes"), 20),
     deliveryRadiusKm: Math.max(0, num(form.get("deliveryRadiusKm"), 8)),

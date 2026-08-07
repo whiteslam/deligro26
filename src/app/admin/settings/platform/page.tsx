@@ -1,5 +1,6 @@
 import { AdminHero, PreviewNotice } from "@/components/admin/admin-ui";
 import { getSettings, settingsBackendReady } from "@/lib/settings";
+import { isRazorpayConfigured } from "@/lib/payments/razorpay";
 import { SettingsForm } from "../settings-form";
 
 /**
@@ -36,7 +37,12 @@ export default async function PlatformSettingsPage() {
         </PreviewNotice>
       ) : null}
 
-      <SettingsForm settings={settings} />
+      {/* Whether the gateway keys exist is a server fact; the form needs it to
+          tell an admin that the payments toggle alone won't do anything. */}
+      <SettingsForm
+        settings={settings}
+        razorpayConfigured={isRazorpayConfigured}
+      />
     </div>
   );
 }

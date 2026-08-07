@@ -1,6 +1,11 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_SETTINGS } from "@/lib/settings-defaults";
+import {
+  columnKnownMissing,
+  isMissingColumn,
+  rememberColumn,
+} from "@/lib/data-access/schema-probe";
 import type { PlatformSettings } from "@/types";
 
 /**
@@ -51,15 +56,22 @@ interface SettingsRow {
   delivery_radius_km: number | string;
   rider_commission: number | string;
   rider_min_payout: number;
+  feature_online_payment?: boolean;
 }
 
-const SELECT = `
+/** `feature_online_payment` only exists once migration 0025 has been applied. */
+const ONLINE_PAYMENT_COLUMN = "platform_settings.feature_online_payment";
+
+function select(withOnlinePayment: boolean): string {
+  return `
   delivery_fee, tax_rate, free_delivery_threshold, min_order,
   business_name, support_phone, support_email, support_whatsapp, business_address,
   accepting_orders, maintenance_message,
   feature_grocery, feature_pharmacy, feature_pick_drop,
   default_prep_minutes, delivery_radius_km, rider_commission, rider_min_payout
+  ${withOnlinePayment ? ", feature_online_payment" : ""}
 `;
+}
 
 function mapSettings(row: SettingsRow): PlatformSettings {
   return {
@@ -81,33 +93,49 @@ function mapSettings(row: SettingsRow): PlatformSettings {
     deliveryRadiusKm: Number(row.delivery_radius_km),
     riderCommission: Number(row.rider_commission),
     riderMinPayout: Number(row.rider_min_payout),
+    // Absent column (pre-0025) reads as off, which is the safe direction.
+    featureOnlinePayment: row.feature_online_payment ?? false,
   };
 }
 
 export async function getSettingsFromDb(): Promise<PlatformSettings> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("platform_settings")
-    .select(SELECT)
-    .eq("id", true)
-    .maybeSingle();
 
-  if (error) {
-    if (isMissingTable(error)) throw new SettingsNotMigratedError();
+  const read = (withOnlinePayment: boolean) =>
+    supabase
+      .from("platform_settings")
+      .select(select(withOnlinePayment))
+      .eq("id", true)
+      .maybeSingle();
+
+  const asked = !columnKnownMissing(ONLINE_PAYMENT_COLUMN);
+  let result = await read(asked);
+
+  // Checked BEFORE isMissingTable: PostgREST's missing-column message also
+  // contains "does not exist", so the table check would swallow it and hand
+  // back DEFAULT_SETTINGS — quietly billing default fees on a database whose
+  // admin had configured real ones. A missing column costs the one column.
+  if (asked && result.error && isMissingColumn(result.error)) {
+    rememberColumn(ONLINE_PAYMENT_COLUMN, false);
+    result = await read(false);
+  } else if (asked && !result.error) {
+    rememberColumn(ONLINE_PAYMENT_COLUMN, true);
+  }
+
+  if (result.error) {
+    if (isMissingTable(result.error)) throw new SettingsNotMigratedError();
     // A configured-but-failing read shouldn't crash the app it configures.
     return DEFAULT_SETTINGS;
   }
-  if (!data) return DEFAULT_SETTINGS;
-  return mapSettings(data as SettingsRow);
+  if (!result.data) return DEFAULT_SETTINGS;
+  return mapSettings(result.data as unknown as SettingsRow);
 }
 
 export async function updateSettings(
   input: PlatformSettings
 ): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("platform_settings")
-    .update({
+  const base: Record<string, unknown> = {
       delivery_fee: input.deliveryFee,
       tax_rate: input.taxRate,
       free_delivery_threshold: input.freeDeliveryThreshold,
@@ -127,8 +155,30 @@ export async function updateSettings(
       rider_commission: input.riderCommission,
       rider_min_payout: input.riderMinPayout,
       updated_at: new Date().toISOString(),
-    })
-    .eq("id", true);
+  };
+
+  const write = (withOnlinePayment: boolean) =>
+    supabase
+      .from("platform_settings")
+      .update(
+        withOnlinePayment
+          ? { ...base, feature_online_payment: input.featureOnlinePayment }
+          : base
+      )
+      .eq("id", true);
+
+  const asked = !columnKnownMissing(ONLINE_PAYMENT_COLUMN);
+  const { error } = await write(asked);
+
+  if (asked && error && isMissingColumn(error)) {
+    // Pre-0025. Save everything else rather than failing the whole form over a
+    // toggle whose only honest value on this database is "off" anyway.
+    rememberColumn(ONLINE_PAYMENT_COLUMN, false);
+    const { error: retry } = await write(false);
+    if (retry) throw retry;
+    return;
+  }
+
   if (error) throw error;
 }
 

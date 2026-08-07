@@ -6,6 +6,8 @@
    Money is whole rupees — render with formatINR().
    ============================================================ */
 
+import type { PaymentMethod, PaymentStatus } from "@/types";
+
 export interface RoleOrderLine {
   name: string;
   qty: number;
@@ -34,6 +36,19 @@ export interface KitchenOrder {
   total: number;
   note?: string;
   status?: string;
+  /**
+   * How this order is being paid, once migration 0025 is applied. Undefined on
+   * a database that predates it (where every order is COD by definition).
+   *
+   * The kitchen and the rider both need this and neither had it: with online
+   * payment on, a rider who assumes cash will ask a prepaid customer to pay
+   * twice.
+   */
+  paymentMethod?: PaymentMethod;
+  paymentStatus?: PaymentStatus;
+  /** When the kitchen accepted / packed it (0026) — drives the late badge. */
+  acceptedAt?: string | null;
+  readyAt?: string | null;
 }
 
 export const RESTAURANT_NAME = "Saffron Kitchen";
@@ -167,12 +182,24 @@ export const ADMIN_METRICS: AdminMetric[] = [
 ];
 
 export interface AdminOrderRow {
+  /** The real order id, for drilling into the detail view. */
+  id?: string;
   code: string;
   customer: string;
   restaurant: string;
-  status: "PLACED" | "KITCHEN" | "ON_THE_WAY" | "DELIVERED" | "CANCELLED";
+  /**
+   * READY is its own stage now. It used to be folded into KITCHEN, so an
+   * operator could not tell a kitchen that was still cooking from one whose
+   * food had been sitting on the pass waiting for a rider — which is the state
+   * they most need to see.
+   */
+  status: "PLACED" | "KITCHEN" | "READY" | "ON_THE_WAY" | "DELIVERED" | "CANCELLED";
   total: number;
   placedAt: string;
+  paymentMethod?: PaymentMethod;
+  paymentStatus?: PaymentStatus;
+  /** Minutes past the expected handover, when the order is running late. */
+  lateByMinutes?: number | null;
 }
 
 export const ADMIN_ORDERS: AdminOrderRow[] = [

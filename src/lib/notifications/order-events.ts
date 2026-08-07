@@ -4,11 +4,41 @@ import { shortOrderId } from "@/lib/utils/order-map";
 import { sendPush, isPushConfigured } from "./onesignal";
 
 /**
- * Push an order-status update to the order's customer. Best-effort and never
- * throws — a failed push must not roll back the delivery transition that
- * triggered it. Looks up the customer's OneSignal player id with the
- * service-role client (the driver/webhook context can't read it under RLS).
+ * Order notifications — every transition, for both sides of it.
+ *
+ * This file used to cover two of six transitions: on-the-way and delivered. A
+ * customer heard nothing when the restaurant accepted their order, nothing when
+ * it was ready, and — worst of the set — nothing when it was rejected. The two
+ * moments people actually wait for were the silent ones.
+ *
+ * Everything here is fire-and-forget and never throws into the caller. A failed
+ * push must not roll back the transition that triggered it; an order that moved
+ * and wasn't announced is recoverable, an order that didn't move is not.
+ *
+ * Reads use the service-role client because the contexts that trigger these —
+ * a driver advancing a delivery, a webhook, a vendor accepting — cannot see the
+ * counterparty's push id under RLS.
  */
+
+async function pushToPlayer(
+  playerId: string | null | undefined,
+  heading: string,
+  message: string,
+  url: string
+): Promise<void> {
+  if (!playerId) return;
+  try {
+    await sendPush(playerId, heading, message, { url });
+  } catch {
+    // swallow — fire-and-forget
+  }
+}
+
+function one<T>(v: T | T[] | null | undefined): T | null {
+  return Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
+}
+
+/** Push an order update to the order's customer. */
 export async function notifyCustomer(
   orderId: string,
   heading: string,
@@ -23,17 +53,94 @@ export async function notifyCustomer(
       .eq("id", orderId)
       .maybeSingle();
 
-    const customer = data?.customer as { onesignal_id: string | null } | { onesignal_id: string | null }[] | null;
-    const playerId = Array.isArray(customer) ? customer[0]?.onesignal_id : customer?.onesignal_id;
-    if (!playerId) return;
-
-    await sendPush(playerId, heading, message, { url: `/orders/${orderId}` });
+    const customer = one(
+      data?.customer as { onesignal_id: string | null } | { onesignal_id: string | null }[] | null
+    );
+    await pushToPlayer(
+      customer?.onesignal_id,
+      heading,
+      message,
+      `/orders/${orderId}`
+    );
   } catch {
     // swallow — fire-and-forget
   }
 }
 
-/** Convenience: the two customer-facing delivery transitions. */
+/**
+ * Push to the owner of the restaurant an order was placed with.
+ *
+ * The vendor board polls every four seconds, which is fine when someone is
+ * watching it and useless when nobody is. A new order is the one event a
+ * kitchen cannot afford to discover late.
+ */
+export async function notifyVendor(
+  orderId: string,
+  heading: string,
+  message: string
+): Promise<void> {
+  if (!isPushConfigured) return;
+  try {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from("orders")
+      .select("restaurants(owner_id)")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    const restaurant = one(
+      data?.restaurants as { owner_id: string | null } | { owner_id: string | null }[] | null
+    );
+    if (!restaurant?.owner_id) return;
+
+    const { data: owner } = await supabase
+      .from("profiles")
+      .select("onesignal_id")
+      .eq("id", restaurant.owner_id)
+      .maybeSingle();
+
+    await pushToPlayer(owner?.onesignal_id, heading, message, `/vendor`);
+  } catch {
+    // swallow — fire-and-forget
+  }
+}
+
+/* ---------- customer-facing transitions ---------- */
+
+/**
+ * Placed — deliberately worded as *sent*, not accepted. The order is waiting on
+ * the kitchen at this point and saying otherwise is the lie the tracker used
+ * to tell.
+ */
+export function notifyOrderPlaced(orderId: string): Promise<void> {
+  return notifyCustomer(
+    orderId,
+    "Order sent 🧾",
+    `Order #${shortOrderId(orderId)} is with the restaurant. We'll tell you the moment they accept.`
+  );
+}
+
+export function notifyOrderAccepted(
+  orderId: string,
+  restaurantName?: string
+): Promise<void> {
+  return notifyCustomer(
+    orderId,
+    "Order accepted 👨‍🍳",
+    restaurantName
+      ? `${restaurantName} accepted order #${shortOrderId(orderId)} and started cooking.`
+      : `Order #${shortOrderId(orderId)} was accepted and is being cooked.`
+  );
+}
+
+export function notifyOrderReady(orderId: string): Promise<void> {
+  return notifyCustomer(
+    orderId,
+    "Food is ready 🍽️",
+    `Order #${shortOrderId(orderId)} is packed and waiting for a rider.`
+  );
+}
+
 export function notifyOnTheWay(orderId: string): Promise<void> {
   return notifyCustomer(
     orderId,
@@ -47,5 +154,76 @@ export function notifyDelivered(orderId: string): Promise<void> {
     orderId,
     "Delivered ✅",
     `Order #${shortOrderId(orderId)} was delivered. Enjoy your meal!`
+  );
+}
+
+/**
+ * Cancelled. `byVendor` changes the wording because the two cases are not the
+ * same message: a customer who cancelled knows why, and one whose order the
+ * restaurant refused needs to be told plainly — and told about their money.
+ */
+export function notifyOrderCancelled(
+  orderId: string,
+  opts: { byVendor?: boolean; refundQueued?: boolean } = {}
+): Promise<void> {
+  const money = opts.refundQueued
+    ? " Your refund has been requested and is being processed."
+    : "";
+  return notifyCustomer(
+    orderId,
+    opts.byVendor ? "Order declined" : "Order cancelled",
+    opts.byVendor
+      ? `The restaurant couldn't take order #${shortOrderId(orderId)}.${money}`
+      : `Order #${shortOrderId(orderId)} was cancelled.${money}`
+  );
+}
+
+export function notifyPaymentFailed(orderId: string): Promise<void> {
+  return notifyCustomer(
+    orderId,
+    "Payment didn't go through",
+    `Order #${shortOrderId(orderId)} is saved but unpaid. Open it to try again.`
+  );
+}
+
+export function notifyRefundDecided(
+  orderId: string,
+  approved: boolean
+): Promise<void> {
+  return notifyCustomer(
+    orderId,
+    approved ? "Refund approved 💸" : "Refund declined",
+    approved
+      ? `Your refund for order #${shortOrderId(orderId)} was approved.`
+      : `We couldn't approve the refund for order #${shortOrderId(orderId)}. Contact support if this looks wrong.`
+  );
+}
+
+/* ---------- vendor-facing ---------- */
+
+export function notifyVendorNewOrder(
+  orderId: string,
+  itemCount?: number
+): Promise<void> {
+  const items =
+    typeof itemCount === "number" && itemCount > 0
+      ? ` · ${itemCount} item${itemCount > 1 ? "s" : ""}`
+      : "";
+  return notifyVendor(
+    orderId,
+    "New order 🔔",
+    `Order #${shortOrderId(orderId)}${items} is waiting for you to accept.`
+  );
+}
+
+/**
+ * The customer pulled out. The board would otherwise just drop the card, which
+ * a kitchen already cooking has no way to notice.
+ */
+export function notifyVendorOrderCancelled(orderId: string): Promise<void> {
+  return notifyVendor(
+    orderId,
+    "Order cancelled by customer",
+    `Order #${shortOrderId(orderId)} was cancelled. Stop preparing it.`
   );
 }

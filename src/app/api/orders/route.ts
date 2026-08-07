@@ -20,6 +20,10 @@ function mapCreateError(message: string) {
     case "tip_unsupported":
       // The database predates migration 0013 and has nowhere to record a tip.
       return { status: 503, error: "tip_unsupported" };
+    case "online_payments_unavailable":
+      // Switched off, unconfigured, or the database predates 0025. Either way
+      // the order is refused rather than silently downgraded to cash.
+      return { status: 503, error: "online_payments_unavailable" };
     default:
       return { status: 500, error: "server_error" };
   }

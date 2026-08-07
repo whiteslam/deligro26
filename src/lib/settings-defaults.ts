@@ -32,6 +32,10 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   featureGrocery: true,
   featurePharmacy: true,
   featurePickDrop: true,
+  // Off until an admin turns it on. This default is also what an un-migrated or
+  // unreadable settings row falls back to, which is the safe direction: the
+  // failure mode is "COD only", never "offer a payment we cannot take".
+  featureOnlinePayment: false,
 
   defaultPrepMinutes: 20,
   deliveryRadiusKm: 8,

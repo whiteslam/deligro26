@@ -80,9 +80,21 @@ export interface StoreCategory extends Category {
   tags: string[];
 }
 
+/**
+ * The customer-facing order stages.
+ *
+ * These now map 1:1 onto the `order_status` enum instead of collapsing two of
+ * its values into one. `ready` used to fold into `KITCHEN`, which meant nobody
+ * — customer or admin — could tell "still cooking" from "packed, waiting for a
+ * rider". That is precisely the window where an order goes wrong, and it was
+ * the one window the system could not describe.
+ *
+ * PLACED means *awaiting* the kitchen's acceptance. It does not mean accepted.
+ */
 export type OrderStatus =
   | "PLACED"
   | "KITCHEN"
+  | "READY"
   | "ON_THE_WAY"
   | "DELIVERED"
   | "CANCELLED";
@@ -241,6 +253,14 @@ export interface PlatformSettings {
   featureGrocery: boolean;
   featurePharmacy: boolean;
   featurePickDrop: boolean;
+  /**
+   * Offer online payment (Razorpay) at checkout. Off by default — the customer
+   * sees "Available soon" and COD is the only method. Turning it on is
+   * necessary but not sufficient: the app also requires the Razorpay keys, so a
+   * keyless environment keeps showing "Available soon" rather than a checkout
+   * that dead-ends. See `onlinePaymentsEnabled()`.
+   */
+  featureOnlinePayment: boolean;
 
   // ---- Ops defaults ----
   defaultPrepMinutes: number;
@@ -250,6 +270,20 @@ export interface PlatformSettings {
   /** Floor on any single delivery payout, in rupees. */
   riderMinPayout: number;
 }
+
+/** How the customer intends to pay. Mirrors the `payment_method` enum (0025). */
+export type PaymentMethod = "cod" | "online";
+
+/**
+ * Where the money actually is. Mirrors the `payment_status` enum (0025).
+ * Only a verified Razorpay signature moves an order off `pending`.
+ */
+export type PaymentStatus =
+  | "pending"
+  | "authorized"
+  | "paid"
+  | "failed"
+  | "refunded";
 
 export interface Banner {
   id: string;

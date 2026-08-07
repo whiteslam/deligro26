@@ -48,7 +48,7 @@ Referrer-Policy, Permissions-Policy — `next.config.ts`), and **app-level rate
 limiting** (`src/lib/rate-limit.ts` via Upstash/Vercel KV, applied to the orders
 API; in-memory fallback when KV env vars are unset).
 
-Migration **0022** additionally closes the findings from the first full audit:
+Migration **0024** additionally closes the findings from the first full audit:
 column-level SELECT on `restaurants` (RLS filters rows, not columns — and 0017
 / 0020 had added payout, KYC and plaintext-credential columns to a publicly
 readable table), admin-only vendor creation and approval, a column guard so a
@@ -57,10 +57,56 @@ vendor cannot rewrite an order's `total`, explicit `order_items` visibility, and
 mandatory admin MFA, OTP-verified phone changes, scrypt OTP hashing, magic-byte
 upload checks, and rate limits on every write endpoint.
 
-**Still to wire when you go live:** payment webhook signature verification,
-applying coupon discounts at order creation (the endpoint validates but nothing
-consumes the result yet), and swapping any remaining portal mocks for the
-RLS-backed data layer.
+Migration **0025** adds online payment (Razorpay), shipped switched off — see
+**Payments** below.
+
+**Still to wire when you go live:** applying coupon discounts at order creation
+(the endpoint validates but nothing consumes the result yet), vendor payout
+settlement, and swapping any remaining portal mocks for the RLS-backed data
+layer.
+
+## Payments
+
+Online payment is **off by default**. The customer sees "Available soon" at
+checkout and COD is the only method until *both* an admin enables it in
+**Settings → Platform → Online payment** *and* the Razorpay keys are present.
+`onlinePaymentsEnabled()` is the single gate; a missing key reduces what is
+offered rather than being ignored.
+
+What holds the money boundary:
+
+- **`orders.payment_status` is the only truth about payment**, and nothing
+  holding a user JWT can set it. A `before insert` trigger pins it to `pending`
+  for customers, and it joins the locked-column list in `guard_order_update()`
+  so a vendor, driver or manager can still only move `status`. It leaves
+  `pending` exclusively through the service role, after a verified signature.
+- **Two signatures, two secrets.** The browser callback is signed over
+  `${order_id}|${payment_id}` with `RAZORPAY_KEY_SECRET`; the webhook is signed
+  over its **raw body** with `RAZORPAY_WEBHOOK_SECRET`. Both are compared in
+  constant time. The webhook must read `request.text()` before any JSON parse —
+  re-serialising reorders keys and the digest stops matching.
+- **A valid signature does not say *which* of our orders was paid.** It covers
+  Razorpay's own ids only, so `/api/payments/razorpay/verify` also checks that
+  the signed provider order belongs to the Deligro order being settled —
+  otherwise a genuine signature from a ₹50 order could be replayed onto a ₹5,000
+  one.
+- **The webhook is the authority.** It is idempotent (unique
+  `provider_order_id`), never walks a settled payment backwards, and answers 2xx
+  for anything applied or duplicate so Razorpay stops retrying. It does *not*
+  check whether payments are currently switched on: money already in flight when
+  an admin flips the toggle off is still real.
+- **No secret is configured → the endpoint 503s.** It does not process an
+  unverified body.
+- **The vendor never sees an unpaid online order.** The kitchen board filters to
+  `payment_method = 'cod' OR payment_status = 'paid'`, so an abandoned checkout
+  does not put a kitchen to work.
+- `payments` has no INSERT/UPDATE/DELETE policy at all — reads are RLS-scoped to
+  the customer and admins (not the vendor, driver or manager), and every write
+  goes through the service role behind a signature check.
+
+Verify the crypto with `npm run test:payments` (offline — no keys, no network).
+Point the Razorpay dashboard webhook at `/api/payments/razorpay/webhook` and
+subscribe to `payment.captured`, `payment.failed` and `refund.processed`.
 
 **Deliberately not done — a nonce-based CSP.** Dropping `'unsafe-inline'` from
 `script-src` requires a per-request nonce, and per the Next 16 CSP guide that

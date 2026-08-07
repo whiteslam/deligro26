@@ -36,6 +36,11 @@ interface DbRow {
   value: number | string;
 }
 
+/** A count from a table a later migration added — `—` when it isn't there yet. */
+function opt(n: number | null): number | string {
+  return n ?? "—";
+}
+
 function dbRowsForTab(tab: BuildTab, db: BuildDbSnapshot): DbRow[] {
   switch (tab) {
     case "customer":
@@ -44,6 +49,18 @@ function dbRowsForTab(tab: BuildTab, db: BuildDbSnapshot): DbRow[] {
         { label: "Saved addresses", table: "addresses", value: db.addresses },
         { label: "Orders", table: "orders", value: db.orders },
         { label: "Legacy orders", table: "orders.external_id", value: db.legacy_orders },
+        { label: "Favorites", table: "favorites", value: opt(db.favorites) },
+        { label: "Reviews", table: "reviews", value: opt(db.reviews) },
+        { label: "Promo banners", table: "banners", value: opt(db.banners) },
+        { label: "Coupons", table: "coupons", value: opt(db.coupons) },
+        {
+          label: "Online payments (paid)",
+          table: "payments.status = paid",
+          value:
+            db.payments === null
+              ? "—"
+              : `${db.payments_paid ?? 0} / ${db.payments}`,
+        },
       ];
     case "vendor":
       return [
@@ -53,6 +70,8 @@ function dbRowsForTab(tab: BuildTab, db: BuildDbSnapshot): DbRow[] {
         { label: "Legacy shops", table: "restaurants.slug ~ '-[0-9]+$'", value: db.legacy_restaurants },
         { label: "Menu items", table: "menu_items", value: db.menu_items },
         { label: "Legacy menu items", table: "menu_items.external_id", value: db.legacy_menu_items },
+        { label: "Vendor categories", table: "vendor_categories", value: opt(db.vendor_categories) },
+        { label: "Legal documents", table: "vendor_documents", value: opt(db.vendor_documents) },
         { label: "Orders (all)", table: "orders", value: db.orders },
         { label: "Legacy orders", table: "orders.external_id", value: db.legacy_orders },
       ];
@@ -63,14 +82,43 @@ function dbRowsForTab(tab: BuildTab, db: BuildDbSnapshot): DbRow[] {
         { label: "Unassigned jobs", table: "deliveries.status = unassigned", value: db.deliveries_unassigned },
         { label: "Orders (pipeline)", table: "orders", value: db.orders },
       ];
+    case "manager":
+      return [
+        { label: "Manager profiles", table: "profiles.role = manager", value: opt(db.profiles_manager) },
+        { label: "Orders (all vendors)", table: "orders", value: db.orders },
+        { label: "Deliveries", table: "deliveries", value: db.deliveries },
+        { label: "Unassigned jobs", table: "deliveries.status = unassigned", value: db.deliveries_unassigned },
+        { label: "Restaurants (open)", table: "restaurants.is_open", value: `${db.restaurants_open} / ${db.restaurants}` },
+      ];
     case "admin":
       return [
         { label: "Admin profiles", table: "profiles.role = admin", value: db.profiles_admin },
-        { label: "All profiles", table: "profiles", value: db.profiles_customer + db.profiles_restaurant + db.profiles_driver + db.profiles_admin },
+        { label: "Manager profiles", table: "profiles.role = manager", value: opt(db.profiles_manager) },
+        {
+          label: "All profiles",
+          table: "profiles",
+          value:
+            db.profiles_customer +
+            db.profiles_restaurant +
+            db.profiles_driver +
+            db.profiles_admin +
+            (db.profiles_manager ?? 0),
+        },
         { label: "Restaurants (approved)", table: "restaurants.approved", value: `${db.restaurants_approved} / ${db.restaurants}` },
+        { label: "Vendor drafts", table: "vendor_registration_drafts", value: opt(db.vendor_drafts) },
+        { label: "Vendor categories", table: "vendor_categories", value: opt(db.vendor_categories) },
         { label: "Orders", table: "orders", value: db.orders },
         { label: "Legacy orders", table: "orders.external_id", value: db.legacy_orders },
         { label: "Refunds (pending)", table: "refunds.status = pending", value: `${db.refunds_pending} / ${db.refunds}` },
+        {
+          label: "Payments (paid)",
+          table: "payments.status = paid",
+          value:
+            db.payments === null
+              ? "—"
+              : `${db.payments_paid ?? 0} / ${db.payments}`,
+        },
+        { label: "Promo banners", table: "banners", value: opt(db.banners) },
         { label: "Addresses", table: "addresses", value: db.addresses },
       ];
   }

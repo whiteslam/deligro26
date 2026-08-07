@@ -18,18 +18,22 @@ const isDev = process.env.NODE_ENV === "development";
 const csp = [
   "default-src 'self'",
   // React dev mode uses eval() for stack traces; production never needs it.
-  // cdn.onesignal.com serves the web-push SDK; maps.googleapis.com the Maps JS.
-  `script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://maps.googleapis.com https://maps.gstatic.com${isDev ? " 'unsafe-eval'" : ""}`,
+  // cdn.onesignal.com serves the web-push SDK; maps.googleapis.com the Maps JS;
+  // checkout.razorpay.com the payment SDK, loaded on demand at checkout.
+  `script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://maps.googleapis.com https://maps.gstatic.com https://checkout.razorpay.com${isDev ? " 'unsafe-eval'" : ""}`,
   // Google Maps injects a stylesheet + Roboto webfont.
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://*.onesignal.com https://onesignal.com https://*.googleapis.com https://*.gstatic.com https://*.google.com",
+  "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://*.onesignal.com https://onesignal.com https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.razorpay.com",
   "font-src 'self' data: https://fonts.gstatic.com",
-  // OneSignal over WSS/HTTPS; Google Maps tiles/geocode/places over HTTPS.
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.onesignal.com https://onesignal.com wss://*.onesignal.com https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com",
+  // OneSignal over WSS/HTTPS; Google Maps tiles/geocode/places over HTTPS;
+  // Razorpay's API + its lumberjack telemetry host, both under *.razorpay.com.
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.onesignal.com https://onesignal.com wss://*.onesignal.com https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com https://*.razorpay.com",
   // The OneSignal service worker is served from our own origin.
   "worker-src 'self'",
-  // Subscription/permission flow may open a OneSignal iframe.
-  "frame-src 'self' https://*.onesignal.com https://onesignal.com",
+  // Subscription/permission flow may open a OneSignal iframe. Razorpay Checkout
+  // is an iframe too, and the bank/UPI redirect legs happen inside it — which
+  // is why they need frame-src and not a hole in form-action.
+  "frame-src 'self' https://*.onesignal.com https://onesignal.com https://*.razorpay.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

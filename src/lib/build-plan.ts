@@ -1,16 +1,25 @@
 /**
  * Build plan + live delivery tracker — single source of truth for `/build`.
  *
- * A 5-week (~35 day) plan to take Deligro from "static UI + partial backend"
- * to a shippable v1. Update `status` as tasks land; the tracker route renders
- * straight from this file, so the page is always in sync with reality.
+ * The original plan was a 5-week (~35 day) run from "static UI + partial
+ * backend" to a shippable v1. That window closed on 2026-08-06 with payments
+ * and the production deploy still open, and with a second body of work — vendor
+ * management, the manager role, storefront depth, the first security audit —
+ * shipped alongside it. Both are recorded here: the original weeks keep their
+ * numbering, and the work that landed outside the plan is filed under its own
+ * later milestone rather than backdated into a week it did not belong to.
+ *
+ * Update `status` as tasks land; the tracker route renders straight from this
+ * file, so the page is always in sync with reality. A task marked "done" must
+ * actually work end to end — if it half-works, say so in `detail` and leave it
+ * "active". A stale tracker is worse than none (see AGENTS.md).
  *
  * status: "done" | "active" | "todo" | "blocked"
  */
 
 export type TaskStatus = "done" | "active" | "todo" | "blocked";
 
-export type BuildTab = "customer" | "vendor" | "driver" | "admin";
+export type BuildTab = "customer" | "vendor" | "driver" | "manager" | "admin";
 
 export interface Task {
   title: string;
@@ -55,20 +64,30 @@ export const BUILD_TABS: BuildTabConfig[] = [
     summary: "Delivery partners — accept, pickup, deliver",
   },
   {
+    id: "manager",
+    label: "Manager",
+    portal: "/manager",
+    summary: "Scoped ops — phone orders, dispatch, no finance",
+  },
+  {
     id: "admin",
     label: "Admin",
     portal: "/admin",
-    summary: "Platform ops — approvals, orders, refunds",
+    summary: "Platform ops — vendors, orders, refunds, team",
   },
 ];
 
-/** Project window — set these to your real start date. */
+/**
+ * Project window. `ship` was 2026-08-06 for the original v1 scope; that date
+ * passed with payments, key rotation and the production deploy outstanding, so
+ * it now points at the revised target — change it to the real one.
+ */
 export const PROJECT = {
   name: "Deligro",
   tagline: "Craving to doorstep",
   start: "2026-07-07",
-  ship: "2026-08-06",
-  durationLabel: "5 weeks · ~35 days",
+  ship: "2026-08-21",
+  durationLabel: "6 weeks · v1 scope + hardening",
 };
 
 export const MILESTONES: Milestone[] = [
@@ -102,8 +121,8 @@ export const MILESTONES: Milestone[] = [
         status: "done",
       },
       {
-        title: "Pexels images for migrated catalog",
-        detail: "Category-based CDN URLs when legacy storage paths are unavailable",
+        title: "Unsplash images for migrated catalog",
+        detail: "Moved off Pexels — scripts/lib/unsplash-images.ts + db:migrate-images backfill category-matched CDN URLs where legacy storage paths are unavailable",
         status: "done",
       },
       {
@@ -114,8 +133,9 @@ export const MILESTONES: Milestone[] = [
       },
       {
         title: "Legacy delivery rules in app",
-        detail: "Min order ₹49, free delivery above ₹499, radius from settings row — still flat ₹29 fee today",
-        status: "todo",
+        detail: "Fee, free-delivery threshold, min order and radius now read from the platform_settings row and bill through lib/pricing.ts; checkout blocks below the minimum",
+        db: "platform_settings · orders.delivery_fee",
+        status: "done",
       },
       {
         title: "Per-restaurant vendor accounts",
@@ -136,7 +156,7 @@ export const MILESTONES: Milestone[] = [
       },
       {
         title: "Reviews import",
-        detail: "Ratings rolled into restaurants via catalog ETL; 491 legacy rows not yet written to reviews",
+        detail: "Ratings rolled into restaurants via catalog ETL; 491 legacy rows still not written to reviews (in-app reviews ship separately — see Week 6)",
         db: "restaurants.rating · reviews",
         status: "todo",
       },
@@ -152,7 +172,7 @@ export const MILESTONES: Milestone[] = [
       { title: "Phone-number OTP login", detail: "Custom Renflair SMS OTP + magic-link session; one global /login (OTP for customers, email+password for operators)", status: "done" },
       { title: "OTP verify screen", detail: "6-digit code entry, 30s resend cooldown, DB rate limit (6/hour)", status: "done" },
       { title: "\"Order\" triggers auth", detail: "Proxy gates checkout/orders/profile → /login?next=… (OTP first); operators use the same page", status: "done" },
-      { title: "Post-login profile bootstrap", detail: "First name + save on first order — edit sheet exists, not forced", status: "todo" },
+      { title: "Post-login profile bootstrap", detail: "First name + save on first order — edit sheet exists, still not forced", status: "todo" },
     ],
   },
   {
@@ -166,6 +186,7 @@ export const MILESTONES: Milestone[] = [
       { title: "Checkout on live data", detail: "Saved address + tip → POST /api/orders (COD implicit; no timing picker)", status: "done" },
       { title: "Order success screen", detail: "Hand-off via /orders/[id]?placed=1 toast on tracking", status: "done" },
       { title: "Live order tracking", detail: "Status stepper + polled /api/orders/[id]/tracking", status: "done" },
+      { title: "Cancel an order", detail: "POST /api/orders/[id]/cancel — customer-initiated, rate limited", db: "orders.status", status: "done" },
     ],
   },
   {
@@ -176,9 +197,19 @@ export const MILESTONES: Milestone[] = [
     tasks: [
       { title: "Restaurant order board (live)", detail: "Accept/Reject → Food ready; AutoRefresh poll (not Supabase Realtime)", status: "done" },
       { title: "Menu availability toggles", detail: "Owner writes menu_items.available via /vendor/menu toggle + RLS", status: "done" },
-      { title: "Driver flow", detail: "Accept → picked up → delivered + delivery OTP; online toggle not persisted; pickup OTP missing", status: "active" },
-      { title: "Admin orders + refunds", detail: "Live /admin/orders + /admin/refunds (UI writes rejected; DB enum is denied)", status: "done" },
-      { title: "Role assignment tooling", detail: "Promote users to vendor/driver/admin safely — seed scripts only, no admin UI", status: "todo" },
+      { title: "Driver flow", detail: "Accept → picked up → delivered + delivery OTP; online toggle still local state; pickup OTP still missing", status: "active" },
+      {
+        title: "Admin orders + refunds",
+        detail: "Live /admin/orders + /admin/refunds. Approve works; deny still writes 'rejected' while refund_status is ('pending','approved','denied') — the deny path is rejected by the DB",
+        db: "refunds.status",
+        status: "active",
+      },
+      {
+        title: "Role assignment tooling",
+        detail: "Admin → Settings → Team creates manager and driver logins (service-role, past the lock_role trigger); vendors get accounts from the registration wizard",
+        db: "profiles.role · lock_role()",
+        status: "done",
+      },
     ],
   },
   {
@@ -187,17 +218,124 @@ export const MILESTONES: Milestone[] = [
     title: "Payments, hardening, QA & launch",
     goal: "Payments live, security tightened, tested, deployed.",
     tasks: [
-      { title: "Online payments (UPI/cards)", detail: "Razorpay/Stripe + webhook signature verify", status: "todo" },
+      {
+        title: "Online payments (UPI/cards)",
+        detail: "Razorpay wired end to end — order → checkout → signature verify → idempotent webhook, with payments recorded and the kitchen board gated on payment. Ships OFF: the customer sees \"Available soon\" until an admin enables it and the keys are set",
+        db: "payments · orders.payment_status (migration 0025)",
+        status: "active",
+      },
+      {
+        title: "Payment signature tests",
+        detail: "npm run test:payments — replay, tampering, wrong-secret and raw-body cases over lib/payments/signatures.ts. Offline; runs first in test:qa",
+        status: "done",
+      },
+      {
+        title: "Go live on Razorpay",
+        detail: "Live keys, webhook registered at /api/payments/razorpay/webhook, a real test transaction, then flip Settings → Platform → Online payment",
+        status: "todo",
+      },
       { title: "Distributed rate limit", detail: "Upstash/Vercel KV so limits hold across instances; memory fallback when unset", status: "done" },
-      { title: "Nonce-based CSP", detail: "Drop 'unsafe-inline' from script-src", status: "todo" },
+      {
+        title: "First full security audit + remediation",
+        detail: "3 Critical / 5 High / 10 Medium / 9 Low across app + migrations 0001–0021; closed in migration 0024 and app changes. docs/SECURITY_AUDIT.md",
+        status: "done",
+      },
+      {
+        title: "Deployment audit checklist",
+        detail: "docs/DEPLOYMENT_AUDIT.md — run before every promotion; sign-off table still empty",
+        status: "done",
+      },
+      {
+        title: "Rotate vendor passwords + Supabase keys",
+        detail: "Outstanding action from the audit — restaurants.temp_password held live credentials in clear until 0024 dropped the column",
+        db: "auth.users",
+        status: "todo",
+      },
+      {
+        title: "Nonce-based CSP",
+        detail: "Accepted risk M-5, not a pending task: a nonce forces every page dynamic (no static render, no ISR, no CDN). Revisit when traffic justifies it",
+        status: "todo",
+      },
       { title: "MFA for admin/restaurant", detail: "TOTP enroll + challenge (/mfa, /mfa/setup); portals require aal2", status: "done" },
       { title: "E2E QA + IDOR tests", detail: "npm run test:qa — RLS/HTTP cross-account 404s + E2E smoke; ZAP via test:zap on staging", status: "done" },
-      { title: "Production deploy", detail: "Vercel + Supabase prod, env + migrations", status: "todo" },
+      { title: "Production deploy", detail: "Vercel + Supabase prod, env + migrations 0001–0024 — no sign-off recorded yet", status: "todo" },
+    ],
+  },
+  {
+    week: 6,
+    range: "Shipped past the plan",
+    title: "Storefront depth",
+    goal: "Customer-facing surface that was never in the 5-week plan but is live today.",
+    tasks: [
+      {
+        title: "Search + category browse",
+        detail: "/search over the live catalog with category pre-filter",
+        db: "restaurants · menu_items",
+        status: "done",
+      },
+      {
+        title: "All-stores directory",
+        detail: "/stores — full shop list with real distances from the picked location",
+        db: "restaurants.lat · restaurants.lng",
+        status: "done",
+      },
+      {
+        title: "Favorites",
+        detail: "Heart a shop; /profile/favorites + /api/favorites, RLS to the owning user",
+        db: "favorites",
+        status: "done",
+      },
+      {
+        title: "Ratings & reviews (in app)",
+        detail: "POST /api/reviews — insert gated by RLS to the customer's own delivered order; averages feed the vendor profile",
+        db: "reviews · restaurants.rating",
+        status: "done",
+      },
+      {
+        title: "Promo banners + tracking",
+        detail: "Admin-managed carousel with impression/click events",
+        db: "banners · banner_events",
+        status: "done",
+      },
+      {
+        title: "Coupons",
+        detail: "Still half-wired (audit M-7): /api/coupons/validate checks code, min order and expiry, but no discount is applied at order creation — unchanged by the payments work, which bills orders.total as computed",
+        db: "coupons",
+        status: "active",
+      },
+      {
+        title: "Push notifications",
+        detail: "OneSignal web push — SDK init in the customer layout, subscription saved via /api/notifications/register, order events fan out server-side",
+        db: "profiles (push id)",
+        status: "done",
+      },
+      {
+        title: "Profile avatar upload",
+        detail: "POST /api/profile/avatar to Supabase Storage",
+        db: "profiles.avatar_url",
+        status: "done",
+      },
+      {
+        title: "Location picker on Google Maps",
+        detail: "Pin-drop + geocode, pinned to Bemetara; no forced permission popup on cold start",
+        db: "addresses.lat · addresses.lng",
+        status: "done",
+      },
+      {
+        title: "Help, About & notification settings",
+        detail: "/profile/help · /profile/about · /profile/notifications",
+        status: "done",
+      },
+      {
+        title: "Modals contained in the phone frame",
+        detail: "Dialogs render inside the device shell instead of the browser viewport",
+        status: "done",
+      },
     ],
   },
 ];
 
-/** Role-specific trackers — vendor / driver / admin portals + DB wiring. */
+/** Role-specific trackers — vendor / driver / manager / admin portals + DB wiring. */
 export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]> = {
   vendor: [
     {
@@ -208,13 +346,13 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
       tasks: [
         {
           title: "Portal routes + nav",
-          detail: "/vendor · /vendor/menu · /vendor/earnings · /vendor/settings",
+          detail: "/vendor · /vendor/overview · /vendor/menu · /vendor/earnings · /vendor/profile · /vendor/settings",
           db: "—",
           status: "done",
         },
         {
           title: "Role gate (restaurant only)",
-          detail: "requireRole('restaurant') in vendor layout",
+          detail: "Superseded by the ownership gate — see Week 3",
           db: "profiles.role = 'restaurant'",
           status: "done",
         },
@@ -252,8 +390,8 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
         },
         {
           title: "Owner login credentials",
-          detail: "Import script writes temp passwords (artifact may be local-only)",
-          db: "auth.users (email + phone_confirm)",
+          detail: "Import script issues temp passwords. They are no longer persisted — 0024 dropped restaurants.temp_password (audit C-2); the wizard shows a password once and drops it",
+          db: "auth.users",
           status: "done",
         },
         {
@@ -264,7 +402,7 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
         },
         {
           title: "Restaurant open/closed toggle",
-          detail: "Owner updates restaurants.is_open — no vendor write UI yet",
+          detail: "Owner flips restaurants.is_open from the vendor portal (RestaurantOpenToggle)",
           db: "restaurants.is_open",
           status: "done",
         },
@@ -299,6 +437,104 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
           detail: "/vendor/earnings aggregates delivered orders.total",
           db: "orders.total",
           status: "done",
+        },
+      ],
+    },
+    {
+      week: 3,
+      range: "Shipped past the plan",
+      title: "A portal a kitchen can actually run on",
+      goal: "Mobile-first tools for a busy counter — menu production, real analytics, correct days.",
+      tasks: [
+        {
+          title: "Mobile kitchen-ops hardening",
+          detail: "Touch-sized order board, sticky headers, loading states, sidebar rework",
+          status: "done",
+        },
+        {
+          title: "Menu production tools",
+          detail: "Create/edit items in a sheet, strike-through discount price, and a customer-eye preview of the live menu",
+          db: "menu_items · menu_items.discount_price",
+          status: "done",
+        },
+        {
+          title: "Earnings analytics",
+          detail: "/vendor/earnings charts + /api/vendor/earnings — payouts, order mix, trend",
+          db: "orders.total · orders.delivery_fee",
+          status: "done",
+        },
+        {
+          title: "Order history",
+          detail: "/api/vendor/orders/history — paged past orders beyond the live board",
+          db: "orders",
+          status: "done",
+        },
+        {
+          title: "Store profile self-service",
+          detail: "Owner edits shop details, hours and imagery from /vendor/profile",
+          db: "restaurants",
+          status: "done",
+        },
+        {
+          title: "IST day boundaries",
+          detail: "lib/utils/ist-time.ts — 'today' means the vendor's day, not UTC's",
+          status: "done",
+        },
+        {
+          title: "Overview dashboard",
+          detail: "/vendor/overview — the day at a glance on live rows",
+          db: "orders · menu_items",
+          status: "done",
+        },
+      ],
+    },
+    {
+      week: 4,
+      range: "Shipped past the plan",
+      title: "Owner onboarding & access",
+      goal: "A real shop can be onboarded end to end by an operator, without a role swap costing the owner their customer account.",
+      tasks: [
+        {
+          title: "Ownership-based portal gate",
+          detail: "hasVendorAccess() — access follows restaurants.owner_id, not profiles.role, so the gate no longer depends on a role change",
+          db: "restaurants.owner_id",
+          status: "done",
+        },
+        {
+          title: "\"Stay both\" — customer becomes a vendor",
+          detail: "An existing customer can own a shop and keep role='customer', so order-insert RLS still lets them shop",
+          db: "profiles.role · restaurants.owner_id",
+          status: "done",
+        },
+        {
+          title: "Owner phone OTP verification",
+          detail: "Verified during registration or later from Edit; non-blocking",
+          db: "restaurants.owner_phone_verified",
+          status: "done",
+        },
+        {
+          title: "Shop logo upload",
+          detail: "Public vendor-logos storage bucket, wired into the wizard",
+          db: "storage: vendor-logos",
+          status: "done",
+        },
+        {
+          title: "Legal documents (FSSAI/GST/PAN)",
+          detail: "Private vendor-docs bucket + registry; served only via short-lived signed URLs from admin-gated code",
+          db: "vendor_documents",
+          status: "done",
+        },
+        {
+          title: "One-time credential handoff",
+          detail: "Password generated, shown once, never stored — replaces the plaintext column dropped in 0024",
+          db: "auth.users",
+          status: "done",
+        },
+        {
+          title: "Vendor payouts / settlements",
+          detail: "Payout details are captured at onboarding and customer-side collection now exists (0025), but nothing settles money out to a vendor yet",
+          db: "wallet_transactions",
+          status: "todo",
         },
       ],
     },
@@ -360,6 +596,12 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
           db: "—",
           status: "done",
         },
+        {
+          title: "Rider accounts from the admin panel",
+          detail: "Admin → Settings → Team creates driver logins with a one-time password",
+          db: "profiles.role = 'driver'",
+          status: "done",
+        },
       ],
     },
     {
@@ -370,7 +612,7 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
       tasks: [
         {
           title: "Online / offline toggle (persisted)",
-          detail: "Driver availability flag on profile or separate table — UI is local useState only",
+          detail: "Still local useState in DriverBoard — going offline does not leave the dispatch pool on the server",
           db: "profiles (TBD)",
           status: "todo",
         },
@@ -382,7 +624,7 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
         },
         {
           title: "Pickup OTP verification",
-          detail: "Restaurant reads orders.pickup_otp at handover — column exists, no UI",
+          detail: "Restaurant reads orders.pickup_otp at handover — column exists, still no UI",
           db: "orders.pickup_otp",
           status: "todo",
         },
@@ -398,6 +640,72 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
           db: "deliveries.delivered_at",
           status: "done",
         },
+        {
+          title: "Payout rules from settings",
+          detail: "rider_commission + rider_min_payout are editable in Admin → Platform, but the board still derives payout per trip in code",
+          db: "platform_settings.rider_commission",
+          status: "active",
+        },
+      ],
+    },
+  ],
+  manager: [
+    {
+      week: 0,
+      range: "Shipped past the plan",
+      title: "A real, scoped operator role",
+      goal: "An operations sub-admin who can move orders and riders but cannot touch money, config or vendors.",
+      tasks: [
+        {
+          title: "`manager` as a real profile role",
+          detail: "Added as its own enum value in its own migration — Postgres refuses to USE a new label in the transaction that adds it",
+          db: "user_role enum · migration 0022",
+          status: "done",
+        },
+        {
+          title: "Manager RLS policies",
+          detail: "Order and delivery access without finance, platform settings or vendor management",
+          db: "migration 0023",
+          status: "done",
+        },
+        {
+          title: "Gated portal",
+          detail: "/manager layout + landing; no longer an alias for admin",
+          db: "profiles.role = 'manager'",
+          status: "done",
+        },
+        {
+          title: "Manager accounts",
+          detail: "Created from Admin → Settings → Team with a one-time password",
+          db: "profiles.role · lock_role()",
+          status: "done",
+        },
+      ],
+    },
+    {
+      week: 1,
+      range: "Next",
+      title: "Manager tools",
+      goal: "The three jobs the portal names but does not yet do.",
+      tasks: [
+        {
+          title: "Phone-in orders",
+          detail: "Place an order on behalf of a customer who called — the reason the role exists",
+          db: "orders · order_items",
+          status: "todo",
+        },
+        {
+          title: "Cross-vendor live order board",
+          detail: "Watch and advance orders across every shop, not one kitchen",
+          db: "orders.status",
+          status: "todo",
+        },
+        {
+          title: "Rider dispatch",
+          detail: "Assign a delivery to a specific rider instead of waiting for a driver to accept",
+          db: "deliveries.driver_id",
+          status: "todo",
+        },
       ],
     },
   ],
@@ -410,7 +718,7 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
       tasks: [
         {
           title: "Portal routes + nav",
-          detail: "/admin · /admin/orders · /admin/refunds · /admin/banners",
+          detail: "/admin · /admin/orders · /admin/refunds · /admin/banners · /admin/vendors · /admin/customers · /admin/settings",
           db: "—",
           status: "done",
         },
@@ -454,9 +762,9 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
         },
         {
           title: "Refund queue (live)",
-          detail: "/admin/refunds — approve works; deny writes 'rejected' vs DB enum 'denied'",
+          detail: "/admin/refunds — approve works; deny writes 'rejected' while the DB enum is 'denied', so the deny path fails",
           db: "refunds.status",
-          status: "done",
+          status: "active",
         },
       ],
     },
@@ -464,30 +772,128 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
       week: 2,
       range: "Governance",
       title: "User & role management",
-      goal: "Safely promote users to vendor / driver / admin.",
+      goal: "Safely promote users to vendor / driver / manager / admin.",
       tasks: [
         {
           title: "Role assignment tooling",
-          detail: "Seed/SQL scripts only — no admin UI; never client-writable",
-          db: "profiles.role · lock_role() trigger",
-          status: "todo",
-        },
-        {
-          title: "Audit log for admin actions",
-          detail: "refunds.decided_by references profiles — no general admin_actions table",
-          db: "refunds.decided_by",
+          detail: "Settings → Team creates manager and driver logins via the service role, past the lock_role trigger; still never client-writable",
+          db: "profiles.role · lock_role()",
           status: "done",
         },
         {
+          title: "Audit log for admin actions",
+          detail: "refunds.decided_by references profiles — still no general admin_actions table",
+          db: "refunds.decided_by",
+          status: "active",
+        },
+        {
           title: "MFA enforcement for admin",
-          detail: "TOTP required before /admin — challenge at /mfa, enroll at /mfa/setup",
-          db: "auth.mfa_factors",
+          detail: "TOTP required before /admin — challenge at /mfa, enroll at /mfa/setup. MFA_EXEMPT_EMAILS must be unset in production",
+          db: "auth.mfa_factors · user_mfa",
           status: "done",
         },
         {
           title: "Legacy order history import",
           detail: "~13.2k orders + order_items via db:import-legacy-orders",
           db: "orders · order_items · address.legacy_order_id",
+          status: "done",
+        },
+      ],
+    },
+    {
+      week: 3,
+      range: "Shipped past the plan",
+      title: "Vendor management console",
+      goal: "Onboard, edit, order and categorise every shop from the admin panel.",
+      tasks: [
+        {
+          title: "Vendor records (list · view · edit)",
+          detail: "/admin/vendors — owner and contact snapshot, commercials, hours, payout details, legal identifiers, lifecycle status, T&C audit trail",
+          db: "restaurants (migration 0017)",
+          status: "done",
+        },
+        {
+          title: "Registration wizard with resumable drafts",
+          detail: "Auto-saves progress; the restaurant and auth account are created only at Review, so an abandoned wizard leaves no orphan shop or login",
+          db: "vendor_registration_drafts",
+          status: "done",
+        },
+        {
+          title: "Owner phone OTP in the wizard",
+          detail: "/api/admin/vendors/verify-phone — admin-gated and rate limited",
+          db: "restaurants.owner_phone_verified",
+          status: "done",
+        },
+        {
+          title: "Logo + legal document upload",
+          detail: "Public vendor-logos bucket; private vendor-docs behind signed URLs",
+          db: "vendor_documents",
+          status: "done",
+        },
+        {
+          title: "Vendor category taxonomy",
+          detail: "/admin/vendors/categories — admin-owned, replaces free-text cuisine strings",
+          db: "vendor_categories",
+          status: "done",
+        },
+        {
+          title: "Storefront ordering",
+          detail: "Drag-free position select decides where a shop appears on the customer home",
+          db: "restaurants.sort_position (migration 0021)",
+          status: "done",
+        },
+        {
+          title: "Customer directory",
+          detail: "/admin/customers — real profiles, no mock rows",
+          db: "profiles.role = 'customer'",
+          status: "done",
+        },
+        {
+          title: "Admin UI system",
+          detail: "Shared admin-ui primitives + colourful iconography across every admin screen",
+          status: "done",
+        },
+      ],
+    },
+    {
+      week: 4,
+      range: "Shipped past the plan",
+      title: "Platform settings & security posture",
+      goal: "Configuration and staff live in the product, not in SQL.",
+      tasks: [
+        {
+          title: "Platform settings screen",
+          detail: "/admin/settings/platform — fees, tax, min order, free-delivery threshold, radius, prep time, support details, feature flags. These bill live orders",
+          db: "platform_settings",
+          status: "done",
+        },
+        {
+          title: "Team management",
+          detail: "/admin/settings/employees — create manager and driver accounts, one-time password shown once",
+          db: "profiles.role",
+          status: "done",
+        },
+        {
+          title: "Security screen",
+          detail: "/admin/settings/security — MFA enrolment and account security in one place",
+          db: "user_mfa",
+          status: "done",
+        },
+        {
+          title: "Column-level grants on restaurants",
+          detail: "Audit C-1: RLS filters rows, not columns, and 0017/0020 had added payout and KYC columns to a publicly-readable table. Explicit column privileges close it",
+          db: "grants on restaurants (migration 0024)",
+          status: "done",
+        },
+        {
+          title: "Rate limiting on every write endpoint",
+          detail: "user.id when authenticated, clientIp(request) when not — applied across the API surface in the audit remediation",
+          status: "done",
+        },
+        {
+          title: "Promo banner management",
+          detail: "/admin/banners — create, duplicate, schedule, activate, with impression and click counts",
+          db: "banners · banner_events",
           status: "done",
         },
       ],

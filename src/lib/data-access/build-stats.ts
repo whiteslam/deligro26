@@ -2,11 +2,19 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-/** Live row counts surfaced on `/build` — keyed by table / filter. */
+/**
+ * Live row counts surfaced on `/build` — keyed by table / filter.
+ *
+ * Counts for tables added by a later migration are `number | null`: null means
+ * "that migration has not been applied here", which the panel shows as `—`. A
+ * genuine 0 and a missing table are different facts, and an environment running
+ * an older schema should not blank the whole board.
+ */
 export interface BuildDbSnapshot {
   profiles_customer: number;
   profiles_restaurant: number;
   profiles_driver: number;
+  profiles_manager: number | null;
   profiles_admin: number;
   restaurants: number;
   restaurants_open: number;
@@ -22,6 +30,15 @@ export interface BuildDbSnapshot {
   refunds: number;
   refunds_pending: number;
   addresses: number;
+  favorites: number | null;
+  reviews: number | null;
+  banners: number | null;
+  coupons: number | null;
+  vendor_categories: number | null;
+  vendor_documents: number | null;
+  vendor_drafts: number | null;
+  payments: number | null;
+  payments_paid: number | null;
 }
 
 async function count(
@@ -32,6 +49,19 @@ async function count(
   let q = supabase.from(table).select("*", { count: "exact", head: true });
   if (filter) q = q.eq(filter.col, filter.val);
   const { count: n } = await q;
+  return n ?? 0;
+}
+
+/** Same, but distinguishes "no rows" (0) from "no such table / column" (null). */
+async function countOptional(
+  table: string,
+  filter?: { col: string; val: string | boolean }
+): Promise<number | null> {
+  const supabase = createAdminClient();
+  let q = supabase.from(table).select("*", { count: "exact", head: true });
+  if (filter) q = q.eq(filter.col, filter.val);
+  const { count: n, error } = await q;
+  if (error) return null;
   return n ?? 0;
 }
 
@@ -72,6 +102,33 @@ export async function getBuildDbSnapshot(): Promise<BuildDbSnapshot | null> {
       count("addresses"),
     ]);
 
+    // Everything below arrived with migrations 0011–0025. Counted optionally so
+    // a database still on an earlier migration reports `—` for the newer
+    // features instead of dropping the entire snapshot.
+    const [
+      profiles_manager,
+      favorites,
+      reviews,
+      banners,
+      coupons,
+      vendor_categories,
+      vendor_documents,
+      vendor_drafts,
+      payments,
+      payments_paid,
+    ] = await Promise.all([
+      countOptional("profiles", { col: "role", val: "manager" }),
+      countOptional("favorites"),
+      countOptional("reviews"),
+      countOptional("banners"),
+      countOptional("coupons"),
+      countOptional("vendor_categories"),
+      countOptional("vendor_documents"),
+      countOptional("vendor_registration_drafts"),
+      countOptional("payments"),
+      countOptional("payments", { col: "status", val: "paid" }),
+    ]);
+
     const [{ count: legacy_menu_items }, { count: legacy_orders }] =
       await Promise.all([
         supabase
@@ -99,6 +156,7 @@ export async function getBuildDbSnapshot(): Promise<BuildDbSnapshot | null> {
       profiles_customer,
       profiles_restaurant,
       profiles_driver,
+      profiles_manager,
       profiles_admin,
       restaurants,
       restaurants_open,
@@ -114,6 +172,15 @@ export async function getBuildDbSnapshot(): Promise<BuildDbSnapshot | null> {
       refunds,
       refunds_pending,
       addresses,
+      favorites,
+      reviews,
+      banners,
+      coupons,
+      vendor_categories,
+      vendor_documents,
+      vendor_drafts,
+      payments,
+      payments_paid,
     };
   } catch {
     return null;

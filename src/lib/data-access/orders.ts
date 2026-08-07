@@ -2,11 +2,17 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { computeChargesWith } from "@/lib/pricing";
 import { getSettings } from "@/lib/settings";
+import { onlinePaymentsEnabled } from "@/lib/payments/availability";
+import {
+  notifyOrderPlaced,
+  notifyVendorNewOrder,
+} from "@/lib/notifications/order-events";
 import {
   columnKnownMissing,
   isMissingColumn,
   rememberColumn,
 } from "@/lib/data-access/schema-probe";
+import type { PaymentMethod, PaymentStatus } from "@/types";
 
 /**
  * Secure data access for orders. Every query here runs through the anon key,
@@ -30,6 +36,9 @@ export interface Order {
   delivery_fee: number;
   tax_amount: number;
   tip: number;
+  /** Present once migration 0025 is applied; COD before that. */
+  payment_method?: PaymentMethod;
+  payment_status?: PaymentStatus;
   created_at: string;
   address: { label?: string; line?: string } | null;
   order_items: OrderItem[];
@@ -44,12 +53,21 @@ export interface Order {
 }
 
 const TIP_COLUMN = "orders.tip";
+/** The payment columns arrive together in 0025, so one probe covers both. */
+const PAYMENT_COLUMNS = "orders.payment_method";
 
-/** `tip` only exists once migration 0013 has been applied — see schema-probe. */
-function select(withTip: boolean): string {
+interface SelectFlags {
+  /** `tip` only exists once migration 0013 has been applied. */
+  tip: boolean;
+  /** `payment_method` / `payment_status` only exist from 0025. */
+  payment: boolean;
+}
+
+function select(flags: SelectFlags): string {
   return [
     "id, restaurant_id, status, total, delivery_fee, tax_amount",
-    withTip ? ", tip" : "",
+    flags.tip ? ", tip" : "",
+    flags.payment ? ", payment_method, payment_status" : "",
     ", created_at, address",
     ", order_items(name, qty, price, menu_items(external_id, veg))",
     ", restaurants(slug, name, image_url, accent_tint, eta_min, eta_max)",
@@ -61,21 +79,45 @@ interface QueryResult<T> {
   error: { code?: string } | null;
 }
 
-/** Run an order query, retrying without `tip` on a database that predates 0013. */
+/**
+ * Run an order query, narrowing the column list on a database that predates
+ * 0013 or 0025.
+ *
+ * Each optional group is dropped independently and remembered, so an
+ * environment missing one migration still gets everything the other provides —
+ * and after the first probe the retry cost is gone.
+ */
 async function selectOrders<T>(
   run: (columns: string) => PromiseLike<QueryResult<T>>
 ): Promise<T | null> {
-  if (!columnKnownMissing(TIP_COLUMN)) {
-    const { data, error } = await run(select(true));
+  const flags: SelectFlags = {
+    tip: !columnKnownMissing(TIP_COLUMN),
+    payment: !columnKnownMissing(PAYMENT_COLUMNS),
+  };
+
+  // `isMissingColumn` doesn't say WHICH column is missing, so drop the newest
+  // migration's group first and re-probe rather than guessing. At most one
+  // attempt per still-optimistic group, plus the final bare one.
+  const groups: Array<{ key: keyof SelectFlags; column: string }> = [
+    { key: "payment", column: PAYMENT_COLUMNS },
+    { key: "tip", column: TIP_COLUMN },
+  ];
+
+  for (const { key, column } of groups) {
+    if (!flags[key]) continue;
+
+    const { data, error } = await run(select(flags));
     if (!error) {
-      rememberColumn(TIP_COLUMN, true);
+      for (const g of groups) if (flags[g.key]) rememberColumn(g.column, true);
       return data;
     }
     if (!isMissingColumn(error)) throw error;
-    rememberColumn(TIP_COLUMN, false);
+
+    rememberColumn(column, false);
+    flags[key] = false;
   }
 
-  const { data, error } = await run(select(false));
+  const { data, error } = await run(select(flags));
   if (error) throw error;
   return data;
 }
@@ -92,6 +134,12 @@ export interface CreateOrderInput {
   address: { label: string; line: string };
   /** Courier tip, in whole rupees. Clamped server-side to what the UI offers. */
   tip?: number;
+  /**
+   * How the customer intends to pay. Defaults to COD, and `online` is honoured
+   * only when the server itself says online payment is on offer — the client
+   * asking for it is a request, not a decision.
+   */
+  paymentMethod?: PaymentMethod;
 }
 
 /** Place an order — prices validated server-side from menu_items, never trusted from client. */
@@ -147,6 +195,16 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     input.tip ?? 0
   );
 
+  // The client may ASK to pay online; whether that is on offer is the server's
+  // call. Asking while it is switched off (or unconfigured) is refused loudly
+  // rather than quietly downgraded to COD — silently changing how someone pays
+  // is its own kind of wrong.
+  const wantsOnline = input.paymentMethod === "online";
+  if (wantsOnline && !(await onlinePaymentsEnabled())) {
+    throw new Error("online_payments_unavailable");
+  }
+  const paymentMethod: PaymentMethod = wantsOnline ? "online" : "cod";
+
   const base: Record<string, unknown> = {
     customer_id: user.id,
     restaurant_id: restaurant.id,
@@ -158,25 +216,42 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     address: input.address,
   };
 
-  const insertOrder = (withTip: boolean) =>
+  // `payment_status` is deliberately not sent: the 0025 insert trigger pins it
+  // to 'pending' for anything holding a user JWT, so sending it would be theatre.
+  const insertOrder = (withTip: boolean, withPayment: boolean) =>
     supabase
       .from("orders")
-      .insert(withTip ? { ...base, tip: charges.tip } : base)
+      .insert({
+        ...base,
+        ...(withTip ? { tip: charges.tip } : {}),
+        ...(withPayment ? { payment_method: paymentMethod } : {}),
+      })
       .select("id")
       .single();
 
-  let { data: order, error: orderError } = await insertOrder(
-    !columnKnownMissing(TIP_COLUMN)
-  );
+  let withTip = !columnKnownMissing(TIP_COLUMN);
+  let withPayment = !columnKnownMissing(PAYMENT_COLUMNS);
 
-  if (orderError && isMissingColumn(orderError)) {
+  let { data: order, error: orderError } = await insertOrder(withTip, withPayment);
+
+  if (orderError && isMissingColumn(orderError) && withPayment) {
+    // Migration 0025 hasn't been applied. COD is what this database can record,
+    // so a COD order proceeds unchanged; an online one cannot be taken at all.
+    rememberColumn(PAYMENT_COLUMNS, false);
+    if (paymentMethod === "online") throw new Error("online_payments_unavailable");
+    withPayment = false;
+    ({ data: order, error: orderError } = await insertOrder(withTip, false));
+  }
+
+  if (orderError && isMissingColumn(orderError) && withTip) {
     // Migration 0013 hasn't been applied. We can still take the order — but we
     // cannot take the tip, because there is nowhere to put it and charging for
     // something we can't record is exactly the bug this replaced. Refuse the tip
     // loudly instead of pocketing it silently.
     rememberColumn(TIP_COLUMN, false);
     if (charges.tip > 0) throw new Error("tip_unsupported");
-    ({ data: order, error: orderError } = await insertOrder(false));
+    withTip = false;
+    ({ data: order, error: orderError } = await insertOrder(false, withPayment));
   }
 
   if (orderError) throw orderError;
@@ -202,6 +277,19 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     oid: order.id,
   });
   if (totalError) throw totalError;
+
+  // Announce it. Fire-and-forget by contract (order-events swallows its own
+  // failures), and deliberately not awaited as a pair with the insert: the
+  // order is already real, and a push outage must not fail a placed order.
+  void notifyOrderPlaced(order.id);
+
+  // The vendor is alerted only once the order is actually theirs to cook. A COD
+  // order is actionable immediately; an online one is not until the money
+  // lands, and settlePayment() raises the alert then. Without this split a
+  // kitchen would be rung for every abandoned checkout.
+  if (paymentMethod === "cod") {
+    void notifyVendorNewOrder(order.id, input.lines.length);
+  }
 
   const created = await getOrderById(order.id);
   if (!created) throw new Error("order_not_found");

@@ -23,6 +23,7 @@
     "db:generate-legacy-customers-sql": "npx tsx scripts/generate-legacy-customers-sql.ts",
     "db:generate-legacy-sql": "npx tsx scripts/generate-legacy-seed-sql.ts",
     "test:idor": "npx tsx scripts/qa/idor-suite.ts",
+    "test:payments": "npx tsx scripts/qa/payments-signature.ts",
     "test:e2e": "npx tsx scripts/qa/e2e-smoke.ts",
     "test:zap": "bash scripts/qa/zap-baseline.sh",
     "test:qa": "bash scripts/qa/run-all.sh"
