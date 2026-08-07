@@ -220,10 +220,17 @@ export function notifyVendorNewOrder(
  * The customer pulled out. The board would otherwise just drop the card, which
  * a kitchen already cooking has no way to notice.
  */
-export function notifyVendorOrderCancelled(orderId: string): Promise<void> {
+export function notifyVendorOrderCancelled(
+  orderId: string,
+  opts: { byAdmin?: boolean } = {}
+): Promise<void> {
+  // Who pulled the order changes what the kitchen does next: a customer
+  // cancelling is routine, support cancelling on their behalf usually means
+  // something went wrong that the restaurant is about to be asked about.
+  // Default unchanged, so the existing customer-path callers are untouched.
   return notifyVendor(
     orderId,
-    "Order cancelled by customer",
+    opts.byAdmin ? "Order cancelled by support" : "Order cancelled by customer",
     `Order #${shortOrderId(orderId)} was cancelled. Stop preparing it.`
   );
 }

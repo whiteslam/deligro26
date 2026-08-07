@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { User, Users } from "lucide-react";
 import {
   listCustomers,
@@ -52,10 +53,11 @@ function renderCustomers(customers: AdminCustomerRow[]) {
       ) : (
         <ul className="space-y-2.5">
           {customers.map((c) => (
-            <li
-              key={c.id}
-              className="rounded-2xl border border-line bg-surface p-3.5 transition-shadow hover:shadow-[var(--shadow-md)]"
-            >
+            <li key={c.id}>
+              <Link
+                href={`/admin/customers/${c.id}`}
+                className="press block rounded-2xl border border-line bg-surface p-3.5 transition-shadow hover:shadow-[var(--shadow-md)]"
+              >
               <div className="flex items-center gap-3">
                 <div className="grid size-10 shrink-0 place-items-center rounded-full bg-accent/15 text-accent">
                   <User className="size-4" />
@@ -81,6 +83,7 @@ function renderCustomers(customers: AdminCustomerRow[]) {
               <p className="mt-2.5 border-t border-line pt-2.5 text-[11px] text-muted">
                 Joined {c.joinedAt}
               </p>
+              </Link>
             </li>
           ))}
         </ul>

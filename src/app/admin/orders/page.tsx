@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ReceiptText } from "lucide-react";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { formatINR } from "@/lib/utils/format";
@@ -70,10 +71,10 @@ function renderOrders(orders: AdminOrderRow[], pending: PendingRestaurant[]) {
       ) : (
         <ul className="space-y-2.5">
           {orders.map((o) => (
-            <li
-              key={o.code}
-              className="rounded-2xl border border-line bg-surface p-3.5 transition-shadow hover:shadow-[var(--shadow-md)]"
-            >
+            <li key={o.code}>
+              {/* The demo seed rows have no id and therefore nothing to open —
+                  a link to /admin/orders/undefined would 404 on tap. */}
+              <Row href={o.id ? `/admin/orders/${o.id}` : null}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-data font-bold">{o.code}</p>
@@ -94,10 +95,30 @@ function renderOrders(orders: AdminOrderRow[], pending: PendingRestaurant[]) {
                   {STATUS[o.status].label}
                 </span>
               </div>
+              </Row>
             </li>
           ))}
         </ul>
       )}
     </div>
+  );
+}
+
+/** The card shell — tappable when there is a real order behind it. */
+function Row({
+  href,
+  children,
+}: {
+  href: string | null;
+  children: React.ReactNode;
+}) {
+  const className =
+    "block rounded-2xl border border-line bg-surface p-3.5 transition-shadow hover:shadow-[var(--shadow-md)]";
+  return href ? (
+    <Link href={href} className={`press ${className}`}>
+      {children}
+    </Link>
+  ) : (
+    <div className={className}>{children}</div>
   );
 }
