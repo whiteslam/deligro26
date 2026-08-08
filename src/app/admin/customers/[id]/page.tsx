@@ -51,7 +51,7 @@ export default async function AdminCustomerDetailPage({
   if (!customer) notFound();
 
   return (
-    <div className="space-y-4">
+    <div className="admin-measure space-y-4">
       <AdminHero
         title={customer.name}
         subtitle={`Joined ${customer.joinedAt}`}

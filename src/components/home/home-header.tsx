@@ -137,8 +137,8 @@ export function HomeHeader({
           type="search"
           value={query}
           onChange={(e) => onQueryChange?.(e.target.value)}
-          placeholder="Search for restaurants or dishes"
-          aria-label="Search for restaurants or dishes"
+          placeholder="Search for a dish, cuisine or restaurant"
+          aria-label="Search for a dish, cuisine or restaurant"
         />
         {query ? (
           <button

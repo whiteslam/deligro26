@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default function NewBannerPage() {
   return (
-    <div className="space-y-6">
+    <div className="admin-measure space-y-6">
       <AdminHero
         backHref="/admin/banners"
         backLabel="Campaigns"

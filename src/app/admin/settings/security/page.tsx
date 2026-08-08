@@ -12,7 +12,7 @@ export default async function AdminSecurityPage() {
   const mfa = await getMfaStatus();
 
   return (
-    <div className="space-y-5">
+    <div className="admin-measure space-y-5">
       <AdminHero
         backHref="/admin/settings"
         backLabel="Settings"

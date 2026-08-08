@@ -3,7 +3,7 @@ import { LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-/** Compact top chrome inside the admin phone frame. */
+/** Top chrome for admin — works in phone frame and web dashboard. */
 export function AdminHeader({
   title = "Admin",
   subtitle = "Operations",
@@ -12,13 +12,13 @@ export function AdminHeader({
   subtitle?: string;
 }) {
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-[color:var(--bg)]/90 px-4 py-3 backdrop-blur-md">
+    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-[color:var(--bg)]/90 px-4 py-3 backdrop-blur-md">
       <span className="size-2.5 shrink-0 rounded-full bg-green" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[15px] font-bold leading-none">{title}</p>
         <p className="text-label mt-1 truncate leading-none">{subtitle}</p>
       </div>
-      <ThemeToggle />
+      <ThemeToggle className="size-9" />
       {isSupabaseConfigured ? (
         <form action="/auth/signout" method="post">
           <button

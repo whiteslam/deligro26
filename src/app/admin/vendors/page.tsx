@@ -17,6 +17,7 @@ import {
 } from "@/lib/data-access/admin-vendors";
 import { listCategories } from "@/lib/data-access/vendor-categories";
 import { AdminHero, EmptyState, StatCard } from "@/components/admin/admin-ui";
+import { DataTable, TablePager, type Column } from "@/components/admin/data-table";
 import { VendorSearchBar } from "./vendor-search-bar";
 import { VendorRowActions } from "./vendor-row-actions";
 import { VendorPositionSelect } from "./vendor-position-select";
@@ -81,6 +82,106 @@ export default async function AdminVendorsPage({
     return query ? `/admin/vendors?${query}` : "/admin/vendors";
   };
 
+  const columns: Column<VendorListItem>[] = [
+    {
+      key: "name",
+      header: "Shop",
+      role: "title",
+      cell: (v) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-cover bg-center text-sm font-bold text-white"
+            style={
+              v.imageUrl
+                ? { backgroundImage: `url(${v.imageUrl})` }
+                : { background: v.accentTint ?? "var(--accent)" }
+            }
+          >
+            {v.imageUrl ? "" : v.name.charAt(0).toUpperCase()}
+          </span>
+          <span className="min-w-0">
+            <span className="flex items-center gap-1.5">
+              <span className="truncate font-semibold">{v.name}</span>
+              <span className="shrink-0 @3xl:hidden">
+                <span className={STATUS_PILL[v.status]}>{v.status}</span>
+              </span>
+            </span>
+            <span className="block truncate text-xs text-muted">/{v.slug}</span>
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "owner",
+      header: "Owner",
+      cell: (v) => (
+        <span className="block min-w-0">
+          <span className="block truncate text-[13px]">
+            {v.ownerName ?? "—"}
+          </span>
+          {v.ownerMobile ? (
+            <span className="text-data block truncate text-[11px] text-muted">
+              {v.ownerMobile}
+            </span>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      key: "category",
+      header: "Category",
+      cell: (v) => (
+        <span className="truncate text-[13px] text-muted">
+          {v.category ?? "Uncategorised"}
+        </span>
+      ),
+    },
+    {
+      key: "commission",
+      header: "Commission",
+      align: "right",
+      cell: (v) => (
+        <span className="text-data text-[13px] font-semibold">
+          {v.commissionPct}%
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      role: "trailing",
+      cell: (v) => (
+        <span className="hidden @3xl:inline">
+          <span className={STATUS_PILL[v.status]}>{v.status}</span>
+        </span>
+      ),
+    },
+    {
+      key: "created",
+      header: "Added",
+      cell: (v) => (
+        <span className="whitespace-nowrap text-[13px] text-muted">
+          {dateFmt.format(new Date(v.createdAt))}
+        </span>
+      ),
+    },
+    {
+      key: "slot",
+      header: "Slot",
+      cell: (v) => <VendorPositionSelect id={v.id} position={v.sortPosition} />,
+    },
+    {
+      key: "actions",
+      header: "",
+      role: "actions",
+      align: "right",
+      width: "w-[56px]",
+      cell: (v) => (
+        <VendorRowActions id={v.id} name={v.name} status={v.status} />
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -95,8 +196,7 @@ export default async function AdminVendorsPage({
         }
       />
 
-      {/* Overview cards */}
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-3 gap-2.5 @3xl:grid-cols-6 @3xl:gap-4">
         <StatCard
           icon={<Store className="size-4" />}
           tone="accent"
@@ -138,107 +238,43 @@ export default async function AdminVendorsPage({
 
       <VendorSearchBar categories={categoryNames} />
 
-      {result.items.length === 0 ? (
-        <EmptyState
-          icon={Store}
-          title={filtered ? "No vendors match" : "No vendors yet"}
-          description={
-            filtered
-              ? "Try a different search or filter."
-              : "Add your first shop to start taking orders."
-          }
-          action={
-            !filtered ? (
-              <Link href="/admin/vendors/new">
-                <Button size="sm">
-                  <Plus className="size-4" /> Add vendor
-                </Button>
-              </Link>
-            ) : null
-          }
-        />
-      ) : (
-        <>
-          <p className="text-xs text-muted">
-            {result.total} vendor{result.total === 1 ? "" : "s"}
-          </p>
-          <ul className="space-y-2.5">
-            {result.items.map((v) => (
-              <VendorCard key={v.id} vendor={v} />
-            ))}
-          </ul>
-        </>
-      )}
-
-      {totalPages > 1 ? (
-        <div className="flex items-center justify-between pt-1">
-          {page > 1 ? (
-            <Link href={pageHref(page - 1)}>
-              <Button size="sm" variant="secondary">
-                Previous
-              </Button>
-            </Link>
-          ) : (
-            <span />
-          )}
-          <span className="text-xs text-muted">
-            Page {page} of {totalPages}
-          </span>
-          {page < totalPages ? (
-            <Link href={pageHref(page + 1)}>
-              <Button size="sm" variant="secondary">
-                Next
-              </Button>
-            </Link>
-          ) : (
-            <span />
-          )}
-        </div>
+      {result.items.length > 0 ? (
+        <p className="text-xs text-muted">
+          {result.total} vendor{result.total === 1 ? "" : "s"}
+          {filtered ? " matching" : ""}
+          {totalPages > 1 ? ` · page ${page} of ${totalPages}` : ""}
+        </p>
       ) : null}
-    </div>
-  );
-}
 
-function VendorCard({ vendor: v }: { vendor: VendorListItem }) {
-  return (
-    <li className="rounded-2xl border border-line bg-surface p-3.5 transition-shadow hover:shadow-[var(--shadow-md)]">
-      <div className="flex gap-3">
-        <div
-          className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-cover bg-center text-lg font-bold text-white"
-          style={
-            v.imageUrl
-              ? { backgroundImage: `url(${v.imageUrl})` }
-              : { background: v.accentTint ?? "var(--accent)" }
-          }
-        >
-          {v.imageUrl ? "" : v.name.charAt(0).toUpperCase()}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <p className="truncate font-semibold">{v.name}</p>
-            <span className={STATUS_PILL[v.status]}>{v.status}</span>
-          </div>
-          <p className="mt-0.5 truncate text-xs text-muted">
-            {v.ownerName ?? "—"}
-            {v.ownerMobile ? ` · ${v.ownerMobile}` : ""}
-          </p>
-          <p className="mt-0.5 truncate text-[11px] text-muted">
-            {v.category ?? "Uncategorised"} · {v.commissionPct}% commission
-          </p>
-          {v.address ? (
-            <p className="mt-0.5 truncate text-[11px] text-muted">{v.address}</p>
-          ) : null}
-        </div>
-      </div>
-      <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <VendorPositionSelect id={v.id} position={v.sortPosition} />
-          <span className="truncate text-[11px] text-muted">
-            {dateFmt.format(new Date(v.createdAt))}
-          </span>
-        </div>
-        <VendorRowActions id={v.id} name={v.name} status={v.status} />
-      </div>
-    </li>
+      <DataTable
+        caption="Vendors"
+        columns={columns}
+        rows={result.items}
+        rowKey={(v) => v.id}
+        rowHref={(v) => `/admin/vendors/${v.id}?tab=overview`}
+        empty={
+          <EmptyState
+            icon={Store}
+            title={filtered ? "No vendors match" : "No vendors yet"}
+            description={
+              filtered
+                ? "Try a different search or filter."
+                : "Add your first shop to start taking orders."
+            }
+            action={
+              !filtered ? (
+                <Link href="/admin/vendors/new">
+                  <Button size="sm">
+                    <Plus className="size-4" /> Add vendor
+                  </Button>
+                </Link>
+              ) : null
+            }
+          />
+        }
+      />
+
+      <TablePager page={page} totalPages={totalPages} hrefFor={pageHref} />
+    </div>
   );
 }

@@ -90,8 +90,8 @@ export function AdminHero({
   backLabel?: string;
 }) {
   return (
-    <div className="vendor-hero relative overflow-hidden rounded-[var(--radius-sheet)] border border-line p-4">
-      <div className="vendor-hero-glow pointer-events-none absolute inset-0" />
+    <div className="admin-hero relative overflow-hidden rounded-[var(--radius-sheet)] border border-line p-4">
+      <div className="admin-hero-glow vendor-hero-glow pointer-events-none absolute inset-0" />
       <div className="relative">
         {backHref ? (
           <div className="mb-3">
@@ -106,7 +106,9 @@ export function AdminHero({
                 {badge}
               </div>
             ) : null}
-            <h1 className="text-2xl font-extrabold tracking-tight">{title}</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight @3xl:text-[30px]">
+              {title}
+            </h1>
             {subtitle ? (
               <p className="mt-1 text-sm text-muted">{subtitle}</p>
             ) : null}
@@ -196,7 +198,7 @@ export function StatCard({
         {icon ? (
           <span
             className={cn(
-              "grid size-8 shrink-0 place-items-center rounded-lg",
+              "grid size-8 shrink-0 place-items-center rounded-lg @3xl:size-10 @3xl:rounded-xl",
               TONES[tone]
             )}
           >
@@ -213,14 +215,14 @@ export function StatCard({
           </span>
         ) : null}
       </div>
-      <p className="text-data mt-2.5 text-xl font-bold leading-none tracking-tight text-ink">
+      <p className="text-data mt-2.5 text-xl font-bold leading-none tracking-tight text-ink @3xl:mt-4 @3xl:text-[28px]">
         {value}
       </p>
-      <p className="text-label mt-1">{label}</p>
+      <p className="text-label mt-1 @3xl:mt-1.5">{label}</p>
     </>
   );
   const className = cn(
-    "block rounded-2xl border border-line bg-surface p-3",
+    "block rounded-2xl border border-line bg-surface p-3 @3xl:p-4",
     href && "press transition-shadow hover:shadow-[var(--shadow-md)]"
   );
   return href ? (
@@ -286,6 +288,91 @@ export function EmptyState({
       <p className="font-semibold">{title}</p>
       <p className="max-w-xs text-sm text-muted">{description}</p>
       {action ? <div className="mt-3">{action}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * A panel built to hold a chart: title, optional headline figure, and a body of
+ * a fixed height (charts need one — a `ResponsiveContainer` inside an auto-height
+ * parent collapses to zero).
+ */
+export function ChartCard({
+  title,
+  subtitle,
+  action,
+  height = 260,
+  children,
+  className,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+  height?: number;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn(
+        // Its own container: a chart in a one-third column must lay itself out
+        // against that column, not against the page. Without this the donut
+        // reads "the page is 1600px wide" and goes side-by-side inside a card
+        // barely wider than the ring.
+        "@container rounded-2xl border border-line bg-surface p-4 @3xl:p-5",
+        className
+      )}
+    >
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-bold tracking-tight">{title}</h2>
+          {subtitle ? (
+            <p className="mt-0.5 text-xs text-muted">{subtitle}</p>
+          ) : null}
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+      <div style={{ height }}>{children}</div>
+    </section>
+  );
+}
+
+/**
+ * The window a screen is reporting on, as links rather than state — the page is
+ * a server component and re-queries when the range changes, so the URL is the
+ * only place the choice can honestly live.
+ */
+export function RangeTabs({
+  options,
+  active,
+  hrefFor,
+}: {
+  options: { value: number; label: string }[];
+  active: number;
+  hrefFor: (value: number) => string;
+}) {
+  return (
+    <div
+      className="flex items-center gap-0.5 rounded-full bg-surface-2 p-0.5 text-xs font-bold"
+      role="group"
+      aria-label="Reporting window"
+    >
+      {options.map((o) => {
+        const on = o.value === active;
+        return (
+          <Link
+            key={o.value}
+            href={hrefFor(o.value)}
+            aria-current={on ? "true" : undefined}
+            className={cn(
+              "press whitespace-nowrap rounded-full px-3 py-1.5 transition-colors",
+              on ? "bg-surface text-ink shadow-[var(--shadow-sm)]" : "text-muted"
+            )}
+          >
+            {o.label}
+          </Link>
+        );
+      })}
     </div>
   );
 }

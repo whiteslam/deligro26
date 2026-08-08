@@ -78,9 +78,10 @@ export default async function VendorDetailPage({
 
   return (
     <div className="space-y-4">
-      {/* Header — gradient hero to match the rest of the admin section */}
-      <div className="vendor-hero relative overflow-hidden rounded-[var(--radius-sheet)] border border-line p-4">
-        <div className="vendor-hero-glow pointer-events-none absolute inset-0" />
+      {/* Header — matches AdminHero: a gradient card in the phone frame, a
+          plain title row in the console (see .admin-hero). */}
+      <div className="admin-hero relative overflow-hidden rounded-[var(--radius-sheet)] border border-line p-4">
+        <div className="admin-hero-glow vendor-hero-glow pointer-events-none absolute inset-0" />
         <div className="relative">
           <div className="mb-3">
             <BackLink href="/admin/vendors">Vendors</BackLink>

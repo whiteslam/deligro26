@@ -55,7 +55,7 @@ export default async function AdminSettingsPage() {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="admin-measure space-y-6">
       <AdminHero
         title="Settings"
         subtitle="Platform configuration — fees, support, availability & ops"
@@ -104,7 +104,10 @@ function Group({
   return (
     <section>
       <h2 className="text-label mb-2">{label}</h2>
-      <div className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+      {/* A divided list in the phone frame; separate cards in the console,
+          where a full-width row with one chevron at the far right reads as an
+          empty shelf rather than a menu. */}
+      <div className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface @3xl:grid @3xl:grid-cols-2 @3xl:gap-4 @3xl:divide-y-0 @3xl:rounded-none @3xl:border-0 @3xl:bg-transparent">
         {children}
       </div>
     </section>
@@ -129,7 +132,10 @@ function Row({
   badgeTone?: "green" | "muted" | "deal";
 }) {
   return (
-    <Link href={href} className="press flex items-center gap-3 px-4 py-3.5">
+    <Link
+      href={href}
+      className="press flex items-center gap-3 px-4 py-3.5 @3xl:rounded-2xl @3xl:border @3xl:border-line @3xl:bg-surface @3xl:transition-shadow @3xl:hover:shadow-[var(--shadow-md)]"
+    >
       <span
         className={`grid size-9 shrink-0 place-items-center rounded-xl ${ICON_TONE[tone]}`}
       >

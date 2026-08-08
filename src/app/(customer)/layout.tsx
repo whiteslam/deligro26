@@ -3,6 +3,7 @@ import { TabBar } from "@/components/layout/tab-bar";
 import { GlassCart } from "@/components/glass/glass-cart";
 import { CartHydrator } from "@/components/glass/cart-hydrator";
 import { ItemSheet } from "@/components/restaurant/item-sheet";
+import { CartSwitchDialog } from "@/components/shared/cart-switch-dialog";
 import { SplashScreen } from "@/components/shared/splash-screen";
 import { OneSignalInit } from "@/components/notifications/onesignal-init";
 import { redirect } from "next/navigation";
@@ -37,6 +38,7 @@ export default async function CustomerLayout({
         <div className="app-scroll no-scrollbar pb-[80px]">{children}</div>
         <StatusBar />
         <ItemSheet />
+        <CartSwitchDialog />
         <GlassCart />
         <CartHydrator />
         <TabBar />

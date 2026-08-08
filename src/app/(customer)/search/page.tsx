@@ -5,16 +5,20 @@ import { listRestaurants } from "@/lib/catalog";
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ category?: string; q?: string }>;
 }) {
-  const [{ category }, restaurants] = await Promise.all([
+  const [{ category, q }, restaurants] = await Promise.all([
     searchParams,
     listRestaurants(),
   ]);
 
   return (
     <Suspense>
-      <SearchView initialCategory={category} restaurants={restaurants} />
+      <SearchView
+        initialCategory={category}
+        initialQuery={q}
+        restaurants={restaurants}
+      />
     </Suspense>
   );
 }

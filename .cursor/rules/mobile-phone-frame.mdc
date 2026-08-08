@@ -26,17 +26,20 @@ Reference implementations:
 ## Rules
 
 - **New customer pages** under `src/app/(customer)/` inherit the frame from the layout — do not add a second `.device` wrapper.
-- **Admin pages** under `src/app/admin/` inherit the frame from the admin layout — do not add a second `.device` wrapper or use `dashboard-shell`.
+- **Admin pages** under `src/app/admin/` inherit the frame from the admin layout — do not add a second `.device` wrapper. Default shell is phone; the header’s app/web toggle may switch to `dashboard-shell` for layout checks — do not hardcode `dashboard-shell` in admin pages.
 - **New auth/entry routes** outside `(customer)` (e.g. `/signin`, `/welcome`, `/login`) must wrap themselves in `.device` + `.app-shell` + `<StatusBar />`, matching `/welcome`.
 - Prefer the **onboarding OTP layout** (`OtpLogin variant="onboarding"`) for customer auth screens so they fill the phone like `/welcome`.
-- Do **not** use `dashboard-shell`, centered max-width cards, or desktop-only layouts for customer/auth/admin screens.
+- Do **not** use `dashboard-shell`, centered max-width cards, or desktop-only layouts for customer/auth screens. Admin web mode is only via `AdminShell` toggle.
 - On desktop (≥480px) `.device` is the iPhone frame; on a real phone it is `display: contents` (full viewport). Design for the 402×874 screen.
 
 ## Exceptions (no phone frame)
 
-- Operator portals still on desktop shell: `/vendor`, `/driver`
+- Operator portals still on desktop shell: `/vendor`, `/driver` (default)
 - Build tracker: `/build`
-- These correctly use `dashboard-shell`.
+- Admin when the desktop Layout popup is set to **web** (`AdminShell` → `dashboard-shell`)
+- Vendor when the desktop Layout popup is set to **web** (default `VendorShell`)
+- The App/Web Layout popup is desktop-only (≥480px); never shown on real phones
+- These correctly use `dashboard-shell` when in web mode.
 
 ## Checklist before finishing UI work
 

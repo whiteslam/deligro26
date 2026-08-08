@@ -1,95 +1,129 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Search, X, MapPinOff, SlidersHorizontal } from "lucide-react";
+import { useDeferredValue, useMemo, useState } from "react";
+import Link from "next/link";
+import { Search, X, UtensilsCrossed, Store } from "lucide-react";
 import type { Restaurant } from "@/types";
+import {
+  buildDishIndex,
+  categoryBasis,
+  groupByShop,
+  searchDishes,
+  FOOD_CATEGORIES,
+  type DishSort,
+  type SearchFilters,
+} from "@/lib/search/dishes";
+import { DishCard } from "@/components/search/dish-card";
 import { RestaurantCard } from "@/components/shared/restaurant-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
+import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
-type Sort = "eta" | "rating";
+type Tab = "dishes" | "shops";
 
-// Suggestions, not history. These three were labelled "Recent" and shown to
-// every user — including someone who had never searched for anything.
-const SUGGESTIONS = ["Biryani", "Pizza", "Healthy bowls"] as const;
+/** Ceiling on the dish list. Long enough to scroll, short enough to render. */
+const DISH_LIMIT = 60;
+
+/** The cap behind the "Under ₹200" chip, in whole rupees. */
+const BUDGET_PRICE = 200;
+
+const SUGGESTIONS = ["Paneer", "Biryani", "Pizza", "Cold coffee", "Dosa"] as const;
 
 const QUICK_FILTERS = [
   { id: "veg", label: "Pure Veg" },
-  { id: "rating", label: "Rating 4.5+" },
+  { id: "popular", label: "Bestsellers" },
+  { id: "cheap", label: `Under ${formatINR(BUDGET_PRICE)}` },
   { id: "fast", label: "Under 25 min" },
+  { id: "rating", label: "Rating 4.5+" },
   { id: "offers", label: "Offers" },
 ] as const;
 
-const CUISINES = [
-  "North Indian",
-  "Fast Food",
-  "Healthy",
-  "Italian",
-  "Chinese",
-  "Desserts",
-] as const;
+const SORTS: { id: DishSort; label: string }[] = [
+  { id: "relevance", label: "Best match" },
+  { id: "price", label: "Price" },
+  { id: "eta", label: "Fastest" },
+  { id: "rating", label: "Top rated" },
+];
 
+/**
+ * Food-first search.
+ *
+ * The question this screen answers is "who has X?", where X is a dish — so the
+ * result is a dish, priced, with an Add on it, and the kitchen named underneath.
+ * Restaurants are still here, one tab across, ranked by how well their menu
+ * answers the same query rather than by their name alone.
+ */
 export function SearchView({
   initialCategory,
+  initialQuery,
   restaurants,
 }: {
   initialCategory?: string;
+  /** Carried over from the home field, so "See all results" keeps the words. */
+  initialQuery?: string;
   restaurants: Restaurant[];
 }) {
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<Sort>("eta");
-  const [filters, setFilters] = useState<Set<string>>(new Set());
-  const [cuisine, setCuisine] = useState<string | null>(
-    initialCategory ? mapCategory(initialCategory) : null
+  const [query, setQuery] = useState(initialQuery ?? "");
+  const [tab, setTab] = useState<Tab>("dishes");
+  const [sort, setSort] = useState<DishSort>("relevance");
+  const [chips, setChips] = useState<Set<string>>(new Set());
+  const [category, setCategory] = useState<string | null>(
+    initialCategory ?? null
   );
 
-  const toggle = (id: string) =>
-    setFilters((prev) => {
+  // Keeps the field responsive while the ranking catches up on a big catalog.
+  const deferredQuery = useDeferredValue(query);
+
+  const index = useMemo(() => buildDishIndex(restaurants), [restaurants]);
+
+  const filters = useMemo<SearchFilters>(
+    () => ({
+      veg: chips.has("veg"),
+      popular: chips.has("popular"),
+      maxPrice: chips.has("cheap") ? BUDGET_PRICE : null,
+      fast: chips.has("fast"),
+      rating: chips.has("rating"),
+      offers: chips.has("offers"),
+      category,
+    }),
+    [chips, category]
+  );
+
+  const dishes = useMemo(
+    () => searchDishes(index, deferredQuery, filters, sort),
+    [index, deferredQuery, filters, sort]
+  );
+
+  const shops = useMemo(
+    () => groupByShop(dishes, restaurants, deferredQuery, filters, sort),
+    [dishes, restaurants, deferredQuery, filters, sort]
+  );
+
+  const toggleChip = (id: string) =>
+    setChips((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let list = restaurants.filter((r) => {
-      const matchesQuery =
-        !q ||
-        r.name.toLowerCase().includes(q) ||
-        r.cuisines.some((c) => c.toLowerCase().includes(q)) ||
-        r.menu.some((m) => m.name.toLowerCase().includes(q));
-      const matchesCuisine =
-        !cuisine || r.cuisines.some((c) => c === cuisine);
-      const matchesVeg =
-        !filters.has("veg") || r.menu.some((m) => m.veg);
-      const matchesRating = !filters.has("rating") || r.rating >= 4.5;
-      const matchesFast = !filters.has("fast") || r.etaMax <= 25;
-      const matchesOffers = !filters.has("offers") || Boolean(r.offer);
-      return (
-        matchesQuery &&
-        matchesCuisine &&
-        matchesVeg &&
-        matchesRating &&
-        matchesFast &&
-        matchesOffers
-      );
-    });
-    list = [...list].sort((a, b) =>
-      sort === "eta" ? a.etaMin - b.etaMin : b.rating - a.rating
-    );
-    return list;
-  }, [query, cuisine, filters, sort, restaurants]);
-
   const clearAll = () => {
-    setFilters(new Set());
-    setCuisine(null);
+    setChips(new Set());
+    setCategory(null);
     setQuery("");
   };
 
-  const activeCount = filters.size + (cuisine ? 1 : 0);
-  const showRecent = !query && !cuisine && filters.size === 0;
+  const typed = deferredQuery.trim();
+  const activeCount = chips.size + (category ? 1 : 0);
+  const showSuggestions = !typed && !category && chips.size === 0;
+  const shown = dishes.slice(0, DISH_LIMIT);
+
+  const activeCategory = FOOD_CATEGORIES.find((c) => c.id === category) ?? null;
+  // A chip nothing on any menu actually matches is being answered by the shops'
+  // cuisine tags instead. Say so — otherwise "Rolls" quietly lists milkshakes.
+  const byCuisineOnly = categoryBasis(index, category) === "cuisine";
+  const partial = Boolean(typed) && Boolean(shown[0]?.partial);
 
   return (
     <div>
@@ -98,9 +132,11 @@ export function SearchView({
           <Search className="size-5 shrink-0" />
           <input
             autoFocus
+            type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search for restaurants or dishes"
+            placeholder="Search for a dish, cuisine or restaurant"
+            aria-label="Search for a dish, cuisine or restaurant"
           />
           {query ? (
             <button
@@ -112,41 +148,47 @@ export function SearchView({
             </button>
           ) : null}
         </div>
+
+        <div className="mt-2.5 flex items-center gap-1 rounded-full bg-surface-2 p-0.5 text-[13px] font-bold">
+          <TabBtn
+            on={tab === "dishes"}
+            onClick={() => setTab("dishes")}
+            icon={<UtensilsCrossed className="size-4" />}
+          >
+            Dishes ({dishes.length})
+          </TabBtn>
+          <TabBtn
+            on={tab === "shops"}
+            onClick={() => setTab("shops")}
+            icon={<Store className="size-4" />}
+          >
+            Restaurants ({shops.length})
+          </TabBtn>
+        </div>
       </div>
 
       <div className="px-4 pt-3">
         <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1">
-          <button
-            type="button"
-            aria-label="Filters"
-            className="press grid size-9 shrink-0 place-items-center rounded-full border border-line bg-surface text-muted"
-          >
-            <SlidersHorizontal className="size-4" />
-          </button>
           {QUICK_FILTERS.map((f) => (
-            <Chip
-              key={f.id}
-              on={filters.has(f.id)}
-              onClick={() => toggle(f.id)}
-            >
+            <Chip key={f.id} on={chips.has(f.id)} onClick={() => toggleChip(f.id)}>
               {f.label}
             </Chip>
           ))}
         </div>
 
         <div className="no-scrollbar -mx-4 mt-2 flex items-center gap-2 overflow-x-auto px-4">
-          {CUISINES.map((c) => (
+          {FOOD_CATEGORIES.map((c) => (
             <Chip
-              key={c}
-              on={cuisine === c}
-              onClick={() => setCuisine(cuisine === c ? null : c)}
+              key={c.id}
+              on={category === c.id}
+              onClick={() => setCategory(category === c.id ? null : c.id)}
             >
-              {c}
+              {c.label}
             </Chip>
           ))}
         </div>
 
-        {showRecent ? (
+        {showSuggestions ? (
           <div className="mt-4">
             <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
               Try searching
@@ -166,58 +208,120 @@ export function SearchView({
           </div>
         ) : null}
 
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm font-medium text-muted">
-            {results.length}{" "}
-            {results.length === 1 ? "restaurant" : "restaurants"}
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate text-sm font-medium text-muted">
+            {tab === "dishes" ? (
+              <>
+                {dishes.length} {dishes.length === 1 ? "dish" : "dishes"}
+                {dishes.length > DISH_LIMIT ? ` · top ${DISH_LIMIT}` : ""}
+              </>
+            ) : (
+              <>
+                {shops.length}{" "}
+                {shops.length === 1 ? "restaurant" : "restaurants"}
+              </>
+            )}
             {activeCount ? ` · ${activeCount} filters` : ""}
           </p>
-          <div className="flex items-center gap-1 rounded-full bg-surface-2 p-0.5 text-xs font-bold">
-            <SortBtn on={sort === "eta"} onClick={() => setSort("eta")}>
-              Fastest
-            </SortBtn>
-            <SortBtn on={sort === "rating"} onClick={() => setSort("rating")}>
-              Top rated
-            </SortBtn>
+          <div className="no-scrollbar flex shrink-0 items-center gap-1 overflow-x-auto rounded-full bg-surface-2 p-0.5 text-xs font-bold">
+            {SORTS.map((s) => (
+              <SortBtn key={s.id} on={sort === s.id} onClick={() => setSort(s.id)}>
+                {s.label}
+              </SortBtn>
+            ))}
           </div>
         </div>
 
-        {results.length ? (
-          <div className="mt-4 space-y-4">
-            {results.map((r) => (
-              <RestaurantCard key={r.slug} restaurant={r} />
+        {!typed && tab === "dishes" && shown.length ? (
+          <h2 className="mt-4 text-[17px] font-extrabold tracking-tight">
+            {activeCategory ? activeCategory.label : "Popular dishes near you"}
+          </h2>
+        ) : null}
+
+        {byCuisineOnly && activeCategory ? (
+          <p className="mt-2 text-[13px] font-medium leading-snug text-muted">
+            No dish near you is listed as {activeCategory.label.toLowerCase()}{" "}
+            yet — showing what these kitchens do serve.
+          </p>
+        ) : null}
+
+        {partial ? (
+          <p className="mt-3 text-[13px] font-medium leading-snug text-muted">
+            Nothing is called &ldquo;{typed}&rdquo; exactly. These are the
+            closest dishes.
+          </p>
+        ) : null}
+
+        {tab === "dishes" ? (
+          shown.length ? (
+            <div className="mt-1 divide-y divide-line">
+              {shown.map((hit) => (
+                <DishCard key={hit.key} hit={hit} />
+              ))}
+            </div>
+          ) : (
+            <NoResults query={typed} onClear={clearAll} kind="dish" />
+          )
+        ) : shops.length ? (
+          <div className="mt-4 space-y-5">
+            {shops.map((shop) => (
+              <div key={shop.restaurant.slug}>
+                <RestaurantCard restaurant={shop.restaurant} />
+                {/* Why this shop is in the list: the dishes that matched. */}
+                {typed && shop.dishes.length ? (
+                  <Link
+                    href={`/restaurant/${shop.restaurant.slug}`}
+                    className="press mt-1.5 block truncate px-0.5 text-[12px] font-medium text-muted"
+                  >
+                    Serves{" "}
+                    <span className="font-semibold text-ink">
+                      {shop.dishes
+                        .slice(0, 3)
+                        .map((d) => d.item.name)
+                        .join(", ")}
+                    </span>
+                    {shop.dishes.length > 3
+                      ? ` +${shop.dishes.length - 3} more`
+                      : ""}
+                  </Link>
+                ) : null}
+              </div>
             ))}
           </div>
         ) : (
-          <EmptyState
-            className="mt-6"
-            icon={<MapPinOff className="size-7" />}
-            title="Nothing matches — yet"
-            description="No restaurants fit these filters here. Try a wider radius or clear a filter."
-            action={
-              <Button variant="outline" onClick={clearAll}>
-                Clear filters
-              </Button>
-            }
-          />
+          <NoResults query={typed} onClear={clearAll} kind="restaurant" />
         )}
       </div>
     </div>
   );
 }
 
-function mapCategory(id: string): string | null {
-  const map: Record<string, string> = {
-    pizza: "Italian",
-    healthy: "Healthy",
-    burgers: "Fast Food",
-    chinese: "Chinese",
-    desserts: "Desserts",
-    biryani: "North Indian",
-    south: "South Indian",
-    rolls: "Fast Food",
-  };
-  return map[id] ?? null;
+function NoResults({
+  query,
+  onClear,
+  kind,
+}: {
+  query: string;
+  onClear: () => void;
+  kind: "dish" | "restaurant";
+}) {
+  return (
+    <EmptyState
+      className="mt-6"
+      icon={<Search className="size-7" />}
+      title={query ? `Nothing called “${query}” yet` : "Nothing matches — yet"}
+      description={
+        kind === "dish"
+          ? "No kitchen near you is cooking that right now. Try a shorter word, or clear a filter."
+          : "No restaurant here fits these filters. Try a wider search or clear a filter."
+      }
+      action={
+        <Button variant="outline" onClick={onClear}>
+          Clear filters
+        </Button>
+      }
+    />
+  );
 }
 
 function Chip({
@@ -233,8 +337,36 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={on}
       className={cn("press bolt-chip", on && "bolt-chip-on")}
     >
+      {children}
+    </button>
+  );
+}
+
+function TabBtn({
+  on,
+  onClick,
+  icon,
+  children,
+}: {
+  on: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={cn(
+        "press flex flex-1 items-center justify-center gap-1.5 rounded-full py-2",
+        on ? "bg-surface text-ink shadow-[var(--shadow-sm)]" : "text-muted"
+      )}
+    >
+      {icon}
       {children}
     </button>
   );
@@ -253,8 +385,9 @@ function SortBtn({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={on}
       className={cn(
-        "press rounded-full px-3 py-1.5",
+        "press shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5",
         on ? "bg-surface text-ink shadow-[var(--shadow-sm)]" : "text-muted"
       )}
     >

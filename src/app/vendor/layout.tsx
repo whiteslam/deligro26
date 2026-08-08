@@ -1,8 +1,4 @@
-import { VendorTopBar } from "@/components/vendor/vendor-top-bar";
-import {
-  VendorBottomNav,
-  VendorSidebar,
-} from "@/components/vendor/vendor-sidebar";
+import { VendorShell } from "@/components/vendor/vendor-shell";
 import { requireVendorAccess } from "@/lib/auth/vendor-access";
 import { requireOperatorMfa } from "@/lib/auth/mfa";
 import {
@@ -40,22 +36,15 @@ export default async function RestaurantLayout({
     }
   }
 
-  const shellProps = {
-    restaurantName: restaurantName || "No restaurant",
-    isOpen,
-    restaurants,
-    activeSlug,
-    showControls: isSupabaseConfigured && restaurants.length > 0,
-  };
-
   return (
-    <div className="dashboard-shell vendor-shell">
-      <VendorSidebar {...shellProps} />
-      <div className="vendor-content">
-        <VendorTopBar {...shellProps} />
-        <main className="dashboard-main vendor-main">{children}</main>
-      </div>
-      <VendorBottomNav />
-    </div>
+    <VendorShell
+      restaurantName={restaurantName || "No restaurant"}
+      isOpen={isOpen}
+      restaurants={restaurants}
+      activeSlug={activeSlug}
+      showControls={isSupabaseConfigured && restaurants.length > 0}
+    >
+      {children}
+    </VendorShell>
   );
 }

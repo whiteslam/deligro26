@@ -45,7 +45,7 @@ Without Supabase keys the app still boots as a **static demo** (enforcement off)
 |---|---|---|
 | **Customer** | `/` | Browse, cart, checkout, live tracking — no login to explore |
 | **Restaurant** | `/vendor` | Live order board, menu availability, earnings |
-| **Driver** | `/driver` | Online toggle, accept → pickup → delivered, earnings |
+| **Driver** | `/driver` | Online toggle, accept → pickup → delivered (earnings still on board today; salary / no-commission plan is on `/build?tab=driver`) |
 | **Admin** | `/admin` | KPIs, all-orders table, refund queue, approvals |
 | Launcher | `/portals` | Links to all four — handy for demo / QA |
 | Build tracker | `/build` | Live delivery plan & progress (see below) |

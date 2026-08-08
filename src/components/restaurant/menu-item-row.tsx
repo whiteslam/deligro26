@@ -3,6 +3,7 @@
 import { Plus, Minus } from "lucide-react";
 import type { MenuItem, Restaurant } from "@/types";
 import { useCart } from "@/stores/cart-store";
+import { useCartSwitch } from "@/stores/cart-switch-store";
 import { useItemSheet } from "@/stores/item-sheet-store";
 import { VegMark } from "@/components/shared/veg-mark";
 import { PhotoTile } from "@/components/shared/photo-tile";
@@ -17,17 +18,23 @@ export function MenuItemRow({
   restaurant: Restaurant;
 }) {
   const lines = useCart((s) => s.lines);
-  const add = useCart((s) => s.add);
+  const cartSlug = useCart((s) => s.restaurantSlug);
   const setQty = useCart((s) => s.setQty);
+  const request = useCartSwitch((s) => s.request);
   const openSheet = useItemSheet((s) => s.open);
 
-  const qty = lines.find((l) => l.itemId === item.id)?.qty ?? 0;
+  // Menu item ids are unique within a menu, not across the catalog — so the
+  // quantity only counts when the basket belongs to this restaurant.
+  const qty =
+    cartSlug === restaurant.slug
+      ? lines.find((l) => l.itemId === item.id)?.qty ?? 0
+      : 0;
   const ref = { slug: restaurant.slug, name: restaurant.name };
 
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    add(item, ref);
+    request(item, ref);
   };
 
   return (

@@ -1,4 +1,4 @@
-import { Clock, RotateCcw, Wallet } from "lucide-react";
+import { Clock, CreditCard, RotateCcw, Wallet } from "lucide-react";
 import { listRefunds } from "@/lib/data-access/refunds";
 import { RefundCard } from "@/components/admin/refund-card";
 import { AdminHero, EmptyState, StatCard } from "@/components/admin/admin-ui";
@@ -40,7 +40,7 @@ export default async function AdminRefundsPage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 gap-2.5 @3xl:grid-cols-4 @3xl:gap-4">
             <StatCard
               icon={<Clock className="size-4" />}
               tone="accent"
@@ -53,6 +53,18 @@ export default async function AdminRefundsPage() {
               tone="deal"
               label="Pending value"
               value={formatINR(pendingAmount)}
+            />
+            <StatCard
+              icon={<CreditCard className="size-4" />}
+              tone="blue"
+              label="Gateway can reverse"
+              value={gatewayCount}
+            />
+            <StatCard
+              icon={<RotateCcw className="size-4" />}
+              tone="muted"
+              label="All requests"
+              value={refunds.length}
             />
           </div>
 
@@ -67,7 +79,9 @@ export default async function AdminRefundsPage() {
             decision, and the money is settled off-platform by hand.
           </p>
 
-          <div className="space-y-2.5">
+          {/* Two columns on a wide screen, never more: a refund is a decision
+              with money attached, and a denser grid invites skimming. */}
+          <div className="grid gap-2.5 @3xl:grid-cols-2 @3xl:gap-4">
             {refunds.map((r) => (
               <RefundCard key={r.id} refund={r} />
             ))}

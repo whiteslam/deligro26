@@ -1035,6 +1035,88 @@ body:has(.dashboard-shell) {
   }
 }
 
+/* ------------------------------------------------------------
+   Admin console (web mode) — permanent left rail + fluid content.
+
+   The rail is `position: sticky` rather than `fixed` so it participates in the
+   flex row and the content column can simply be `flex: 1`; a fixed rail would
+   need the content to carry a matching margin, which then has to be unwound at
+   every breakpoint. Below 1024px the rail is hidden and the same nav is served
+   as a slide-over (AdminNavDrawer).
+   ------------------------------------------------------------ */
+.admin-shell {
+  display: flex;
+  min-height: 100dvh;
+  background: var(--bg);
+}
+.admin-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  flex-shrink: 0;
+  z-index: 20;
+}
+.admin-content {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.admin-main {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  /* The console is a data tool: it uses the width it is given, up to a limit
+     that keeps table rows scannable rather than stretched across an ultrawide. */
+  max-width: 1600px;
+  margin-inline: auto;
+  padding: 18px 16px 48px;
+  overflow-x: clip;
+}
+@media (min-width: 1024px) {
+  .admin-main {
+    padding: 26px 28px 56px;
+  }
+}
+
+/* The admin page header. In the phone frame it is the gradient card the vendor
+   portal uses; in the console it sheds the card entirely and becomes a plain
+   title row, because a full-width gradient banner on every screen is noise.
+   Driven by a container query so the phone-frame preview keeps the card even
+   though the window around it is wide. */
+.admin-hero {
+  background: linear-gradient(135deg, var(--surface) 0%, var(--accent-soft) 120%);
+  box-shadow: var(--shadow-md);
+}
+@container (min-width: 768px) {
+  .admin-hero {
+    background: none;
+    border-color: transparent;
+    box-shadow: none;
+    padding: 0;
+  }
+  .admin-hero-glow {
+    display: none;
+  }
+}
+
+/* Forms and single-record detail views cap at a readable measure. The console
+   is 1600px wide at most, which is right for a table and wrong for a column of
+   labelled inputs — a 1500px-wide text field is a worse form, not a bigger one.
+   List screens deliberately do NOT carry this class. */
+@container (min-width: 1024px) {
+  .admin-measure {
+    max-width: 1000px;
+  }
+}
+
+/* The dashboard's "today" band. Keeps its gradient at every width — unlike the
+   page header, this one IS a card, and it is the screen's focal point. */
+.admin-today {
+  background: linear-gradient(135deg, var(--surface) 0%, var(--accent-soft) 120%);
+  box-shadow: var(--shadow-md);
+}
+
 /* Vendor UI primitives */
 .vendor-hero {
   background: linear-gradient(

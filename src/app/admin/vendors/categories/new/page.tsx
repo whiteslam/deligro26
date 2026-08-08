@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default function NewCategoryPage() {
   return (
-    <div className="space-y-4">
+    <div className="admin-measure space-y-4">
       <AdminHero
         backHref="/admin/vendors/categories"
         backLabel="Categories"

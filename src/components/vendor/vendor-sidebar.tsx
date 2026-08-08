@@ -129,12 +129,21 @@ export function VendorSidebar({
   );
 }
 
-export function VendorBottomNav() {
+export function VendorBottomNav({
+  phoneFrame = false,
+}: {
+  /** Keep mobile tabs visible inside the desktop phone-frame preview. */
+  phoneFrame?: boolean;
+}) {
   const pathname = usePathname();
 
   return (
     <nav
-      className="vendor-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/90 backdrop-blur-xl lg:hidden"
+      className={
+        phoneFrame
+          ? "vendor-bottom-nav absolute inset-x-0 bottom-0 z-40 border-t border-line bg-surface/90 backdrop-blur-xl"
+          : "vendor-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/90 backdrop-blur-xl lg:hidden"
+      }
       aria-label="Vendor navigation"
     >
       <div className="mx-auto grid max-w-lg grid-cols-5 gap-0.5 px-2 pt-2">

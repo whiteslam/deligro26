@@ -15,7 +15,7 @@ export default async function EditCategoryPage({
   if (!category) notFound();
 
   return (
-    <div className="space-y-4">
+    <div className="admin-measure space-y-4">
       <AdminHero
         backHref="/admin/vendors/categories"
         backLabel="Categories"

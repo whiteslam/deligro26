@@ -1,8 +1,17 @@
-import { StatusBar } from "@/components/layout/status-bar";
-import { AdminHeader } from "@/components/admin/admin-header";
-import { AdminTabBar } from "@/components/admin/admin-tab-bar";
-import { requireRole } from "@/lib/auth";
+import { AdminShell } from "@/components/admin/admin-shell";
+import { getProfile, requireRole } from "@/lib/auth";
 import { requireOperatorMfa } from "@/lib/auth/mfa";
+import {
+  getAdminNavCounts,
+  type AdminNavCounts,
+} from "@/lib/data-access/admin-stats";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+
+const NO_COUNTS: AdminNavCounts = {
+  pendingApprovals: 0,
+  pendingRefunds: 0,
+  liveOrders: 0,
+};
 
 export default async function AdminLayout({
   children,
@@ -12,16 +21,19 @@ export default async function AdminLayout({
   await requireRole("admin");
   await requireOperatorMfa("/admin", "admin"); // opt-in: challenges enrolled admins, lets others through
 
+  // The console's badges and its "signed in as". Both are chrome: a failure
+  // here must not take the page under it down, so counts fall back to zero
+  // (nothing to do) and the name to a neutral label — never to someone else's.
+  const [counts, profile] = await Promise.all([
+    isSupabaseConfigured
+      ? getAdminNavCounts().catch(() => NO_COUNTS)
+      : Promise.resolve(NO_COUNTS),
+    getProfile().catch(() => null),
+  ]);
+
   return (
-    <div className="device">
-      <div className="app-shell">
-        <div className="app-scroll no-scrollbar pb-[80px]">
-          <AdminHeader />
-          <div className="px-4 pb-6 pt-4">{children}</div>
-        </div>
-        <StatusBar />
-        <AdminTabBar />
-      </div>
-    </div>
+    <AdminShell counts={counts} name={profile?.full_name?.trim() || "Admin"}>
+      {children}
+    </AdminShell>
   );
 }

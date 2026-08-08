@@ -40,7 +40,7 @@ export default async function NewVendorPage({
   const categoryNames = categories.map((c) => c.name);
 
   return (
-    <div className="space-y-4">
+    <div className="admin-measure space-y-4">
       <AdminHero
         backHref="/admin/vendors"
         backLabel="Vendors"

@@ -16,7 +16,7 @@ export default async function AdminEmployeesPage() {
     : [];
 
   return (
-    <div className="space-y-5">
+    <div className="admin-measure space-y-5">
       <AdminHero
         backHref="/admin/settings"
         backLabel="Settings"

@@ -264,6 +264,63 @@ export async function getAdminDashboard(): Promise<AdminDashboard> {
   };
 }
 
+/**
+ * The three numbers the web shell's sidebar and top bar wear as badges.
+ *
+ * Every one is a real queue an operator can act on — approvals waiting, refunds
+ * waiting, orders currently in flight. A badge that isn't counted from the
+ * database is a badge that lies about how much work there is, so a failing
+ * sub-query reads as 0 (nothing to do) rather than as a guess.
+ *
+ * Runs on every admin page render, so all three are head-only counts.
+ */
+export interface AdminNavCounts {
+  pendingApprovals: number;
+  pendingRefunds: number;
+  liveOrders: number;
+}
+
+/** Stages where an order still needs somebody to do something. */
+const IN_FLIGHT = ["placed", "kitchen", "ready", "on_the_way"];
+
+export async function getAdminNavCounts(): Promise<AdminNavCounts> {
+  const supabase = await createClient();
+
+  const countOf = async (
+    build: () => PromiseLike<{ count: number | null; error: unknown }>
+  ): Promise<number> => {
+    try {
+      const { count, error } = await build();
+      return error ? 0 : count ?? 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const [pendingApprovals, pendingRefunds, liveOrders] = await Promise.all([
+    countOf(() =>
+      supabase
+        .from("restaurants")
+        .select("id", { count: "exact", head: true })
+        .eq("approved", false)
+    ),
+    countOf(() =>
+      supabase
+        .from("refunds")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+    ),
+    countOf(() =>
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .in("status", IN_FLIGHT)
+    ),
+  ]);
+
+  return { pendingApprovals, pendingRefunds, liveOrders };
+}
+
 /** Restaurants waiting on an admin — the real queue, not a hardcoded list. */
 export async function listPendingRestaurants(): Promise<PendingRestaurant[]> {
   const supabase = await createClient();

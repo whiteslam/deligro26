@@ -16,6 +16,7 @@ import {
   PreviewNotice,
   StatCard,
 } from "@/components/admin/admin-ui";
+import { DataTable, type Column } from "@/components/admin/data-table";
 import { BannerRowActions } from "./banner-row-actions";
 
 export const dynamic = "force-dynamic";
@@ -73,7 +74,7 @@ export default async function AdminBannersPage() {
         </PreviewNotice>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5 @3xl:grid-cols-4 @3xl:gap-4">
         <StatCard
           icon={<Radio className="size-4" />}
           tone="green"
@@ -100,59 +101,111 @@ export default async function AdminBannersPage() {
         />
       </div>
 
-      {banners.length === 0 ? (
-        <EmptyState
-          icon={Megaphone}
-          title="No campaigns yet"
-          description="Create a banner and it shows in the customer app."
-          action={
-            <Link href="/admin/banners/new">
-              <Button size="sm">
-                <Plus className="size-4" /> New campaign
-              </Button>
-            </Link>
-          }
-        />
-      ) : (
-        <ul className="space-y-2.5">
-          {banners.map((b) => (
-            <BannerCard key={b.id} banner={b} />
-          ))}
-        </ul>
-      )}
+      <DataTable
+        caption="Campaigns"
+        columns={bannerColumns}
+        rows={banners}
+        rowKey={(b) => b.id}
+        rowHref={(b) => `/admin/banners/${b.id}`}
+        empty={
+          <EmptyState
+            icon={Megaphone}
+            title="No campaigns yet"
+            description="Create a banner and it shows in the customer app."
+            action={
+              <Link href="/admin/banners/new">
+                <Button size="sm">
+                  <Plus className="size-4" /> New campaign
+                </Button>
+              </Link>
+            }
+          />
+        }
+      />
     </div>
   );
 }
 
-function BannerCard({ banner: b }: { banner: Banner }) {
-  const a = b.analytics;
-  return (
-    <li className="rounded-2xl border border-line bg-surface p-3.5 transition-shadow hover:shadow-[var(--shadow-md)]">
-      <div className="flex gap-3">
-        <div
-          className="grid size-11 shrink-0 place-items-center rounded-xl text-lg"
+const bannerColumns: Column<Banner>[] = [
+  {
+    key: "headline",
+    header: "Campaign",
+    role: "title",
+    cell: (b) => (
+      <div className="flex min-w-0 items-center gap-3">
+        <span
+          className="grid size-10 shrink-0 place-items-center rounded-xl text-lg"
           style={{ background: b.tint }}
         >
           {b.glyph ?? "📢"}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <p className="truncate font-semibold">{b.headline}</p>
-            <span className={STATUS_PILL[b.status]}>{b.status}</span>
-          </div>
-          <p className="mt-0.5 truncate text-xs text-muted">
+        </span>
+        <span className="min-w-0">
+          <span className="flex items-center gap-1.5">
+            <span className="truncate font-semibold">{b.headline}</span>
+            <span className="shrink-0 @3xl:hidden">
+              <span className={STATUS_PILL[b.status]}>{b.status}</span>
+            </span>
+          </span>
+          <span className="block truncate text-xs text-muted">
             {b.name}
             {b.kind === "sponsored" ? " · Sponsored" : ""}
-          </p>
-          <p className="mt-2 text-[11px] text-muted">
-            {(a?.impressions ?? 0).toLocaleString("en-IN")} imp ·{" "}
-            {pct(a?.ctr ?? 0)} CTR · {a?.clicks ?? 0} clicks
-          </p>
-        </div>
+          </span>
+        </span>
       </div>
-      <div className="mt-3 border-t border-line pt-3">
-        <BannerRowActions id={b.id} status={b.status} />
-      </div>
-    </li>
-  );
-}
+    ),
+  },
+  {
+    key: "placements",
+    header: "Placements",
+    cell: (b) => (
+      <span className="truncate text-[13px] text-muted">
+        {b.placements.length ? b.placements.join(", ") : "—"}
+      </span>
+    ),
+  },
+  {
+    key: "status",
+    header: "Status",
+    role: "trailing",
+    cell: (b) => (
+      <span className="hidden @3xl:inline">
+        <span className={STATUS_PILL[b.status]}>{b.status}</span>
+      </span>
+    ),
+  },
+  {
+    key: "impressions",
+    header: "Impressions",
+    align: "right",
+    cell: (b) => (
+      <span className="text-data text-[13px]">
+        {(b.analytics?.impressions ?? 0).toLocaleString("en-IN")}
+      </span>
+    ),
+  },
+  {
+    key: "clicks",
+    header: "Clicks",
+    align: "right",
+    cell: (b) => (
+      <span className="text-data text-[13px]">{b.analytics?.clicks ?? 0}</span>
+    ),
+  },
+  {
+    key: "ctr",
+    header: "CTR",
+    align: "right",
+    cell: (b) => (
+      <span className="text-data text-[13px] font-semibold">
+        {pct(b.analytics?.ctr ?? 0)}
+      </span>
+    ),
+  },
+  {
+    key: "actions",
+    header: "",
+    role: "actions",
+    align: "right",
+    cell: (b) => <BannerRowActions id={b.id} status={b.status} />,
+  },
+];

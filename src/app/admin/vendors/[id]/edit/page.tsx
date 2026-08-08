@@ -20,7 +20,7 @@ export default async function EditVendorPage({
   if (!vendor) notFound();
 
   return (
-    <div className="space-y-4">
+    <div className="admin-measure space-y-4">
       <AdminHero
         backHref={`/admin/vendors/${id}`}
         backLabel={vendor.name}

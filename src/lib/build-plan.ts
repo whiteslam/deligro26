@@ -61,7 +61,7 @@ export const BUILD_TABS: BuildTabConfig[] = [
     id: "driver",
     label: "Driver",
     portal: "/driver",
-    summary: "Delivery partners — accept, pickup, deliver",
+    summary: "Salary riders — jobs, routes, attendance (no commission UI)",
   },
   {
     id: "manager",
@@ -197,7 +197,7 @@ export const MILESTONES: Milestone[] = [
     tasks: [
       { title: "Restaurant order board (live)", detail: "Accept/Reject → Food ready; AutoRefresh poll (not Supabase Realtime)", status: "done" },
       { title: "Menu availability toggles", detail: "Owner writes menu_items.available via /vendor/menu toggle + RLS", status: "done" },
-      { title: "Driver flow", detail: "Accept → picked up → delivered + delivery OTP; online toggle still local state; pickup OTP still missing", status: "active" },
+      { title: "Driver flow", detail: "Accept → picked up → delivered + delivery OTP; salary model (no commission/earnings on board); online toggle still local; pickup OTP still missing", status: "active" },
       {
         title: "Admin orders + refunds",
         detail: "Live /admin/orders + /admin/refunds. Approve works; deny still writes 'rejected' while refund_status is ('pending','approved','denied') — the deny path is rejected by the DB",
@@ -607,13 +607,13 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
     {
       week: 2,
       range: "Operations",
-      title: "Driver on live deliveries",
-      goal: "Accept jobs, pickup OTP, delivery OTP, earnings.",
+      title: "Live jobs — no commission UI",
+      goal: "Riders are on salary. Board shows jobs and trip progress only — never commission, per-trip payout, or earnings.",
       tasks: [
         {
-          title: "Online / offline toggle (persisted)",
-          detail: "Still local useState in DriverBoard — going offline does not leave the dispatch pool on the server",
-          db: "profiles (TBD)",
+          title: "Salary model on the board",
+          detail: "Remove Today's earnings / payout-per-job from DriverBoard; rider_commission stays admin-only (if kept for reporting) and must not surface in /driver",
+          db: "—",
           status: "todo",
         },
         {
@@ -635,16 +635,86 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
           status: "done",
         },
         {
-          title: "Trip history + earnings",
-          detail: "Today's trips + earnings on the board — no full history page yet",
-          db: "deliveries.delivered_at",
-          status: "done",
+          title: "Current job clarity",
+          detail: "Active trip shows what they are delivering, vendor pickup address, and customer drop-off — phase: to-vendor vs to-customer",
+          db: "deliveries.status · orders",
+          status: "active",
         },
         {
-          title: "Payout rules from settings",
-          detail: "rider_commission + rider_min_payout are editable in Admin → Platform, but the board still derives payout per trip in code",
-          db: "platform_settings.rider_commission",
+          title: "Trip history (no money)",
+          detail: "Today's trip count on the board exists; full history of delivered + cancelled jobs with destinations still missing",
+          db: "deliveries.delivered_at · orders.cancelled_at",
+          status: "todo",
+        },
+      ],
+    },
+    {
+      week: 3,
+      range: "Attendance & visibility",
+      title: "On duty, location, admin oversight",
+      goal: "Rider app on/off and live location are real server state so admin/manager can see who is working and where they are on the road.",
+      tasks: [
+        {
+          title: "Online / offline toggle (persisted)",
+          detail: "Still local useState in DriverBoard — going offline does not leave the dispatch pool on the server",
+          db: "profiles.is_online (TBD) or driver_shifts",
+          status: "todo",
+        },
+        {
+          title: "Attendance with location",
+          detail: "Clock-on / shift record with last known lat/lng + timestamp so attendance is auditable, not just a boolean",
+          db: "driver_shifts or profiles.driver_lat/lng",
+          status: "todo",
+        },
+        {
+          title: "Live GPS while on a job",
+          detail: "POST /api/driver/location already writes deliveries.driver_lat/lng; ensure phase (pickup vs dropoff) is obvious from deliveries.status",
+          db: "deliveries.driver_lat · driver_location_source",
           status: "active",
+        },
+        {
+          title: "Admin sees rider on/off + route phase",
+          detail: "Admin/manager can see which riders have the app on, who is idle vs going to vendor vs going to customer, and last fix time",
+          db: "deliveries · profiles",
+          status: "todo",
+        },
+        {
+          title: "Cancelled jobs for the rider",
+          detail: "Rider history includes cancelled deliveries (and who cancelled) so disputes are visible without digging in admin",
+          db: "orders.cancelled_at · deliveries",
+          status: "todo",
+        },
+      ],
+    },
+    {
+      week: 4,
+      range: "COD change → wallet",
+      title: "Safe customer wallet top-up from COD",
+      goal: "When a COD customer overpays (e.g. ₹500 for a ₹490 order), the rider can credit only the calculated excess to that customer's wallet — never free-form amounts.",
+      tasks: [
+        {
+          title: "COD cash-received entry",
+          detail: "On COD handover, rider taps Add change → enters amount received (e.g. 500); UI never asks for a wallet credit amount directly",
+          db: "orders.payment_method = cash",
+          status: "todo",
+        },
+        {
+          title: "Server computes excess only",
+          detail: "excess = cash_received − order.total; reject if ≤ 0, non-COD, not this rider's active/delivered job, or cash_received above a hard cap",
+          db: "wallet_transactions · orders.total",
+          status: "todo",
+        },
+        {
+          title: "Confirm credit to that customer",
+          detail: "App shows 'Add ₹{excess} to {customer} wallet?' — confirm writes wallet_transactions (service role) + bumps profiles.wallet_balance for the order's customer only",
+          db: "wallet_transactions.order_id · profiles.wallet_balance",
+          status: "todo",
+        },
+        {
+          title: "Anti-fraud guards",
+          detail: "One wallet credit per order (unique on order_id + reason); require delivery OTP verified first; rate-limit; rider cannot pick arbitrary user_id; admin audit trail",
+          db: "wallet_transactions reason = 'cod_change'",
+          status: "todo",
         },
       ],
     },

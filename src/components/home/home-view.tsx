@@ -1,18 +1,24 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, MapPinOff } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 import type { Banner, Order, Restaurant } from "@/types";
 import { useLocation } from "@/stores/location-store";
 import { PINNED_LOCATION } from "@/lib/location/pinned";
 import { distanceToShop } from "@/lib/geo/distance";
+import { buildDishIndex, groupByShop, searchDishes } from "@/lib/search/dishes";
 import { HomeHeader, type SavedAddress } from "@/components/home/home-header";
 import { ActiveOrderStrip } from "@/components/home/active-order-strip";
 import { CategoryStrip } from "@/components/home/category-strip";
 import { PromoBannerCarousel } from "@/components/home/promo-banner-carousel";
+import { DishCard } from "@/components/search/dish-card";
 import { RestaurantCard } from "@/components/shared/restaurant-card";
 import { EmptyState } from "@/components/shared/empty-state";
+
+/** How much of the answer the home field shows before handing off to /search. */
+const HOME_DISH_LIMIT = 8;
+const HOME_SHOP_LIMIT = 4;
 
 export function HomeView({
   savedAddress,
@@ -30,6 +36,8 @@ export function HomeView({
   nearby: Restaurant[];
 }) {
   const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
+  const typed = deferredQuery.trim();
   const searching = query.trim().length > 0;
 
   // Measured from wherever the customer is — Bemetara until they detect a fix
@@ -50,18 +58,19 @@ export function HomeView({
     });
   }, [nearby, origin, anyPinned]);
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return restaurants
-      .filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          r.cuisines.some((c) => c.toLowerCase().includes(q)) ||
-          r.menu.some((m) => m.name.toLowerCase().includes(q))
-      )
-      .sort((a, b) => a.etaMin - b.etaMin);
-  }, [query, restaurants]);
+  // Food-first, the same ranking the search tab uses: the header field answers
+  // "who has X?" with the dish itself, and lists the kitchens underneath.
+  const index = useMemo(() => buildDishIndex(restaurants), [restaurants]);
+
+  const dishes = useMemo(
+    () => (typed ? searchDishes(index, typed) : []),
+    [index, typed]
+  );
+
+  const shops = useMemo(
+    () => (typed ? groupByShop(dishes, restaurants, typed) : []),
+    [dishes, restaurants, typed]
+  );
 
   return (
     <>
@@ -74,24 +83,59 @@ export function HomeView({
       {searching ? (
         <div className="px-4 pt-3">
           <p className="text-sm font-medium text-muted">
-            {results.length}{" "}
-            {results.length === 1 ? "result" : "results"} for &ldquo;{query.trim()}
-            &rdquo;
+            {dishes.length} {dishes.length === 1 ? "dish" : "dishes"} ·{" "}
+            {shops.length}{" "}
+            {shops.length === 1 ? "restaurant" : "restaurants"} for &ldquo;
+            {query.trim()}&rdquo;
           </p>
-          {results.length ? (
-            <div className="mt-4 space-y-4">
-              {results.map((r) => (
-                <RestaurantCard key={r.slug} restaurant={r} />
-              ))}
-            </div>
-          ) : (
+
+          {dishes[0]?.partial ? (
+            <p className="mt-1 text-[13px] font-medium leading-snug text-muted">
+              Nothing is called that exactly — these are the closest dishes.
+            </p>
+          ) : null}
+
+          {dishes.length ? (
+            <>
+              <div className="mt-1 divide-y divide-line">
+                {dishes.slice(0, HOME_DISH_LIMIT).map((hit) => (
+                  <DishCard key={hit.key} hit={hit} />
+                ))}
+              </div>
+              {dishes.length > HOME_DISH_LIMIT ? (
+                <Link
+                  href={`/search?q=${encodeURIComponent(query.trim())}`}
+                  className="press bolt-section-link mt-1 inline-flex"
+                >
+                  See all {dishes.length} dishes{" "}
+                  <ChevronRight className="size-4" />
+                </Link>
+              ) : null}
+            </>
+          ) : null}
+
+          {shops.length ? (
+            <section className="mt-6 space-y-3">
+              <h2 className="text-heading">Restaurants serving this</h2>
+              <div className="space-y-4">
+                {shops.slice(0, HOME_SHOP_LIMIT).map((shop) => (
+                  <RestaurantCard
+                    key={shop.restaurant.slug}
+                    restaurant={shop.restaurant}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {!dishes.length && !shops.length ? (
             <EmptyState
               className="mt-6"
-              icon={<MapPinOff className="size-7" />}
-              title="Nothing matches — yet"
-              description="Try a different dish or restaurant name."
+              icon={<Search className="size-7" />}
+              title={`Nothing called “${query.trim()}” yet`}
+              description="No kitchen near you is cooking that right now. Try a shorter word — “paneer” finds more than “paneer tikka masala”."
             />
-          )}
+          ) : null}
         </div>
       ) : (
         <div className="space-y-6 pt-3">

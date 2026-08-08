@@ -61,8 +61,14 @@ export function VendorSearchBar({ categories }: { categories: string[] }) {
   const sort = params.get("sort") ?? "recent";
 
   return (
-    <div className={pending ? "space-y-2.5 opacity-70 transition-opacity" : "space-y-2.5"}>
-      <div className="relative">
+    <div
+      className={
+        pending
+          ? "space-y-2.5 opacity-70 transition-opacity @3xl:flex @3xl:items-center @3xl:gap-3 @3xl:space-y-0"
+          : "space-y-2.5 @3xl:flex @3xl:items-center @3xl:gap-3 @3xl:space-y-0"
+      }
+    >
+      <div className="relative @3xl:min-w-0 @3xl:flex-1">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
         <input
           value={q}
@@ -83,7 +89,7 @@ export function VendorSearchBar({ categories }: { categories: string[] }) {
         ) : null}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 @3xl:w-[420px] @3xl:shrink-0">
         <select
           value={status}
           onChange={(e) =>

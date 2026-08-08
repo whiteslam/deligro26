@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Plus, Minus } from "lucide-react";
 import { useCart } from "@/stores/cart-store";
+import { useCartSwitch } from "@/stores/cart-switch-store";
 import { useItemSheet } from "@/stores/item-sheet-store";
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { VegMark } from "@/components/shared/veg-mark";
@@ -26,18 +27,24 @@ function ItemSheetInner() {
   const restaurant = useItemSheet((s) => s.restaurant)!;
   const onClose = useItemSheet((s) => s.close);
 
-  const add = useCart((s) => s.add);
-  const setQty = useCart((s) => s.setQty);
+  const request = useCartSwitch((s) => s.request);
   const lines = useCart((s) => s.lines);
-  const inCart = lines.find((l) => l.itemId === item.id)?.qty ?? 0;
+  const cartSlug = useCart((s) => s.restaurantSlug);
+  // Only this restaurant's basket can pre-fill the stepper — ids repeat across
+  // menus, so another shop's quantity is not this dish's quantity.
+  const inCart =
+    cartSlug === restaurant.slug
+      ? lines.find((l) => l.itemId === item.id)?.qty ?? 0
+      : 0;
 
   const [qty, setLocalQty] = useState(Math.max(inCart, 1));
 
   const ref = { slug: restaurant.slug, name: restaurant.name };
 
   const commit = () => {
-    add(item, ref); // ensure the line exists
-    setQty(item.id, qty); // then set the exact quantity
+    // Adds at the chosen quantity, or asks first when this would replace a
+    // basket from another kitchen (see cart-switch-store).
+    request(item, ref, qty);
     onClose();
   };
 

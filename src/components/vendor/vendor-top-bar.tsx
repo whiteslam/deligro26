@@ -15,17 +15,26 @@ export function VendorTopBar({
   restaurants,
   activeSlug,
   showControls,
+  phoneFrame = false,
 }: {
   restaurantName: string;
   isOpen: boolean;
   restaurants: OwnedRestaurant[];
   activeSlug: string;
   showControls: boolean;
+  /** Keep mobile chrome visible inside the desktop phone-frame preview. */
+  phoneFrame?: boolean;
 }) {
   const multiStore = restaurants.length > 1;
 
   return (
-    <header className="vendor-top-bar glass sticky top-0 z-30 border-x-0 border-t-0 lg:hidden">
+    <header
+      className={
+        phoneFrame
+          ? "vendor-top-bar glass sticky top-0 z-30 border-x-0 border-t-0"
+          : "vendor-top-bar glass sticky top-0 z-30 border-x-0 border-t-0 lg:hidden"
+      }
+    >
       <div className="flex items-center gap-2 px-4 py-2.5">
         <div className="min-w-0 flex-1">
           {multiStore && showControls ? (
