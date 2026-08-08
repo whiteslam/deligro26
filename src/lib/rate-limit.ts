@@ -2,16 +2,22 @@ import "server-only";
 
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import {
+  SUPABASE_SERVICE_ROLE_KEY,
+  SUPABASE_URL,
+  isSupabaseConfigured,
+} from "@/lib/supabase/config";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Fixed-window rate limiter (checklist §4).
+ * Fixed-window rate limiter.
  *
- * Uses Upstash Redis / Vercel KV when `UPSTASH_REDIS_REST_*` or `KV_REST_API_*`
- * env vars are set, so limits hold across serverless instances. Falls back to
- * an in-memory Map for local/demo when KV is not configured.
+ * Order of backends:
+ *  1. Upstash Redis / Vercel KV — optional, if env vars are set
+ *  2. Supabase Postgres (`check_rate_limit` RPC) — default shared store
+ *  3. In-memory Map — last resort (local / migration not applied yet)
  *
- * Supabase Auth already rate-limits login/OTP server-side, which covers the
- * highest-risk endpoints out of the box.
+ * Postgres is enough at current scale; Redis is not required.
  */
 export interface RateLimitResult {
   ok: boolean;
@@ -26,6 +32,7 @@ const memoryStore = new Map<string, Bucket>();
 const limiterCache = new Map<string, Ratelimit>();
 
 let redis: Redis | null | undefined;
+let loggedPgFallback = false;
 
 function getRedis(): Redis | null {
   if (redis !== undefined) return redis;
@@ -34,18 +41,6 @@ function getRedis(): Redis | null {
     process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL ?? "";
   const token =
     process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN ?? "";
-
-  // The memory fallback is per-lambda, and lambdas scale with load — so under
-  // exactly the traffic a limiter exists to absorb, the effective limit
-  // multiplies by the instance count. That is acceptable locally and useless in
-  // production, so production must have a shared store.
-  if ((!url || !token) && process.env.NODE_ENV === "production") {
-    throw new Error(
-      "UPSTASH_REDIS_REST_URL / _TOKEN (or KV_REST_API_URL / _TOKEN) are " +
-        "required in production: the in-memory rate limiter is per-instance " +
-        "and provides no real limit across serverless workers."
-    );
-  }
 
   redis = url && token ? new Redis({ url, token }) : null;
   return redis;
@@ -118,11 +113,64 @@ function getLimiter(limit: number, windowMs: number): Ratelimit | null {
     redis: client,
     limiter: Ratelimit.fixedWindow(limit, `${windowSec} s`),
     prefix: "deligro:ratelimit",
-    // Fail open if Redis is slow — prefer availability over hard deny.
     timeout: 3000,
   });
   limiterCache.set(cacheKey, limiter);
   return limiter;
+}
+
+type PgRateLimitRow = {
+  ok: boolean;
+  remaining: number;
+  reset_at: number;
+  retry_after: number;
+};
+
+async function postgresRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number
+): Promise<RateLimitResult | null> {
+  if (!isSupabaseConfigured || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return null;
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase.rpc("check_rate_limit", {
+      p_key: key,
+      p_limit: limit,
+      p_window_ms: windowMs,
+    });
+
+    if (error || !data || typeof data !== "object") {
+      if (!loggedPgFallback) {
+        loggedPgFallback = true;
+        console.error(
+          "[rate-limit] Postgres check_rate_limit failed — apply migration 0027_rate_limits.sql. Falling back to memory.",
+          error?.message ?? "empty response"
+        );
+      }
+      return null;
+    }
+
+    const row = data as PgRateLimitRow;
+    return {
+      ok: Boolean(row.ok),
+      remaining: Number(row.remaining) || 0,
+      resetAt: Number(row.reset_at) || Date.now() + windowMs,
+      retryAfter: Number(row.retry_after) || 0,
+    };
+  } catch (err) {
+    if (!loggedPgFallback) {
+      loggedPgFallback = true;
+      console.error(
+        "[rate-limit] Postgres rate limit threw — falling back to memory.",
+        err instanceof Error ? err.message : err
+      );
+    }
+    return null;
+  }
 }
 
 export async function rateLimit(
@@ -130,24 +178,27 @@ export async function rateLimit(
   limit: number,
   windowMs: number
 ): Promise<RateLimitResult> {
+  // Optional Redis — only when explicitly configured.
   const limiter = getLimiter(limit, windowMs);
-  if (!limiter) {
-    return memoryRateLimit(key, limit, windowMs);
+  if (limiter) {
+    try {
+      const result = await limiter.limit(key);
+      const now = Date.now();
+      return {
+        ok: result.success,
+        remaining: result.remaining,
+        resetAt: result.reset,
+        retryAfter: result.success
+          ? 0
+          : Math.max(0, Math.ceil((result.reset - now) / 1000)),
+      };
+    } catch {
+      // Fall through to Postgres / memory.
+    }
   }
 
-  try {
-    const result = await limiter.limit(key);
-    const now = Date.now();
-    return {
-      ok: result.success,
-      remaining: result.remaining,
-      resetAt: result.reset,
-      retryAfter: result.success
-        ? 0
-        : Math.max(0, Math.ceil((result.reset - now) / 1000)),
-    };
-  } catch {
-    // Redis unreachable — degrade to per-instance memory so the API stays up.
-    return memoryRateLimit(key, limit, windowMs);
-  }
+  const pg = await postgresRateLimit(key, limit, windowMs);
+  if (pg) return pg;
+
+  return memoryRateLimit(key, limit, windowMs);
 }

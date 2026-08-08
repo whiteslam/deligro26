@@ -18,8 +18,13 @@ loudly. Better here than silently in front of customers.
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Throws at boot | as above |
 | `SUPABASE_SERVICE_ROLE_KEY` | Throws on first admin/OTP operation | OTP, vendor admin and push all need it |
 | `OTP_PEPPER` | Throws on first OTP request | OTP hashes are worthless without it. Generate per environment: `openssl rand -hex 32` |
-| `UPSTASH_REDIS_REST_URL` + `_TOKEN` | Throws on first rate-limited request | The memory fallback is per-lambda; under load it multiplies the limit by the instance count. `KV_REST_API_URL` / `_TOKEN` also accepted |
 | `RENFLAIR_API_KEY` | OTP request returns 503 | Without it no customer can sign in |
+
+### Optional
+
+| Variable | Notes |
+|---|---|
+| `UPSTASH_REDIS_REST_URL` + `_TOKEN` (or `KV_REST_API_*`) | Not required. Rate limits default to Supabase Postgres (`0027_rate_limits.sql`). Redis is only an optional faster backend if you add it later. |
 
 ### Must be ABSENT (or empty) in production
 

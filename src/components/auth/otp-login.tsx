@@ -66,7 +66,7 @@ export function OtpLogin({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (!res.ok) {
         if (data.error === "cooldown") setCooldown(data.retryAfter ?? 30);
         setError(errorText(data.error));
@@ -91,7 +91,7 @@ export function OtpLogin({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, code }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (!res.ok || !data.tokenHash) {
         setError(errorText(data.error));
         return;
@@ -334,6 +334,26 @@ function ValidationError({ children }: { children: React.ReactNode }) {
   );
 }
 
+async function readJson(res: Response): Promise<{
+  error?: string;
+  retryAfter?: number;
+  devCode?: string;
+  tokenHash?: string;
+}> {
+  const text = await res.text();
+  if (!text) return { error: res.ok ? undefined : "server_error" };
+  try {
+    return JSON.parse(text) as {
+      error?: string;
+      retryAfter?: number;
+      devCode?: string;
+      tokenHash?: string;
+    };
+  } catch {
+    return { error: "server_error" };
+  }
+}
+
 function errorText(code?: string): string {
   switch (code) {
     case "invalid_phone":
@@ -347,7 +367,14 @@ function errorText(code?: string): string {
     case "cooldown":
       return "Please wait a moment before resending.";
     case "too_many":
+    case "rate_limited":
       return "Too many requests. Try again later.";
+    case "sms_unavailable":
+    case "otp_misconfigured":
+    case "backend_not_configured":
+      return "Sign-in is temporarily unavailable. Please try again later.";
+    case "server_error":
+      return "Server error — please try again.";
     default:
       return "Something went wrong. Please try again.";
   }
