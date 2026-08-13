@@ -1,7 +1,7 @@
 import "server-only";
 import { randomInt, scryptSync, timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { phoneToSyntheticEmail } from "@/lib/auth/phone";
+import { resolveAccountByPhone } from "@/lib/auth/customer-account";
 
 /**
  * Server-side OTP lifecycle. All queries use the service-role client (the
@@ -136,8 +136,11 @@ export async function verifyOtp(phone: string, code: string): Promise<VerifyResu
 
   // Resolve the user: existing profile by phone (any role) wins, so operators
   // can OTP into their real account; otherwise create a phone-only customer.
-  const { user, email, isNewUser } = await resolveUser(phone);
-  if (!user) return { ok: false, error: "user_error" };
+  // Shared with the phone-order desk so both produce the same one account per
+  // number — see lib/auth/customer-account.ts.
+  const account = await resolveAccountByPhone(phone);
+  if (!account) return { ok: false, error: "user_error" };
+  const { email, isNewUser } = account;
 
   // Mint a magic-link token the browser exchanges to establish the session.
   const { data: link, error: linkErr } = await supabase.auth.admin.generateLink({
@@ -187,70 +190,3 @@ export async function checkOtp(phone: string, code: string): Promise<CheckResult
   return { ok: true };
 }
 
-/**
- * Find an auth user by exact email, paging until found. Supabase's admin API
- * has no direct get-by-email, so we walk pages — but we walk *all* of them
- * instead of assuming everyone fits on the first.
- */
-async function findUserByEmail(email: string): Promise<{ id: string } | null> {
-  const supabase = createAdminClient();
-  const target = email.toLowerCase();
-  const perPage = 200;
-
-  for (let page = 1; page <= 50; page++) {
-    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
-    if (error || !data?.users?.length) return null;
-
-    const hit = data.users.find((u) => u.email?.toLowerCase() === target);
-    if (hit) return { id: hit.id };
-
-    if (data.users.length < perPage) return null; // last page
-  }
-  return null;
-}
-
-async function resolveUser(
-  phone: string
-): Promise<{ user: { id: string } | null; email: string; isNewUser: boolean }> {
-  const supabase = createAdminClient();
-
-  // 1. Existing profile with this phone?
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("phone", phone)
-    .maybeSingle();
-
-  if (profile?.id) {
-    const { data } = await supabase.auth.admin.getUserById(profile.id);
-    const existingEmail = data.user?.email;
-    if (existingEmail) return { user: { id: profile.id }, email: existingEmail, isNewUser: false };
-  }
-
-  // 2. Phone-only synthetic user (create if needed).
-  const email = phoneToSyntheticEmail(phone);
-  const { data: created, error } = await supabase.auth.admin.createUser({
-    email,
-    phone,
-    email_confirm: true,
-    phone_confirm: true,
-    user_metadata: { phone },
-  });
-
-  if (error) {
-    // Almost certainly "already registered". Look the account up directly
-    // rather than paging the user list — the previous `listUsers({perPage: 200})`
-    // silently stopped finding anyone past the 200th user, turning a normal
-    // repeat login into an unexplained failure once the app grew.
-    const found = await findUserByEmail(email);
-    if (found) {
-      await supabase.from("profiles").update({ phone }).eq("id", found.id);
-      return { user: { id: found.id }, email, isNewUser: false };
-    }
-    return { user: null, email, isNewUser: false };
-  }
-
-  // Backfill the phone onto the auto-created profile (signup trigger made it).
-  await supabase.from("profiles").update({ phone }).eq("id", created.user.id);
-  return { user: { id: created.user.id }, email, isNewUser: true };
-}

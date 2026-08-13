@@ -15,6 +15,29 @@
  * "active". A stale tracker is worse than none (see AGENTS.md).
  *
  * status: "done" | "active" | "todo" | "blocked"
+ *
+ * ---------------------------------------------------------------------------
+ * Verified against the code on 2026-08-13. That pass was worth doing: this file
+ * had drifted in *both* directions, which is the part worth remembering.
+ *
+ *   * Work shipped and never ticked off — the manager board and rider dispatch
+ *     (slice E), and the refund deny path, which this file still described as
+ *     broken long after it was fixed. Reading it, you would have rebuilt three
+ *     things that already worked.
+ *   * Work described more kindly than it was — "coupons: half-wired" when in
+ *     fact nothing in the app had ever called the endpoint, so there was no
+ *     wiring at all; "pickup OTP: no UI" when the rider's half shipped and only
+ *     the kitchen's check is missing.
+ *   * A decision filed as debt — a nonce-based CSP sat here as a `todo` while
+ *     its own `detail` said it was an accepted risk. It now lives only in
+ *     docs/SECURITY_AUDIT.md, where accepted risks belong.
+ *
+ * Neither direction is harmless: the first wastes a rebuild, the second hides
+ * a gap, the third inflates what is left. When you change a status, check the
+ * code rather than your memory of it — and when a `detail` states a fact about
+ * the codebase ("no UI", "the deny path fails"), that is a claim with a shelf
+ * life, so re-read it before trusting it.
+ * ---------------------------------------------------------------------------
  */
 
 export type TaskStatus = "done" | "active" | "todo" | "blocked";
@@ -200,9 +223,9 @@ export const MILESTONES: Milestone[] = [
       { title: "Driver flow", detail: "Accept → picked up → delivered + delivery OTP; salary model (no commission/earnings on board); online toggle still local; pickup OTP still missing", status: "active" },
       {
         title: "Admin orders + refunds",
-        detail: "Live /admin/orders + /admin/refunds. Approve works; deny still writes 'rejected' while refund_status is ('pending','approved','denied') — the deny path is rejected by the DB",
+        detail: "Live /admin/orders + /admin/refunds. Approve and deny both work — the deny path no longer writes the 'rejected' value that refund_status has never accepted",
         db: "refunds.status",
-        status: "active",
+        status: "done",
       },
       {
         title: "Role assignment tooling",
@@ -222,7 +245,9 @@ export const MILESTONES: Milestone[] = [
         title: "Online payments (UPI/cards)",
         detail: "Razorpay wired end to end — order → checkout → signature verify → idempotent webhook, with payments recorded and the kitchen board gated on payment. Ships OFF: the customer sees \"Available soon\" until an admin enables it and the keys are set",
         db: "payments · orders.payment_status (migration 0025)",
-        status: "active",
+        // Built and gated correctly; what remains is switching it on, which is
+        // the "Go live on Razorpay" task below and not a code change.
+        status: "done",
       },
       {
         title: "Payment signature tests",
@@ -252,13 +277,24 @@ export const MILESTONES: Milestone[] = [
         status: "todo",
       },
       {
-        title: "Nonce-based CSP",
-        detail: "Accepted risk M-5, not a pending task: a nonce forces every page dynamic (no static render, no ISR, no CDN). Revisit when traffic justifies it",
-        status: "todo",
+        // Was "Nonce-based CSP", carried as a todo while its own detail said it
+        // was an accepted risk. It lives in docs/SECURITY_AUDIT.md under
+        // accepted risks (M-5); a task list is for things someone intends to
+        // do, and counting a decision as debt makes the tracker read wrong.
+        title: "Checkout could not complete an order",
+        detail:
+          "0024 locked `total` against non-admins, and recompute_order_total() — the only thing that writes an authoritative total — was blocked by that same guard, so every checkout 500'd after writing an orphan order and its items. The guard assumed SECURITY DEFINER changed the caller's identity; it changes privileges, not auth.uid(). Fixed in 0030 by testing current_user from a SECURITY INVOKER guard. `total` is now pinned at INSERT too, so it cannot be forged past the app either",
+        db: "guard_order_update() · recompute_order_total() (migration 0030)",
+        status: "done",
       },
       { title: "MFA for admin/restaurant", detail: "TOTP enroll + challenge (/mfa, /mfa/setup); portals require aal2", status: "done" },
       { title: "E2E QA + IDOR tests", detail: "npm run test:qa — RLS/HTTP cross-account 404s + E2E smoke; ZAP via test:zap on staging", status: "done" },
-      { title: "Production deploy", detail: "Vercel + Supabase prod, env + migrations 0001–0024 — no sign-off recorded yet", status: "todo" },
+      {
+        title: "Production deploy",
+        detail:
+          "Vercel + Supabase prod, env + migrations 0001–0031 — no sign-off recorded yet. 0028–0031 are not on the live database; 0030 is the urgent one, because without it no customer can complete a checkout",
+        status: "todo",
+      },
     ],
   },
   {
@@ -299,9 +335,10 @@ export const MILESTONES: Milestone[] = [
       },
       {
         title: "Coupons",
-        detail: "Still half-wired (audit M-7): /api/coupons/validate checks code, min order and expiry, but no discount is applied at order creation — unchanged by the payments work, which bills orders.total as computed",
-        db: "coupons",
-        status: "active",
+        detail:
+          "Wired end to end (closes audit M-7). Checkout has a code field and an itemised bill; the discount is re-derived server-side by apply_coupon_to_order() from the order's own items and recorded in coupon_redemptions in the same transaction. Codes are single-use per customer by default — before this they had no limit of any kind, so any code was a permanent price cut",
+        db: "coupons · coupon_redemptions · orders.discount (migration 0031)",
+        status: "done",
       },
       {
         title: "Push notifications",
@@ -532,9 +569,10 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
         },
         {
           title: "Vendor payouts / settlements",
-          detail: "Payout details are captured at onboarding and customer-side collection now exists (0025), but nothing settles money out to a vendor yet",
-          db: "wallet_transactions",
-          status: "todo",
+          detail:
+            "/admin/settlements — manual IST date-range ledger: draft from delivered orders (online remits vendor net, COD deducts commission), Mark paid with UTR, Void releases orders (migration 0028)",
+          db: "vendor_settlements · vendor_settlement_orders",
+          status: "done",
         },
       ],
     },
@@ -612,8 +650,9 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
       tasks: [
         {
           title: "Salary model on the board",
-          detail: "Remove Today's earnings / payout-per-job from DriverBoard; rider_commission stays admin-only (if kept for reporting) and must not surface in /driver",
-          db: "—",
+          detail:
+            "Still shows both. `DriverBoardData.today.earnings` is a money figure on the board, and `DeliveryJob.payout` puts a per-trip commission on every job card — computed by payoutFor()/riderPayout(). Removing them means dropping the two fields, not hiding them in the UI: a salaried rider's client should not be able to read a commission it is not paid",
+          db: "riderPayout() · rider_commission",
           status: "todo",
         },
         {
@@ -624,9 +663,10 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
         },
         {
           title: "Pickup OTP verification",
-          detail: "Restaurant reads orders.pickup_otp at handover — column exists, still no UI",
+          detail:
+            "Half done: the rider's board shows the code to read to the counter (getPickupOtp, RLS-scoped to the parties to that handover). The kitchen has no screen to check it against, so nothing yet *verifies* the courier — it is a code read aloud and trusted",
           db: "orders.pickup_otp",
-          status: "todo",
+          status: "active",
         },
         {
           title: "Delivery OTP verification",
@@ -636,8 +676,9 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
         },
         {
           title: "Current job clarity",
-          detail: "Active trip shows what they are delivering, vendor pickup address, and customer drop-off — phase: to-vendor vs to-customer",
-          db: "deliveries.status · orders",
+          detail:
+            "Mostly there: `DriverActive.leg` is a real TO_PICKUP/TO_CUSTOMER phase, and the card carries pickupArea, dropArea and a cash-vs-prepaid instruction. What is missing is *what they are delivering* — the job still says `items: 4`, a count, so a rider cannot check the bag against the order",
+          db: "deliveries.status · order_items",
           status: "active",
         },
         {
@@ -690,7 +731,8 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
       week: 4,
       range: "COD change → wallet",
       title: "Safe customer wallet top-up from COD",
-      goal: "When a COD customer overpays (e.g. ₹500 for a ₹490 order), the rider can credit only the calculated excess to that customer's wallet — never free-form amounts.",
+      goal:
+        "When a COD customer overpays (e.g. ₹500 for a ₹490 order), the rider can credit only the calculated excess to that customer's wallet — never free-form amounts. The schema is already there: `wallet_transactions` and `profiles.wallet_balance` have existed since 0006 and nothing has ever written to either. This is the feature, not the table.",
       tasks: [
         {
           title: "COD cash-received entry",
@@ -754,27 +796,44 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
     },
     {
       week: 1,
-      range: "Next",
+      range: "Shipped",
       title: "Manager tools",
-      goal: "The three jobs the portal names but does not yet do.",
+      goal: "The three jobs the portal named. All three now do them.",
       tasks: [
         {
           title: "Phone-in orders",
-          detail: "Place an order on behalf of a customer who called — the reason the role exists",
+          detail:
+            "/manager/new-order — look the caller up by mobile, build the order off the live menu, take the address, place it. Priced server-side from the same settings the app bills with; cash on delivery, because there is no way to take a card on a call",
           db: "orders · order_items",
-          status: "todo",
+          status: "done",
+        },
+        {
+          title: "Phone orders are attributable",
+          detail:
+            "channel + placed_by on every order, locked against later edits by guard_order_update(). The desk refuses to run on a database that cannot record who took the call, rather than writing an anonymous order in a customer's name",
+          db: "orders.channel · orders.placed_by · migration 0029",
+          status: "done",
+        },
+        {
+          title: "One account per mobile",
+          detail:
+            "A caller with no account gets one, created by the same resolver OTP login uses — so ringing up and signing in later land on the same customer, not two halves of one",
+          db: "profiles.phone · auth.users",
+          status: "done",
         },
         {
           title: "Cross-vendor live order board",
-          detail: "Watch and advance orders across every shop, not one kitchen",
+          detail:
+            "Every order in flight across every shop, oldest first, auto-refreshing; advance one stage at a time. Shipped with the portal in slice E — this tracker was the last thing that hadn't noticed",
           db: "orders.status",
-          status: "todo",
+          status: "done",
         },
         {
           title: "Rider dispatch",
-          detail: "Assign a delivery to a specific rider instead of waiting for a driver to accept",
+          detail:
+            "Assign a delivery to a named rider, least-loaded first, instead of waiting for one to accept. Loses the race gracefully when a driver self-assigns at the same moment",
           db: "deliveries.driver_id",
-          status: "todo",
+          status: "done",
         },
       ],
     },
@@ -788,7 +847,7 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
       tasks: [
         {
           title: "Portal routes + nav",
-          detail: "/admin · /admin/orders · /admin/refunds · /admin/banners · /admin/vendors · /admin/customers · /admin/settings",
+          detail: "/admin · /admin/orders · /admin/refunds · /admin/settlements · /admin/banners · /admin/vendors · /admin/customers · /admin/settings",
           db: "—",
           status: "done",
         },
@@ -832,9 +891,10 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
         },
         {
           title: "Refund queue (live)",
-          detail: "/admin/refunds — approve works; deny writes 'rejected' while the DB enum is 'denied', so the deny path fails",
+          detail:
+            "/admin/refunds — approve and deny both work. The deny path used to write 'rejected', which no refund_status enum has ever accepted, so every deny failed at the database while the UI reported it as recorded; the vocabulary is now the database's throughout. Approving an online-paid order calls Razorpay and leaves the request pending if the gateway refuses",
           db: "refunds.status",
-          status: "active",
+          status: "done",
         },
       ],
     },

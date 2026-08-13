@@ -86,6 +86,7 @@ function dbRowsForTab(tab: BuildTab, db: BuildDbSnapshot): DbRow[] {
       return [
         { label: "Manager profiles", table: "profiles.role = manager", value: opt(db.profiles_manager) },
         { label: "Orders (all vendors)", table: "orders", value: db.orders },
+        { label: "Phone orders taken", table: "orders.channel = phone", value: opt(db.orders_phone) },
         { label: "Deliveries", table: "deliveries", value: db.deliveries },
         { label: "Unassigned jobs", table: "deliveries.status = unassigned", value: db.deliveries_unassigned },
         { label: "Restaurants (open)", table: "restaurants.is_open", value: `${db.restaurants_open} / ${db.restaurants}` },

@@ -39,6 +39,8 @@ export interface BuildDbSnapshot {
   vendor_drafts: number | null;
   payments: number | null;
   payments_paid: number | null;
+  /** Orders a manager typed on a call. Null before migration 0029. */
+  orders_phone: number | null;
 }
 
 async function count(
@@ -102,7 +104,7 @@ export async function getBuildDbSnapshot(): Promise<BuildDbSnapshot | null> {
       count("addresses"),
     ]);
 
-    // Everything below arrived with migrations 0011–0025. Counted optionally so
+    // Everything below arrived with migrations 0011–0029. Counted optionally so
     // a database still on an earlier migration reports `—` for the newer
     // features instead of dropping the entire snapshot.
     const [
@@ -116,6 +118,7 @@ export async function getBuildDbSnapshot(): Promise<BuildDbSnapshot | null> {
       vendor_drafts,
       payments,
       payments_paid,
+      orders_phone,
     ] = await Promise.all([
       countOptional("profiles", { col: "role", val: "manager" }),
       countOptional("favorites"),
@@ -127,6 +130,7 @@ export async function getBuildDbSnapshot(): Promise<BuildDbSnapshot | null> {
       countOptional("vendor_registration_drafts"),
       countOptional("payments"),
       countOptional("payments", { col: "status", val: "paid" }),
+      countOptional("orders", { col: "channel", val: "phone" }),
     ]);
 
     const [{ count: legacy_menu_items }, { count: legacy_orders }] =
@@ -181,6 +185,7 @@ export async function getBuildDbSnapshot(): Promise<BuildDbSnapshot | null> {
       vendor_drafts,
       payments,
       payments_paid,
+      orders_phone,
     };
   } catch {
     return null;

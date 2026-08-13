@@ -190,7 +190,16 @@ A shop / restaurant listing. Vendor account = `profiles` where `role = 'restaura
 | `address` | `jsonb` | null | See shape below |
 | `pickup_otp` | `text` | random 4-digit | Restaurant handover (`0006`) |
 | `delivery_otp` | `text` | random 4-digit | Rider handover (`0006`) |
+| `discount` | `integer` | `0` | Rupees off the grand total. Written only by `apply_coupon_to_order()` (`0031`) |
+| `coupon_code` | `text` | null | Snapshot of the code used; no FK, so deleting a coupon can't rewrite history (`0031`) |
+| `channel` | `text` | `'app'` | `app` \| `phone` — how the order was taken (`0029`) |
+| `placed_by` | `uuid` | null | FK → `profiles(id)` SET NULL. The operator who took a phone order; null for an app order (`0029`) |
 | `created_at` | `timestamptz` | `now()` | |
+
+> This column list is not exhaustive past `0012`: `tip` (`0013`),
+> `external_id` (`0015`), `payment_method` / `payment_status` (`0025`) and
+> `accepted_at` / `ready_at` / `cancelled_at` (`0026`) are also on this table.
+> Read the migrations for the full shape.
 
 **`address` JSON shape**
 
@@ -205,9 +214,21 @@ Optional `lat` / `lng` may be added from map picker.
 
 **Indexes:** `customer_id`, `restaurant_id`
 
-**RLS:** Customer own orders; restaurant own `restaurant_id`; driver assigned active delivery; admin all.
+**RLS:** Customer own orders; restaurant own `restaurant_id`; driver assigned active delivery; manager read + advance `status` (`0023`); admin all.
 
-**DAL:** [`orders.ts`](../src/lib/data-access/orders.ts), [`vendor-orders.ts`](../src/lib/data-access/vendor-orders.ts), [`admin-orders.ts`](../src/lib/data-access/admin-orders.ts)
+**Column guard:** `guard_order_update()` — anyone who is not admin or the
+service role may move `status` and nothing else. `channel`, `placed_by`,
+`discount` and `coupon_code` are on that locked list. It is **SECURITY INVOKER**
+as of `0030`, deliberately: as DEFINER it read its own owner as `current_user`
+and could not tell a trusted server function from a customer, which is the
+whole job. `total` is also pinned at INSERT (`0030`), so it cannot be posted
+directly.
+
+**No manager INSERT policy — on purpose.** Phone orders are written by
+`placePhoneOrder()` through the service role, which stamps `placed_by`. See
+SECURITY.md → "Manager".
+
+**DAL:** [`orders.ts`](../src/lib/data-access/orders.ts), [`vendor-orders.ts`](../src/lib/data-access/vendor-orders.ts), [`admin-orders.ts`](../src/lib/data-access/admin-orders.ts), [`manager-orders.ts`](../src/lib/data-access/manager-orders.ts), [`manager-phone-orders.ts`](../src/lib/data-access/manager-phone-orders.ts)
 
 **Vendor board filters:** `status IN ('placed','kitchen','ready')` for active kitchen columns.
 
@@ -464,6 +485,8 @@ where r.slug = 'burger-republic';
 |---------|------------------|-----------|
 | Customer catalog | `src/lib/data-access/restaurants.ts` | — |
 | Place order | `src/lib/data-access/orders.ts` | `POST /api/orders` |
+| Manager board + dispatch | `src/lib/data-access/manager-orders.ts` | `src/app/manager/actions.ts` |
+| Phone order desk | `src/lib/data-access/manager-phone-orders.ts` | `src/app/manager/new-order/actions.ts` |
 | Vendor kitchen board | `src/lib/data-access/vendor-orders.ts` | `PATCH /api/orders/[id]/status` |
 | Vendor menu toggle | `src/lib/data-access/vendor-menu.ts` | `PATCH /api/vendor/menu/[id]/availability` |
 | Vendor earnings | `src/lib/data-access/vendor-earnings.ts` | — |

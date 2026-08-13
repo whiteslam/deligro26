@@ -37,6 +37,41 @@ Reference data layer: [`src/lib/data-access/orders.ts`](src/lib/data-access/orde
 Driver access auto-revokes when the delivery status leaves `assigned`/`picked_up`
 (delivered or reassigned) — the "assigned only, while active" rule, in SQL.
 
+### Manager — an operations role, not a small admin
+
+`manager` (migrations **0022**/**0023**) reads every order, advances its status,
+and manages `deliveries` to dispatch riders. It has no write on
+`platform_settings`, no refund decision, and no vendor management. It is not
+`is_admin()`, so `guard_order_update()` holds it to `status` and nothing else,
+exactly as it holds a vendor or a driver.
+
+**Phone orders are the one exception, and it is a code path rather than a
+privilege.** A manager has no INSERT policy on `orders` — deliberately, and
+0023 says so in its header. An INSERT policy would travel with the role into any
+raw PostgREST call, with any `customer_id`, any `total` and no attribution.
+Instead, `placePhoneOrder()` (`src/lib/data-access/manager-phone-orders.ts`) is
+the only way to create one:
+
+- It re-checks the acting role in the same scope as `createAdminClient()`, so a
+  future caller that forgets `requireRole` still fails.
+- The bill is computed from `menu_items` prices and live platform settings. The
+  request carries dish ids and quantities and no amount at all.
+- Every row it writes stamps `channel = 'phone'` and `placed_by = <the
+  operator>` (migration **0029**). Both join the locked-column list in
+  `guard_order_update()`, so nobody below admin can rewrite the attribution
+  afterwards — including the manager who created it.
+- On a database without 0029 it **refuses to place the order**. The audit trail
+  is what makes writing an order in someone else's name defensible, so producing
+  one without it is not an acceptable degradation.
+- Payment is always COD. There is no path by which this role can mark money
+  received; `payment_status` still only leaves `pending` through the service
+  role after a verified signature.
+
+Placing a phone order can create a customer account for a number that has none.
+It goes through `resolveAccountByPhone()` — the same resolver OTP login uses, so
+there is one account per mobile — and the action is rate-limited on the
+operator's id.
+
 ## What's covered vs. still to wire
 
 **Covered now:** server-side role gating, DB-level ownership (RLS), role can't be
@@ -60,10 +95,55 @@ upload checks, and rate limits on every write endpoint.
 Migration **0025** adds online payment (Razorpay), shipped switched off — see
 **Payments** below.
 
-**Still to wire when you go live:** applying coupon discounts at order creation
-(the endpoint validates but nothing consumes the result yet), vendor payout
-settlement, and swapping any remaining portal mocks for the RLS-backed data
-layer.
+Migration **0030** fixes a control that had been asserted here and was not
+true. 0024 locked `total` against every role below admin and stated that
+`recompute_order_total()` was exempt "because it is SECURITY DEFINER owned by
+postgres". SECURITY DEFINER changes a function's *privileges*; it does not
+change `auth.uid()` or `auth.jwt()`, which still describe the requesting
+customer. So the guard fired on the recompute and **no customer could place an
+order** — checkout 500'd after writing an orphan order at `total = 0`. The
+guard is now SECURITY INVOKER and tests `current_user`, which really is
+`postgres` inside a trusted definer and `authenticated` under PostgREST. 0030
+also pins `total` at INSERT: `orders — customer insert` only ever checked row
+ownership, so a direct PostgREST call could post its own total.
+
+**Still to wire when you go live:** vendor payout settlement, and swapping any
+remaining portal mocks for the RLS-backed data layer.
+
+Coupon discounts are applied as of migration **0031** — see below.
+
+## Coupons
+
+A discount is money, so none of it is the client's to state:
+
+- **The amount is derived, never accepted.** `apply_coupon_to_order()` reads the
+  order's own `order_items` for the subtotal and prices the coupon itself.
+  `/api/coupons/validate` still exists, but only as the checkout's preview —
+  the same split `computeChargesWith` already makes for fees.
+- **`orders.discount` and `orders.coupon_code` cannot be written from a
+  client.** Both are on the locked list in `guard_order_update()`, and the
+  INSERT trigger from 0030 pins them alongside `total`. The sole writer is the
+  SECURITY DEFINER function, which passes the guard because of 0030's
+  `current_user` test.
+- **One redemption per order, enforced by a unique constraint** — not by the
+  code remembering to check. Two concurrent calls cannot both discount the same
+  order; the loser catches `unique_violation` and reports the discount as
+  already applied, which it is.
+- **Codes are limited per customer.** `max_per_customer` defaults to **1**.
+  Before 0031 the table had no limit column at all, so both live codes were
+  usable by the same person on every order they ever placed — a promo that is
+  really a permanent price cut. NULL means unlimited, so "no limit" is now
+  something an admin chose.
+- **The order must still be `placed`.** A coupon cannot be applied to an order
+  the kitchen has already accepted, which would change a bill someone agreed to.
+- `coupon_redemptions` has no INSERT/UPDATE/DELETE policy for anyone; reads are
+  RLS-scoped to the customer the row is about, plus admins.
+
+The delivery fee is not discountable — the discount is capped at the food
+subtotal, because somebody still rides the order to the door. The discount comes
+off the grand total *after* tax rather than reducing the taxable base; that
+keeps one implementation of the fee-and-tax arithmetic (`src/lib/pricing.ts`)
+instead of forking it into SQL. Revisit if GST-correct invoicing is needed.
 
 ## Payments
 

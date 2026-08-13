@@ -105,7 +105,55 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   const showAddForm =
     addFormRequested || (!addrLoading && addresses.length === 0);
 
-  const payTotal = charges.total;
+  // ---- coupon ----
+  // `pricedAt` is the subtotal the discount was quoted against. If the basket
+  // moves afterwards the quote is stale — a percentage is simply wrong, and a
+  // flat code may no longer clear its minimum — so the code is dropped rather
+  // than silently re-used at a number nobody calculated.
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState<{
+    code: string;
+    discount: number;
+    pricedAt: number;
+  } | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
+  if (coupon && coupon.pricedAt !== subtotal) {
+    setCoupon(null);
+    setCouponError("Your basket changed — apply the code again.");
+  }
+
+  const discount = coupon?.discount ?? 0;
+  // After tax, not before it. The server bills the same way; see migration 0031
+  // for why the discount is subtractive on the grand total rather than folded
+  // into the taxable base.
+  const payTotal = Math.max(0, charges.total - discount);
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code) return;
+    setCouponBusy(true);
+    setCouponError(null);
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, subtotal }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setCouponError(couponMessage(data.error, data.minOrder));
+        return;
+      }
+      setCoupon({ code: data.code, discount: data.discount, pricedAt: subtotal });
+      setCouponInput("");
+    } catch {
+      setCouponError("Couldn't check that code. Try again.");
+    } finally {
+      setCouponBusy(false);
+    }
+  };
 
   // Availability gates: the platform can be paused, or a minimum can apply.
   const belowMinimum = config.minOrder > 0 && subtotal < config.minOrder;
@@ -274,6 +322,9 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
             // A request, not an instruction — the server re-checks that online
             // payment is on offer and refuses the order if it isn't.
             paymentMethod: payOnline ? "online" : "cod",
+            // The code only. What it is worth is re-derived server-side from
+            // the order's own items, so the quote above is a preview.
+            couponCode: coupon?.code,
             address: {
               label: selectedAddress.label,
               line: [
@@ -300,6 +351,18 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
 
         const data = (await res.json()) as { order?: { id: string }; error?: string };
         if (!res.ok || !data.order?.id) {
+          // The server re-prices the coupon against the order it is about to
+          // write, so it can refuse one the preview accepted — the code lapsed
+          // in between, or another device used the last redemption. Nothing was
+          // created; drop the code, say why, and let them place it again.
+          if (data.error?.startsWith("coupon_")) {
+            const reason = data.error.slice("coupon_".length);
+            setCoupon(null);
+            setCouponError(couponMessage(reason, config.minOrder));
+            setError("Your promo code was refused. Check the total and try again.");
+            setStatus("ready");
+            return;
+          }
           setError(
             data.error === "invalid_items"
               ? "Something in your cart is no longer available."
@@ -576,6 +639,89 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
           </div>
         </section>
 
+        <section className="card p-4">
+          <h2 className="text-[15px] font-bold">Have a code?</h2>
+          {coupon ? (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-green-soft px-3.5 py-3">
+              <div className="min-w-0">
+                <p className="text-data truncate text-sm font-bold text-green">
+                  {coupon.code}
+                </p>
+                <p className="text-xs text-muted">
+                  {formatINR(coupon.discount)} off your food
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setCoupon(null);
+                  setCouponError(null);
+                }}
+                className="press shrink-0 text-sm font-semibold text-muted hover:text-ink"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <div className="mt-3 flex gap-2">
+              <input
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void applyCoupon();
+                  }
+                }}
+                placeholder="Promo code"
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="Promo code"
+                className="text-data min-w-0 flex-1 rounded-xl bg-surface-2 px-3.5 py-3 text-[15px] uppercase tracking-wide text-ink outline-none focus:ring-2 focus:ring-accent/30"
+              />
+              <Button
+                variant="secondary"
+                onClick={applyCoupon}
+                disabled={couponBusy || !couponInput.trim()}
+                className="shrink-0"
+              >
+                {couponBusy ? <Loader2 className="size-4 animate-spin" /> : null}
+                Apply
+              </Button>
+            </div>
+          )}
+          {couponError ? (
+            <p className="mt-2 text-sm font-medium text-deal">{couponError}</p>
+          ) : null}
+
+          {/* The bill, itemised. It only became worth showing once a line could
+              come *off* it — a discount the customer cannot see applied is
+              indistinguishable from one that silently didn't. */}
+          <div className="mt-4 space-y-1 border-t border-line pt-3 text-sm">
+            <BillRow label="Item total" value={charges.subtotal} />
+            <BillRow
+              label="Delivery"
+              value={charges.deliveryFee}
+              free={charges.deliveryFee === 0}
+            />
+            <BillRow label="Taxes" value={charges.taxes} />
+            {charges.tip > 0 ? (
+              <BillRow label="Courier tip" value={charges.tip} />
+            ) : null}
+            {discount > 0 ? (
+              <div className="flex justify-between font-medium text-green">
+                <span>Discount · {coupon?.code}</span>
+                <span className="text-data">−{formatINR(discount)}</span>
+              </div>
+            ) : null}
+            <div className="flex justify-between pt-1.5 text-[15px] font-bold text-ink">
+              <span>To pay</span>
+              <span className="text-data">{formatINR(payTotal)}</span>
+            </div>
+          </div>
+        </section>
+
         {error ? (
           <p className="text-center text-sm text-deal">{error}</p>
         ) : null}
@@ -628,6 +774,57 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
       />
     </div>
   );
+}
+
+/**
+ * One vocabulary for coupon refusals, shared by the "apply" button and the
+ * place-order response — the server can refuse at either moment (the basket is
+ * re-priced at submit) and the customer should read the same sentence either
+ * way. Keys match the RPC's error strings, with the `coupon_` prefix the order
+ * API adds stripped by the caller.
+ */
+function BillRow({
+  label,
+  value,
+  free,
+}: {
+  label: string;
+  value: number;
+  free?: boolean;
+}) {
+  return (
+    <div className="flex justify-between text-muted">
+      <span>{label}</span>
+      <span className={cn("text-data", free && "text-green")}>
+        {free ? "Free" : formatINR(value)}
+      </span>
+    </div>
+  );
+}
+
+function couponMessage(error?: string, minOrder?: number): string {
+  switch (error) {
+    case "invalid":
+      return "That code isn't recognised.";
+    case "expired":
+      return "That code has expired.";
+    case "min_order":
+      return minOrder
+        ? `Spend ${formatINR(minOrder)} on food to use this code.`
+        : "Your basket is below this code's minimum.";
+    case "already_used":
+      return "You've already used this code.";
+    case "exhausted":
+      return "This code has been fully claimed.";
+    case "already_applied":
+      return "A code is already applied to this order.";
+    case "order_not_open":
+      return "This order has moved on — the code can't be added now.";
+    case "empty":
+      return "Enter a code first.";
+    default:
+      return "That code couldn't be applied.";
+  }
 }
 
 function PaymentOption({

@@ -9,6 +9,13 @@ import {
 } from "@/lib/data-access/orders";
 
 function mapCreateError(message: string) {
+  // Coupon refusals are the customer's to act on — retry without the code, or
+  // add another ₹80 to clear the minimum — so they keep their own reason
+  // rather than collapsing into a generic 400.
+  if (message.startsWith("coupon_")) {
+    return { status: 400, error: message };
+  }
+
   switch (message) {
     case "unauthorized":
       return { status: 401, error: "unauthorized" };

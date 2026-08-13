@@ -8,6 +8,7 @@ import {
   Banknote,
   CreditCard,
   Phone,
+  PhoneIncoming,
   ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -143,6 +144,15 @@ function OrderCard({
                 ? "Prepaid"
                 : "Online · unpaid"
               : "Cash"}
+          </span>
+        ) : null}
+        {/* Nobody at the other end saw a checkout screen, so nothing about this
+            order was confirmed by the customer — worth knowing before you read
+            an address back or assume they are watching the tracker. */}
+        {o.byPhone ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-pop/15 px-2 py-0.5 text-[11px] font-semibold text-ink">
+            <PhoneIncoming className="size-3" />
+            Phone order
           </span>
         ) : null}
         {o.rider ? (

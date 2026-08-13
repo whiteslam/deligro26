@@ -21,6 +21,8 @@ import { columnKnownMissing, isMissingColumn, rememberColumn } from "./schema-pr
 const ACTIVE = ["placed", "kitchen", "ready", "on_the_way"] as const;
 
 const PAYMENT_COLUMNS = "orders.payment_method";
+/** Provenance, added by 0029. Shared probe key with manager-phone-orders.ts. */
+const CHANNEL_COLUMN = "orders.channel";
 
 export interface ManagerOrderRow {
   id: string;
@@ -37,6 +39,13 @@ export interface ManagerOrderRow {
   /** Undefined when the column is absent — not "cash". See slice A/D. */
   paymentMethod?: PaymentMethod;
   paymentStatus?: PaymentStatus;
+  /**
+   * True when a manager typed this order on a call (0029). Worth a badge on the
+   * board: nobody at the other end confirmed a total, an address or an ETA, so
+   * an address that looks wrong probably is, and the customer cannot be assumed
+   * to be watching the tracker.
+   */
+  byPhone?: boolean;
   /** The rider carrying it, when one has been assigned. */
   rider: { id: string; name: string; phone: string | null } | null;
   deliveryStatus: string | null;
@@ -49,6 +58,7 @@ interface OrderRow {
   created_at: string;
   payment_method?: PaymentMethod | null;
   payment_status?: PaymentStatus | null;
+  channel?: string | null;
   order_items: { id: string }[] | null;
   restaurants: { name: string | null } | { name: string | null }[] | null;
   customer:
@@ -67,14 +77,71 @@ function one<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
 }
 
-function columns(withPayment: boolean): string {
+/**
+ * Which optional migrations this database is believed to have. Each group is
+ * dropped independently, so an environment missing one still gets the other.
+ */
+interface SelectFlags {
+  /** `payment_method` / `payment_status` — migration 0025. */
+  payment: boolean;
+  /** `channel` — migration 0029. */
+  channel: boolean;
+}
+
+function columns(flags: SelectFlags): string {
   return [
     "id, status, total, created_at",
-    withPayment ? ", payment_method, payment_status" : "",
+    flags.payment ? ", payment_method, payment_status" : "",
+    flags.channel ? ", channel" : "",
     ", order_items(id)",
     ", restaurants(name)",
     ", customer:profiles!orders_customer_id_fkey(full_name, phone)",
   ].join("");
+}
+
+/**
+ * Newest migration first. `isMissingColumn` doesn't say WHICH column PostgREST
+ * rejected, so the only sound order is to drop the most recently added group
+ * and re-probe. Same shape as `selectOrders()` in data-access/orders.ts, which
+ * solves the same problem for the customer-facing query.
+ */
+const OPTIONAL_GROUPS: Array<{ key: keyof SelectFlags; column: string }> = [
+  { key: "channel", column: CHANNEL_COLUMN },
+  { key: "payment", column: PAYMENT_COLUMNS },
+];
+
+interface QueryResult<T> {
+  data: T | null;
+  error: { code?: string } | null;
+}
+
+/**
+ * Run the query, narrowing the column list until the database accepts it, and
+ * remember the answer so the retry cost is paid once per process.
+ *
+ * At most one attempt per still-optimistic group, plus the final bare one.
+ */
+async function probeSelect<T>(
+  run: (select: string) => PromiseLike<QueryResult<T>>,
+  flags: SelectFlags
+): Promise<T | null> {
+  for (const { key, column } of OPTIONAL_GROUPS) {
+    if (!flags[key]) continue;
+
+    const { data, error } = await run(columns(flags));
+    if (!error) {
+      for (const g of OPTIONAL_GROUPS) if (flags[g.key]) rememberColumn(g.column, true);
+      return data;
+    }
+    if (!isMissingColumn(error)) throw error;
+
+    rememberColumn(column, false);
+    flags[key] = false;
+  }
+
+  const { data, error } = await run(columns(flags));
+  if (error) throw error;
+  return data;
 }
 
 /**
@@ -88,30 +155,23 @@ function columns(withPayment: boolean): string {
 export async function listActiveOrders(): Promise<ManagerOrderRow[]> {
   const supabase = await createClient();
 
-  const run = async (withPayment: boolean) =>
+  const run = async (select: string) =>
     supabase
       .from("orders")
-      .select(columns(withPayment))
+      .select(select)
       .in("status", ACTIVE)
       .order("created_at", { ascending: true })
       .overrideTypes<Record<string, unknown>[]>();
 
-  let withPayment = !columnKnownMissing(PAYMENT_COLUMNS);
-  let { data, error } = await run(withPayment);
+  // A missing group costs the board a badge, never a row: without 0025 it
+  // cannot say how anything was paid (and says nothing rather than guessing
+  // "cash"); without 0029 it cannot mark phone orders. Both still list.
+  const flags: SelectFlags = {
+    payment: !columnKnownMissing(PAYMENT_COLUMNS),
+    channel: !columnKnownMissing(CHANNEL_COLUMN),
+  };
 
-  if (error && withPayment && isMissingColumn(error)) {
-    // 0025 not applied here. The board still works; it just cannot say how
-    // anything was paid, and says nothing rather than guessing "cash".
-    rememberColumn(PAYMENT_COLUMNS, false);
-    withPayment = false;
-    ({ data, error } = await run(false));
-  } else if (!error && withPayment) {
-    rememberColumn(PAYMENT_COLUMNS, true);
-  }
-
-  if (error) throw error;
-
-  const rows = (data ?? []) as unknown as OrderRow[];
+  const rows = ((await probeSelect(run, flags)) ?? []) as unknown as OrderRow[];
   if (rows.length === 0) return [];
 
   // One query for the delivery legs rather than one per order.
@@ -166,6 +226,10 @@ export async function listActiveOrders(): Promise<ManagerOrderRow[]> {
       itemCount: r.order_items?.length ?? 0,
       paymentMethod: r.payment_method ?? undefined,
       paymentStatus: r.payment_status ?? undefined,
+      // Undefined, not false, when 0029 is absent: "we don't know" and "placed
+      // in the app" are different claims, and the badge should stay off rather
+      // than assert the second one.
+      byPhone: r.channel === undefined ? undefined : r.channel === "phone",
       rider:
         leg?.driver_id && rider
           ? {
