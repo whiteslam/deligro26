@@ -12,11 +12,12 @@ export default async function AdminSecurityPage() {
   const mfa = await getMfaStatus();
 
   return (
-    <div className="admin-measure space-y-5">
+    <div className="admin-measure space-y-4">
       <AdminHero
         backHref="/admin/settings"
         backLabel="Settings"
         title="Security"
+        tag={mfa ? (mfa.enrolled ? "2FA on" : "2FA off") : undefined}
         subtitle="Two-factor authentication for your admin account. Enable it for a code at sign-in, or turn it off anytime."
       />
 

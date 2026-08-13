@@ -17,10 +17,11 @@ import { Button } from "@/components/ui/button";
  */
 export default function ManagerError({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  unstable_retry: () => void;
+  /** `retry` — see next/dist/client/components/error-boundary.d.ts. */
+  retry: () => void;
 }) {
   useEffect(() => {
     console.error(error);
@@ -37,7 +38,7 @@ export default function ManagerError({
           Orders could not be read. Nothing was changed — retrying is safe.
         </p>
         <div className="mt-3">
-          <Button size="sm" variant="secondary" onClick={() => unstable_retry()}>
+          <Button size="sm" variant="secondary" onClick={() => retry()}>
             <RotateCw className="size-4" /> Try again
           </Button>
         </div>

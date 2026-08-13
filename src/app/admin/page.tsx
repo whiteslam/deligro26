@@ -1,17 +1,11 @@
 import Link from "next/link";
-import {
-  Bike,
-  ChevronRight,
-  ReceiptText,
-  ShieldAlert,
-  ShieldCheck,
-  Store,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { ShieldAlert, ShieldCheck } from "lucide-react";
 import {
   getAdminDashboard,
+  getAdminNavCounts,
   listPendingRestaurants,
+  type AdminNavCounts,
+  type Trend,
 } from "@/lib/data-access/admin-stats";
 import {
   getAdminSeries,
@@ -19,44 +13,47 @@ import {
   type AdminSeries,
   type StatusSlice,
 } from "@/lib/data-access/admin-series";
-import { ApproveRestaurantButton } from "@/components/admin/approve-restaurant-button";
+import { getLiveBoard } from "@/lib/data-access/admin-dispatch";
+import { getSettlementStats } from "@/lib/data-access/admin-settlements";
+import { AdminHero, ChartCard, Panel, RangeTabs } from "@/components/admin/admin-ui";
 import {
-  ChartCard,
-  LiveDot,
-  Panel,
-  RangeTabs,
-  StatCard,
-  TrendPill,
-} from "@/components/admin/admin-ui";
-import {
-  OrdersChart,
-  RevenueChart,
-  StatusDonut,
-} from "@/components/admin/admin-charts";
+  DecisionRow,
+  KpiStrip,
+  ShareBar,
+  type Decision,
+  type KpiItem,
+  type ShareSegment,
+} from "@/components/admin/console-ui";
+import { GmvOrdersChart } from "@/components/admin/admin-charts";
+import { LiveBoard } from "@/components/admin/live-board";
+import { ApprovalQueue } from "@/components/admin/approval-queue";
 import { getOperatorMfaGate } from "@/lib/auth/mfa";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { formatINR } from "@/lib/utils/format";
-import { cn } from "@/lib/utils/cn";
+import { formatINR, formatWaited } from "@/lib/utils/format";
 
 /**
  * Admin home = the platform dashboard.
  *
- * Top-to-bottom it tells a story: today's live pulse, then the all-time totals
- * with week-over-week movement, then how the last N days actually went, then the
- * one queue that needs a human. Every number is counted from the database, so a
- * quiet day reads as zero rather than as a busy one.
+ * The redesign reorganised this around what the operator does rather than what
+ * the database can count. Top to bottom: today's five figures with their trend
+ * lines, then the two things that need a person right now (what is in flight,
+ * and what is queued for a decision), then the shape of the window and the
+ * approval queue you can clear without leaving the page.
  *
- * One page, two layouts. In the phone frame it is a single column of cards; in
- * the console the same content becomes a hero-plus-KPI-row over a chart grid.
- * The switch is a container query (`@3xl`), so the phone-frame preview keeps the
- * phone layout even though the browser window around it is wide.
+ * Every number is counted from the database, so a quiet day reads as zero
+ * rather than as a busy one. Nothing here is seeded, sampled or rounded up.
+ *
+ * One page, two shells. In the phone frame the wrapping flex rows collapse to
+ * a single column; in the console they are the 1.55/1 split the design calls
+ * for. The tables inside scroll sideways rather than squashing.
  */
 export const dynamic = "force-dynamic";
 
 const nf = new Intl.NumberFormat("en-IN");
 
-/** How many approvals to surface inline before deferring to the vendors list. */
-const APPROVALS_SHOWN = 6;
+/** How many rows each dashboard queue shows before deferring to its screen. */
+const BOARD_ROWS = 8;
+const APPROVALS_SHOWN = 4;
 
 const RANGES = [
   { value: 7, label: "7 days" },
@@ -70,6 +67,18 @@ const EMPTY_SERIES: AdminSeries = {
   peak: null,
 };
 
+const NO_COUNTS: AdminNavCounts = {
+  pendingApprovals: 0,
+  pendingRefunds: 0,
+  liveOrders: 0,
+};
+
+/** "+8.4%" / "−2.1%" / "0%" — pre-formatted for the KPI strip. */
+function deltaLabel(t: Trend): string {
+  if (t.direction === "flat") return "0%";
+  return `${t.direction === "up" ? "+" : "−"}${Math.abs(t.pct)}%`;
+}
+
 export default async function AdminOverviewPage({
   searchParams,
 }: {
@@ -79,291 +88,291 @@ export default async function AdminOverviewPage({
   const requested = Number(daysParam);
   const days = RANGES.some((r) => r.value === requested) ? requested : 7;
 
-  const [dash, pending, mfa, series, mix] = await Promise.all([
-    getAdminDashboard(),
-    listPendingRestaurants(),
-    isSupabaseConfigured
-      ? getOperatorMfaGate()
-      : Promise.resolve({ ok: true as const, currentLevel: null }),
-    isSupabaseConfigured
-      ? getAdminSeries(days)
-      : Promise.resolve<AdminSeries>(EMPTY_SERIES),
-    isSupabaseConfigured
-      ? getOrderStatusMix(days)
-      : Promise.resolve<StatusSlice[]>([]),
-  ]);
+  const [dash, pending, mfa, series, mix, board, counts, settlements] =
+    await Promise.all([
+      getAdminDashboard(),
+      listPendingRestaurants(),
+      isSupabaseConfigured
+        ? getOperatorMfaGate()
+        : Promise.resolve({ ok: true as const, currentLevel: null }),
+      isSupabaseConfigured
+        ? getAdminSeries(days)
+        : Promise.resolve<AdminSeries>(EMPTY_SERIES),
+      isSupabaseConfigured
+        ? getOrderStatusMix(days)
+        : Promise.resolve<StatusSlice[]>([]),
+      isSupabaseConfigured
+        ? getLiveBoard(BOARD_ROWS)
+        : Promise.resolve({ rows: [], inFlight: 0, atRisk: 0, unassigned: 0 }),
+      isSupabaseConfigured
+        ? getAdminNavCounts().catch(() => NO_COUNTS)
+        : Promise.resolve(NO_COUNTS),
+      isSupabaseConfigured
+        ? getSettlementStats().catch(() => ({ draftCount: 0 }))
+        : Promise.resolve({ draftCount: 0 }),
+    ]);
 
   const mfaActive = mfa.ok && mfa.currentLevel === "aal2";
-  const today = new Intl.DateTimeFormat("en-IN", {
+  const now = new Intl.DateTimeFormat("en-IN", {
     weekday: "short",
     day: "numeric",
     month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "Asia/Kolkata",
   }).format(new Date());
 
-  const shown = pending.slice(0, APPROVALS_SHOWN);
-  const overflow = pending.length - shown.length;
   const rangeLabel =
     RANGES.find((r) => r.value === days)?.label ?? `${days} days`;
   const rangeHref = (v: number) => (v === 7 ? "/admin" : `/admin?days=${v}`);
 
+  /* ---------- KPI strip ----------
+     Five figures, three of which have a history to draw. Riders on delivery
+     and orders in flight are instantaneous states — nothing records what they
+     were yesterday — so they get no sparkline rather than a fabricated one. */
+  const spark = series.days.slice(-7);
+  const basketToday =
+    dash.today.orders > 0 ? Math.round(dash.today.gmv / dash.today.orders) : 0;
+
+  const kpis: KpiItem[] = [
+    {
+      label: "GMV today",
+      value: formatINR(dash.today.gmv),
+      delta: { label: deltaLabel(dash.trends.gmv), direction: dash.trends.gmv.direction, note: "vs last week" },
+      spark: spark.map((d) => d.gmv),
+    },
+    {
+      label: "Orders today",
+      value: nf.format(dash.today.orders),
+      delta: {
+        label: deltaLabel(dash.trends.orders),
+        direction: dash.trends.orders.direction,
+        note: "vs last week",
+      },
+      spark: spark.map((d) => d.orders),
+    },
+    {
+      label: "Avg basket",
+      value: formatINR(basketToday),
+      unit: "per order today",
+      // Deliberately no delta: a week-over-week average basket is not derivable
+      // from the GMV and order trends without re-querying, and inferring one
+      // from the other two would be arithmetic that looks like a measurement.
+      spark: spark.map((d) => (d.orders > 0 ? Math.round(d.gmv / d.orders) : 0)),
+    },
+    {
+      label: "Riders on delivery",
+      value: nf.format(dash.today.activeRiders),
+      unit: `of ${nf.format(dash.totals.drivers)} registered`,
+    },
+    {
+      label: "In flight",
+      value: nf.format(board.inFlight || counts.liveOrders),
+      unit: board.atRisk > 0 ? `${board.atRisk} past promise` : "all on time",
+    },
+  ];
+
+  /* ---------- the decision queue ----------
+     Only queues with something in them. A list of zeros is a list an operator
+     learns to stop reading. */
+  const decisions: Decision[] = [
+    {
+      href: "/admin/vendors",
+      title: "Vendor approvals",
+      detail: "Shops waiting to go live",
+      count: pending.length,
+      color: "var(--accent)",
+    },
+    {
+      href: "/admin/refunds",
+      title: "Refund requests",
+      detail: "Money waiting on your decision",
+      count: counts.pendingRefunds,
+      color: "var(--deal)",
+    },
+    {
+      href: "/admin/settlements",
+      title: "Settlement drafts",
+      detail: "Built, not yet paid out",
+      count: settlements.draftCount,
+      color: "var(--pop)",
+    },
+    {
+      href: "/admin/orders",
+      title: "Unassigned orders",
+      detail: "No rider after 8 minutes",
+      count: board.unassigned,
+      color: "var(--blue)",
+    },
+  ].filter((d) => d.count > 0);
+
+  const decisionTotal = decisions.reduce((sum, d) => sum + d.count, 0);
+
+  /* ---------- outcome mix ---------- */
+  const SLICE_COLOR: Record<string, string> = {
+    placed: "var(--accent)",
+    kitchen: "var(--accent)",
+    ready: "var(--pop)",
+    on_the_way: "var(--blue)",
+    delivered: "var(--green)",
+    cancelled: "var(--deal)",
+  };
+  const segments: ShareSegment[] = mix.map((s) => ({
+    label: s.label,
+    count: s.count,
+    color: SLICE_COLOR[s.status] ?? "var(--c-faint)",
+  }));
+  const mixTotal = mix.reduce((sum, s) => sum + s.count, 0);
+
+  /* ---------- approvals ---------- */
+  const oldestWait = pending.length
+    ? formatWaited(
+        [...pending].sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0]
+          .createdAt
+      )
+    : null;
+
   return (
-    <div className="space-y-5 @3xl:space-y-6">
-      {/* ---------- page header ---------- */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[26px] font-extrabold tracking-tight @3xl:text-[30px]">
-            Dashboard
-          </h1>
-          <p className="mt-0.5 text-sm text-muted">
-            Platform pulse · {today}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="hidden @3xl:block">
-            <RangeTabs options={RANGES} active={days} hrefFor={rangeHref} />
+    <>
+      <AdminHero
+        title="Dashboard"
+        tag="Live"
+        subtitle={`Platform pulse · ${now} IST`}
+        action={
+          <div className="flex items-center gap-2">
+            <div className="hidden @3xl:block">
+              <RangeTabs options={RANGES} active={days} hrefFor={rangeHref} />
+            </div>
+            {mfaActive ? (
+              <span className="pill pill-green shrink-0">
+                <ShieldCheck className="size-3.5" /> MFA
+              </span>
+            ) : (
+              <Link href="/mfa/setup?next=/admin" className="pill pill-deal shrink-0">
+                <ShieldAlert className="size-3.5" /> MFA
+              </Link>
+            )}
           </div>
-          {mfaActive ? (
-            <span className="pill pill-green shrink-0">
-              <ShieldCheck className="size-3.5" /> MFA
-            </span>
-          ) : (
-            <Link
-              href="/mfa/setup?next=/admin"
-              className="pill pill-deal shrink-0"
-            >
-              <ShieldAlert className="size-3.5" /> MFA
-            </Link>
-          )}
+        }
+      />
+
+      <KpiStrip items={kpis} />
+
+      {/* Wrapping flex, not a fixed two-column grid: the 1.55/1 ratio has to be
+          able to collapse to stacked inside the phone frame. */}
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="min-w-0 grow-[1.55] basis-[420px]">
+          <Panel
+            title="Live order board"
+            subtitle="Anything past its promise time is flagged for you"
+            action={
+              <div className="flex items-center gap-2.5">
+                {board.atRisk > 0 ? (
+                  <span className="pill pill-deal">{board.atRisk} at risk</span>
+                ) : null}
+                <Link
+                  href="/admin/orders"
+                  className="press text-xs font-semibold text-accent-ink"
+                >
+                  Open board
+                </Link>
+              </div>
+            }
+          >
+            <LiveBoard rows={board.rows} />
+          </Panel>
+        </div>
+
+        <div className="flex min-w-0 grow basis-[300px] flex-col gap-4">
+          <Panel
+            title="Needs a decision"
+            action={
+              decisionTotal > 0 ? (
+                <span className="text-data rounded-full bg-[var(--c-divider)] px-2 py-0.5 text-[11px] font-semibold text-ink">
+                  {decisionTotal}
+                </span>
+              ) : null
+            }
+          >
+            {decisions.length ? (
+              <div className="space-y-2">
+                {decisions.map((d) => (
+                  <DecisionRow key={d.href} item={d} />
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-lg bg-surface-2 px-3.5 py-6 text-center text-[13px] text-muted">
+                Nothing waiting on you. Every queue is clear.
+              </p>
+            )}
+          </Panel>
+
+          <Panel
+            title="Where orders ended up"
+            subtitle={`${rangeLabel} · ${nf.format(mixTotal)} orders`}
+          >
+            <ShareBar segments={segments} />
+          </Panel>
         </div>
       </div>
 
-      {/* ---------- 1. today, live and money-first ---------- */}
-      <section className="admin-today relative overflow-hidden rounded-[var(--radius-sheet)] border border-line p-4 @3xl:p-5">
-        <div className="vendor-hero-glow pointer-events-none absolute inset-0" />
-        <div className="relative @3xl:flex @3xl:items-center @3xl:gap-8">
-          <div className="@3xl:min-w-[240px]">
-            <div className="flex items-center justify-between gap-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-green/15 px-2.5 py-1 text-[11px] font-bold text-green">
-                <LiveDot />
-                Live
-              </span>
-              <span className="text-[11px] font-medium text-muted @3xl:hidden">
-                {today}
-              </span>
-            </div>
-
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <p className="text-label">Today&rsquo;s GMV</p>
-              <div className="@3xl:hidden">
-                <TrendPill trend={dash.trends.gmv} />
-              </div>
-            </div>
-            <p className="text-data mt-1 text-[34px] font-extrabold leading-none tracking-tight text-accent @3xl:text-[40px]">
-              {formatINR(dash.today.gmv)}
-            </p>
-            <div className="mt-2 hidden @3xl:block">
-              <TrendPill trend={dash.trends.gmv} />
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-3 divide-x divide-line border-t border-line pt-3.5 @3xl:mt-0 @3xl:flex-1 @3xl:border-l @3xl:border-t-0 @3xl:pl-8 @3xl:pt-0">
-            <HeroMini
-              icon={<ReceiptText className="size-3" />}
-              label="Orders"
-              value={nf.format(dash.today.orders)}
-            />
-            <HeroMini
-              icon={<Bike className="size-3" />}
-              label="Riders"
-              value={nf.format(dash.today.activeRiders)}
-            />
-            <HeroMini
-              icon={<Store className="size-3" />}
-              label="Awaiting"
-              value={nf.format(dash.today.pendingApprovals)}
-              href={dash.today.pendingApprovals > 0 ? "#pending" : undefined}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ---------- 2. platform totals ---------- */}
-      <section>
-        <div className="mb-2.5 flex items-baseline justify-between">
-          <h2 className="text-label">Platform</h2>
-          <span className="text-[11px] font-medium text-muted">vs last week</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2.5 @3xl:grid-cols-4 @3xl:gap-4">
-          <StatCard
-            icon={<Store className="size-4" />}
-            tone="accent"
-            label="Restaurants"
-            value={nf.format(dash.totals.shops)}
-            trend={dash.trends.shops}
-            href="/admin/vendors"
-          />
-          <StatCard
-            icon={<Users className="size-4" />}
-            tone="green"
-            label="Users"
-            value={nf.format(dash.totals.users)}
-            trend={dash.trends.users}
-            href="/admin/customers"
-          />
-          <StatCard
-            icon={<ReceiptText className="size-4" />}
-            tone="blue"
-            label="Orders"
-            value={nf.format(dash.totals.orders)}
-            trend={dash.trends.orders}
-            href="/admin/orders"
-          />
-          <StatCard
-            icon={<Bike className="size-4" />}
-            tone="muted"
-            label="Riders"
-            value={nf.format(dash.totals.drivers)}
-          />
-        </div>
-      </section>
-
-      {/* ---------- 3. the window ---------- */}
-      <section className="space-y-3 @3xl:space-y-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-label">Last {rangeLabel}</h2>
-          <div className="@3xl:hidden">
-            <RangeTabs options={RANGES} active={days} hrefFor={rangeHref} />
-          </div>
-        </div>
-
-        <div className="grid gap-3 @3xl:grid-cols-3 @3xl:gap-4">
+      <div className="flex flex-wrap items-stretch gap-4">
+        <div className="flex min-w-0 grow-[1.55] basis-[420px] flex-col">
           <ChartCard
-            className="@3xl:col-span-2"
-            title="Revenue"
+            className="flex-1"
+            title="GMV and orders"
+            subtitle={`${rangeLabel} · bars are orders, line is GMV`}
+            height={196}
+            action={
+              <div className="flex gap-5 text-right">
+                <div>
+                  <p className="text-[19px] font-bold leading-none tracking-[-0.02em] tabular-nums">
+                    {formatINR(series.totals.gmv)}
+                  </p>
+                  <p className="mt-1 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted">
+                    GMV
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[19px] font-bold leading-none tracking-[-0.02em] tabular-nums">
+                    {nf.format(series.totals.orders)}
+                  </p>
+                  <p className="mt-1 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted">
+                    Orders
+                  </p>
+                </div>
+              </div>
+            }
+          >
+            <GmvOrdersChart days={series.days} />
+          </ChartCard>
+        </div>
+
+        <div className="flex min-w-0 grow basis-[300px] flex-col">
+          <Panel
+            id="pending"
+            className="flex-1"
+            title="Vendors waiting to go live"
             subtitle={
-              series.peak
-                ? `${formatINR(series.totals.gmv)} in ${rangeLabel} · busiest ${series.peak.label}`
-                : `${formatINR(series.totals.gmv)} in ${rangeLabel}`
+              oldestWait
+                ? `Oldest first · longest wait ${oldestWait}`
+                : "Nothing in the queue"
             }
             action={
-              <span className="hidden items-center gap-1 text-[11px] font-semibold text-muted @sm:inline-flex">
-                <TrendingUp className="size-3.5" />
-                GMV per day
-              </span>
+              pending.length > APPROVALS_SHOWN ? (
+                <Link
+                  href="/admin/vendors"
+                  className="press text-xs font-semibold text-accent-ink"
+                >
+                  All {pending.length}
+                </Link>
+              ) : null
             }
           >
-            <RevenueChart days={series.days} />
-          </ChartCard>
-
-          <ChartCard
-            title="Order mix"
-            subtitle={`Where ${rangeLabel} of orders ended up`}
-          >
-            <StatusDonut slices={mix} />
-          </ChartCard>
-
-          <ChartCard
-            className="@3xl:col-span-3"
-            title="Orders per day"
-            subtitle={`${nf.format(series.totals.orders)} orders in ${rangeLabel}`}
-            height={230}
-          >
-            <OrdersChart days={series.days} />
-          </ChartCard>
+            <ApprovalQueue pending={pending} limit={APPROVALS_SHOWN} />
+          </Panel>
         </div>
-      </section>
-
-      {/* ---------- 4. the one queue that needs a human ---------- */}
-      <Panel
-        id="pending"
-        title="Pending approvals"
-        subtitle="Restaurants waiting to go live"
-        action={
-          pending.length > 0 ? (
-            <span className="pill pill-accent">{pending.length}</span>
-          ) : null
-        }
-      >
-        {pending.length === 0 ? (
-          <div className="flex items-center gap-3 rounded-xl bg-surface-2 px-4 py-4">
-            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-green/15 text-green">
-              <ShieldCheck className="size-4" />
-            </span>
-            <p className="text-sm text-muted">
-              All clear. New restaurants stay hidden until you approve them.
-            </p>
-          </div>
-        ) : (
-          <>
-            <ul className="divide-y divide-line @3xl:grid @3xl:grid-cols-2 @3xl:gap-x-6 @3xl:divide-y-0">
-              {shown.map((r) => (
-                <li
-                  key={r.id}
-                  className="flex items-center gap-3 py-3 first:pt-0 @3xl:border-b @3xl:border-line @3xl:first:pt-3"
-                >
-                  <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent/15 text-accent">
-                    <Store className="size-4" />
-                  </span>
-                  <Link
-                    href={`/admin/vendors/${r.id}?tab=overview`}
-                    className="press min-w-0 flex-1"
-                  >
-                    <p className="truncate text-sm font-semibold">{r.name}</p>
-                    <p className="truncate text-xs text-muted">/{r.slug}</p>
-                  </Link>
-                  <ApproveRestaurantButton id={r.id} name={r.name} />
-                </li>
-              ))}
-            </ul>
-            {overflow > 0 ? (
-              <Link
-                href="/admin/vendors"
-                className="press mt-1 flex items-center justify-center gap-1 border-t border-line pt-3 text-sm font-semibold text-accent-ink"
-              >
-                View all {pending.length} in Vendors
-                <ChevronRight className="size-4" />
-              </Link>
-            ) : null}
-          </>
-        )}
-      </Panel>
-    </div>
-  );
-}
-
-/**
- * One of the three small "today" figures inside the hero. Rendered flat — no
- * card of its own — so it reads as part of the hero container, split only by a
- * hairline divider.
- */
-function HeroMini({
-  icon,
-  label,
-  value,
-  href,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  href?: string;
-}) {
-  const body = (
-    <>
-      <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
-        {icon}
-        {label}
-      </span>
-      <span className="text-data mt-1.5 block text-lg font-extrabold leading-none text-ink @3xl:text-2xl">
-        {value}
-      </span>
+      </div>
     </>
-  );
-  const className = "px-3 first:pl-0 last:pr-0 @3xl:px-6";
-  return href ? (
-    <Link href={href} className={cn("press block", className)}>
-      {body}
-    </Link>
-  ) : (
-    <div className={className}>{body}</div>
   );
 }

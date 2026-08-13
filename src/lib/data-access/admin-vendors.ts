@@ -351,6 +351,40 @@ export async function listVendors(
   return { items, total: count ?? 0, page, pageSize };
 }
 
+/**
+ * Shops waiting to go live, oldest first, with the full list columns.
+ *
+ * Filters on `approved = false`, which is the same predicate the nav badge
+ * (`getAdminNavCounts`) and the dashboard queue (`listPendingRestaurants`) use.
+ * Deliberately *not* `status = 'pending'`: those are two different fields with
+ * two different lifecycles, and a queue that disagrees with the badge counting
+ * it is a queue an operator stops trusting.
+ *
+ * The difference from `listPendingRestaurants` is only the column list — this
+ * one carries the category, address and image the approval cards render — so
+ * it stays here beside `listVendors`, whose service-role client and mapper it
+ * reuses rather than reimplements. Admin-gated upstream (AGENTS.md §5).
+ */
+export async function listAwaitingApproval(
+  limit = 24
+): Promise<VendorListItem[]> {
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from("restaurants")
+    .select(LIST_SELECT)
+    .eq("approved", false)
+    .order("created_at", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    if (isMissingSchema(error)) return [];
+    throw error;
+  }
+
+  return ((data as VendorRow[] | null) ?? []).map(mapListItem);
+}
+
 /** The six dashboard cards. A failing sub-count reads as 0, never blank. */
 export async function getVendorCounts(): Promise<VendorCounts> {
   const supabase = await createClient();

@@ -58,7 +58,7 @@ export function EmployeesManager({
       </Button>
 
       {!configured ? (
-        <p className="rounded-2xl border border-pop/40 bg-pop/10 px-3.5 py-3 text-sm font-medium text-ink">
+        <p className="rounded-xl border border-pop/40 bg-pop/10 px-3.5 py-3 text-sm font-medium text-ink">
           Connect Supabase to create and manage employees.
         </p>
       ) : null}
@@ -66,7 +66,7 @@ export function EmployeesManager({
       <section>
         <h2 className="text-label mb-2">Team members</h2>
         {employees.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-10 text-center">
+          <div className="flex flex-col items-center gap-2 rounded-xl border border-line bg-surface px-4 py-10 text-center">
             <Users className="size-8 text-muted" />
             <p className="font-semibold">No employees yet</p>
             <p className="text-sm text-muted">
@@ -74,7 +74,7 @@ export function EmployeesManager({
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
             {employees.map((e) => (
               <EmployeeRow key={e.id} employee={e} />
             ))}

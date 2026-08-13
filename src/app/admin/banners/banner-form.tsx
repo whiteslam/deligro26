@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { fieldCls, labelCls } from "@/components/ui/field";
 import { PromoBannerCarousel } from "@/components/home/promo-banner-carousel";
 import { saveBannerAction, type ActionResult } from "./actions";
 import type {
@@ -13,9 +14,10 @@ import type {
   BannerTargetType,
 } from "@/types";
 
-const field =
-  "w-full rounded-xl bg-surface-2 px-3.5 py-3 text-[15px] outline-none focus:ring-2 focus:ring-accent/30";
-const labelCls = "text-xs font-semibold text-muted";
+// Was a local copy of the same two strings. Sharing them is what lets the
+// console restyle every form at once — a private copy here would have left this
+// screen's inputs at mobile proportions inside the console.
+const field = fieldCls;
 
 const PLACEMENTS: { id: BannerPlacement; label: string }[] = [
   { id: "home_hero", label: "Home · hero carousel" },

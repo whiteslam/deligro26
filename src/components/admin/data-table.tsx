@@ -55,6 +55,9 @@ export function DataTable<T>({
   sortHref,
   empty,
   caption,
+  footer,
+  minWidth = 840,
+  rowTone,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -66,6 +69,16 @@ export function DataTable<T>({
   sortHref?: (key: string, dir: "asc" | "desc") => string;
   empty?: React.ReactNode;
   caption?: string;
+  /** Sunken bar inside the card's bottom edge — counts and pagination. */
+  footer?: React.ReactNode;
+  /**
+   * The width below which the table scrolls sideways instead of squashing.
+   * Real minimums, not `minmax(0,1fr)`: columns that can collapse to zero next
+   * to fixed ones overprint their text rather than scrolling.
+   */
+  minWidth?: number;
+  /** Flags a row as needing attention — tinted, e.g. an order past its promise. */
+  rowTone?: (row: T) => "alert" | null;
 }) {
   if (!rows.length) return <>{empty ?? null}</>;
 
@@ -79,18 +92,21 @@ export function DataTable<T>({
   return (
     <>
       {/* ---------- wide: table ---------- */}
-      <div className="hidden overflow-hidden rounded-2xl border border-line bg-surface @3xl:block">
+      <div className="hidden overflow-hidden rounded-xl border border-line bg-surface @3xl:block">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-sm">
+          <table
+            className="w-full border-collapse text-left text-sm"
+            style={{ minWidth }}
+          >
             {caption ? <caption className="sr-only">{caption}</caption> : null}
             <thead>
-              <tr className="border-b border-line bg-surface-2/60">
+              <tr className="border-b border-[color:var(--c-divider)] bg-surface-2">
                 {columns.map((col) => (
                   <th
                     key={col.key}
                     scope="col"
                     className={cn(
-                      "whitespace-nowrap px-4 py-3 text-[11px] font-bold uppercase tracking-[0.06em] text-muted",
+                      "whitespace-nowrap px-4 py-2.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted",
                       col.align === "right" && "text-right",
                       col.width
                     )}
@@ -110,19 +126,25 @@ export function DataTable<T>({
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody>
               {rows.map((row) => {
                 const href = rowHref?.(row) ?? null;
+                const alert = rowTone?.(row) === "alert";
                 return (
                   <tr
                     key={rowKey(row)}
-                    className="group transition-colors hover:bg-surface-2/50"
+                    className={cn(
+                      "c-rowin group border-b border-[color:var(--c-divider-2)] transition-colors last:border-b-0 hover:bg-[var(--c-hover)]",
+                      // A tint, not a border or an icon: it has to survive being
+                      // one row among forty and still be visible at a glance.
+                      alert && "bg-deal/[0.035]"
+                    )}
                   >
                     {columns.map((col, i) => (
                       <td
                         key={col.key}
                         className={cn(
-                          "px-4 py-3 align-middle",
+                          "px-4 py-2.5 align-middle",
                           col.align === "right" && "text-right"
                         )}
                       >
@@ -145,6 +167,11 @@ export function DataTable<T>({
             </tbody>
           </table>
         </div>
+        {footer ? (
+          <div className="border-t border-[color:var(--c-divider)] bg-surface-2 px-4 py-[11px]">
+            {footer}
+          </div>
+        ) : null}
       </div>
 
       {/* ---------- narrow: cards ---------- */}
@@ -167,7 +194,10 @@ export function DataTable<T>({
           return (
             <li
               key={rowKey(row)}
-              className="rounded-2xl border border-line bg-surface p-3.5 transition-shadow hover:shadow-[var(--shadow-md)]"
+              className={cn(
+                "c-rowin rounded-2xl border border-line bg-surface p-3.5 transition-shadow hover:shadow-[var(--shadow-md)]",
+                rowTone?.(row) === "alert" && "border-deal/30 bg-deal/[0.035]"
+              )}
             >
               {href ? (
                 <Link href={href} className="press block">
@@ -205,6 +235,7 @@ export function DataTable<T>({
             </li>
           );
         })}
+        {footer ? <li className="pt-1">{footer}</li> : null}
       </ul>
     </>
   );
@@ -244,45 +275,59 @@ function SortHeader({
   );
 }
 
-/** Prev / page-of / next, for server-paginated tables. */
-export function TablePager({
+/**
+ * The table card's footer bar: what you are looking at on the left, paging on
+ * the right. Pass it to DataTable's `footer` so it sits inside the card's
+ * bottom edge rather than floating under it.
+ *
+ * Renders even at one page, because the count is the useful half — "42 orders"
+ * is the answer to a question an operator actually has.
+ */
+export function TableFooter({
   page,
   totalPages,
   hrefFor,
+  summary,
 }: {
   page: number;
   totalPages: number;
   hrefFor: (page: number) => string;
+  summary: string;
 }) {
-  if (totalPages <= 1) return null;
-
   const base =
-    "press rounded-xl border border-line bg-surface px-3.5 py-2 text-[13px] font-semibold transition-colors hover:bg-surface-2";
+    "press rounded-[7px] border border-line bg-surface px-2.5 py-1 text-xs font-semibold transition-colors hover:border-[var(--c-border-hover)]";
 
   return (
     <nav
-      className="flex items-center justify-between gap-3 pt-1"
+      className="flex flex-wrap items-center justify-between gap-2"
       aria-label="Pagination"
     >
-      {page > 1 ? (
-        <Link href={hrefFor(page - 1)} className={base}>
-          Previous
-        </Link>
-      ) : (
-        <span className={cn(base, "pointer-events-none opacity-40")}>
-          Previous
-        </span>
-      )}
       <span className="text-xs text-muted">
-        Page {page} of {totalPages}
+        {summary}
+        {totalPages > 1 ? ` · page ${page} of ${totalPages}` : ""}
       </span>
-      {page < totalPages ? (
-        <Link href={hrefFor(page + 1)} className={base}>
-          Next
-        </Link>
-      ) : (
-        <span className={cn(base, "pointer-events-none opacity-40")}>Next</span>
-      )}
+      {totalPages > 1 ? (
+        <span className="flex items-center gap-1.5">
+          {page > 1 ? (
+            <Link href={hrefFor(page - 1)} className={base}>
+              Previous
+            </Link>
+          ) : (
+            <span className={cn(base, "pointer-events-none opacity-40")}>
+              Previous
+            </span>
+          )}
+          {page < totalPages ? (
+            <Link href={hrefFor(page + 1)} className={base}>
+              Next
+            </Link>
+          ) : (
+            <span className={cn(base, "pointer-events-none opacity-40")}>
+              Next
+            </span>
+          )}
+        </span>
+      ) : null}
     </nav>
   );
 }

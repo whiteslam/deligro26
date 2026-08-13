@@ -195,7 +195,14 @@ export interface AdminOrderRow {
    */
   status: "PLACED" | "KITCHEN" | "READY" | "ON_THE_WAY" | "DELIVERED" | "CANCELLED";
   total: number;
+  /** Formatted for display, e.g. "24 Jul, 8:24 PM". Not parseable — see below. */
   placedAt: string;
+  /**
+   * The raw `created_at`, for anything that needs to do arithmetic on the age
+   * of an order. `placedAt` is a localised string; parsing it back to a time is
+   * guesswork. Absent on the demo seed rows, which have no real timestamp.
+   */
+  placedAtIso?: string;
   paymentMethod?: PaymentMethod;
   paymentStatus?: PaymentStatus;
   /** Minutes past the expected handover, when the order is running late. */

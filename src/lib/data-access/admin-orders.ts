@@ -377,6 +377,7 @@ function mapListRow(r: ListRow, prepMinutes: number, now: number): RankedRow {
       status,
       total: r.total,
       placedAt: formatDateTime(r.created_at),
+      placedAtIso: r.created_at,
       // Left undefined when the column isn't there, so the UI stays silent
       // rather than calling an unknown payment "cash".
       paymentMethod: r.payment_method ?? undefined,

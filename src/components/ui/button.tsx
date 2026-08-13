@@ -3,8 +3,14 @@ import { cn } from "@/lib/utils/cn";
 type Variant = "primary" | "secondary" | "ghost" | "outline";
 type Size = "sm" | "md" | "lg";
 
+/**
+ * `ui-btn` is a stable hook, not a style. The ops console retunes buttons to
+ * its own proportions through it (see `.console-theme .ui-btn` in globals.css):
+ * an 8px radius, tighter heights and no glow, because that shell has no
+ * elevation anywhere. Everywhere else keeps the app's pill button.
+ */
 const base =
-  "press inline-flex items-center justify-center gap-2 font-semibold rounded-full select-none disabled:opacity-50 disabled:pointer-events-none";
+  "ui-btn press inline-flex items-center justify-center gap-2 font-semibold rounded-full select-none disabled:opacity-50 disabled:pointer-events-none";
 
 const variants: Record<Variant, string> = {
   primary:

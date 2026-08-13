@@ -55,7 +55,7 @@ export function RefundCard({ refund: r }: { refund: RefundRow }) {
         : "Payment method not recorded";
 
   return (
-    <div className="rounded-2xl border border-line bg-surface p-3.5">
+    <div className="rounded-xl border border-line bg-surface p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-data font-semibold">

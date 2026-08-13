@@ -11,6 +11,7 @@ import { DesktopShellSwitcher } from "@/components/shared/desktop-shell-switcher
 import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { useAdminShell } from "@/stores/admin-shell-store";
 import type { AdminNavCounts } from "@/lib/data-access/admin-stats";
+import type { ConsoleHealth } from "@/lib/console-health";
 
 /**
  * Admin chrome with an app ↔ web switch (desktop/laptop only).
@@ -26,15 +27,23 @@ import type { AdminNavCounts } from "@/lib/data-access/admin-stats";
  * same table can be a real grid in the console and stacked cards inside the
  * 390px phone frame, on one desktop viewport where a `md:` breakpoint would
  * wrongly report "wide" for both.
+ *
+ * `console-theme` is on the web branch only. It carries the ops-console
+ * palette (see globals.css), so the phone frame keeps the app's own look —
+ * which is the honest thing for a preview of a handset to do.
  */
 export function AdminShell({
   children,
   counts,
+  health,
   name,
+  email,
 }: {
   children: React.ReactNode;
   counts: AdminNavCounts;
+  health: ConsoleHealth;
   name: string;
+  email: string | null;
 }) {
   const mode = useAdminShell((s) => s.mode);
   const hydrated = useAdminShell((s) => s.hydrated);
@@ -59,7 +68,12 @@ export function AdminShell({
           <div className="app-shell">
             <div className="app-scroll no-scrollbar pb-[80px]">
               <AdminHeader />
-              <div className="@container px-4 pb-6 pt-4">{children}</div>
+              {/* Same vertical rhythm as `.admin-main` in the console, so a
+                  screen that returns a list of sections rather than one
+                  wrapper div is spaced in both shells. */}
+              <div className="@container flex flex-col gap-5 px-4 pb-6 pt-4">
+                {children}
+              </div>
             </div>
             <StatusBar />
             <AdminTabBar />
@@ -76,14 +90,15 @@ export function AdminShell({
 
   return (
     <>
-      <div className="dashboard-shell admin-shell">
-        <AdminSidebar counts={counts} />
+      <div className="console-theme dashboard-shell admin-shell">
+        <AdminSidebar
+          counts={counts}
+          health={health}
+          name={name}
+          email={email}
+        />
         <div className="admin-content">
-          <AdminTopBar
-            counts={counts}
-            name={name}
-            onMenu={() => setNavOpen(true)}
-          />
+          <AdminTopBar counts={counts} onMenu={() => setNavOpen(true)} />
           <main className="admin-main @container">{children}</main>
         </div>
       </div>

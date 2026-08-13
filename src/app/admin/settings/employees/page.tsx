@@ -16,11 +16,12 @@ export default async function AdminEmployeesPage() {
     : [];
 
   return (
-    <div className="admin-measure space-y-5">
+    <div className="admin-measure space-y-4">
       <AdminHero
         backHref="/admin/settings"
         backLabel="Settings"
         title="Team"
+        tag={`${employees.length} with access`}
         subtitle="Create manager &amp; driver logins, and see who has access."
       />
 

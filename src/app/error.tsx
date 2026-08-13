@@ -20,12 +20,13 @@ import { TriangleAlert, RotateCw } from "lucide-react";
  */
 export default function Error({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  // Next 16 renamed this from `reset`. Taking the old name would leave the
-  // retry button wired to undefined — it would render and do nothing.
-  unstable_retry: () => void;
+  // `retry` — see next/dist/client/components/error-boundary.d.ts. The
+  // `unstable_retry` name this was written against only existed in the Next 16
+  // pre-releases, so the button threw instead of retrying.
+  retry: () => void;
 }) {
   useEffect(() => {
     console.error(error);
@@ -47,7 +48,7 @@ export default function Error({
             </p>
             <button
               type="button"
-              onClick={() => unstable_retry()}
+              onClick={() => retry()}
               className="press mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 text-sm font-semibold text-white"
             >
               <RotateCw className="size-4" />
