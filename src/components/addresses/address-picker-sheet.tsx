@@ -69,7 +69,7 @@ export function AddressPickerSheet({
                     <span
                       className={cn(
                         "mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg",
-                        on ? "bg-accent text-white" : "bg-surface-2 text-muted"
+                        on ? "bg-accent text-[var(--on-accent)]" : "bg-surface-2 text-muted"
                       )}
                     >
                       <MapPin className="size-[18px]" />

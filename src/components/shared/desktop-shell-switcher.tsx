@@ -69,7 +69,7 @@ function ModeButton({
       className={cn(
         "press flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12px] font-bold transition-colors disabled:opacity-40",
         active
-          ? "bg-accent text-white shadow-[var(--glow-accent)]"
+          ? "bg-accent text-[var(--on-accent)] shadow-[var(--glow-accent)]"
           : "text-muted hover:bg-surface-2 hover:text-ink"
       )}
     >

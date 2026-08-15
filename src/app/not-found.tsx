@@ -29,7 +29,7 @@ export default function NotFound() {
             </p>
             <Link
               href="/"
-              className="press mt-5 inline-flex h-11 items-center justify-center rounded-full bg-accent px-5 text-sm font-semibold text-white"
+              className="press mt-5 inline-flex h-11 items-center justify-center rounded-full bg-accent px-5 text-sm font-semibold text-[var(--on-accent)]"
             >
               Go home
             </Link>

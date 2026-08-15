@@ -122,7 +122,7 @@ function ItemSheetInner() {
           <button
             onClick={commit}
             disabled={item.soldOut}
-            className="press flex h-12 flex-1 items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-white shadow-[var(--glow-accent)] disabled:opacity-50"
+            className="press flex h-12 flex-1 items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:opacity-50"
           >
             <span>{item.soldOut ? "Sold out" : "Add"}</span>
             {!item.soldOut ? <span>{formatINR(item.price * qty)}</span> : null}

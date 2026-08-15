@@ -115,7 +115,7 @@ export default async function RestaurantPage({
         {/* Temporarily hidden — offer banner not needed right now
         {r.offer ? (
           <div className="flex items-center gap-3 rounded-2xl bg-deal-soft px-4 py-3">
-            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-deal text-white">
+            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-deal text-[var(--on-deal)]">
               <BadgePercent className="size-5" />
             </span>
             <span className="text-sm font-bold text-deal">{r.offer}</span>

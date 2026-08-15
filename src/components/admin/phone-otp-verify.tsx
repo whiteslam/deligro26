@@ -128,7 +128,7 @@ export function PhoneOtpVerify({
               type="button"
               onClick={submitCode}
               disabled={busy || code.length !== 6}
-              className="press inline-flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+              className="press inline-flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5 text-xs font-bold text-[var(--on-accent)] disabled:opacity-50"
             >
               {busy ? <Loader2 className="size-3.5 animate-spin" /> : "Verify"}
             </button>

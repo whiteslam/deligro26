@@ -85,7 +85,7 @@ export default async function ProfilePage() {
           </div>
           <Link
             href="/login?next=/profile"
-            className="press mt-1 flex items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-bold text-white shadow-[var(--glow-accent)]"
+            className="press mt-1 flex items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)]"
           >
             <LogIn className="size-4" /> Sign in
           </Link>

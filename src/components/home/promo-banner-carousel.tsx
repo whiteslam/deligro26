@@ -38,13 +38,23 @@ function track(bannerId: string, kind: "impression" | "click", placement: string
  * for its placement — it hardcodes nothing. Auto-advances (per-banner cadence),
  * supports native swipe, shows pagination dots and a "Sponsored" badge on paid
  * slots, and logs an impression per slide plus a click on the CTA.
+ *
+ * `analytics={false}` renders the same slide without logging anything. The admin
+ * previews are the reason: they mount this component precisely so what an
+ * operator sees cannot drift from what a customer sees, but every mount was
+ * posting a real impression — so opening the edit screen inflated the campaign's
+ * own "Shown" figure, and the CTR shown on the campaigns page was measured
+ * partly against admins looking at it.
  */
 export function PromoBannerCarousel({
   banners,
   placement = "home_hero",
+  analytics = true,
 }: {
   banners: Banner[];
   placement?: string;
+  /** Set false for admin previews — renders identically, records nothing. */
+  analytics?: boolean;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
@@ -57,12 +67,13 @@ export function PromoBannerCarousel({
 
   const logImpression = useCallback(
     (i: number) => {
+      if (!analytics) return;
       const b = banners[i];
       if (!b || impressed.current.has(b.id)) return;
       impressed.current.add(b.id);
       track(b.id, "impression", placement);
     },
-    [banners, placement]
+    [banners, placement, analytics]
   );
 
   // Derive the active index from scroll position — keeps dots in sync with a
@@ -128,7 +139,9 @@ export function PromoBannerCarousel({
             <BannerSlide
               key={b.id}
               banner={b}
-              onCta={() => track(b.id, "click", placement)}
+              onCta={() => {
+                if (analytics) track(b.id, "click", placement);
+              }}
             />
           ))}
         </div>

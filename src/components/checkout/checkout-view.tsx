@@ -743,7 +743,7 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
         <button
           onClick={placeOrder}
           disabled={status !== "ready" || checkoutBlocked}
-          className="press flex h-12 w-full items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-white shadow-[var(--glow-accent)] disabled:opacity-70"
+          className="press flex h-12 w-full items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:opacity-70"
         >
           {status === "processing" ? (
             <span className="mx-auto flex items-center gap-2">

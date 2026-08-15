@@ -292,7 +292,14 @@ async function insertVendorRestaurant(
       // stored: Supabase Auth already holds the bcrypt hash, and a plaintext
       // copy here would be a live credential sitting in a table row.
       password_reset_at: new Date().toISOString(),
-      commission_pct: Math.min(100, Math.max(0, data.commissionPct ?? 0)),
+      // Left unset, a new vendor inherits the platform rate (NULL, migration
+      // 0032). The old `?? 0` would now register every new shop as an explicit
+      // 0% override — i.e. permanently free, and silently exempt from any rate
+      // the platform sets later.
+      commission_pct:
+        data.commissionPct === undefined || data.commissionPct === null
+          ? null
+          : Math.min(100, Math.max(0, data.commissionPct)),
       min_order: Math.max(0, Math.trunc(data.minOrder ?? 0)),
       delivery_available: data.deliveryAvailable ?? true,
       self_pickup: data.selfPickup ?? false,

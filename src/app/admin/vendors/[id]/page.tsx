@@ -106,7 +106,7 @@ export default async function VendorDetailPage({
               </div>
               <p className="mt-1 truncate text-[13px] text-muted">
                 /{vendor.slug} · {vendor.category ?? "Uncategorised"} ·{" "}
-                {vendor.commissionPct}% commission
+                {vendor.effectiveCommissionPct}% commission
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2 self-start">
@@ -195,7 +195,12 @@ function OverviewTab({ v }: { v: VendorDetail }) {
       </Card>
       <Card title="Shop">
         <Row label="Category" value={v.category} />
-        <Row label="Commission" value={`${v.commissionPct}%`} />
+        <Row
+          label="Commission"
+          value={`${v.effectiveCommissionPct}%${
+            v.inheritsPlatformRate ? " · platform rate" : ""
+          }`}
+        />
         <Row label="Min order" value={rupees(v.minOrder)} />
         <Row label="Menu items" value={v.menuItemCount} />
         <Row label="Registered" value={fmtDate(v.createdAt)} />
@@ -238,7 +243,12 @@ function PaymentTab({ v }: { v: VendorDetail }) {
   return (
     <div className="space-y-3">
       <Card title="Payout">
-        <Row label="Commission" value={`${v.commissionPct}%`} />
+        <Row
+          label="Commission"
+          value={`${v.effectiveCommissionPct}%${
+            v.inheritsPlatformRate ? " · platform rate" : ""
+          }`}
+        />
         <Row label="UPI ID" value={v.upiId} />
         <Row label="Account name" value={v.bankAccountName} />
         <Row label="Bank" value={v.bankName} />

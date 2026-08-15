@@ -82,7 +82,7 @@ export function OrderCard({ order }: { order: Order }) {
         <button
           onClick={() => router.push(`/orders/${order.id}`)}
           aria-label="Track order"
-          className="press grid size-10 shrink-0 place-items-center rounded-full bg-accent text-white shadow-[var(--glow-accent)]"
+          className="press grid size-10 shrink-0 place-items-center rounded-full bg-accent text-[var(--on-accent)] shadow-[var(--glow-accent)]"
         >
           <ChevronRight className="size-5" />
         </button>

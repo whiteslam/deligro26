@@ -1,6 +1,7 @@
 import {
   Banknote,
   LayoutDashboard,
+  ListOrdered,
   Megaphone,
   ReceiptText,
   RotateCcw,
@@ -86,6 +87,17 @@ export const ADMIN_NAV: AdminNavItem[] = [
     badge: "pendingApprovals",
     tone: "accent",
     match: (p) => p.startsWith("/admin/vendors"),
+  },
+  {
+    // A sub-route of Vendors that the rail lists directly, for the same reason
+    // Team and Platform config are listed: activeNavItem's longest-href rule
+    // hands it the highlight here, and Vendors keeps it everywhere else.
+    href: "/admin/vendors/slots",
+    label: "Featured slots",
+    icon: ListOrdered,
+    group: "Catalogue",
+    tone: "deal",
+    match: (p) => p.startsWith("/admin/vendors/slots"),
   },
   {
     href: "/admin/banners",

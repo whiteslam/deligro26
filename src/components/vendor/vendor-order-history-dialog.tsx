@@ -263,7 +263,7 @@ export function VendorOrderHistoryDialog({
                 className={cn(
                   "press shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold",
                   range === opt.id
-                    ? "border-accent bg-accent text-white"
+                    ? "border-accent bg-accent text-[var(--on-accent)]"
                     : "border-line bg-surface-2 text-muted"
                 )}
               >

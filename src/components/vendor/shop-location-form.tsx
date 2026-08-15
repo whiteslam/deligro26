@@ -77,7 +77,7 @@ export function ShopLocationForm({
         type="button"
         onClick={onSave}
         disabled={!picked || busy}
-        className="press flex h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 font-bold text-white disabled:opacity-50"
+        className="press flex h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 font-bold text-[var(--on-accent)] disabled:opacity-50"
       >
         {busy ? (
           <LoaderCircle className="size-4 animate-spin" />

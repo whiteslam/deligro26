@@ -75,7 +75,7 @@ export function RoleNavLink({
       href={href}
       className={cn(
         "press whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-semibold transition-colors",
-        active ? "bg-accent text-white" : "text-muted hover:bg-surface-2"
+        active ? "bg-accent text-[var(--on-accent)]" : "text-muted hover:bg-surface-2"
       )}
     >
       {children}

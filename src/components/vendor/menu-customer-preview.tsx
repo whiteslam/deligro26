@@ -84,7 +84,7 @@ export function MenuCustomerPreview({
                 Sold out
               </p>
             ) : (
-              <span className="mt-3 inline-flex h-9 items-center justify-center rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-[var(--glow-accent)]">
+              <span className="mt-3 inline-flex h-9 items-center justify-center rounded-full bg-accent px-4 text-sm font-semibold text-[var(--on-accent)] shadow-[var(--glow-accent)]">
                 ADD
               </span>
             )}

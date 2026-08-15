@@ -11,6 +11,10 @@ import { setVendorPositionAction } from "./actions";
  * shop to the top of the customer feed in that order, or "Rank" to unpin. The
  * change hits the server action and refreshes so the list (and the customer
  * feed, revalidated by the action) reflect it.
+ *
+ * A slot holds one shop: picking an occupied one evicts its current holder. The
+ * whole board is at /admin/vendors/slots, which is the screen for arranging the
+ * ten together — this one is the shortcut for the row already under the cursor.
  */
 export function VendorPositionSelect({
   id,

@@ -152,7 +152,7 @@ export function GlassCart() {
               <Link
                 href="/checkout"
                 onClick={() => closeCart()}
-                className="press flex h-12 items-center justify-between rounded-full bg-accent px-5 font-bold text-white shadow-[var(--glow-accent)]"
+                className="press flex h-12 items-center justify-between rounded-full bg-accent px-5 font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)]"
               >
                 <span>Go to checkout</span>
                 <span className="flex items-center gap-1">

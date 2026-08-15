@@ -46,7 +46,7 @@ export function VendorSidebar({
       <div className="flex h-full w-[248px] flex-col border-r border-line bg-surface p-4">
         <div className="mb-6 px-1">
           <div className="flex items-center gap-2.5">
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent text-sm font-bold text-white shadow-[var(--glow-accent)]">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent text-sm font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)]">
               D
             </span>
             <div className="min-w-0">
@@ -89,7 +89,7 @@ export function VendorSidebar({
                 className={cn(
                   "press flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all",
                   active
-                    ? "bg-accent text-white shadow-[var(--glow-accent)]"
+                    ? "bg-accent text-[var(--on-accent)] shadow-[var(--glow-accent)]"
                     : "text-muted hover:bg-surface-2 hover:text-ink"
                 )}
               >

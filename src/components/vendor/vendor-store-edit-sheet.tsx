@@ -347,7 +347,7 @@ export function VendorStoreEditSheet({
                   onClick={() => set("accentTint", t.id)}
                   className={`press rounded-full border px-3 py-1.5 text-xs font-semibold ${
                     values.accentTint === t.id
-                      ? "border-accent bg-accent text-white"
+                      ? "border-accent bg-accent text-[var(--on-accent)]"
                       : "border-line bg-surface-2 text-muted"
                   }`}
                 >

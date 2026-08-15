@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Store, Tags } from "lucide-react";
+import { ListOrdered, Plus, Store, Tags } from "lucide-react";
 import {
   getVendorCounts,
   listAwaitingApproval,
@@ -171,7 +171,7 @@ export default async function AdminVendorsPage({
       align: "right",
       cell: (v) => (
         <span className="text-data text-[13px] font-semibold">
-          {v.commissionPct}%
+          {v.effectiveCommissionPct}%
         </span>
       ),
     },
@@ -304,13 +304,22 @@ export default async function AdminVendorsPage({
         }
       />
 
-      <Link
-        href="/admin/vendors/categories"
-        className="press inline-flex items-center gap-1.5 text-xs font-semibold text-accent-ink"
-      >
-        <Tags className="size-3.5" />
-        Manage categories
-      </Link>
+      <div className="flex flex-wrap items-center gap-4">
+        <Link
+          href="/admin/vendors/categories"
+          className="press inline-flex items-center gap-1.5 text-xs font-semibold text-accent-ink"
+        >
+          <Tags className="size-3.5" />
+          Manage categories
+        </Link>
+        <Link
+          href="/admin/vendors/slots"
+          className="press inline-flex items-center gap-1.5 text-xs font-semibold text-accent-ink"
+        >
+          <ListOrdered className="size-3.5" />
+          Featured slots
+        </Link>
+      </div>
     </>
   );
 }

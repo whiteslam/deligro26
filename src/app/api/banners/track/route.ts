@@ -48,6 +48,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
+  // The admin previews render the customer component verbatim, so "preview" is
+  // not customer traffic and must never reach the counters a campaign is judged
+  // on. The client already suppresses this (`analytics={false}`); refusing it
+  // here as well means a stale bundle or a hand-rolled POST cannot pad a
+  // campaign's impressions by claiming to be a preview either.
+  if (placement === "preview") {
+    return NextResponse.json({ ok: true, recorded: false });
+  }
+
   // recordBannerEvent swallows its own failures; keep the handler resilient too.
   try {
     await recordBannerEvent(bannerId, kind, { placement });
