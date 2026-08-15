@@ -1,40 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ReceiptText, Wallet, MapPin, CheckCheck } from "lucide-react";
-import { AdminHero, Panel, StatCard, EmptyState } from "@/components/admin/admin-ui";
+import { ReceiptText } from "lucide-react";
+import { AdminHero, Panel, EmptyState } from "@/components/admin/admin-ui";
+import { StatTile, StatTiles } from "@/components/admin/console-ui";
+import { ORDER_STATUS } from "@/components/admin/order-status";
 import { formatINR } from "@/lib/utils/format";
-import {
-  getCustomerDetail,
-  type AdminCustomerDetail,
-} from "@/lib/data-access/admin-customers";
+import { getCustomerDetail } from "@/lib/data-access/admin-customers";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export const metadata: Metadata = { title: "Customer · Admin · Deligro" };
-
-const STATUS_PILL: Record<
-  AdminCustomerDetail["orders"][number]["status"],
-  string
-> = {
-  PLACED: "pill-accent",
-  KITCHEN: "pill-accent",
-  READY: "pill-accent",
-  ON_THE_WAY: "pill-accent",
-  DELIVERED: "pill-green",
-  CANCELLED: "pill-muted",
-};
-
-const STATUS_LABEL: Record<
-  AdminCustomerDetail["orders"][number]["status"],
-  string
-> = {
-  PLACED: "Placed",
-  KITCHEN: "Preparing",
-  READY: "Ready",
-  ON_THE_WAY: "On the way",
-  DELIVERED: "Delivered",
-  CANCELLED: "Cancelled",
-};
 
 export default async function AdminCustomerDetailPage({
   params,
@@ -54,6 +29,7 @@ export default async function AdminCustomerDetailPage({
     <div className="admin-measure space-y-4">
       <AdminHero
         title={customer.name}
+        tag={`${customer.orderCount} order${customer.orderCount === 1 ? "" : "s"}`}
         subtitle={`Joined ${customer.joinedAt}`}
         backHref="/admin/customers"
         backLabel="Customers"
@@ -69,34 +45,33 @@ export default async function AdminCustomerDetailPage({
         }
       />
 
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <StatCard
-          icon={<ReceiptText className="size-4" />}
+      <StatTiles>
+        <StatTile
           label="Orders"
           value={customer.orderCount}
-          tone="accent"
+          note="Placed on this account"
         />
-        <StatCard
-          icon={<CheckCheck className="size-4" />}
+        <StatTile
           label="Delivered"
           value={customer.deliveredCount}
-          tone="green"
+          note={`${customer.orderCount - customer.deliveredCount} did not complete`}
         />
-        <StatCard
-          icon={<Wallet className="size-4" />}
+        <StatTile
           label="Lifetime spend"
           value={formatINR(customer.lifetimeSpend)}
-          tone="blue"
-          hint="delivered only"
+          note="Delivered orders only"
         />
-        <StatCard
-          icon={<MapPin className="size-4" />}
+        <StatTile
           label="Saved addresses"
           // Null is "could not read", which is not zero — see getCustomerDetail.
           value={customer.savedAddresses ?? "—"}
-          tone="muted"
+          note={
+            customer.savedAddresses === null
+              ? "Could not be read"
+              : "On file for delivery"
+          }
         />
-      </div>
+      </StatTiles>
 
       <Panel
         title="Order history"
@@ -113,30 +88,30 @@ export default async function AdminCustomerDetailPage({
             description="This customer has an account but has never checked out."
           />
         ) : (
-          <ul className="space-y-2.5">
+          <ul>
             {customer.orders.map((o) => (
               <li key={o.id}>
                 <Link
                   href={`/admin/orders/${o.id}`}
-                  className="press block rounded-2xl border border-line bg-surface p-3.5 transition-shadow hover:shadow-[var(--shadow-md)]"
+                  className="press flex items-center gap-3 border-b border-[color:var(--c-divider)] py-2.5 transition-colors last:border-b-0 hover:bg-[var(--c-hover)]"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-data font-bold">{o.code}</p>
-                      <p className="mt-0.5 truncate text-sm text-ink">
-                        {o.restaurant}
-                      </p>
-                      <p className="text-xs text-muted">{o.placedAt}</p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-data text-sm font-bold">
-                        {formatINR(o.total)}
-                      </p>
-                      <span className={`pill mt-1 ${STATUS_PILL[o.status]}`}>
-                        {STATUS_LABEL[o.status]}
-                      </span>
-                    </div>
-                  </div>
+                  <span className="min-w-0 flex-1">
+                    <span className="text-data block text-xs text-ink">
+                      {o.code}
+                    </span>
+                    <span className="block truncate text-[12.5px] text-ink">
+                      {o.restaurant}
+                    </span>
+                    <span className="block truncate text-[11.5px] text-muted">
+                      {o.placedAt}
+                    </span>
+                  </span>
+                  <span className={`pill shrink-0 ${ORDER_STATUS[o.status].cls}`}>
+                    {ORDER_STATUS[o.status].short}
+                  </span>
+                  <span className="text-data w-[80px] shrink-0 text-right text-[13px] font-semibold tabular-nums">
+                    {formatINR(o.total)}
+                  </span>
                 </Link>
               </li>
             ))}

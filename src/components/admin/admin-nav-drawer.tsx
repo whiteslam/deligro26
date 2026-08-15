@@ -5,7 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, X } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
-import { ADMIN_NAV, ADMIN_NAV_GROUPS } from "@/components/admin/admin-nav";
+import {
+  ADMIN_NAV,
+  ADMIN_NAV_GROUPS,
+  activeNavItem,
+} from "@/components/admin/admin-nav";
 import type { AdminNavCounts } from "@/lib/data-access/admin-stats";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { cn } from "@/lib/utils/cn";
@@ -15,6 +19,10 @@ import { cn } from "@/lib/utils/cn";
  * permanent rail (roughly 480–1024px — a small laptop or a tablet). Below 480
  * the shell falls back to the phone frame entirely, so this never has to serve
  * as a phone menu.
+ *
+ * Carries `console-theme` itself: it renders as a sibling of the shell rather
+ * than inside it, so it would otherwise fall back to the app's default palette
+ * and open as a white panel over a warm-paper console.
  *
  * Closes on route change: without it, tapping a destination leaves the panel
  * covering the page you just asked for.
@@ -29,6 +37,8 @@ export function AdminNavDrawer({
   counts: AdminNavCounts;
 }) {
   const pathname = usePathname();
+  // Same longest-match rule as the rail — see AdminSidebar.
+  const current = activeNavItem(pathname);
 
   useEffect(() => {
     onClose();
@@ -46,50 +56,50 @@ export function AdminNavDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 lg:hidden">
+    <div className="console-theme fixed inset-0 z-50 lg:hidden">
       <button
         aria-label="Close navigation"
         onClick={onClose}
-        className="animate-fade-in absolute inset-0 bg-ink/45"
+        className="animate-fade-in absolute inset-0 bg-black/50"
       />
-      <div className="absolute inset-y-0 left-0 flex w-[272px] max-w-[85vw] flex-col border-r border-line bg-surface shadow-[var(--shadow-lg)]">
-        <div className="flex items-center gap-2.5 px-5 pb-4 pt-5">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent text-sm font-extrabold text-white">
+      <div className="absolute inset-y-0 left-0 flex w-[248px] max-w-[85vw] flex-col bg-[var(--sb-bg)] shadow-[var(--shadow-lg)]">
+        <div className="flex items-center gap-[9px] px-4 pb-4 pt-[18px]">
+          <span className="grid size-[26px] shrink-0 place-items-center rounded-[7px] bg-accent text-sm font-bold text-white">
             D
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[16px] font-extrabold leading-none tracking-tight">
-              Deligro<span className="text-accent">.</span>
+            <span className="block truncate text-sm font-bold leading-none tracking-[-0.01em] text-white">
+              Deligro
             </span>
-            <span className="mt-1 block truncate text-[11px] text-muted">
-              Operations console
+            <span className="mt-1 block truncate text-[10px] font-medium uppercase leading-none tracking-[0.06em] text-[var(--sb-group)]">
+              Ops console
             </span>
           </span>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close navigation"
-            className="press grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-muted"
+            className="press grid size-7 shrink-0 place-items-center rounded-md text-[var(--sb-meta)] transition-colors hover:bg-[var(--sb-hover)] hover:text-white"
           >
             <X className="size-4" />
           </button>
         </div>
 
         <nav
-          className="no-scrollbar flex-1 overflow-y-auto px-3 pb-4"
+          className="no-scrollbar flex-1 overflow-y-auto px-2 py-1"
           aria-label="Admin navigation"
         >
           {ADMIN_NAV_GROUPS.map((group) => {
             const items = ADMIN_NAV.filter((i) => i.group === group);
             if (!items.length) return null;
             return (
-              <div key={group} className="mb-4 last:mb-0">
-                <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.09em] text-muted">
+              <div key={group}>
+                <p className="px-2 pb-[5px] pt-3.5 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--sb-group)]">
                   {group}
                 </p>
-                <ul className="space-y-0.5">
+                <ul className="space-y-px">
                   {items.map((item) => {
-                    const active = item.match(pathname);
+                    const active = current?.href === item.href;
                     const count = item.badge ? counts[item.badge] : 0;
                     const Icon = item.icon;
                     return (
@@ -98,18 +108,18 @@ export function AdminNavDrawer({
                           href={item.href}
                           aria-current={active ? "page" : undefined}
                           className={cn(
-                            "press flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                            "flex items-center gap-[9px] rounded-[7px] px-[9px] py-[7px] text-[13px] transition-colors",
                             active
-                              ? "bg-accent-soft font-bold text-accent-ink"
-                              : "font-medium text-muted hover:bg-surface-2 hover:text-ink"
+                              ? "bg-[var(--sb-active)] font-semibold text-white"
+                              : "font-medium text-[var(--sb-text)] hover:bg-[var(--sb-hover)] hover:text-white"
                           )}
                         >
-                          <Icon className="size-[18px] shrink-0" />
+                          <Icon className="size-[15px] shrink-0" strokeWidth={1.7} />
                           <span className="min-w-0 flex-1 truncate">
                             {item.label}
                           </span>
                           {count > 0 ? (
-                            <span className="text-data shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold tabular-nums">
+                            <span className="text-data shrink-0 rounded-full bg-white/10 px-1.5 py-px text-[10.5px] font-semibold tabular-nums text-[var(--sb-text)]">
                               {count > 99 ? "99+" : count}
                             </span>
                           ) : null}
@@ -123,15 +133,15 @@ export function AdminNavDrawer({
           })}
         </nav>
 
-        <div className="flex items-center justify-between gap-2 border-t border-line px-4 py-3">
-          <ThemeToggle className="size-9" />
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-[var(--sb-border)] px-3 py-3">
+          <ThemeToggle className="size-8 rounded-md border-0 bg-transparent text-[var(--sb-meta)] hover:bg-[var(--sb-hover)]" />
           {isSupabaseConfigured ? (
             <form action="/auth/signout" method="post">
               <button
                 type="submit"
-                className="press flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-muted hover:bg-surface-2 hover:text-ink"
+                className="press flex items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-xs font-semibold text-[var(--sb-meta)] transition-colors hover:bg-[var(--sb-hover)] hover:text-white"
               >
-                <LogOut className="size-4" />
+                <LogOut className="size-4" strokeWidth={1.7} />
                 Sign out
               </button>
             </form>

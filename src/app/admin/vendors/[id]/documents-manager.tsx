@@ -130,7 +130,7 @@ export function DocumentsManager({
       </div>
 
       {documents.length === 0 ? (
-        <p className="rounded-2xl border border-line bg-surface px-4 py-8 text-center text-sm text-muted">
+        <p className="rounded-xl border border-line bg-surface px-4 py-8 text-center text-sm text-muted">
           No documents uploaded yet.
         </p>
       ) : (
@@ -138,7 +138,7 @@ export function DocumentsManager({
           {documents.map((doc) => (
             <li
               key={doc.id}
-              className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-3"
+              className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3"
             >
               <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
                 <FileText className="size-4" />

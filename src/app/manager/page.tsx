@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { PhoneIncoming } from "lucide-react";
 import { requireRole } from "@/lib/auth";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { ManagerOrderBoard } from "@/components/manager/manager-order-board";
@@ -63,6 +65,25 @@ export default async function ManagerHome() {
           vendor management stay with the admin team.
         </p>
       </header>
+
+      {/* Above the board, not buried in a menu: a ringing phone is the one
+          thing on this screen that cannot wait for the operator to go looking. */}
+      <Link
+        href="/manager/new-order"
+        className="press mt-4 flex items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 hover:bg-surface-2"
+      >
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/12 text-accent">
+          <PhoneIncoming className="size-5" />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[15px] font-bold text-ink">
+            Take a phone order
+          </span>
+          <span className="block text-xs text-muted">
+            For a customer on the line — cash on delivery
+          </span>
+        </span>
+      </Link>
 
       {!isSupabaseConfigured ? (
         <p className="mt-5 rounded-xl border border-pop/40 bg-pop/10 px-3.5 py-3 text-sm font-medium text-ink">

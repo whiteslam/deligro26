@@ -68,13 +68,24 @@ export function BackLink({
 }
 
 /**
- * The gradient page header every admin screen opens with — the section's
- * signature, matching the vendor hero. Optional back link, live badge, a free
- * `badge` slot and a right-aligned `action` (a button, count or headline stat).
+ * The page header every admin screen opens with. One component, two faces:
+ *
+ * - phone frame — the gradient card, matching the vendor hero.
+ * - console — a plain title row: 25px title, an outlined status `tag` beside
+ *   it, a subtitle under it, and the screen's controls on the right.
+ *
+ * The switch is `.admin-hero`'s container query in globals.css, not a second
+ * component, because these pages render in both shells. A separate
+ * `ConsoleHeader` would mean every screen rendering two headers and hiding one.
+ *
+ * `tag` is the console's status chip ("18 in flight", "6 open") — a live count
+ * belongs next to the title, not buried in the body. On the phone it falls
+ * back to the same row as `badge`, where the card has room for it.
  */
 export function AdminHero({
   title,
   subtitle,
+  tag,
   badge,
   action,
   live,
@@ -83,6 +94,7 @@ export function AdminHero({
 }: {
   title: string;
   subtitle?: string;
+  tag?: string;
   badge?: React.ReactNode;
   action?: React.ReactNode;
   live?: boolean;
@@ -98,25 +110,44 @@ export function AdminHero({
             <BackLink href={backHref}>{backLabel ?? "Back"}</BackLink>
           </div>
         ) : null}
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             {live || badge ? (
-              <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              <div className="mb-1.5 flex flex-wrap items-center gap-2 @3xl:hidden">
                 {live ? <LiveBadge /> : null}
                 {badge}
               </div>
             ) : null}
-            <h1 className="text-2xl font-extrabold tracking-tight @3xl:text-[30px]">
-              {title}
-            </h1>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-2xl font-extrabold tracking-tight @3xl:text-[25px] @3xl:tracking-[-0.025em]">
+                {title}
+              </h1>
+              {live ? (
+                <span className="hidden @3xl:inline">
+                  <LiveBadge />
+                </span>
+              ) : null}
+              {tag ? <StatusTag>{tag}</StatusTag> : null}
+            </div>
             {subtitle ? (
-              <p className="mt-1 text-sm text-muted">{subtitle}</p>
+              <p className="mt-1 text-sm text-muted @3xl:text-[13px]">
+                {subtitle}
+              </p>
             ) : null}
           </div>
           {action ? <div className="shrink-0">{action}</div> : null}
         </div>
       </div>
     </div>
+  );
+}
+
+/** The outlined chip beside a page title: "22 waiting", "Cycle 12 Aug". */
+function StatusTag({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-[5px] border border-line bg-surface px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted">
+      {children}
+    </span>
   );
 }
 
@@ -141,31 +172,6 @@ export function TrendChip({ trend }: { trend: TrendLike }) {
     >
       <Icon className="size-3" />
       {Math.abs(trend.pct)}%
-    </span>
-  );
-}
-
-/** Rounded, tinted trend pill for hero headlines — includes "vs last week". */
-export function TrendPill({ trend }: { trend: TrendLike }) {
-  if (trend.direction === "flat") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-muted">
-        <Minus className="size-3" />
-        Flat vs last week
-      </span>
-    );
-  }
-  const up = trend.direction === "up";
-  const Icon = up ? ArrowUpRight : ArrowDownRight;
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold",
-        up ? "bg-green/15 text-green" : "bg-deal/15 text-deal"
-      )}
-    >
-      <Icon className="size-3" />
-      {Math.abs(trend.pct)}% vs last week
     </span>
   );
 }
@@ -222,8 +228,8 @@ export function StatCard({
     </>
   );
   const className = cn(
-    "block rounded-2xl border border-line bg-surface p-3 @3xl:p-4",
-    href && "press transition-shadow hover:shadow-[var(--shadow-md)]"
+    "block rounded-xl border border-line bg-surface p-3 @3xl:p-4",
+    href && "press transition-colors hover:border-[var(--c-border-hover)]"
   );
   return href ? (
     <Link href={href} className={className}>
@@ -281,7 +287,9 @@ export function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-10 text-center">
+    // `ui-empty` is the console's hook — this component is shared with the
+    // customer app, so its radius is retuned by CSS rather than changed here.
+    <div className="ui-empty flex flex-col items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-10 text-center">
       <span className="mb-1 grid size-12 place-items-center rounded-2xl bg-surface-2 text-muted">
         <Icon className="size-6" />
       </span>
@@ -319,13 +327,13 @@ export function ChartCard({
         // against that column, not against the page. Without this the donut
         // reads "the page is 1600px wide" and goes side-by-side inside a card
         // barely wider than the ring.
-        "@container rounded-2xl border border-line bg-surface p-4 @3xl:p-5",
+        "@container rounded-xl border border-line bg-surface p-4 @3xl:px-4 @3xl:py-[14px]",
         className
       )}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[15px] font-bold tracking-tight">{title}</h2>
+          <h2 className="text-[14.5px] font-bold tracking-[-0.01em]">{title}</h2>
           {subtitle ? (
             <p className="mt-0.5 text-xs text-muted">{subtitle}</p>
           ) : null}
@@ -353,7 +361,7 @@ export function RangeTabs({
 }) {
   return (
     <div
-      className="flex items-center gap-0.5 rounded-full bg-surface-2 p-0.5 text-xs font-bold"
+      className="flex items-center gap-0.5 rounded-lg border border-line bg-surface p-0.5 text-xs"
       role="group"
       aria-label="Reporting window"
     >
@@ -365,8 +373,10 @@ export function RangeTabs({
             href={hrefFor(o.value)}
             aria-current={on ? "true" : undefined}
             className={cn(
-              "press whitespace-nowrap rounded-full px-3 py-1.5 transition-colors",
-              on ? "bg-surface text-ink shadow-[var(--shadow-sm)]" : "text-muted"
+              "press whitespace-nowrap rounded-md px-[11px] py-[5px] transition-colors",
+              on
+                ? "bg-ink font-semibold text-[color:var(--surface)]"
+                : "font-medium text-muted hover:text-ink"
             )}
           >
             {o.label}

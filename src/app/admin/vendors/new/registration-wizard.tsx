@@ -42,9 +42,9 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** A time-input variant that can shrink inside a 2-col grid without overflowing
- *  (native time controls have a wide intrinsic min-width; min-w-0 lets it flex). */
-const timeCls =
-  "w-full min-w-0 rounded-xl bg-surface-2 px-3 py-3 text-[15px] text-ink outline-none focus:ring-2 focus:ring-accent/30";
+ *  (native time controls have a wide intrinsic min-width; min-w-0 lets it flex).
+ *  Built from the shared field so it picks up the console's proportions too. */
+const timeCls = `${fieldCls} min-w-0`;
 
 /** Verify the vendor's mobile via the admin verify-phone route (no session mint). */
 async function verifyWizardPhone(
@@ -1237,7 +1237,7 @@ function ReviewStep({
   ];
   return (
     <div className="space-y-2.5">
-      <div className="rounded-2xl border border-line bg-surface p-3.5">
+      <div className="rounded-xl border border-line bg-surface p-3.5">
         <dl className="space-y-2">
           {rows.map((r) => (
             <div key={r.label} className="flex items-start justify-between gap-3">

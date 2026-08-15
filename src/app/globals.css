@@ -15,18 +15,32 @@
      height. Screens read it rather than hard-coding 56px. */
   --status-h: env(safe-area-inset-top, 0px);
 
-  /* Light — bright, high-contrast, appetite-forward */
+  /* Light — bright, high-contrast, appetite-forward.
+     ------------------------------------------------------------------
+     Text colours here are held to WCAG AA (4.5:1 against the surface they
+     sit on) and the greys to AAA, because almost everything secondary in
+     this app is set at 10–13px. AA is a floor for body copy, and a floor
+     measured at 16px is not a pass at 11px uppercase with letter-spacing —
+     which is what most labels on the operator screens actually are.
+     Ratios below are against --surface (#ffffff) unless stated. */
   --bg: #ffffff;
   --surface: #ffffff;
   --surface-2: #f4f5f6;
   --ink: #0e1417;
-  --muted: #6a7178;
+  /* 7.20:1 (was #6a7178 — 4.95:1, and only 4.53:1 on --surface-2, which is
+     where half the muted text in the admin console actually sits). This one
+     token carries 550+ usages, so it is the single biggest legibility lever
+     in the codebase. */
+  --muted: #52585e;
   --accent: #f2660c; /* Deligro orange — the action + the live moment */
   --accent-soft: #fdecdd;
-  --accent-ink: #b8500e; /* readable orange for text on light */
-  --green: #17b26a;
+  --accent-ink: #b8500e; /* readable orange for text on light — 5.01:1 */
+  /* 5.39:1 as text, and the same white-on-green. The old #17b26a was 2.76:1
+     BOTH ways: green text was unreadable, and so was white text on a green
+     fill. Deeper, but it is the difference between a colour and a decoration. */
+  --green: #0f7a48;
   --green-soft: #e7f8ef;
-  --deal: #e5352b; /* discount badges + strikethrough deal prices */
+  --deal: #d1201a; /* discount badges + strikethrough deal prices — 5.34:1 (was 4.31:1) */
   --deal-soft: #fdeceb;
   --pop: #ffc531; /* Popular / bestseller amber */
   --pop-ink: #7a5200;
@@ -42,6 +56,26 @@
   /* Glass */
   --glass-bg: rgba(255, 255, 255, 0.82);
   --glass-border: rgba(14, 20, 23, 0.06);
+
+  /* Console detail tokens, in the app's own palette.
+     `.console-theme` (further down) overrides all of these with the ops-console
+     values. They are defined here as well because the admin screens render in
+     two shells: the console, which is themed, and the phone frame, which is
+     not. A component reaching for `var(--c-divider)` inside the phone preview
+     would otherwise resolve to nothing and draw no border at all. */
+  --c-hover: #fafafb;
+  --c-divider: #f2f2f4;
+  --c-divider-2: #f6f6f8;
+  --c-border-strong: #dcdce0;
+  --c-border-hover: #c6c6cc;
+  --c-faint: #a8adb2;
+  --c-bar: #e6e7ea;
+  --c-bar-peak: #c9cbd0;
+  --c-tint-blue: #e9f0f7;
+  --c-tint-amber: #fdf3e0;
+  --c-ink-amber: #8a5200;
+  --c-spark-up: #0f7a48;
+  --c-spark-down: #d1201a;
 }
 
 [data-theme="dark"] {
@@ -70,6 +104,20 @@
 
   --glass-bg: rgba(23, 27, 31, 0.78);
   --glass-border: rgba(255, 255, 255, 0.07);
+
+  --c-hover: #1e2328;
+  --c-divider: #252b31;
+  --c-divider-2: #21262b;
+  --c-border-strong: #363d44;
+  --c-border-hover: #47505a;
+  --c-faint: #6d757c;
+  --c-bar: #2b3138;
+  --c-bar-peak: #424a53;
+  --c-tint-blue: rgba(35, 66, 94, 0.5);
+  --c-tint-amber: rgba(90, 62, 18, 0.5);
+  --c-ink-amber: #e2ab68;
+  --c-spark-up: #2ed47f;
+  --c-spark-down: #ff5c4d;
 }
 
 @theme inline {
@@ -1035,6 +1083,431 @@ body:has(.dashboard-shell) {
   }
 }
 
+/* ============================================================
+   Console theme — the ops-console redesign, scoped to admin web mode
+   ============================================================
+   A warm paper palette (page #F5F4F1, warm-grey hairlines, near-black ink)
+   over the app's bright white one. It is applied by adding `.console-theme`,
+   which the web AdminShell puts on the shell and the nav drawer — NOT on the
+   phone frame, and nowhere near the customer or vendor apps. Those keep the
+   original tokens untouched.
+
+   The override works because `@theme inline` (top of this file) compiles
+   Tailwind's colour utilities to `var(--bg)` / `var(--line)` / … rather than to
+   baked hex values. Redefining the variables on a subtree therefore re-skins
+   every `bg-surface`, `text-muted` and `border-line` inside it for free, which
+   is why the existing StatCard/DataTable/pill primitives need no per-component
+   fork to adopt this palette.
+
+   Two deliberate departures from the design handoff, both for legibility:
+   1. The handoff's tertiary greys (#7A7D84, #8C8880) are 4.3:1 and 3.5:1 on
+      white. This project holds body text to WCAG AA and greys to AAA (see the
+      token comments at the top of the file), and almost every use of those two
+      is 10.5–12px. Both collapse to `--muted: #6E7178` (5.0:1), the handoff's
+      own subtitle grey.
+   2. The sidebar's group label #6E727B is 3.4:1 on #14171C; it becomes
+      #8B8F98 (5.3:1). The hue is the handoff's, the value is ours.
+   ------------------------------------------------------------ */
+.console-theme {
+  --bg: #f5f4f1;
+  --surface: #ffffff;
+  --surface-2: #fbfaf8;
+  --ink: #14171c;
+  --muted: #6e7178;
+  --accent: #ea5b0c;
+  --accent-soft: #fdf1ea;
+  --accent-ink: #b8460a;
+  --green: #0f7b4f;
+  --green-soft: #e7f5ee;
+  --deal: #c0362c;
+  --deal-soft: #fbebe9;
+  --pop: #b45309;
+  --pop-ink: #ffffff;
+  --blue: #2b5f8e;
+  --line: #e4e1da;
+
+  /* Console-only values Tailwind has no token for. */
+  --c-hover: #faf9f6; /* row hover */
+  --c-divider: #f0eee9; /* inner hairline, lighter than --line */
+  --c-divider-2: #f4f2ee; /* table body row rule, lighter still */
+  --c-border-strong: #dcd8d0; /* outlined buttons */
+  --c-border-hover: #c9c5bc;
+  --c-faint: #b4b0a8; /* non-text only: em-dash placeholders, tracks */
+  --c-bar: #e6e3dc; /* chart bars */
+  --c-bar-peak: #c6c2b9;
+  --c-tint-blue: #eaf1f8;
+  --c-tint-amber: #fdf3e4;
+  --c-ink-amber: #9a4708;
+  --c-spark-up: #2e9e68;
+  --c-spark-down: #d06a5f;
+
+  /* The rail is dark in both themes — it is chrome, not page. */
+  --sb-bg: #14171c;
+  --sb-text: #b9bcc3;
+  --sb-text-active: #ffffff;
+  --sb-group: #8b8f98;
+  --sb-meta: #a2a6ae;
+  --sb-hover: rgba(255, 255, 255, 0.07);
+  --sb-active: rgba(255, 255, 255, 0.11);
+  --sb-border: rgba(255, 255, 255, 0.09);
+  --sb-ok: #4ed07f;
+}
+
+/* Dark console. The handoff is light-only, so this is derived: same warm-
+   neutral hue family, inverted values, accents lifted to stay legible on a
+   dark ground. The rail goes *below* the page rather than above it — at these
+   values a #14171C rail on a #14171C page would have no edge at all. */
+[data-theme="dark"] .console-theme {
+  --bg: #14171c;
+  --surface: #1b1f25;
+  --surface-2: #232830;
+  --ink: #eceae5;
+  --muted: #a2a6ae;
+  --accent: #ff8534;
+  --accent-soft: rgba(122, 60, 20, 0.55);
+  --accent-ink: #ffa060;
+  --green: #4ed07f;
+  --green-soft: rgba(20, 66, 45, 0.7);
+  --deal: #ff6b5c;
+  --deal-soft: rgba(78, 30, 26, 0.7);
+  --pop: #d98324;
+  --pop-ink: #1a1207;
+  --blue: #6fa8dc;
+  --line: #2c323a;
+
+  --c-hover: #21262e;
+  --c-divider: #262c34;
+  --c-divider-2: #22272e;
+  --c-border-strong: #39404a;
+  --c-border-hover: #4a525d;
+  --c-faint: #6b7078;
+  --c-bar: #2f353d;
+  --c-bar-peak: #454d57;
+  --c-tint-blue: rgba(31, 62, 92, 0.5);
+  --c-tint-amber: rgba(94, 62, 16, 0.55);
+  --c-ink-amber: #e0a55f;
+  --c-spark-up: #4ed07f;
+  --c-spark-down: #ff8577;
+
+  --sb-bg: #0e1116;
+  --sb-border: rgba(255, 255, 255, 0.08);
+}
+
+/* Status pills, retinted to the handoff's fg/bg pairs. The global `.pill-deal`
+   is a solid red capsule with white text; in the console every pill is a tint,
+   so a solid one would read as the loudest thing on a screen full of them. */
+.console-theme .pill {
+  padding: 3px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.console-theme .pill-accent {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.console-theme .pill-green {
+  background: var(--green-soft);
+  color: var(--green);
+}
+.console-theme .pill-deal {
+  background: var(--deal-soft);
+  color: var(--deal);
+}
+.console-theme .pill-pop {
+  background: var(--c-tint-amber);
+  color: var(--c-ink-amber);
+}
+.console-theme .pill-muted {
+  background: var(--c-divider);
+  color: var(--muted);
+}
+.console-theme .pill-blue {
+  background: var(--c-tint-blue);
+  color: var(--blue);
+}
+
+/* ---------- console primitives ---------- */
+
+/* The standard card. Depth here comes from a hairline and a tint, never from
+   elevation — the handoff specifies essentially no shadows. */
+.c-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+/* Panel is shared with the vendor portal, so it is retuned here rather than
+   forked: the console wants a tighter radius, the handoff's card padding, and
+   no elevation at all. Same component, same call sites, console proportions. */
+.console-theme .vendor-panel {
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: none;
+}
+
+/* Likewise the shell's own surfaces, which the app gives a gradient wash. In
+   an ops console a tinted banner on every screen is noise, and the handoff
+   drops it — the page header is already plain here via .admin-hero. */
+.console-theme .admin-today,
+.console-theme .vendor-hero {
+  background: var(--surface);
+  box-shadow: none;
+}
+.console-theme .vendor-hero-glow {
+  display: none;
+}
+
+/* A dot that breathes, for "live" and "healthy". */
+.c-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: pulseDot 1.8s ease-in-out infinite;
+}
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.82);
+  }
+}
+
+/* Table rows arrive rather than appear. Suppressed for anyone who has asked
+   for less motion — this fires on every row of every list in the console. */
+.c-rowin {
+  animation: rowIn 220ms ease both;
+}
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .c-rowin,
+  .c-dot {
+    animation: none;
+  }
+}
+
+/* Buttons. Three weights: dark primary, outlined secondary, quiet text. */
+.c-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background-color 120ms, border-color 120ms, color 120ms;
+}
+.c-btn-dark {
+  background: var(--ink);
+  color: var(--surface);
+}
+.c-btn-dark:hover {
+  background: color-mix(in srgb, var(--ink) 82%, var(--surface));
+}
+.c-btn-outline {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.c-btn-outline:hover {
+  border-color: var(--c-border-hover);
+}
+/* The row-level affirmative: outlined at rest, inverts to solid on hover. */
+.c-btn-affirm {
+  border: 1px solid var(--c-border-strong);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+  transition: background-color 120ms, color 120ms, border-color 120ms;
+}
+.c-btn-affirm:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--surface);
+}
+.c-btn-quiet {
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: background-color 120ms, color 120ms;
+}
+.c-btn-quiet:hover {
+  background: var(--c-divider);
+  color: var(--ink);
+}
+
+/* ---------- switch ----------
+   A real `<input type="checkbox">` with the track as its next sibling, so the
+   settings form still submits as a plain form with no client state. The knob is
+   a pseudo-element rather than a nested span because Tailwind's `peer-checked:`
+   only reaches siblings, and a knob inside the track is not one.
+
+   Defined outside `.console-theme`: the platform settings screen renders in the
+   phone frame too. */
+.c-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--c-border-strong);
+  transition: background-color 160ms;
+  cursor: pointer;
+}
+.c-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: left 160ms;
+}
+input:checked + .c-switch {
+  background: var(--green);
+}
+input:checked + .c-switch::after {
+  left: 18px;
+}
+input:disabled + .c-switch {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+input:focus-visible + .c-switch {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .c-switch,
+  .c-switch::after {
+    transition: none;
+  }
+}
+
+/* ---------- the shared vocabulary, at console proportions ----------
+   These retune the app-wide primitives (Button, Field, Section, Toggle, .card)
+   for the console shell only, keyed on the `ui-*` hooks those components carry.
+   One block here is what keeps the twenty detail and form screens consistent
+   with the redesigned dashboard without each of them shipping a console fork.
+
+   Unlayered on purpose: Tailwind utilities live in `@layer utilities`, and any
+   unlayered rule outclasses a layered one whatever the specificity — which is
+   exactly what is wanted, since these override utilities on the same elements. */
+
+.console-theme .card {
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.console-theme .ui-empty {
+  border-radius: 12px;
+}
+
+.console-theme .ui-section {
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: none;
+}
+.console-theme .ui-section-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Inputs: shorter, hairlined rather than filled. A filled 15px field reads as a
+   mobile form; the console wants a data-entry field that lines up with a table
+   row next to it. */
+.console-theme .ui-field {
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.console-theme .ui-field:focus {
+  border-color: var(--accent);
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 #0000;
+}
+.console-theme .ui-label {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.console-theme .ui-hint {
+  font-size: 11px;
+}
+.console-theme .ui-toggle {
+  border-radius: 8px;
+  background: transparent;
+  border-top: 1px solid var(--c-divider);
+  padding: 11px 0;
+}
+
+/* Buttons: 8px radius, console heights, no glow. */
+.console-theme .ui-btn {
+  border-radius: 8px;
+  box-shadow: none;
+}
+.console-theme .ui-btn.h-10 {
+  height: 32px;
+  padding-inline: 12px;
+  font-size: 12px;
+}
+.console-theme .ui-btn.h-12 {
+  height: 36px;
+  padding-inline: 14px;
+  font-size: 12.5px;
+}
+.console-theme .ui-btn.h-14 {
+  height: 40px;
+  padding-inline: 18px;
+  font-size: 13px;
+}
+
+/* A compact right-aligned field, for settings rows where the value is the
+   control: "Delivery fee  [ 39 ]". */
+.c-field {
+  width: 96px;
+  flex: none;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 4px 8px;
+  text-align: right;
+  font-size: 12.5px;
+  color: var(--ink);
+  outline: none;
+}
+.c-field:focus {
+  border-color: var(--accent);
+}
+.c-field-wide {
+  width: 100%;
+  text-align: left;
+}
+
 /* ------------------------------------------------------------
    Admin console (web mode) — permanent left rail + fluid content.
 
@@ -1070,12 +1543,17 @@ body:has(.dashboard-shell) {
      that keeps table rows scannable rather than stretched across an ultrawide. */
   max-width: 1600px;
   margin-inline: auto;
-  padding: 18px 16px 48px;
+  padding: 18px 16px 40px;
   overflow-x: clip;
+  /* Screens are a vertical stack of sections at a fixed rhythm, so no page has
+     to restate its own spacing. */
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 @media (min-width: 1024px) {
   .admin-main {
-    padding: 26px 28px 56px;
+    padding: 22px 24px 40px;
   }
 }
 
@@ -1313,6 +1791,13 @@ body:has(.dashboard-shell) {
 .pill-pop {
   background: var(--pop);
   color: var(--pop-ink);
+}
+/* "On the way" and other in-transit states. Tinted like the rest rather than
+   solid, and defined here (not only under .console-theme) so the phone frame
+   can render the same stage pill. */
+.pill-blue {
+  background: var(--c-tint-blue);
+  color: var(--blue);
 }
 
 /* Bolt-signature rating chip: solid dark capsule with a gold star,

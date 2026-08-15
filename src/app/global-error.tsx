@@ -19,10 +19,11 @@
  */
 export default function GlobalError({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  unstable_retry: () => void;
+  /** `retry` — see next/dist/client/components/error-boundary.d.ts. */
+  retry: () => void;
 }) {
   return (
     <html lang="en">
@@ -58,7 +59,7 @@ export default function GlobalError({
           </p>
           <button
             type="button"
-            onClick={() => unstable_retry()}
+            onClick={() => retry()}
             style={{
               marginTop: "20px",
               height: "44px",

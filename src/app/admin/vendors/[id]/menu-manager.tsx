@@ -249,7 +249,7 @@ export function MenuManager({
       ) : null}
 
       {items.length === 0 && !editing ? (
-        <p className="rounded-2xl border border-line bg-surface px-4 py-8 text-center text-sm text-muted">
+        <p className="rounded-xl border border-line bg-surface px-4 py-8 text-center text-sm text-muted">
           No menu items yet. Add them manually or import from Excel below.
         </p>
       ) : (
@@ -257,7 +257,7 @@ export function MenuManager({
           {items.map((item) => (
             <li
               key={item.id}
-              className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-3"
+              className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3"
             >
               <span
                 className={

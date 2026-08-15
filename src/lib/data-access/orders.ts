@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { computeChargesWith } from "@/lib/pricing";
 import { getSettings } from "@/lib/settings";
+import { evaluateCoupon } from "@/lib/data-access/coupons";
 import { onlinePaymentsEnabled } from "@/lib/payments/availability";
 import {
   notifyOrderPlaced,
@@ -39,6 +40,9 @@ export interface Order {
   /** Present once migration 0025 is applied; COD before that. */
   payment_method?: PaymentMethod;
   payment_status?: PaymentStatus;
+  /** Present once 0031 is applied. Rupees off the grand total; 0 when no coupon. */
+  discount?: number;
+  coupon_code?: string | null;
   created_at: string;
   address: { label?: string; line?: string } | null;
   order_items: OrderItem[];
@@ -55,12 +59,16 @@ export interface Order {
 const TIP_COLUMN = "orders.tip";
 /** The payment columns arrive together in 0025, so one probe covers both. */
 const PAYMENT_COLUMNS = "orders.payment_method";
+/** `discount` / `coupon_code` arrive together in 0031. */
+const COUPON_COLUMNS = "orders.discount";
 
 interface SelectFlags {
   /** `tip` only exists once migration 0013 has been applied. */
   tip: boolean;
   /** `payment_method` / `payment_status` only exist from 0025. */
   payment: boolean;
+  /** `discount` / `coupon_code` only exist from 0031. */
+  coupon: boolean;
 }
 
 function select(flags: SelectFlags): string {
@@ -68,6 +76,7 @@ function select(flags: SelectFlags): string {
     "id, restaurant_id, status, total, delivery_fee, tax_amount",
     flags.tip ? ", tip" : "",
     flags.payment ? ", payment_method, payment_status" : "",
+    flags.coupon ? ", discount, coupon_code" : "",
     ", created_at, address",
     ", order_items(name, qty, price, menu_items(external_id, veg))",
     ", restaurants(slug, name, image_url, accent_tint, eta_min, eta_max)",
@@ -93,12 +102,14 @@ async function selectOrders<T>(
   const flags: SelectFlags = {
     tip: !columnKnownMissing(TIP_COLUMN),
     payment: !columnKnownMissing(PAYMENT_COLUMNS),
+    coupon: !columnKnownMissing(COUPON_COLUMNS),
   };
 
   // `isMissingColumn` doesn't say WHICH column is missing, so drop the newest
   // migration's group first and re-probe rather than guessing. At most one
   // attempt per still-optimistic group, plus the final bare one.
   const groups: Array<{ key: keyof SelectFlags; column: string }> = [
+    { key: "coupon", column: COUPON_COLUMNS },
     { key: "payment", column: PAYMENT_COLUMNS },
     { key: "tip", column: TIP_COLUMN },
   ];
@@ -140,6 +151,41 @@ export interface CreateOrderInput {
    * asking for it is a request, not a decision.
    */
   paymentMethod?: PaymentMethod;
+  /**
+   * A promo code to try against this order. The code only — never an amount.
+   * What it is worth is decided by `apply_coupon_to_order()` from the order's
+   * own items, so the preview the customer saw at checkout has no authority
+   * over what they are charged.
+   */
+  couponCode?: string;
+}
+
+/** Why a coupon didn't apply. Mirrors the RPC's vocabulary 1:1. */
+export type CouponFailure =
+  | "empty"
+  | "invalid"
+  | "expired"
+  | "min_order"
+  | "already_used"
+  | "already_applied"
+  | "exhausted"
+  | "order_not_open"
+  | "order_not_found";
+
+export interface AppliedCoupon {
+  code: string;
+  discount: number;
+}
+
+/**
+ * A coupon the customer asked for and cannot have. Carries the reason as a
+ * code so the API can map it to a message without matching on prose.
+ */
+export class CouponRejected extends Error {
+  constructor(public readonly reason: CouponFailure) {
+    super(`coupon_${reason}`);
+    this.name = "CouponRejected";
+  }
 }
 
 /** Place an order — prices validated server-side from menu_items, never trusted from client. */
@@ -204,6 +250,19 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     throw new Error("online_payments_unavailable");
   }
   const paymentMethod: PaymentMethod = wantsOnline ? "online" : "cod";
+
+  // A coupon is checked BEFORE anything is written, against the subtotal the
+  // server just derived rather than the one the browser previewed with. The
+  // order cannot be rolled back later — a customer has no DELETE on `orders`,
+  // by design — so a code that is going to be refused has to be refused while
+  // there is still nothing to undo. Charging someone full price for an order
+  // they placed expecting a discount is the same wrong as quietly downgrading
+  // how they pay, and gets the same answer: refuse loudly.
+  const wantsCoupon = input.couponCode?.trim();
+  if (wantsCoupon) {
+    const preview = await evaluateCoupon(wantsCoupon, itemSubtotal);
+    if (!preview.ok) throw new CouponRejected(preview.error as CouponFailure);
+  }
 
   const base: Record<string, unknown> = {
     customer_id: user.id,
@@ -273,6 +332,30 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     .insert(orderItems);
   if (itemsError) throw itemsError;
 
+  // Now apply it for real. The pre-check above priced it; this is the write
+  // that decides, and it re-derives the amount from the rows just inserted.
+  //
+  // A failure here is a race the pre-check cannot cover — the customer's last
+  // allowed use of the code landed on another request in between, or the
+  // campaign hit its global cap. The order is already real and cannot be
+  // unwound, so it proceeds at full price rather than being abandoned. The
+  // customer is not misled: the Order returned below carries the actual
+  // discount (zero) and the success screen shows the actual total.
+  if (wantsCoupon) {
+    const { data: applied } = await supabase.rpc("apply_coupon_to_order", {
+      oid: order.id,
+      coupon: wantsCoupon,
+    });
+    const result = applied as { ok?: boolean } | null;
+    if (!result?.ok) {
+      console.warn(
+        `[orders] coupon ${wantsCoupon} passed pre-check but was refused for order ${order.id}`
+      );
+    }
+  }
+
+  // Runs whether or not a coupon applied — the RPC recomputes on success, and
+  // this is what sets the total in every other case. Idempotent either way.
   const { error: totalError } = await supabase.rpc("recompute_order_total", {
     oid: order.id,
   });

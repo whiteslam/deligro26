@@ -10,50 +10,45 @@ import {
 } from "@/lib/data-access/admin-stats";
 import { PendingApprovals } from "@/components/admin/pending-approvals";
 import { AdminHero, EmptyState } from "@/components/admin/admin-ui";
-import { DataTable, type Column } from "@/components/admin/data-table";
+import { StatTile, StatTiles } from "@/components/admin/console-ui";
+import {
+  ORDER_STATUS,
+  ORDER_STATUS_ORDER,
+} from "@/components/admin/order-status";
+import {
+  DataTable,
+  TableFooter,
+  type Column,
+} from "@/components/admin/data-table";
 import {
   FilterChips,
-  FilterSummary,
   SearchForm,
 } from "@/components/admin/admin-filters";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 /**
  * Admin → Orders. Every order across every restaurant, newest first, with the
- * in-flight ones pulled forward.
+ * in-flight ones pulled forward and the late ones pulled forward of those.
  *
  * Search and status live in the URL so a filtered view is reloadable and
  * shareable. Both are applied to the window this page loads, not to the whole
- * order history — the summary line says which, because "3 orders" meaning
- * "3 in the last 200" and meaning "3, ever" are very different answers.
+ * order history — the footer says which, because "3 orders" meaning "3 in the
+ * last 200" and meaning "3, ever" are very different answers.
  */
-
-const STATUS: Record<AdminOrderRow["status"], { label: string; cls: string }> = {
-  PLACED: { label: "Placed", cls: "pill-accent" },
-  KITCHEN: { label: "Preparing", cls: "pill-accent" },
-  // READY is its own stage now (0026 / OrderStatus). It used to be folded into
-  // KITCHEN, which is why an operator could not tell a kitchen that was still
-  // cooking from one whose food had been sitting on the pass. Given a bare
-  // `Record`, a missing key is not a blank cell — `STATUS[o.status].cls` throws
-  // and takes the whole orders screen down with it.
-  READY: { label: "Ready for pickup", cls: "pill-pop" },
-  ON_THE_WAY: { label: "On the way", cls: "pill-accent" },
-  DELIVERED: { label: "Delivered", cls: "pill-green" },
-  CANCELLED: { label: "Cancelled", cls: "pill-muted" },
-};
-
-const STATUS_ORDER: AdminOrderRow["status"][] = [
-  "PLACED",
-  "KITCHEN",
-  "READY",
-  "ON_THE_WAY",
-  "DELIVERED",
-  "CANCELLED",
-];
 
 /** The window we pull. Widened when searching so a query can reach further back. */
 const WINDOW = 50;
 const SEARCH_WINDOW = 250;
+
+/** Matches the AutoRefresh interval below; stated in the UI, not implied. */
+const REFRESH_MS = 4000;
+
+const IN_FLIGHT: AdminOrderRow["status"][] = [
+  "PLACED",
+  "KITCHEN",
+  "READY",
+  "ON_THE_WAY",
+];
 
 type Search = { q?: string; status?: string };
 
@@ -64,7 +59,7 @@ export default async function AdminOrdersPage({
 }) {
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
-  const status = STATUS_ORDER.includes(sp.status as AdminOrderRow["status"])
+  const status = ORDER_STATUS_ORDER.includes(sp.status as AdminOrderRow["status"])
     ? (sp.status as AdminOrderRow["status"])
     : null;
 
@@ -98,11 +93,19 @@ function renderOrders(
     );
   });
 
-  const counts = STATUS_ORDER.map((s) => ({
+  const counts = ORDER_STATUS_ORDER.map((s) => ({
     value: s,
-    label: STATUS[s].label,
+    label: ORDER_STATUS[s].short,
     count: all.filter((o) => o.status === s).length,
   })).filter((s) => s.count > 0);
+
+  // Summary figures describe the loaded window, which is what the operator can
+  // actually see and act on — not an all-time aggregate they cannot reach.
+  const inFlight = all.filter((o) => IN_FLIGHT.includes(o.status)).length;
+  const late = all.filter((o) => (o.lateByMinutes ?? 0) > 0).length;
+  const worst = all.reduce((m, o) => Math.max(m, o.lateByMinutes ?? 0), 0);
+  const cancelled = all.filter((o) => o.status === "CANCELLED").length;
+  const value = all.reduce((sum, o) => sum + o.total, 0);
 
   const href = (next: Partial<Search>) => {
     const usp = new URLSearchParams();
@@ -118,15 +121,12 @@ function renderOrders(
       key: "code",
       header: "Order",
       role: "title",
+      width: "w-[150px]",
       cell: (o) => (
         <div className="min-w-0">
-          <p className="text-data font-bold">{o.code}</p>
-          <p className="mt-0.5 truncate text-[13px] text-ink @3xl:hidden">
-            {o.customer}
-          </p>
-          <p className="truncate text-xs text-muted @3xl:hidden">
-            {o.restaurant}
-          </p>
+          <p className="text-data text-xs font-semibold text-ink">{o.code}</p>
+          <p className="mt-0.5 truncate text-[11.5px] text-muted">{o.restaurant}</p>
+          <p className="truncate text-[13px] text-ink @3xl:hidden">{o.customer}</p>
         </div>
       ),
     },
@@ -134,25 +134,34 @@ function renderOrders(
       key: "customer",
       header: "Customer",
       role: "wideOnly",
-      cell: (o) => <span className="truncate">{o.customer}</span>,
-    },
-    {
-      key: "restaurant",
-      header: "Restaurant",
-      role: "wideOnly",
-      cell: (o) => <span className="truncate text-muted">{o.restaurant}</span>,
+      cell: (o) => (
+        <div className="min-w-0">
+          <p className="truncate text-[12.5px] text-ink">{o.customer}</p>
+          {o.paymentMethod ? (
+            <p className="truncate text-[11.5px] text-muted">
+              {o.paymentMethod === "online" ? "Paid online" : "Cash on delivery"}
+              {o.paymentStatus && o.paymentStatus !== "paid" ? (
+                <span className="ml-1 font-semibold uppercase text-deal">
+                  {o.paymentStatus}
+                </span>
+              ) : null}
+            </p>
+          ) : null}
+        </div>
+      ),
     },
     {
       key: "status",
-      header: "Status",
+      header: "Stage",
       role: "trailing",
+      width: "w-[128px]",
       cell: (o) => (
         <span className="inline-flex flex-col items-end gap-1 @3xl:items-start">
-          <span className={`pill ${STATUS[o.status].cls}`}>
-            {STATUS[o.status].label}
+          <span className={`pill ${ORDER_STATUS[o.status].cls}`}>
+            {ORDER_STATUS[o.status].short}
           </span>
           {o.lateByMinutes ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-deal">
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-deal">
               <AlertTriangle className="size-3" />
               {o.lateByMinutes}m late
             </span>
@@ -161,85 +170,79 @@ function renderOrders(
       ),
     },
     {
-      key: "payment",
-      header: "Payment",
-      cell: (o) =>
-        o.paymentMethod ? (
-          <span className="text-[13px]">
-            {o.paymentMethod === "online" ? "Online" : "Cash"}
-            {o.paymentStatus && o.paymentStatus !== "paid" ? (
-              <span className="ml-1.5 text-[11px] font-bold uppercase text-deal">
-                {o.paymentStatus}
-              </span>
-            ) : null}
-          </span>
-        ) : (
-          <span className="text-muted">—</span>
-        ),
-    },
-    {
       key: "placedAt",
       header: "Placed",
-      cell: (o) => <span className="text-muted">{o.placedAt}</span>,
+      width: "w-[110px]",
+      cell: (o) => (
+        <span className="text-data whitespace-nowrap text-[11.5px] text-muted">
+          {o.placedAt}
+        </span>
+      ),
     },
     {
       key: "total",
-      header: "Total",
+      header: "Value",
       align: "right",
+      width: "w-[96px]",
       cell: (o) => (
-        <span className="text-data font-bold">{formatINR(o.total)}</span>
+        <span className="text-data text-[13px] font-semibold tabular-nums">
+          {formatINR(o.total)}
+        </span>
       ),
+    },
+    {
+      key: "actions",
+      header: "",
+      role: "actions",
+      align: "right",
+      width: "w-[80px]",
+      // Open only. An admin-initiated refund has no server action behind it —
+      // refunds are raised against an order and then decided on the Refunds
+      // screen — and a button that cannot do the thing it names is worse than
+      // no button.
+      cell: (o) =>
+        o.id ? (
+          <Link href={`/admin/orders/${o.id}`} className="c-btn-affirm press">
+            Open
+          </Link>
+        ) : null,
     },
   ];
 
+  const filtered = Boolean(q || status);
+
   return (
-    <div className="space-y-5">
-      {isSupabaseConfigured ? <AutoRefresh interval={4000} /> : null}
+    <>
+      {isSupabaseConfigured ? <AutoRefresh interval={REFRESH_MS} /> : null}
 
       <AdminHero
         title="Orders"
-        subtitle="Live &amp; recent, across every restaurant"
+        tag={inFlight > 0 ? `${inFlight} in flight` : "All settled"}
+        subtitle={`The last ${windowSize} orders, plus everything still moving`}
         live
-        action={
-          <div className="text-right">
-            <p className="text-data text-xl font-bold leading-none @3xl:text-3xl">
-              {all.length}
-            </p>
-            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
-              in view
-            </p>
-          </div>
-        }
       />
 
-      <PendingApprovals pending={pending} />
-
-      <div className="space-y-3">
-        <div className="flex flex-col gap-2 @3xl:flex-row @3xl:items-center">
-          <SearchForm
-            action="/admin/orders"
-            defaultValue={q}
-            placeholder="Order code, customer or restaurant"
-            carry={{ status: status ?? undefined }}
-          />
-        </div>
+      <div className="flex flex-col gap-2.5">
+        <SearchForm
+          action="/admin/orders"
+          defaultValue={q}
+          placeholder="Order code, customer or restaurant"
+          carry={{ status: status ?? undefined }}
+        />
 
         {counts.length > 1 ? (
-          <FilterChips
-            label="Order status"
-            options={counts}
-            active={status}
-            hrefFor={(v) => href({ status: v ?? undefined })}
-          />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <FilterChips
+              label="Order status"
+              options={counts}
+              active={status}
+              hrefFor={(v) => href({ status: v ?? undefined })}
+            />
+            <p className="text-xs text-muted">
+              Auto-refreshing every {Math.round(REFRESH_MS / 1000)}s
+            </p>
+          </div>
         ) : null}
-
-        <FilterSummary
-          shown={orders.length}
-          total={all.length}
-          noun="order"
-          filtered={Boolean(q || status)}
-          clearHref="/admin/orders"
-        />
       </div>
 
       <DataTable
@@ -250,21 +253,31 @@ function renderOrders(
         // The demo seed rows have no id and therefore nothing to open — a link
         // to /admin/orders/undefined would 404 on tap.
         rowHref={(o) => (o.id ? `/admin/orders/${o.id}` : null)}
+        rowTone={(o) => ((o.lateByMinutes ?? 0) > 0 ? "alert" : null)}
+        footer={
+          <TableFooter
+            page={1}
+            totalPages={1}
+            hrefFor={() => "/admin/orders"}
+            summary={
+              filtered
+                ? `${orders.length} of ${all.length} in this window`
+                : `${all.length} order${all.length === 1 ? "" : "s"} in this window`
+            }
+          />
+        }
         empty={
           <EmptyState
             icon={ReceiptText}
-            title={q || status ? "No orders match" : "No orders yet"}
+            title={filtered ? "No orders match" : "No orders yet"}
             description={
-              q || status
+              filtered
                 ? `Nothing in the last ${windowSize} orders matches. Older orders are not in this window.`
                 : "New orders land here in real time as customers check out."
             }
             action={
-              q || status ? (
-                <Link
-                  href="/admin/orders"
-                  className="press rounded-xl border border-line bg-surface px-4 py-2 text-[13px] font-bold"
-                >
+              filtered ? (
+                <Link href="/admin/orders" className="c-btn c-btn-outline press">
                   Clear filters
                 </Link>
               ) : null
@@ -272,6 +285,31 @@ function renderOrders(
           />
         }
       />
-    </div>
+
+      <StatTiles>
+        <StatTile
+          label="In flight"
+          value={inFlight}
+          note="Placed, cooking, ready or on the way"
+        />
+        <StatTile
+          label="Past promise time"
+          value={late}
+          note={late > 0 ? `Worst is ${worst}m over` : "Everything is on time"}
+        />
+        <StatTile
+          label="Cancelled"
+          value={cancelled}
+          note="In this window"
+        />
+        <StatTile
+          label="Value in window"
+          value={formatINR(value)}
+          note={`Across ${all.length} order${all.length === 1 ? "" : "s"}`}
+        />
+      </StatTiles>
+
+      <PendingApprovals pending={pending} />
+    </>
   );
 }

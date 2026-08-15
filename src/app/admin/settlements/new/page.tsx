@@ -1,0 +1,101 @@
+import Link from "next/link";
+import { AdminHero } from "@/components/admin/admin-ui";
+import { istDateKey, startOfIstWeek, addIstDays } from "@/lib/utils/ist-time";
+import {
+  listSettlementVendors,
+  previewSettlement,
+} from "@/lib/data-access/admin-settlements";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { SettlementPreviewPanel } from "./settlement-preview-panel";
+import { NewSettlementForm } from "./new-settlement-form";
+
+export const dynamic = "force-dynamic";
+
+type Search = { [key: string]: string | string[] | undefined };
+
+function one(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
+export default async function NewSettlementPage({
+  searchParams,
+}: {
+  searchParams: Promise<Search>;
+}) {
+  if (!isSupabaseConfigured) {
+    return (
+      <AdminHero
+        backHref="/admin/settlements"
+        backLabel="Settlements"
+        title="New settlement"
+        subtitle="Connect Supabase to build a draft."
+      />
+    );
+  }
+
+  const sp = await searchParams;
+  const restaurantId = one(sp.restaurantId) ?? "";
+  const weekStart = startOfIstWeek(new Date());
+  const defaultFrom = istDateKey(weekStart);
+  const defaultTo = istDateKey(addIstDays(new Date(), 0));
+  const fromDate = one(sp.from) ?? defaultFrom;
+  const toDate = one(sp.to) ?? defaultTo;
+
+  const vendors = await listSettlementVendors().catch(() => []);
+
+  let preview = null;
+  let previewError: string | null = null;
+  if (restaurantId) {
+    const result = await previewSettlement({
+      restaurantId,
+      fromDate,
+      toDate,
+    }).catch(() => ({ error: "Could not preview. Is migration 0028 applied?" }));
+    if ("error" in result) previewError = result.error;
+    else preview = result;
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Back link via AdminHero, not a separate BackLink above it — every
+          other sub-page in the console puts it inside the header. */}
+      <AdminHero
+        backHref="/admin/settlements"
+        backLabel="Settlements"
+        title="New settlement"
+        subtitle="Pick a vendor and IST date range — only unsettled delivered orders are included"
+      />
+
+      <NewSettlementForm
+        vendors={vendors}
+        restaurantId={restaurantId}
+        fromDate={fromDate}
+        toDate={toDate}
+      />
+
+      {previewError ? (
+        <p className="rounded-xl border border-deal/30 bg-deal-soft px-3.5 py-3 text-sm text-deal">
+          {previewError}
+        </p>
+      ) : null}
+
+      {preview ? (
+        <SettlementPreviewPanel
+          preview={preview}
+          fromDate={fromDate}
+          toDate={toDate}
+        />
+      ) : null}
+
+      {!restaurantId ? (
+        <p className="text-sm text-muted">
+          Or open a vendor from{" "}
+          <Link href="/admin/vendors" className="font-medium text-accent-ink">
+            Vendors
+          </Link>{" "}
+          after you know who needs a payout.
+        </p>
+      ) : null}
+    </div>
+  );
+}

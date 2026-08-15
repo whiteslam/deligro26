@@ -86,9 +86,9 @@ export default async function VendorDetailPage({
           <div className="mb-3">
             <BackLink href="/admin/vendors">Vendors</BackLink>
           </div>
-          <div className="flex gap-3">
+          <div className="flex items-start gap-3">
             <div
-              className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-cover bg-center text-xl font-bold text-white"
+              className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-cover bg-center text-lg font-bold text-white"
               style={
                 vendor.imageUrl
                   ? { backgroundImage: `url(${vendor.imageUrl})` }
@@ -98,39 +98,51 @@ export default async function VendorDetailPage({
               {vendor.imageUrl ? "" : vendor.name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <h1 className="truncate text-lg font-extrabold tracking-tight">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate text-xl font-extrabold tracking-tight @3xl:text-[25px] @3xl:tracking-[-0.025em]">
                   {vendor.name}
                 </h1>
                 <span className={STATUS_PILL[vendor.status]}>{vendor.status}</span>
               </div>
-              <p className="mt-0.5 truncate text-xs text-muted">
-                /{vendor.slug} · {vendor.category ?? "Uncategorised"}
+              <p className="mt-1 truncate text-[13px] text-muted">
+                /{vendor.slug} · {vendor.category ?? "Uncategorised"} ·{" "}
+                {vendor.commissionPct}% commission
               </p>
             </div>
-            <Link href={`/admin/vendors/${id}/edit`} className="shrink-0 self-start">
-              <Button size="sm" variant="secondary">
-                <Pencil className="size-4" /> Edit
-              </Button>
-            </Link>
-          </div>
-          <div className="mt-3 flex justify-end border-t border-line pt-3">
-            <VendorRowActions id={vendor.id} name={vendor.name} status={vendor.status} />
+            <div className="flex shrink-0 items-center gap-2 self-start">
+              <Link href={`/admin/vendors/${id}/edit`}>
+                <Button size="sm" variant="outline">
+                  <Pencil className="size-3.5" /> Edit
+                </Button>
+              </Link>
+              <VendorRowActions
+                id={vendor.id}
+                name={vendor.name}
+                status={vendor.status}
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+      {/* Tabs — the same segmented control the dashboard uses for its range
+          picker, so "pick one of a set" looks like one thing across the console. */}
+      <div
+        className="no-scrollbar flex gap-0.5 overflow-x-auto rounded-lg border border-line bg-surface p-0.5 text-xs"
+        role="tablist"
+        aria-label="Vendor sections"
+      >
         {TABS.map((t) => (
           <Link
             key={t.id}
             href={`/admin/vendors/${id}?tab=${t.id}`}
+            role="tab"
+            aria-selected={t.id === active}
             className={
-              "press shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold " +
+              "press shrink-0 whitespace-nowrap rounded-md px-[11px] py-[5px] transition-colors " +
               (t.id === active
-                ? "bg-accent text-white"
-                : "bg-surface-2 text-muted hover:text-ink")
+                ? "bg-ink font-semibold text-[color:var(--surface)]"
+                : "font-medium text-muted hover:text-ink")
             }
           >
             {t.label}
@@ -152,18 +164,22 @@ export default async function VendorDetailPage({
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-line bg-surface p-3.5">
-      <h2 className="text-label mb-2.5">{title}</h2>
-      <dl className="space-y-2">{children}</dl>
+    <section className="rounded-xl border border-line bg-surface px-4 py-3.5">
+      <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted">
+        {title}
+      </h2>
+      <dl className="mt-1">{children}</dl>
     </section>
   );
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-3">
-      <dt className="text-sm text-muted">{label}</dt>
-      <dd className="text-right text-sm font-medium text-ink">{value || "—"}</dd>
+    <div className="flex items-start justify-between gap-3 border-t border-[color:var(--c-divider)] py-2 first:border-t-0">
+      <dt className="text-[12.5px] text-muted">{label}</dt>
+      <dd className="text-right text-[12.5px] font-medium text-ink">
+        {value || <span className="text-[color:var(--c-faint)]">—</span>}
+      </dd>
     </div>
   );
 }

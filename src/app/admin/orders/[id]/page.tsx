@@ -11,32 +11,14 @@ import {
   Banknote,
 } from "lucide-react";
 import { AdminHero, Panel } from "@/components/admin/admin-ui";
+import { ORDER_STATUS } from "@/components/admin/order-status";
 import { OrderIntervention } from "@/components/admin/order-intervention";
 import { formatINR } from "@/lib/utils/format";
 import { formatDateTime } from "@/lib/utils/relative-time";
 import { getAdminOrderDetail } from "@/lib/data-access/admin-orders";
-import type { AdminOrderDetail } from "@/lib/data-access/admin-orders";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export const metadata: Metadata = { title: "Order · Admin · Deligro" };
-
-const STATUS_PILL: Record<AdminOrderDetail["status"], string> = {
-  PLACED: "pill-accent",
-  KITCHEN: "pill-accent",
-  READY: "pill-accent",
-  ON_THE_WAY: "pill-accent",
-  DELIVERED: "pill-green",
-  CANCELLED: "pill-muted",
-};
-
-const STATUS_LABEL: Record<AdminOrderDetail["status"], string> = {
-  PLACED: "Placed",
-  KITCHEN: "Preparing",
-  READY: "Ready for pickup",
-  ON_THE_WAY: "On the way",
-  DELIVERED: "Delivered",
-  CANCELLED: "Cancelled",
-};
 
 export default async function AdminOrderDetailPage({
   params,
@@ -57,29 +39,37 @@ export default async function AdminOrderDetailPage({
     <div className="admin-measure space-y-4">
       <AdminHero
         title={order.code}
+        tag={ORDER_STATUS[order.status].label}
         subtitle={`Placed ${order.placedAt}`}
         backHref="/admin/orders"
         backLabel="Orders"
         badge={
           <>
-            <span className={`pill ${STATUS_PILL[order.status]}`}>
-              {STATUS_LABEL[order.status]}
+            <span className={`pill ${ORDER_STATUS[order.status].cls}`}>
+              {ORDER_STATUS[order.status].label}
             </span>
             {order.lateByMinutes !== null ? (
-              <span className="pill bg-red-500/10 text-red-600">
+              <span className="pill pill-deal">
                 {order.lateByMinutes} min late
               </span>
             ) : null}
           </>
         }
         action={
-          <div className="text-right">
-            <p className="text-data text-xl font-bold leading-none">
-              {formatINR(order.total)}
-            </p>
-            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
-              total
-            </p>
+          <div className="flex items-center gap-3">
+            {order.lateByMinutes !== null ? (
+              <span className="pill pill-deal hidden @3xl:inline-flex">
+                {order.lateByMinutes} min late
+              </span>
+            ) : null}
+            <div className="text-right">
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted">
+                Total
+              </p>
+              <p className="mt-1 text-[21px] font-bold leading-none tracking-[-0.02em] tabular-nums">
+                {formatINR(order.total)}
+              </p>
+            </div>
           </div>
         }
       />

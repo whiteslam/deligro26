@@ -24,19 +24,21 @@ import { Button } from "@/components/ui/button";
  */
 export default function AdminError({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  // Next 16 renamed this from `reset`; the old name would be undefined here and
-  // the retry button would render but do nothing.
-  unstable_retry: () => void;
+  // `retry` — see next/dist/client/components/error-boundary.d.ts, which is
+  // what actually hands these props over. It was briefly `unstable_retry` in
+  // the Next 16 pre-releases and this file was written against that name, so
+  // every "Try again" button threw "unstable_retry is not a function" on click.
+  retry: () => void;
 }) {
   useEffect(() => {
     console.error(error);
   }, [error]);
 
   return (
-    <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-10 text-center">
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-line bg-surface px-4 py-10 text-center">
       <span className="mb-1 grid size-12 place-items-center rounded-2xl bg-red-500/10 text-red-600">
         <TriangleAlert className="size-6" />
       </span>
@@ -45,7 +47,7 @@ export default function AdminError({
         The database did not answer. Nothing was changed — retrying is safe.
       </p>
       <div className="mt-3">
-        <Button size="sm" variant="secondary" onClick={() => unstable_retry()}>
+        <Button size="sm" variant="secondary" onClick={() => retry()}>
           <RotateCw className="size-4" /> Try again
         </Button>
       </div>

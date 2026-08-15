@@ -49,8 +49,8 @@ export default async function NewVendorPage({
       />
 
       {!draftId && drafts.length > 0 ? (
-        <section className="rounded-2xl border border-line bg-surface p-3.5">
-          <h2 className="text-label mb-2.5">Resume a draft</h2>
+        <section className="rounded-xl border border-line bg-surface px-4 py-3.5">
+          <h2 className="text-label mb-2">Resume a draft</h2>
           <ul className="space-y-1.5">
             {drafts.map((d) => (
               <DraftRow

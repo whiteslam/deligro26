@@ -23,10 +23,7 @@ export default function AdminNotFound() {
       title="Not found"
       description="This record doesn't exist, or it has been removed since the link was made."
       action={
-        <Link
-          href="/admin"
-          className="press inline-flex h-10 items-center justify-center rounded-full bg-surface-2 px-4 text-sm font-semibold text-ink"
-        >
+        <Link href="/admin" className="c-btn c-btn-outline press">
           Back to dashboard
         </Link>
       }
