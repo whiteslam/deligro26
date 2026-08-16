@@ -192,7 +192,7 @@ export default function LocationPage() {
                   <span
                     className={`mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl ${
                       a.id === selectedId
-                        ? "bg-accent text-white"
+                        ? "bg-accent text-[var(--on-accent)]"
                         : "bg-surface-2 text-muted"
                     }`}
                   >

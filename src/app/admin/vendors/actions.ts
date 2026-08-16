@@ -21,7 +21,12 @@ import {
   deleteCategory,
   type VendorCategoryInput,
 } from "@/lib/data-access/vendor-categories";
-import { setVendorPosition } from "@/lib/data-access/vendor-positions";
+import {
+  clearVendorSlot,
+  setVendorPosition,
+  swapVendorSlots,
+  SLOT_COUNT,
+} from "@/lib/data-access/vendor-positions";
 import {
   saveDraft,
   deleteDraft,
@@ -50,6 +55,7 @@ async function mutate(fn: () => Promise<unknown>): Promise<ActionResult> {
     return { ok: false, error: "That didn't go through. Try again." };
   }
   revalidatePath("/admin/vendors");
+  revalidatePath("/admin/vendors/slots");
   revalidatePath("/", "layout");
   return { ok: true };
 }
@@ -84,7 +90,10 @@ function parseVendor(form: FormData): VendorInput {
     ownerEmail: strOrNull(form, "ownerEmail"),
     tagline: strOrNull(form, "tagline"),
     description: strOrNull(form, "description"),
-    commissionPct: Math.min(100, Math.max(0, num(form, "commissionPct"))),
+    // Blank = inherit the platform rate (stored as NULL, migration 0032). An
+    // explicit 0 is a different statement — "this vendor pays nothing" — so it
+    // must survive as 0 rather than collapse back to inherit.
+    commissionPct: commissionOverride(form),
     minOrder: Math.max(0, Math.trunc(num(form, "minOrder"))),
     deliveryAvailable: bool(form, "deliveryAvailable"),
     selfPickup: bool(form, "selfPickup"),
@@ -105,9 +114,24 @@ function parseVendor(form: FormData): VendorInput {
   };
 }
 
+/**
+ * An empty commission field means "no override" and stores NULL. Anything else
+ * is clamped to the column's 0–100 CHECK.
+ */
+function commissionOverride(form: FormData): number | null {
+  const raw = form.get("commissionPct");
+  if (typeof raw !== "string" || raw.trim() === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  return Math.min(100, Math.max(0, n));
+}
+
 function validateVendor(input: VendorInput): string | null {
   if (!input.name) return "Shop name is required.";
-  if (input.commissionPct < 0 || input.commissionPct > 100)
+  if (
+    input.commissionPct !== null &&
+    (input.commissionPct < 0 || input.commissionPct > 100)
+  )
     return "Commission must be between 0 and 100%.";
   if (input.ownerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.ownerEmail))
     return "That email address doesn't look right.";
@@ -151,15 +175,48 @@ export async function setVendorStatusAction(id: string, status: VendorStatus) {
   return mutate(() => setVendorStatus(id, status));
 }
 
+/** Reject anything the 0021 CHECK would: a slot is an integer 1–SLOT_COUNT. */
+function validSlot(position: number): boolean {
+  return Number.isInteger(position) && position >= 1 && position <= SLOT_COUNT;
+}
+
 /** Pin a vendor to a customer-feed slot 1–10, or null to unrank it. */
 export async function setVendorPositionAction(
   id: string,
   position: number | null
 ): Promise<ActionResult> {
-  if (position != null && (position < 1 || position > 10)) {
-    return { ok: false, error: "Position must be between 1 and 10." };
+  if (position != null && !validSlot(position)) {
+    return { ok: false, error: `Position must be between 1 and ${SLOT_COUNT}.` };
   }
   return mutate(() => setVendorPosition(id, position));
+}
+
+/**
+ * Slots board: put a vendor in a slot, or pass null to empty it. Assigning
+ * evicts the slot's current occupant (setVendorPosition enforces that), and
+ * moves the vendor out of any other slot it held — one shop, one rank.
+ */
+export async function assignVendorSlotAction(
+  position: number,
+  vendorId: string | null
+): Promise<ActionResult> {
+  if (!validSlot(position)) {
+    return { ok: false, error: `Position must be between 1 and ${SLOT_COUNT}.` };
+  }
+  return mutate(() =>
+    vendorId ? setVendorPosition(vendorId, position) : clearVendorSlot(position)
+  );
+}
+
+/** Slots board: exchange two slots' occupants — the move up/down control. */
+export async function swapVendorSlotsAction(
+  a: number,
+  b: number
+): Promise<ActionResult> {
+  if (!validSlot(a) || !validSlot(b)) {
+    return { ok: false, error: `Position must be between 1 and ${SLOT_COUNT}.` };
+  }
+  return mutate(() => swapVendorSlots(a, b));
 }
 
 export interface DeleteVendorActionResult extends ActionResult {

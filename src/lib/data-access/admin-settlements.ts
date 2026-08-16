@@ -8,6 +8,10 @@ import {
   type SettlementPaymentMethod,
   type SettlementPaymentStatus,
 } from "@/lib/settlements/math";
+import {
+  effectiveCommissionPct,
+  getVendorCommissionDefault,
+} from "@/lib/data-access/admin-commission";
 
 /**
  * Admin vendor settlements — the settle-out ledger.
@@ -166,14 +170,23 @@ interface RestaurantRow {
   bank_name: string | null;
 }
 
-function payoutFrom(r: RestaurantRow): SettlementPayoutSnapshot {
+/**
+ * `platformDefault` is the rate from platform settings; the row's own
+ * `commission_pct` overrides it when non-null. `?? 0` would have been wrong
+ * here after 0032 — it cannot tell "inherit" from a vendor deliberately set to
+ * free, and would have quietly billed every inheriting vendor nothing.
+ */
+function payoutFrom(
+  r: RestaurantRow,
+  platformDefault: number
+): SettlementPayoutSnapshot {
   return {
     upiId: r.upi_id,
     bankAccountName: r.bank_account_name,
     bankAccountNumber: r.bank_account_number,
     bankIfsc: r.bank_ifsc,
     bankName: r.bank_name,
-    commissionPct: Number(r.commission_pct ?? 0),
+    commissionPct: effectiveCommissionPct(r.commission_pct, platformDefault),
   };
 }
 
@@ -252,7 +265,11 @@ export async function previewSettlement(input: {
   if (!restaurant) return { error: "Restaurant not found." };
 
   const rest = restaurant as RestaurantRow;
-  const commissionPct = Number(rest.commission_pct ?? 0);
+  const platformDefault = await getVendorCommissionDefault();
+  const commissionPct = effectiveCommissionPct(
+    rest.commission_pct,
+    platformDefault
+  );
 
   const { data: orders, error: oErr } = await supabase
     .from("orders")
@@ -314,7 +331,7 @@ export async function previewSettlement(input: {
     periodLabel: periodLabel(startIso, endIso),
     ...totals,
     lines,
-    payout: payoutFrom(rest),
+    payout: payoutFrom(rest, platformDefault),
   };
 }
 
@@ -455,6 +472,10 @@ export async function getSettlement(
   const rest = Array.isArray(restRaw) ? restRaw[0] : restRaw;
   if (!rest) return null;
 
+  // The stored `commission` in rupees stays authoritative for this settlement;
+  // this only labels the rate the vendor is on now.
+  const platformDefault = await getVendorCommissionDefault();
+
   const { data: lines, error: lErr } = await supabase
     .from("vendor_settlement_orders")
     .select(
@@ -514,7 +535,7 @@ export async function getSettlement(
     createdBy: (data.created_by as string | null) ?? null,
     paidBy: (data.paid_by as string | null) ?? null,
     voidedAt: (data.voided_at as string | null) ?? null,
-    payout: payoutFrom(rest),
+    payout: payoutFrom(rest, platformDefault),
     lines: mapped,
   };
 }
@@ -602,20 +623,34 @@ export async function voidSettlement(input: {
 
 /** Vendors for the settlement picker — active shops, name order. */
 export async function listSettlementVendors(): Promise<
-  { id: string; name: string; commissionPct: number }[]
+  {
+    id: string;
+    name: string;
+    commissionPct: number;
+    inheritsPlatformRate: boolean;
+  }[]
 > {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("restaurants")
-    .select("id, name, commission_pct, status")
-    .in("status", ["active", "inactive", "pending"])
-    .order("name", { ascending: true })
-    .limit(500);
+  const [{ data, error }, platformDefault] = await Promise.all([
+    supabase
+      .from("restaurants")
+      .select("id, name, commission_pct, status")
+      .in("status", ["active", "inactive", "pending"])
+      .order("name", { ascending: true })
+      .limit(500),
+    getVendorCommissionDefault(),
+  ]);
   if (error) throw error;
   return (data ?? []).map((r) => ({
     id: r.id as string,
     name: (r.name as string)?.trim() || "Restaurant",
-    commissionPct: Number(r.commission_pct ?? 0),
+    commissionPct: effectiveCommissionPct(
+      r.commission_pct as number | null,
+      platformDefault
+    ),
+    // The picker distinguishes the two so an admin can see at a glance which
+    // vendors will move when the platform rate changes.
+    inheritsPlatformRate: r.commission_pct === null,
   }));
 }
 

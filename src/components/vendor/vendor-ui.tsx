@@ -233,7 +233,7 @@ export function VendorChip({
       className={cn(
         "press inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all",
         active
-          ? "border-accent bg-accent text-white shadow-[var(--glow-accent)]"
+          ? "border-accent bg-accent text-[var(--on-accent)] shadow-[var(--glow-accent)]"
           : "border-line bg-surface text-muted hover:border-accent/40 hover:text-ink"
       )}
     >

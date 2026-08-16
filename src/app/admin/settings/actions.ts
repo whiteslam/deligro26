@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { updateSettings } from "@/lib/data-access/settings";
+import {
+  CommissionNotMigratedError,
+  clampCommissionPct,
+  setVendorCommissionDefault,
+} from "@/lib/data-access/admin-commission";
 import type { PlatformSettings } from "@/types";
 
 export interface ActionResult {
@@ -73,14 +78,43 @@ export async function saveSettingsAction(
     };
   }
 
+  // Clamped here as well as in the data layer and by a CHECK constraint: this
+  // is a public HTTP endpoint, so the number in the form is whatever the caller
+  // chose to post, not whatever the number input allowed.
+  const vendorCommissionPct = clampCommissionPct(
+    num(form.get("vendorCommissionPct"), 0)
+  );
+
   try {
     await updateSettings(parse(form));
   } catch {
     return { ok: false, error: "Couldn't save settings. Try again." };
   }
 
+  // Separate write: the column is admin-only and goes through the service-role
+  // client, so it cannot ride along with the RLS-scoped settings update. Kept
+  // after it deliberately — if this throws, the rest of the form is already
+  // saved and the admin is told which part did not land.
+  try {
+    await setVendorCommissionDefault(vendorCommissionPct);
+  } catch (e) {
+    if (e instanceof CommissionNotMigratedError) {
+      return {
+        ok: false,
+        error:
+          "Saved everything except the vendor commission — apply migration 0032_platform_commission.sql to store it.",
+      };
+    }
+    return {
+      ok: false,
+      error: "Saved the rest, but couldn't save the vendor commission.",
+    };
+  }
+
   // Fees, availability and support text are read across the app — rebuild it.
   revalidatePath("/", "layout");
   revalidatePath("/admin/settings/platform");
+  // Settlement previews quote the rate; drop their cached copies too.
+  revalidatePath("/admin/settlements", "layout");
   return { ok: true };
 }

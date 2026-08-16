@@ -13,7 +13,12 @@ export function NewSettlementForm({
   fromDate,
   toDate,
 }: {
-  vendors: { id: string; name: string; commissionPct: number }[];
+  vendors: {
+    id: string;
+    name: string;
+    commissionPct: number;
+    inheritsPlatformRate: boolean;
+  }[];
   restaurantId: string;
   fromDate: string;
   toDate: string;
@@ -51,7 +56,7 @@ export function NewSettlementForm({
           <option value="">Select a restaurant…</option>
           {vendors.map((v) => (
             <option key={v.id} value={v.id}>
-              {v.name} ({v.commissionPct}%)
+              {v.name} ({v.commissionPct}%{v.inheritsPlatformRate ? " platform" : ""})
             </option>
           ))}
         </select>

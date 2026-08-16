@@ -49,7 +49,7 @@ export default function Error({
             <button
               type="button"
               onClick={() => retry()}
-              className="press mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 text-sm font-semibold text-white"
+              className="press mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 text-sm font-semibold text-[var(--on-accent)]"
             >
               <RotateCw className="size-4" />
               Try again

@@ -396,7 +396,11 @@ export function BannerForm({ banner }: { banner?: Banner }) {
       <aside className="space-y-3 lg:sticky lg:top-24 lg:self-start">
         <p className={labelCls}>Live preview</p>
         <div className="rounded-3xl border border-line bg-bg p-3">
-          <PromoBannerCarousel banners={[preview]} placement="preview" />
+          <PromoBannerCarousel
+            banners={[preview]}
+            placement="preview"
+            analytics={false}
+          />
         </div>
         <p className="text-xs text-muted">
           The customer sees this exact component. Sponsored campaigns show the

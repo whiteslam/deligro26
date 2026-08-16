@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getVendorDetail } from "@/lib/data-access/admin-vendors";
 import { listCategories } from "@/lib/data-access/vendor-categories";
+import { getVendorCommissionDefault } from "@/lib/data-access/admin-commission";
 import { AdminHero } from "@/components/admin/admin-ui";
 import { VendorForm } from "./vendor-form";
 import { VendorCredentials } from "./vendor-credentials";
@@ -13,9 +14,10 @@ export default async function EditVendorPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [vendor, categories] = await Promise.all([
+  const [vendor, categories, platformCommissionPct] = await Promise.all([
     getVendorDetail(id),
     listCategories(),
+    getVendorCommissionDefault(),
   ]);
   if (!vendor) notFound();
 
@@ -33,7 +35,11 @@ export default async function EditVendorPage({
         ownerMobile={vendor.ownerMobile}
         ownerPhoneVerified={vendor.ownerPhoneVerified}
       />
-      <VendorForm vendor={vendor} categories={categories.map((c) => c.name)} />
+      <VendorForm
+        vendor={vendor}
+        categories={categories.map((c) => c.name)}
+        platformCommissionPct={platformCommissionPct}
+      />
     </div>
   );
 }

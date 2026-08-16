@@ -29,9 +29,12 @@ function time(t: string | null): string {
 export function VendorForm({
   vendor,
   categories,
+  platformCommissionPct = 0,
 }: {
   vendor: VendorDetail;
   categories: string[];
+  /** Shown as the placeholder when this vendor has no override of its own. */
+  platformCommissionPct?: number;
 }) {
   const action = saveVendorAction.bind(null, vendor.id);
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(
@@ -163,12 +166,19 @@ export function VendorForm({
             <input
               type="number"
               name="commissionPct"
-              defaultValue={vendor.commissionPct}
+              defaultValue={vendor.commissionPct ?? ""}
+              placeholder={`${platformCommissionPct} (platform rate)`}
               min={0}
               max={100}
               step={0.5}
+              onFocus={(e) => e.currentTarget.select()}
               className={fieldCls}
             />
+            <p className="mt-1 text-[11px] leading-snug text-muted">
+              {vendor.commissionPct === null
+                ? `Following the platform rate. Type a number to set a rate for this vendor only.`
+                : `Overriding the platform rate of ${platformCommissionPct}%. Clear the field to follow it again.`}
+            </p>
           </Field>
         </div>
         <Toggle

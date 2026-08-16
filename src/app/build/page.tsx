@@ -317,7 +317,7 @@ export default async function BuildTrackerPage({
                 className={
                   "flex min-w-[5.5rem] flex-1 flex-col items-center rounded-xl px-3 py-2 text-center transition-colors" +
                   (active
-                    ? " bg-accent text-white"
+                    ? " bg-accent text-[var(--on-accent)]"
                     : " text-muted hover:bg-surface-2 hover:text-foreground")
                 }
               >

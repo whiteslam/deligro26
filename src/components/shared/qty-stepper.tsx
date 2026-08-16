@@ -57,7 +57,7 @@ export function QtyStepper({
   return (
     <div
       className={cn(
-        "flex items-center justify-between rounded-full bg-accent px-1 font-semibold text-white shadow-[var(--glow-accent)]",
+        "flex items-center justify-between rounded-full bg-accent px-1 font-semibold text-[var(--on-accent)] shadow-[var(--glow-accent)]",
         dims,
         className
       )}

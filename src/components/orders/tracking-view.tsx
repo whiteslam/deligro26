@@ -227,7 +227,7 @@ export function TrackingView({
     <div className="relative">
       {toast ? (
         <div className="animate-slide-up glass fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 shadow-[var(--shadow-md)]">
-          <span className="grid size-6 place-items-center rounded-full bg-green text-white">
+          <span className="grid size-6 place-items-center rounded-full bg-green text-[var(--on-green)]">
             <Check className="size-4" strokeWidth={3} />
           </span>
           <span className="text-sm font-bold">Order placed</span>
@@ -314,7 +314,7 @@ export function TrackingView({
                     <span
                       className={cn(
                         "grid size-6 shrink-0 place-items-center rounded-full border-2",
-                        done && "border-green bg-green text-white",
+                        done && "border-green bg-green text-[var(--on-green)]",
                         active && "border-green bg-surface",
                         !done && !active && "border-line bg-surface"
                       )}
@@ -371,7 +371,7 @@ export function TrackingView({
 
         {deliveryOtp && !delivered && !cancelled ? (
           <div className="flex items-center gap-3 rounded-2xl bg-accent-soft p-4">
-            <span className="grid size-10 place-items-center rounded-xl bg-accent text-white">
+            <span className="grid size-10 place-items-center rounded-xl bg-accent text-[var(--on-accent)]">
               <ShieldCheck className="size-5" />
             </span>
             <div className="flex-1">
@@ -417,7 +417,7 @@ export function TrackingView({
               <a
                 href={`tel:${riderTel}`}
                 aria-label="Call rider"
-                className="press grid size-11 place-items-center rounded-full bg-accent text-white shadow-[var(--glow-accent)]"
+                className="press grid size-11 place-items-center rounded-full bg-accent text-[var(--on-accent)] shadow-[var(--glow-accent)]"
               >
                 <Phone className="size-5" />
               </a>
@@ -426,7 +426,7 @@ export function TrackingView({
                 type="button"
                 aria-label="Call rider"
                 disabled
-                className="press grid size-11 place-items-center rounded-full bg-accent text-white opacity-50 shadow-[var(--glow-accent)]"
+                className="press grid size-11 place-items-center rounded-full bg-accent text-[var(--on-accent)] opacity-50 shadow-[var(--glow-accent)]"
               >
                 <Phone className="size-5" />
               </button>
@@ -538,7 +538,7 @@ export function TrackingView({
                   await cancelOrder();
                 }}
                 disabled={cancelBusy}
-                className="press rounded-full bg-deal py-3 text-sm font-bold text-white disabled:opacity-60"
+                className="press rounded-full bg-deal py-3 text-sm font-bold text-[var(--on-deal)] disabled:opacity-60"
               >
                 Yes, cancel
               </button>

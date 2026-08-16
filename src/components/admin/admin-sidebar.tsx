@@ -52,7 +52,7 @@ export function AdminSidebar({
       <div className="flex h-full w-[216px] flex-col bg-[var(--sb-bg)]">
         <div className="flex items-center gap-[9px] px-4 pb-4 pt-[18px]">
           <Link href="/admin" className="press flex items-center gap-[9px]">
-            <span className="grid size-[26px] shrink-0 place-items-center rounded-[7px] bg-accent text-sm font-bold text-white">
+            <span className="grid size-[26px] shrink-0 place-items-center rounded-[7px] bg-accent text-sm font-bold text-[var(--on-accent)]">
               D
             </span>
             <span className="min-w-0">
@@ -98,7 +98,7 @@ export function AdminSidebar({
           <SystemCard health={health} />
 
           <div className="flex items-center gap-2.5">
-            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent text-[11px] font-bold text-white">
+            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent text-[11px] font-bold text-[var(--on-accent)]">
               {initials(name)}
             </span>
             <span className="min-w-0 flex-1">

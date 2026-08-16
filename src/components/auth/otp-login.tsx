@@ -128,7 +128,7 @@ export function OtpLogin({
   }
 
   const ctaClass =
-    "press flex h-12 w-full items-center justify-center gap-2 rounded-full bg-accent text-[16px] font-bold text-white shadow-[var(--glow-accent)] disabled:opacity-50";
+    "press flex h-12 w-full items-center justify-center gap-2 rounded-full bg-accent text-[16px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:opacity-50";
 
   // ---- Phone step ----
   if (step === "phone") {

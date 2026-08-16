@@ -1,6 +1,10 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  effectiveCommissionPct,
+  getVendorCommissionDefault,
+} from "@/lib/data-access/admin-commission";
 import { VENDOR_STATUSES, type VendorStatus } from "@/lib/vendor-status";
 import { legiblePassword } from "@/lib/utils/password";
 import { toE164 } from "@/lib/auth/phone";
@@ -46,7 +50,11 @@ export interface VendorListItem {
   ownerMobile: string | null;
   category: string | null;
   address: string | null;
-  commissionPct: number;
+  commissionPct: number | null;
+  /** `commissionPct` with the platform default already applied. */
+  effectiveCommissionPct: number;
+  /** True when this vendor tracks the platform rate rather than its own. */
+  inheritsPlatformRate: boolean;
   status: VendorStatus;
   isOpen: boolean;
   imageUrl: string | null;
@@ -102,7 +110,7 @@ export interface VendorInput {
   ownerEmail: string | null;
   tagline: string | null;
   description: string | null;
-  commissionPct: number;
+  commissionPct: number | null;
   minOrder: number;
   deliveryAvailable: boolean;
   selfPickup: boolean;
@@ -219,7 +227,7 @@ function isMissingSchema(
   );
 }
 
-function mapListItem(row: VendorRow): VendorListItem {
+function mapListItem(row: VendorRow, platformDefault = 0): VendorListItem {
   return {
     id: row.id,
     slug: row.slug,
@@ -228,7 +236,17 @@ function mapListItem(row: VendorRow): VendorListItem {
     ownerMobile: row.owner_mobile,
     category: row.category,
     address: row.address,
-    commissionPct: Number(row.commission_pct ?? 0),
+    // null means "inherit the platform rate" — see migration 0032. Preserved as
+    // null rather than coerced to 0, which would read as "this vendor is free".
+    commissionPct:
+      row.commission_pct === null ? null : Number(row.commission_pct),
+    // What this vendor is actually billed, with the platform rate already
+    // resolved — every screen that just prints a percentage wants this one.
+    effectiveCommissionPct: effectiveCommissionPct(
+      row.commission_pct === null ? null : Number(row.commission_pct),
+      platformDefault
+    ),
+    inheritsPlatformRate: row.commission_pct === null,
     status: row.status,
     isOpen: row.is_open,
     imageUrl: row.image_url,
@@ -239,9 +257,13 @@ function mapListItem(row: VendorRow): VendorListItem {
   };
 }
 
-function mapDetail(row: VendorRow, menuItemCount: number): VendorDetail {
+function mapDetail(
+  row: VendorRow,
+  menuItemCount: number,
+  platformDefault = 0
+): VendorDetail {
   return {
-    ...mapListItem(row),
+    ...mapListItem(row, platformDefault),
     ownerId: row.owner_id ?? "",
     tagline: row.tagline ?? null,
     description: row.description ?? null,
@@ -343,7 +365,10 @@ export async function listVendors(
     throw error;
   }
 
-  const items = (data as VendorRow[] | null ?? []).map(mapListItem);
+  const platformDefault = await getVendorCommissionDefault();
+  const items = ((data as VendorRow[] | null) ?? []).map((r) =>
+    mapListItem(r, platformDefault)
+  );
   // Attach manual featured slots (0021); resilient if the column is absent.
   const { byId } = await getVendorPositions();
   for (const item of items) item.sortPosition = byId.get(item.id) ?? null;
@@ -382,7 +407,10 @@ export async function listAwaitingApproval(
     throw error;
   }
 
-  return ((data as VendorRow[] | null) ?? []).map(mapListItem);
+  const platformDefault = await getVendorCommissionDefault();
+  return ((data as VendorRow[] | null) ?? []).map((r) =>
+    mapListItem(r, platformDefault)
+  );
 }
 
 /** The six dashboard cards. A failing sub-count reads as 0, never blank. */
@@ -452,7 +480,8 @@ export async function getVendorDetail(id: string): Promise<VendorDetail | null> 
     .select("id", { count: "exact", head: true })
     .eq("restaurant_id", id);
 
-  const detail = mapDetail(data as VendorRow, count ?? 0);
+  const platformDefault = await getVendorCommissionDefault();
+  const detail = mapDetail(data as VendorRow, count ?? 0, platformDefault);
   const { byId } = await getVendorPositions();
   detail.sortPosition = byId.get(id) ?? null;
   return detail;

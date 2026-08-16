@@ -716,7 +716,7 @@ function BusinessStep({
                 }
                 className={
                   "press rounded-full px-3 py-1.5 text-sm font-semibold " +
-                  (on ? "bg-accent text-white" : "bg-surface-2 text-muted")
+                  (on ? "bg-accent text-[var(--on-accent)]" : "bg-surface-2 text-muted")
                 }
               >
                 {d}
@@ -857,8 +857,18 @@ function PaymentStep({ data, update }: StepProps) {
           min={0}
           max={100}
           step={0.5}
-          value={data.commissionPct ?? 0}
-          onChange={(e) => update({ commissionPct: Number(e.target.value) })}
+          placeholder="Platform rate"
+          onFocus={(e) => e.currentTarget.select()}
+          value={data.commissionPct ?? ""}
+          onChange={(e) =>
+            // Blank = inherit the platform rate. Only a typed number becomes an
+            // override, so a shop registered without a rate follows the
+            // platform instead of being pinned at 0% forever.
+            update({
+              commissionPct:
+                e.target.value === "" ? undefined : Number(e.target.value),
+            })
+          }
         />
       </Field>
     </Card>
@@ -1230,7 +1240,14 @@ function ReviewStep({
           : "—",
       step: 3,
     },
-    { label: "Commission", value: `${data.commissionPct ?? 0}%`, step: 3 },
+    {
+      label: "Commission",
+      value:
+        data.commissionPct === undefined || data.commissionPct === null
+          ? "Platform rate"
+          : `${data.commissionPct}%`,
+      step: 3,
+    },
     { label: "FSSAI", value: data.fssaiNumber ?? "—", step: 4 },
     { label: "Menu items", value: String((data.menuItems ?? []).filter((m) => m.name?.trim()).length), step: 5 },
     { label: "Terms", value: data.tcAccepted ? "Accepted" : "Not accepted", step: 6 },

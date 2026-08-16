@@ -23,9 +23,17 @@
      measured at 16px is not a pass at 11px uppercase with letter-spacing —
      which is what most labels on the operator screens actually are.
      Ratios below are against --surface (#ffffff) unless stated. */
-  --bg: #ffffff;
-  --surface: #ffffff;
-  --surface-2: #f4f5f6;
+  /* Page vs card. These were both #ffffff, which gave the light theme a
+     separation of 1.000:1 — a card was literally indistinguishable from the
+     page behind it, and every screen read as one unbroken sheet of white.
+     The ground now sits a step below the card so hierarchy comes from value
+     rather than from borders alone, and neither is pure white: a full-screen
+     #ffffff at typical display brightness is the glare people mean when they
+     say a light theme is tiring. Warm-neutral rather than blue-grey, to match
+     the console's ground and keep food photography looking appetising. */
+  --bg: #f4f3f0;
+  --surface: #fcfcfb;
+  --surface-2: #edece8;
   --ink: #0e1417;
   /* 7.20:1 (was #6a7178 — 4.95:1, and only 4.53:1 on --surface-2, which is
      where half the muted text in the admin console actually sits). This one
@@ -34,18 +42,37 @@
   --muted: #52585e;
   --accent: #f2660c; /* Deligro orange — the action + the live moment */
   --accent-soft: #fdecdd;
-  --accent-ink: #b8500e; /* readable orange for text on light — 5.01:1 */
+  /* Label colour for anything filled with --accent. White on orange is 3.14:1
+     in light and 2.43:1 in dark — below AA at every button size this app ships
+     (14–17px semibold, so WCAG's large-text exemption never applies). Orange is
+     simply too luminous to carry white; the same reasoning already gave gold
+     pills their dark --pop-ink. One value clears AA against all four accent
+     variants — #f2660c 5.60:1, #ea5b0c 5.03:1, #ff8534 7.25:1 — so it needs no
+     per-theme override, and the brand orange itself is untouched. */
+  --on-accent: #2a1305;
+  /* Readable orange for text on light. Held against --accent-soft (the pill
+     ground) rather than against white, because that is the harder pairing and
+     the one `.pill-accent` actually uses — on #fdecdd the old #b8500e was
+     4.35:1, a near-miss that still reads as washed out at pill sizes. */
+  --accent-ink: #a4460b;
   /* 5.39:1 as text, and the same white-on-green. The old #17b26a was 2.76:1
      BOTH ways: green text was unreadable, and so was white text on a green
      fill. Deeper, but it is the difference between a colour and a decoration. */
   --green: #0f7a48;
   --green-soft: #e7f8ef;
+  /* Labels on solid --green / --deal fills. Light keeps white (5.39:1 and
+     5.34:1), but both tokens brighten in dark to stay visible on a dark page,
+     and white on those lifted values collapses to 1.94:1 and 3.05:1 — the
+     dark-mode delivery ticks and the solid deal capsule were effectively
+     unlabelled. Same trade as --on-accent: keep the fill, darken the ink. */
+  --on-green: #ffffff;
+  --on-deal: #ffffff;
   --deal: #d1201a; /* discount badges + strikethrough deal prices — 5.34:1 (was 4.31:1) */
   --deal-soft: #fdeceb;
   --pop: #ffc531; /* Popular / bestseller amber */
-  --pop-ink: #7a5200;
+  --pop-ink: #6b4700; /* was #7a5200 — 4.38:1 on the amber pill, just under AA */
   --blue: #2b5f8c;
-  --line: #ececef;
+  --line: #dedcd6; /* was #ececef, invisible against the new warmer ground */
 
   /* Elevation — deliberately restrained */
   --shadow-sm: 0 1px 2px rgba(14, 20, 23, 0.05);
@@ -63,11 +90,11 @@
      two shells: the console, which is themed, and the phone frame, which is
      not. A component reaching for `var(--c-divider)` inside the phone preview
      would otherwise resolve to nothing and draw no border at all. */
-  --c-hover: #fafafb;
-  --c-divider: #f2f2f4;
-  --c-divider-2: #f6f6f8;
-  --c-border-strong: #dcdce0;
-  --c-border-hover: #c6c6cc;
+  --c-hover: #f6f5f2;
+  --c-divider: #eae8e3;
+  --c-divider-2: #f0efeb;
+  --c-border-strong: #d5d2ca;
+  --c-border-hover: #bfbbb2;
   --c-faint: #a8adb2;
   --c-bar: #e6e7ea;
   --c-bar-peak: #c9cbd0;
@@ -92,9 +119,13 @@
   --green-soft: rgba(23, 61, 43, 0.7);
   --deal: #ff5c4d;
   --deal-soft: rgba(74, 27, 24, 0.7);
+  /* Inherited by the dark console too, whose green/deal are lifted the same
+     way (#4ed07f / #ff6b5c) — 9.47:1 and 6.62:1 there. */
+  --on-green: #04160c;
+  --on-deal: #2b0704;
   --pop: #ffce5c;
   --pop-ink: #4a3000; /* dark ink so gold pills (.pill-pop) stay readable in dark mode */
-  --blue: #5b96c9;
+  --blue: #77b0e0; /* was #5b96c9 — 4.37:1 on --c-tint-blue, the ground .pill-blue puts it on */
   --line: #2a3036;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -147,6 +178,21 @@
 
 * {
   border-color: var(--line);
+}
+
+/* `--accent` is tuned as a *fill*: it has to carry white button labels, so it
+   stays vivid. As text on a light ground that same value is 2.8–3.4:1, under
+   AA — and `text-accent` is used as text at ~106 call sites, which is where
+   most of the "I can't read the orange" reports come from. `--accent-ink` is
+   the readable orange this file already defines for exactly that job, so the
+   utility resolves to it rather than asking every call site to remember.
+   `bg-accent`, `border-accent` and the `/nn` opacity variants are untouched.
+
+   Unlayered on purpose: Tailwind emits its own `.text-accent` inside
+   `@layer utilities`, and an unlayered rule beats any layered one regardless
+   of source order, so this holds without `!important`. */
+.text-accent {
+  color: var(--accent-ink);
 }
 
 html {
@@ -231,6 +277,22 @@ h6 {
   right: 0;
   bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
   z-index: 20;
+}
+/* Web console: the bar lives in the content column, after the form.
+   `.dashboard-shell` is only mounted in App/Web = Web. Do not use a
+   container query here — `position: fixed` is containing-blocked by
+   overflow/transform ancestors, so a @container override never won. */
+.dashboard-shell .action-dock {
+  position: static;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
+  margin-top: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  backdrop-filter: none;
 }
 
 /* ---------- Surfaces ----------
@@ -1109,35 +1171,42 @@ body:has(.dashboard-shell) {
       #8B8F98 (5.3:1). The hue is the handoff's, the value is ours.
    ------------------------------------------------------------ */
 .console-theme {
-  --bg: #f5f4f1;
-  --surface: #ffffff;
-  --surface-2: #fbfaf8;
+  /* A console is read for a whole shift, so the ground is pulled down and the
+     card off pure white: the old pairing was #ffffff cards at 1.100:1 over the
+     page, which on a wall-to-wall dashboard is a lot of raw white for very
+     little hierarchy. Card still reads as raised, with less to squint through. */
+  --bg: #eeece7;
+  --surface: #fbfaf8;
+  --surface-2: #f4f2ee;
   --ink: #14171c;
-  --muted: #6e7178;
+  /* 4.44:1 on the page ground and 4.22:1 on --c-divider under the old #6e7178,
+     i.e. failing AA exactly where the console puts most of its 10.5–12px
+     labels. Deepened until it clears AA on the darkest ground it lands on. */
+  --muted: #5b5f66;
   --accent: #ea5b0c;
-  --accent-soft: #fdf1ea;
-  --accent-ink: #b8460a;
-  --green: #0f7b4f;
-  --green-soft: #e7f5ee;
+  --accent-soft: #fbeade;
+  --accent-ink: #a03f08;
+  --green: #0d7046; /* 4.48:1 on the page ground at #0f7b4f — under AA by a hair */
+  --green-soft: #e4f3ec;
   --deal: #c0362c;
   --deal-soft: #fbebe9;
   --pop: #b45309;
   --pop-ink: #ffffff;
   --blue: #2b5f8e;
-  --line: #e4e1da;
+  --line: #dbd7ce;
 
   /* Console-only values Tailwind has no token for. */
-  --c-hover: #faf9f6; /* row hover */
-  --c-divider: #f0eee9; /* inner hairline, lighter than --line */
-  --c-divider-2: #f4f2ee; /* table body row rule, lighter still */
-  --c-border-strong: #dcd8d0; /* outlined buttons */
-  --c-border-hover: #c9c5bc;
-  --c-faint: #b4b0a8; /* non-text only: em-dash placeholders, tracks */
-  --c-bar: #e6e3dc; /* chart bars */
-  --c-bar-peak: #c6c2b9;
-  --c-tint-blue: #eaf1f8;
-  --c-tint-amber: #fdf3e4;
-  --c-ink-amber: #9a4708;
+  --c-hover: #f3f1ec; /* row hover */
+  --c-divider: #e8e5df; /* inner hairline, lighter than --line */
+  --c-divider-2: #efede7; /* table body row rule, lighter still */
+  --c-border-strong: #d3cfc6; /* outlined buttons */
+  --c-border-hover: #bdb9b0;
+  --c-faint: #a8a49c; /* non-text only: em-dash placeholders, tracks */
+  --c-bar: #ddd9d1; /* chart bars */
+  --c-bar-peak: #bcb8ae;
+  --c-tint-blue: #e6eef7;
+  --c-tint-amber: #fbf0dd;
+  --c-ink-amber: #8a3f06;
   --c-spark-up: #2e9e68;
   --c-spark-down: #d06a5f;
 
@@ -1776,9 +1845,12 @@ input:focus-visible + .c-switch {
   background: var(--accent-soft);
   color: var(--accent-ink);
 }
+/* Was `--accent-ink`: an orange ink on a green tint, which read as a
+   mis-coloured accent pill rather than a live/delivered state. The console
+   override below has always used `--green`; this brings the app in line. */
 .pill-green {
   background: var(--green-soft);
-  color: var(--accent-ink);
+  color: var(--green);
 }
 .pill-muted {
   background: var(--surface-2);
@@ -1786,7 +1858,7 @@ input:focus-visible + .c-switch {
 }
 .pill-deal {
   background: var(--deal);
-  color: #fff;
+  color: var(--on-deal);
 }
 .pill-pop {
   background: var(--pop);

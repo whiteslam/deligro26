@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/field";
+import { cn } from "@/lib/utils/cn";
 import { saveSettingsAction, type ActionResult } from "./actions";
 import type { PlatformSettings } from "@/types";
 
@@ -26,16 +27,23 @@ function Card({
   title,
   desc,
   children,
+  className,
 }: {
   title: string;
   desc?: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="rounded-xl border border-line bg-surface px-[17px] py-4">
+    <section
+      className={cn(
+        "flex h-full flex-col rounded-xl border border-line bg-surface px-[17px] py-4",
+        className
+      )}
+    >
       <h2 className="text-[14.5px] font-bold tracking-[-0.01em]">{title}</h2>
       {desc ? <p className="mt-0.5 text-xs text-muted">{desc}</p> : null}
-      <div className="mt-2.5">{children}</div>
+      <div className="mt-2.5 flex-1">{children}</div>
     </section>
   );
 }
@@ -64,6 +72,19 @@ function Row({
       </label>
       {children}
     </div>
+  );
+}
+
+/**
+ * A closing note under a card's rows. Carries the same top hairline the rows
+ * use so it reads as part of the stack rather than as text floating under it,
+ * which is what a bare <p> looked like next to the neighbouring cards.
+ */
+function Note({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="border-t border-[color:var(--c-divider)] pt-[11px] text-[11.5px] leading-relaxed text-muted">
+      {children}
+    </p>
   );
 }
 
@@ -112,6 +133,12 @@ function Num({
       min={min}
       max={max}
       step={step}
+      // Every one of these fields is pre-filled, usually with 0. Clicking into
+      // one drops the caret wherever the pointer landed — typically before the
+      // existing digit — so typing "10" over a "0" produced "100". Selecting on
+      // focus makes the first keystroke replace the value, which is what
+      // "change the number" means on a single-value field like this.
+      onFocus={(e) => e.currentTarget.select()}
       className="c-field text-data tabular-nums"
     />
   );
@@ -120,10 +147,25 @@ function Num({
 export function SettingsForm({
   settings,
   razorpayConfigured = false,
+  vendorCommissionPct = 0,
+  commissionCoverage = { inheriting: 0, overridden: 0, migrated: true },
 }: {
   settings: PlatformSettings;
   /** Are the Razorpay keys present in this environment? */
   razorpayConfigured?: boolean;
+  /**
+   * Passed separately from `settings` on purpose: `PlatformSettings` is
+   * client-safe and shared with the cart, and what the platform charges its
+   * vendors is not storefront config. See `admin-commission.ts`.
+   */
+  vendorCommissionPct?: number;
+  /** How many vendors track the platform rate vs hold their own. */
+  commissionCoverage?: {
+    inheriting: number;
+    overridden: number;
+    /** False until migration 0032 is applied. */
+    migrated: boolean;
+  };
 }) {
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(
     saveSettingsAction,
@@ -131,7 +173,7 @@ export function SettingsForm({
   );
 
   return (
-    <form action={formAction} className="space-y-4 pb-24">
+    <form action={formAction} className="space-y-4 pb-24 @3xl:pb-0">
       {state.error ? (
         <p className="rounded-xl border border-deal/30 bg-deal/10 px-3.5 py-3 text-sm font-medium text-deal">
           {state.error}
@@ -143,8 +185,55 @@ export function SettingsForm({
         </p>
       ) : null}
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] items-start gap-3.5">
+      <div className="grid grid-cols-1 items-stretch gap-3.5 @3xl:grid-cols-2">
         <Card
+          className="@3xl:order-1"
+          title="Vendor commission"
+          desc="What the platform keeps from each vendor's food subtotal. Settlements are generated from it."
+        >
+          <Row
+            label="Commission"
+            hint="Percent of the food subtotal."
+            htmlFor="vendorCommissionPct"
+          >
+            <Num
+              id="vendorCommissionPct"
+              name="vendorCommissionPct"
+              defaultValue={vendorCommissionPct}
+              max={100}
+              step={0.5}
+            />
+          </Row>
+          <Note>
+            {!commissionCoverage.migrated ? (
+              <>
+                Not stored yet — apply migration{" "}
+                <code className="rounded bg-surface-2 px-1">
+                  0032_platform_commission.sql
+                </code>{" "}
+                to save a platform rate. Until then each vendor keeps its own
+                commission.
+              </>
+            ) : commissionCoverage.overridden > 0 ? (
+              <>
+                Applies to {commissionCoverage.inheriting} of{" "}
+                {commissionCoverage.inheriting + commissionCoverage.overridden}{" "}
+                vendors — the other {commissionCoverage.overridden} have a
+                negotiated rate and won&apos;t change. Settlements already
+                generated keep the rate they were created with.
+              </>
+            ) : (
+              <>
+                Applies to all {commissionCoverage.inheriting} vendors.
+                Settlements already generated keep the rate they were created
+                with. To exempt one vendor, set a commission on their own page.
+              </>
+            )}
+          </Note>
+        </Card>
+
+        <Card
+          className="@3xl:order-2"
           title="Fees and tax"
           desc="Authoritative — every order is billed from these, free delivery and minimums included."
         >
@@ -177,6 +266,7 @@ export function SettingsForm({
         </Card>
 
         <Card
+          className="@3xl:order-3"
           title="Availability"
           desc="Turn the whole platform — or individual verticals — on and off."
         >
@@ -226,6 +316,7 @@ export function SettingsForm({
         </Card>
 
         <Card
+          className="@3xl:order-5"
           title="Payments"
           desc="Cash on delivery is always available. Online payment is off until you turn it on here."
         >
@@ -270,6 +361,7 @@ export function SettingsForm({
         </Card>
 
         <Card
+          className="@3xl:order-6"
           title="Dispatch and rider payout"
           desc="Operational defaults and the formula riders are paid by."
         >
@@ -311,6 +403,7 @@ export function SettingsForm({
         </Card>
 
         <Card
+          className="@3xl:order-4"
           title="Support and brand"
           desc="Shown to customers on the Help and Profile screens."
         >
@@ -357,10 +450,21 @@ export function SettingsForm({
         </Card>
       </div>
 
-      <div className="action-dock flex items-center gap-3 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur">
-        <Button type="submit" disabled={pending}>
+      <div className="action-dock flex items-center gap-3 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur @3xl:mt-1 @3xl:justify-end">
+        <Button
+          type="submit"
+          disabled={pending}
+          className="@3xl:hidden"
+        >
           {pending ? "Saving…" : "Save settings"}
         </Button>
+        <button
+          type="submit"
+          disabled={pending}
+          className="c-btn c-btn-dark press hidden disabled:opacity-50 @3xl:inline-flex"
+        >
+          {pending ? "Saving…" : "Save settings"}
+        </button>
         <p className="text-xs text-muted">
           Nothing is saved until you press this.
         </p>

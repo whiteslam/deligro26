@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Bike,
@@ -10,107 +11,56 @@ import {
   Loader2,
   ShieldCheck,
   UserPlus,
-  Users,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, fieldCls } from "@/components/ui/field";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { useAdminShell } from "@/stores/admin-shell-store";
+import { cn } from "@/lib/utils/cn";
 import { createEmployeeAction } from "./actions";
-import type { EmployeeListItem, EmployeeRole } from "@/lib/data-access/employees";
-
-const dateFmt = new Intl.DateTimeFormat("en-IN", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
+import type { EmployeeRole } from "@/lib/data-access/employees";
 
 const ROLE_META: Record<
   EmployeeRole,
-  { label: string; blurb: string; icon: typeof ShieldCheck; pill: string }
+  { label: string; blurb: string; icon: typeof ShieldCheck }
 > = {
   manager: {
     label: "Manager",
     blurb: "Full access to the admin panel",
     icon: ShieldCheck,
-    pill: "pill pill-green",
   },
   driver: {
     label: "Driver",
     blurb: "Delivery partner app only",
     icon: Bike,
-    pill: "pill pill-accent",
   },
 };
 
-export function EmployeesManager({
-  employees,
+export function CreateEmployeeButton({
   configured,
 }: {
-  employees: EmployeeListItem[];
   configured: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="space-y-4">
-      <Button className="w-full" onClick={() => setOpen(true)} disabled={!configured}>
-        <UserPlus className="size-4" /> Create employee
-      </Button>
-
-      {!configured ? (
-        <p className="rounded-xl border border-pop/40 bg-pop/10 px-3.5 py-3 text-sm font-medium text-ink">
-          Connect Supabase to create and manage employees.
-        </p>
-      ) : null}
-
-      <section>
-        <h2 className="text-label mb-2">Team members</h2>
-        {employees.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 rounded-xl border border-line bg-surface px-4 py-10 text-center">
-            <Users className="size-8 text-muted" />
-            <p className="font-semibold">No employees yet</p>
-            <p className="text-sm text-muted">
-              Create a manager or driver login to get started.
-            </p>
-          </div>
-        ) : (
-          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
-            {employees.map((e) => (
-              <EmployeeRow key={e.id} employee={e} />
-            ))}
-          </ul>
-        )}
-      </section>
-
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        disabled={!configured}
+        className="c-btn c-btn-dark press disabled:pointer-events-none disabled:opacity-50"
+      >
+        <UserPlus className="size-3.5" strokeWidth={2.4} /> Create employee
+      </button>
       {open ? (
         <CreateEmployeeSheet
           onClose={() => setOpen(false)}
           onCreated={() => setOpen(false)}
         />
       ) : null}
-    </div>
-  );
-}
-
-function EmployeeRow({ employee: e }: { employee: EmployeeListItem }) {
-  const meta = ROLE_META[e.role];
-  const Icon = meta.icon;
-  return (
-    <li className="flex items-center gap-3 px-4 py-3.5">
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-ink">
-        <Icon className="size-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <p className="truncate font-semibold">{e.fullName ?? "Unnamed"}</p>
-          <span className={meta.pill}>{meta.label}</span>
-        </div>
-        <p className="mt-0.5 truncate text-xs text-muted">
-          {e.phone ?? "No mobile"}
-          {e.createdAt ? ` · Joined ${dateFmt.format(new Date(e.createdAt))}` : ""}
-        </p>
-      </div>
-    </li>
+    </>
   );
 }
 
@@ -122,6 +72,9 @@ function CreateEmployeeSheet({
   onCreated: () => void;
 }) {
   const router = useRouter();
+  const isDesktop = useIsDesktop();
+  const shellMode = useAdminShell((s) => s.mode);
+  const isWeb = isDesktop && shellMode !== "app";
   const [role, setRole] = useState<EmployeeRole>("manager");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -152,30 +105,57 @@ function CreateEmployeeSheet({
     });
   }
 
-  function done() {
-    onCreated();
+  function dismiss() {
+    if (created) onCreated();
+    else onClose();
   }
 
-  return (
-    <div className="fixed inset-0 z-50">
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (created) onCreated();
+      else onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [created, onCreated, onClose]);
+
+  const overlay = (
+    <div
+      className={
+        isWeb
+          ? "fixed inset-0 z-50 flex items-center justify-center p-6"
+          : "fixed inset-0 z-50"
+      }
+    >
       <button
         type="button"
         aria-label="Close"
-        onClick={created ? done : onClose}
+        onClick={dismiss}
         className="absolute inset-0 bg-ink/40"
       />
       <div
         role="dialog"
         aria-modal="true"
-        className="bolt-sheet animate-sheet-in absolute inset-x-0 bottom-0 max-h-[90vh] overflow-y-auto p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+        className={
+          isWeb
+            ? "relative z-10 flex w-full max-w-lg max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-xl"
+            : "bolt-sheet animate-sheet-in absolute inset-x-0 bottom-0 max-h-[90vh] overflow-y-auto p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+        }
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div
+          className={
+            isWeb
+              ? "flex items-center justify-between border-b border-line px-5 py-3.5"
+              : "mb-4 flex items-center justify-between"
+          }
+        >
           <h2 className="text-heading">
             {created ? "Employee created" : "Create employee"}
           </h2>
           <button
             type="button"
-            onClick={created ? done : onClose}
+            onClick={dismiss}
             className="press grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
           >
             <X className="size-5" />
@@ -183,113 +163,153 @@ function CreateEmployeeSheet({
         </div>
 
         {created ? (
-          <CreatedPanel
-            role={role}
-            email={created.email}
-            password={created.password}
-            onDone={done}
-          />
+          <div className={isWeb ? "overflow-y-auto p-5" : undefined}>
+            <CreatedPanel
+              role={role}
+              email={created.email}
+              password={created.password}
+              onDone={dismiss}
+              isWeb={isWeb}
+            />
+          </div>
         ) : (
-          <div className="space-y-4">
-            <div>
-              <span className="text-xs font-semibold text-muted">Role</span>
-              <div className="mt-1.5 grid grid-cols-2 gap-2">
-                {(Object.keys(ROLE_META) as EmployeeRole[]).map((r) => {
-                  const meta = ROLE_META[r];
-                  const Icon = meta.icon;
-                  const active = role === r;
-                  return (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setRole(r)}
-                      className={
-                        "press rounded-xl border p-3 text-left transition-colors " +
-                        (active
-                          ? "border-accent bg-accent-soft"
-                          : "border-line bg-surface-2")
-                      }
-                    >
-                      <Icon
-                        className={
-                          "size-4 " + (active ? "text-accent" : "text-muted")
-                        }
-                      />
-                      <p className="mt-1.5 text-sm font-bold text-ink">
-                        {meta.label}
-                      </p>
-                      <p className="text-[11px] text-muted">{meta.blurb}</p>
-                    </button>
-                  );
-                })}
+          <div
+            className={
+              isWeb ? "flex min-h-0 flex-1 flex-col" : "space-y-4"
+            }
+          >
+            <div
+              className={
+                isWeb ? "grid gap-4 overflow-y-auto px-5 py-4 sm:grid-cols-2" : "space-y-4"
+              }
+            >
+              <div className={isWeb ? "sm:col-span-2" : undefined}>
+                <span className="text-xs font-semibold text-muted">Role</span>
+                <div className="mt-1.5 grid grid-cols-2 gap-2">
+                  {(Object.keys(ROLE_META) as EmployeeRole[]).map((r) => {
+                    const meta = ROLE_META[r];
+                    const Icon = meta.icon;
+                    const active = role === r;
+                    return (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setRole(r)}
+                        className={cn(
+                          "press rounded-xl border p-3 text-left transition-colors",
+                          isWeb && "p-2.5",
+                          active
+                            ? "border-accent bg-accent-soft"
+                            : "border-line bg-surface-2"
+                        )}
+                      >
+                        <Icon
+                          className={
+                            "size-4 " + (active ? "text-accent" : "text-muted")
+                          }
+                        />
+                        <p className="mt-1.5 text-sm font-bold text-ink">
+                          {meta.label}
+                        </p>
+                        <p className="text-[11px] text-muted">{meta.blurb}</p>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              <Field label="Full name" required>
+                <input
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g. Priya Sharma"
+                  className={fieldCls}
+                />
+              </Field>
+
+              <Field label="Email" required hint="Used to sign in to the portal.">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  autoCapitalize="none"
+                  className={fieldCls}
+                />
+              </Field>
+
+              <Field
+                label="Mobile"
+                hint="Optional. Enables OTP sign-in for this employee."
+              >
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  className={fieldCls}
+                />
+              </Field>
+
+              <Field
+                label="Password"
+                hint="Leave blank to auto-generate a one-time password to hand off."
+              >
+                <input
+                  type="text"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Auto-generated"
+                  autoCapitalize="none"
+                  className={fieldCls}
+                />
+              </Field>
+
+              {error ? (
+                <p className="text-sm font-medium text-deal sm:col-span-2">
+                  {error}
+                </p>
+              ) : null}
             </div>
 
-            <Field label="Full name" required>
-              <input
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="e.g. Priya Sharma"
-                className={fieldCls}
-              />
-            </Field>
-
-            <Field label="Email" required hint="Used to sign in to the portal.">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
-                autoCapitalize="none"
-                className={fieldCls}
-              />
-            </Field>
-
-            <Field
-              label="Mobile"
-              hint="Optional. Enables OTP sign-in for this employee."
-            >
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+91 98765 43210"
-                className={fieldCls}
-              />
-            </Field>
-
-            <Field
-              label="Password"
-              hint="Leave blank to auto-generate a one-time password to hand off."
-            >
-              <input
-                type="text"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Auto-generated"
-                autoCapitalize="none"
-                className={fieldCls}
-              />
-            </Field>
-
-            {error ? (
-              <p className="text-sm font-medium text-deal">{error}</p>
-            ) : null}
-
-            <Button className="w-full" disabled={pending} onClick={submit}>
-              {pending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <>
-                  <UserPlus className="size-4" /> Create {ROLE_META[role].label.toLowerCase()}
-                </>
-              )}
-            </Button>
+            {isWeb ? (
+              <div className="flex justify-end gap-2 border-t border-line px-5 py-3.5">
+                <Button size="sm" variant="secondary" onClick={onClose} disabled={pending}>
+                  Cancel
+                </Button>
+                <Button size="sm" disabled={pending} onClick={submit}>
+                  {pending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <>
+                      <UserPlus className="size-3.5" /> Create{" "}
+                      {ROLE_META[role].label.toLowerCase()}
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <Button className="mt-4 w-full" disabled={pending} onClick={submit}>
+                {pending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <>
+                    <UserPlus className="size-4" /> Create{" "}
+                    {ROLE_META[role].label.toLowerCase()}
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         )}
       </div>
     </div>
   );
+
+  if (isWeb && typeof document !== "undefined") {
+    return createPortal(overlay, document.body);
+  }
+  return overlay;
 }
 
 function CreatedPanel({
@@ -297,11 +317,13 @@ function CreatedPanel({
   email,
   password,
   onDone,
+  isWeb,
 }: {
   role: EmployeeRole;
   email: string;
   password: string;
   onDone: () => void;
+  isWeb: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -316,9 +338,17 @@ function CreatedPanel({
       <CopyRow label="Email" value={email} />
       <CopyRow label="Temporary password" value={password} mono icon />
 
-      <Button className="w-full" variant="secondary" onClick={onDone}>
-        Done
-      </Button>
+      {isWeb ? (
+        <div className="flex justify-end">
+          <Button size="sm" variant="secondary" onClick={onDone}>
+            Done
+          </Button>
+        </div>
+      ) : (
+        <Button className="w-full" variant="secondary" onClick={onDone}>
+          Done
+        </Button>
+      )}
     </div>
   );
 }

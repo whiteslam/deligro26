@@ -172,7 +172,7 @@ function LoginForm() {
       <button
         type="submit"
         disabled={busy}
-        className="press mt-4 flex h-14 w-full items-center justify-center rounded-full bg-accent text-[17px] font-bold text-white shadow-[var(--glow-accent)] disabled:opacity-50"
+        className="press mt-4 flex h-14 w-full items-center justify-center rounded-full bg-accent text-[17px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:opacity-50"
       >
         {busy ? "Signing in…" : "Sign in"}
       </button>

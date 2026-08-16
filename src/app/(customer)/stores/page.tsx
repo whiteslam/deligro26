@@ -74,7 +74,7 @@ export default async function StoresPage({
             action={
               <Link
                 href="/stores"
-                className="press rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white shadow-[var(--glow-accent)]"
+                className="press rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)]"
               >
                 Show all stores
               </Link>

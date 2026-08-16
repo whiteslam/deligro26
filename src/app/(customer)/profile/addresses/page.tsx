@@ -78,7 +78,7 @@ export default function ProfileAddressesPage() {
             <button
               type="button"
               onClick={() => setShowAdd(true)}
-              className="press mt-4 rounded-full bg-accent px-6 py-3 text-sm font-bold text-white"
+              className="press mt-4 rounded-full bg-accent px-6 py-3 text-sm font-bold text-[var(--on-accent)]"
             >
               Add address
             </button>

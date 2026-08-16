@@ -8,6 +8,7 @@ import {
   PreviewNotice,
 } from "@/components/admin/admin-ui";
 import { StatTile, StatTiles } from "@/components/admin/console-ui";
+import { PromoBannerCarousel } from "@/components/home/promo-banner-carousel";
 import { BannerRowActions } from "./banner-row-actions";
 
 /**
@@ -149,6 +150,14 @@ function CampaignCard({ banner: b }: { banner: Banner }) {
   const a = b.analytics;
   return (
     <article className="flex flex-col gap-3.5 rounded-xl border border-line bg-surface px-[17px] py-4">
+      {/* The slide itself, rendered by the customer component so what an
+          operator approves here cannot drift from what ships. `analytics={false}`
+          because a campaigns list that logged an impression per card would be
+          measuring its own audience. */}
+      <div className="pointer-events-none -mx-[17px] -mt-4 overflow-hidden rounded-t-xl [&_a]:rounded-none">
+        <PromoBannerCarousel banners={[b]} placement="preview" analytics={false} />
+      </div>
+
       <div className="flex items-start gap-3">
         <span
           className="grid size-10 shrink-0 place-items-center rounded-[9px] text-lg"

@@ -64,7 +64,7 @@ export function AdminNavDrawer({
       />
       <div className="absolute inset-y-0 left-0 flex w-[248px] max-w-[85vw] flex-col bg-[var(--sb-bg)] shadow-[var(--shadow-lg)]">
         <div className="flex items-center gap-[9px] px-4 pb-4 pt-[18px]">
-          <span className="grid size-[26px] shrink-0 place-items-center rounded-[7px] bg-accent text-sm font-bold text-white">
+          <span className="grid size-[26px] shrink-0 place-items-center rounded-[7px] bg-accent text-sm font-bold text-[var(--on-accent)]">
             D
           </span>
           <span className="min-w-0 flex-1">

@@ -1,6 +1,10 @@
 import { AdminHero, PreviewNotice } from "@/components/admin/admin-ui";
 import { getSettings, settingsBackendReady } from "@/lib/settings";
 import { isRazorpayConfigured } from "@/lib/payments/razorpay";
+import {
+  getCommissionCoverage,
+  getVendorCommissionDefault,
+} from "@/lib/data-access/admin-commission";
 import { SettingsForm } from "../settings-form";
 
 /**
@@ -12,18 +16,21 @@ import { SettingsForm } from "../settings-form";
 export const dynamic = "force-dynamic";
 
 export default async function PlatformSettingsPage() {
-  const [settings, backendReady] = await Promise.all([
-    getSettings(),
-    settingsBackendReady(),
-  ]);
+  const [settings, backendReady, vendorCommissionPct, commissionCoverage] =
+    await Promise.all([
+      getSettings(),
+      settingsBackendReady(),
+      getVendorCommissionDefault(),
+      getCommissionCoverage(),
+    ]);
 
   return (
-    <div className="admin-measure space-y-5">
+    <>
       <AdminHero
         backHref="/admin/settings"
         backLabel="Settings"
         title="Platform configuration"
-        subtitle="Fees, support, availability & the rider payout formula."
+        subtitle="Fees, support, availability and the rider payout formula."
       />
 
       {!backendReady ? (
@@ -42,7 +49,9 @@ export default async function PlatformSettingsPage() {
       <SettingsForm
         settings={settings}
         razorpayConfigured={isRazorpayConfigured}
+        vendorCommissionPct={vendorCommissionPct}
+        commissionCoverage={commissionCoverage}
       />
-    </div>
+    </>
   );
 }

@@ -61,7 +61,7 @@ export function CartSwitchDialog() {
             <button
               type="button"
               onClick={confirm}
-              className="press h-12 flex-1 rounded-full bg-accent text-[15px] font-bold text-white shadow-[var(--glow-accent)]"
+              className="press h-12 flex-1 rounded-full bg-accent text-[15px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)]"
             >
               Start new
             </button>

@@ -199,7 +199,7 @@ function TrackingMapFallback({
           className="absolute transition-all duration-1000 ease-out"
           style={{ left, top }}
         >
-          <span className="pulse-ring grid size-8 place-items-center rounded-full bg-accent text-white ring-4 ring-white/70">
+          <span className="pulse-ring grid size-8 place-items-center rounded-full bg-accent text-[var(--on-accent)] ring-4 ring-white/70">
             <Bike className="size-4" />
           </span>
         </div>

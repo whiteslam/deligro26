@@ -30,7 +30,7 @@ export default async function FavoritesPage() {
           </p>
           <Link
             href="/"
-            className="press mt-4 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-bold text-white"
+            className="press mt-4 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-bold text-[var(--on-accent)]"
           >
             <Compass className="size-4" /> Explore restaurants
           </Link>

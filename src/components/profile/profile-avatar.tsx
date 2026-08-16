@@ -134,7 +134,7 @@ export function ProfileAvatar({
             initials
           )}
         </span>
-        <span className="absolute -bottom-0.5 -right-0.5 grid size-6 place-items-center rounded-full border-2 border-bg bg-accent text-white">
+        <span className="absolute -bottom-0.5 -right-0.5 grid size-6 place-items-center rounded-full border-2 border-bg bg-accent text-[var(--on-accent)]">
           {busy ? (
             <Loader2 className="size-3 animate-spin" />
           ) : (
