@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronDown, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { resolveLanding } from "@/lib/auth/landing";
 import { cn } from "@/lib/utils/cn";
 
 type Step = "phone" | "code";
@@ -15,8 +14,12 @@ const CODE_LEN = 6;
  * Phone-OTP login. Requests a code (Renflair SMS via our API), then verifies it
  * and exchanges the returned magic-link token for a real Supabase session.
  *
+ * `next` is where a successful sign-in lands — the caller decides that (the
+ * customer door sends you into the app, the vendor door into /vendor). This
+ * component never re-routes on role.
+ *
  * Two layouts share one logic core:
- *   - "card"        centred block, button under the input (operator /login)
+ *   - "card"        centred block, button under the input
  *   - "onboarding"  full-height screen with the primary CTA pinned to the
  *                   bottom and a country prefix beside the field — the
  *                   standard mobile sign-up shape used in the entry flow.
@@ -107,18 +110,10 @@ export function OtpLogin({
         return;
       }
 
-      // Route by the account's real role, not a hardcoded "/". The destination
-      // is resolved once and reused for the MFA hop so the user lands in their
-      // own portal (a vendor → /vendor, never the customer shell).
-      const dest = await resolveLanding(next);
-
-      const { data: aal } =
-        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (aal?.currentLevel !== "aal2" && aal?.nextLevel === "aal2") {
-        router.push(`/mfa?next=${encodeURIComponent(dest)}`);
-      } else {
-        router.push(dest);
-      }
+      // Go where this door leads — the caller already resolved that. This used
+      // to look the account's role up and reroute, which is exactly how a
+      // customer sign-in could end up on the admin console.
+      router.push(next);
       router.refresh();
     } catch {
       setError("Network error — please try again.");

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { GUEST_COOKIE } from "@/lib/auth/guest";
+import { loginPathForRole } from "@/lib/auth/portals";
 
 export type Role = "customer" | "restaurant" | "driver" | "admin" | "manager";
 
@@ -83,6 +84,11 @@ export async function requireUser(): Promise<Profile> {
  * role check (check #2 of authenticated -> role -> ownership). Wrong role gets a
  * consistent redirect — the UI never decides access on its own.
  *
+ * The redirect goes to the door for the role that was *required*, not the one
+ * the visitor has: a customer who opens /admin lands on the admin sign-in page
+ * and is told that account can't open it, rather than being dumped on their own
+ * login with no explanation.
+ *
  * In demo mode (no Supabase keys) it passes through so the static UI renders.
  */
 export async function requireRole(role: Role | Role[]): Promise<Profile> {
@@ -94,7 +100,7 @@ export async function requireRole(role: Role | Role[]): Promise<Profile> {
 
   const profile = await requireUser();
   if (!allowed.includes(profile.role)) {
-    redirect("/login?denied=1");
+    redirect(`${loginPathForRole(allowed[0])}?denied=1`);
   }
   return profile;
 }

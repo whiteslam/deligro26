@@ -30,11 +30,14 @@ loudly. Better here than silently in front of customers.
 
 | Variable | Why |
 |---|---|
-| `MFA_EXEMPT_EMAILS` | Lets a named account into the admin portal without MFA. Development already exempts the `@deligro.demo` trio automatically; production must not |
+| `MFA_EXEMPT_EMAILS` | Dead since migration 0033 removed MFA — nothing reads it. Delete it wherever it is still set, so it is never mistaken for a live control |
 
 - [ ] Every required variable is set on the **Production** environment
       specifically — not just Preview, not just Development.
-- [ ] `MFA_EXEMPT_EMAILS` is unset in Production.
+- [ ] `MFA_EXEMPT_EMAILS` is unset everywhere (MFA is gone; the variable is dead).
+- [ ] Each portal's sign-in page loads for a signed-out visitor and admits only
+      its own role: `/admin/login`, `/vendor/login`, `/manager/login`,
+      `/driver/login`, and `/login` for customers.
 - [ ] No `NEXT_PUBLIC_` prefix on anything secret. Check with
       `grep -rn 'NEXT_PUBLIC_' src/ | grep -i 'secret\|service\|password'`.
 - [ ] Preview deployments do **not** carry production keys. Preview URLs are

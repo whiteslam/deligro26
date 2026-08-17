@@ -1,6 +1,5 @@
 import { StatusBar } from "@/components/layout/status-bar";
 import { requireRole } from "@/lib/auth";
-import { requireOperatorMfa } from "@/lib/auth/mfa";
 
 // The Manager / Sub-Admin portal. Managers are primarily a mobile client, but
 // this web route exists so a manager who signs in on the web lands somewhere
@@ -12,7 +11,6 @@ export default async function ManagerLayout({
   children: React.ReactNode;
 }) {
   await requireRole(["manager", "admin"]);
-  await requireOperatorMfa("/manager", "manager"); // opt-in, like the other operator portals
 
   return (
     <div className="device">

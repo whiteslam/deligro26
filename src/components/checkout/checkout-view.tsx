@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -31,6 +31,12 @@ import {
   openRazorpayCheckout,
   RazorpayDismissedError,
 } from "@/lib/payments/razorpay-checkout";
+import {
+  codLimitHint,
+  DEFAULT_PAYMENT_RULES,
+  paymentAvailability,
+  type VendorPaymentRules,
+} from "@/lib/payments/cod-rules";
 import type { PaymentMethod } from "@/types";
 
 type CheckoutStatus = "ready" | "processing" | "paying" | "placed";
@@ -94,7 +100,6 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   // from the config: an admin turning payments off mid-session must not leave a
   // stale "online" selection that the order API will refuse.
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
-  const payOnline = config.onlinePayments && paymentMethod === "online";
 
   // One definition of what an order costs, from the live platform settings the
   // server bills with — so the quote here equals the charge.
@@ -130,6 +135,46 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   // into the taxable base.
   const payTotal = Math.max(0, charges.total - discount);
 
+  // ---- what this shop takes ----
+  // Which methods are on offer is a per-vendor fact, and the basket only knows
+  // its restaurant on the client, so it is fetched rather than passed in.
+  // Starts permissive-but-platform-bounded so the options do not flicker: the
+  // order API re-checks every rule anyway, so being briefly optimistic here
+  // costs a clear error message, never a wrong charge.
+  const [vendorRules, setVendorRules] = useState<VendorPaymentRules>({
+    ...DEFAULT_PAYMENT_RULES,
+    acceptOnline: config.onlinePayments,
+  });
+
+  useEffect(() => {
+    if (!restaurantSlug || !isSupabaseConfigured) return;
+    let live = true;
+    fetch(`/api/restaurants/${encodeURIComponent(restaurantSlug)}/payment-options`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { rules?: VendorPaymentRules } | null) => {
+        if (live && d?.rules) setVendorRules(d.rules);
+      })
+      .catch(() => {
+        // Leave the optimistic default in place. The server is the gate.
+      });
+    return () => {
+      live = false;
+    };
+  }, [restaurantSlug]);
+
+  // Measured against what the customer will actually hand over — after the
+  // coupon, including delivery and tax. That is the cash the rider collects.
+  const availability = paymentAvailability(vendorRules, payTotal);
+  const codHint = codLimitHint(vendorRules, payTotal);
+
+  // The selection is a request; this is what it resolves to. Deriving it (rather
+  // than "fixing" paymentMethod in an effect) is what stops the basket crossing
+  // the cash ceiling and leaving a stale COD selection behind: add one more
+  // item and the order becomes an online one on the same render.
+  const payOnline = availability.online && !availability.cod
+    ? true
+    : availability.online && paymentMethod === "online";
+
   const applyCoupon = async () => {
     const code = couponInput.trim();
     if (!code) return;
@@ -159,7 +204,10 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   const belowMinimum = config.minOrder > 0 && subtotal < config.minOrder;
   const shortBy = config.minOrder - subtotal;
   const ordersClosed = !config.acceptingOrders;
-  const checkoutBlocked = ordersClosed || belowMinimum;
+  // A shop with cash switched off and online unavailable can take nothing. The
+  // button is disabled rather than left to fail at the API, because "Could not
+  // place the order" after filling in an address is a worse way to learn it.
+  const checkoutBlocked = ordersClosed || belowMinimum || availability.noMethod;
 
   // Move the map pin onto whichever address the customer picked. Adjusted during
   // render rather than in an effect, so the map never paints a frame still
@@ -290,6 +338,10 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
       );
       return;
     }
+    if (availability.notice && !availability.cod && !availability.online) {
+      setError(availability.notice);
+      return;
+    }
     if (!selectedAddress) {
       setError("Add a delivery address to continue.");
       setAddFormRequested(true);
@@ -349,7 +401,11 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
           return;
         }
 
-        const data = (await res.json()) as { order?: { id: string }; error?: string };
+        const data = (await res.json()) as {
+          order?: { id: string };
+          error?: string;
+          message?: string;
+        };
         if (!res.ok || !data.order?.id) {
           // The server re-prices the coupon against the order it is about to
           // write, so it can refuse one the preview accepted — the code lapsed
@@ -360,6 +416,14 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
             setCoupon(null);
             setCouponError(couponMessage(reason, config.minOrder));
             setError("Your promo code was refused. Check the total and try again.");
+            setStatus("ready");
+            return;
+          }
+          // A payment refusal arrives with its own sentence, because the cash
+          // ceiling is per shop and only the server knows the number. Show it
+          // verbatim rather than paraphrasing it into something vaguer.
+          if (data.message) {
+            setError(data.message);
             setStatus("ready");
             return;
           }
@@ -579,17 +643,42 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
           <div className="border-b border-line px-4 py-3">
             <h2 className="text-[15px] font-bold">Payment</h2>
             <p className="mt-0.5 text-xs text-muted">
-              {config.onlinePayments
+              {availability.cod && availability.online
                 ? "Pay now by UPI or card, or pay the courier on delivery."
-                : "Cash on delivery. Online payment is on the way."}
+                : availability.online
+                  ? "Pay now by UPI, card, netbanking or wallet."
+                  : availability.cod
+                    ? "Pay the courier in cash when your order arrives."
+                    : "Payment is not available for this shop right now."}
             </p>
           </div>
           <div className="space-y-2 p-4">
+            {/* The one line that has to be plain English: it tells the customer
+                what to do, not what went wrong. */}
+            {availability.notice ? (
+              <p className="rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[13px] font-medium leading-snug text-accent-ink">
+                {availability.notice}
+              </p>
+            ) : null}
             <PaymentOption
               icon={<Banknote className="size-5" />}
               label="Cash on delivery"
-              desc="Pay the courier when your order arrives."
-              selected={!payOnline}
+              desc={
+                availability.codRefusal === "over_limit"
+                  ? "Not available for this amount."
+                  : codHint ?? "Pay the courier when your order arrives."
+              }
+              selected={availability.cod && !payOnline}
+              // Genuinely disabled, not merely styled that way — and the order
+              // API refuses a cash order over the ceiling regardless.
+              disabled={!availability.cod}
+              badge={
+                availability.codRefusal === "over_limit"
+                  ? "Over cash limit"
+                  : availability.codRefusal === "cod_off"
+                    ? "Not accepted"
+                    : undefined
+              }
               onSelect={() => setPaymentMethod("cod")}
             />
             <PaymentOption
@@ -597,11 +686,14 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
               label="Pay online"
               desc="UPI, cards, netbanking and wallets."
               selected={payOnline}
-              // The single source of truth for whether this is on offer. When
-              // false the input is genuinely disabled, not merely styled that
-              // way — and the server refuses an online order regardless.
-              disabled={!config.onlinePayments}
-              badge={config.onlinePayments ? undefined : "Available soon"}
+              disabled={!availability.online}
+              badge={
+                availability.online
+                  ? undefined
+                  : config.onlinePayments
+                    ? "Not accepted"
+                    : "Available soon"
+              }
               onSelect={() => setPaymentMethod("online")}
             />
           </div>
@@ -738,6 +830,11 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
           <p className="mb-2 text-center text-sm font-medium text-muted">
             Add {formatINR(shortBy)} more to reach the{" "}
             {formatINR(config.minOrder)} minimum.
+          </p>
+        ) : availability.noMethod ? (
+          <p className="mb-2 flex items-center gap-1.5 text-center text-sm font-medium text-deal">
+            <AlertTriangle className="size-4 shrink-0" />
+            This shop cannot take payment right now.
           </p>
         ) : null}
         <button

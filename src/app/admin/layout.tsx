@@ -1,6 +1,5 @@
 import { AdminShell } from "@/components/admin/admin-shell";
 import { getProfile, requireRole } from "@/lib/auth";
-import { requireOperatorMfa } from "@/lib/auth/mfa";
 import {
   getAdminNavCounts,
   type AdminNavCounts,
@@ -45,7 +44,6 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   await requireRole("admin");
-  await requireOperatorMfa("/admin", "admin"); // opt-in: challenges enrolled admins, lets others through
 
   // The console's badges and its "signed in as". Both are chrome: a failure
   // here must not take the page under it down, so counts fall back to zero

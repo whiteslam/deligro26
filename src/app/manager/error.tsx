@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
  *
  * The board itself already catches its own read failure and says so in place —
  * a manager shown an empty board during an outage would believe there was no
- * work. This covers what that cannot: a throw from the layout's `requireRole` /
- * `requireOperatorMfa` path, or from a server action's re-render.
+ * work. This covers what that cannot: a throw from the layout's `requireRole`
+ * path, or from a server action's re-render.
  *
  * Renders bare: the manager layout supplies `.device` / `.app-shell`, and
  * wrapping again would put a phone frame inside a phone frame on desktop.

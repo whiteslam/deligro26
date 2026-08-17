@@ -4,6 +4,13 @@ import { computeChargesWith } from "@/lib/pricing";
 import { getSettings } from "@/lib/settings";
 import { evaluateCoupon } from "@/lib/data-access/coupons";
 import { onlinePaymentsEnabled } from "@/lib/payments/availability";
+import { getVendorPaymentRules } from "@/lib/payments/vendor-rules";
+import {
+  refusalMessage,
+  refusePayment,
+  type PaymentRefusalCode,
+  type VendorPaymentRules,
+} from "@/lib/payments/cod-rules";
 import {
   notifyOrderPlaced,
   notifyVendorNewOrder,
@@ -188,6 +195,25 @@ export class CouponRejected extends Error {
   }
 }
 
+/**
+ * The shop does not take this payment method for this amount.
+ *
+ * Carries its own message rather than a bare code: the ceiling is per vendor,
+ * so "Orders above ₹300 must be paid online" cannot be written as a constant
+ * in the API layer — only the rules that refused the order know the number.
+ */
+export class PaymentRefused extends Error {
+  readonly customerMessage: string;
+  constructor(
+    public readonly reason: PaymentRefusalCode,
+    rules: VendorPaymentRules
+  ) {
+    super(reason);
+    this.name = "PaymentRefused";
+    this.customerMessage = refusalMessage(reason, rules);
+  }
+}
+
 /** Place an order — prices validated server-side from menu_items, never trusted from client. */
 export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const supabase = await createClient();
@@ -258,11 +284,26 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   // there is still nothing to undo. Charging someone full price for an order
   // they placed expecting a discount is the same wrong as quietly downgrading
   // how they pay, and gets the same answer: refuse loudly.
+  //
+  // It also has to happen before the cash-ceiling check below, because the
+  // discount is what decides whether this order is over the ceiling: a ₹320
+  // basket with a ₹50 code is ₹270 of cash at the door.
   const wantsCoupon = input.couponCode?.trim();
+  let previewDiscount = 0;
   if (wantsCoupon) {
     const preview = await evaluateCoupon(wantsCoupon, itemSubtotal);
     if (!preview.ok) throw new CouponRejected(preview.error as CouponFailure);
+    previewDiscount = Math.max(0, Math.round(preview.discount ?? 0));
   }
+
+  // What this shop takes, and up to what amount in cash. Re-read from the
+  // database on every order: the rules the browser was shown may be minutes
+  // old, and an admin who has just switched cash off for a shop expects that to
+  // hold from the next order, not the next page load.
+  const rules = await getVendorPaymentRules(restaurant.id);
+  const payable = Math.max(0, charges.total - previewDiscount);
+  const refusal = refusePayment(rules, paymentMethod, payable);
+  if (refusal) throw new PaymentRefused(refusal, rules);
 
   const base: Record<string, unknown> = {
     customer_id: user.id,

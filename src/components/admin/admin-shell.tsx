@@ -7,6 +7,7 @@ import { AdminTabBar } from "@/components/admin/admin-tab-bar";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminNavDrawer } from "@/components/admin/admin-nav-drawer";
 import { AdminTopBar } from "@/components/admin/admin-top-bar";
+import { FoodUploadDock } from "@/components/admin/food-upload-dock";
 import { DesktopShellSwitcher } from "@/components/shared/desktop-shell-switcher";
 import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { useAdminShell } from "@/stores/admin-shell-store";
@@ -84,6 +85,10 @@ export function AdminShell({
           onChange={setMode}
           hydrated={hydrated}
         />
+        {/* Outside `.device`: a folder upload started on the food photos page
+            keeps running wherever the operator goes next, so its progress
+            belongs to the console, not to the screen that began it. */}
+        <FoodUploadDock />
       </>
     );
   }
@@ -98,16 +103,24 @@ export function AdminShell({
           email={email}
         />
         <div className="admin-content">
-          <AdminTopBar counts={counts} onMenu={() => setNavOpen(true)} />
+          {/* The layout switch lives in this header. The floating pill is kept
+              only for the phone-frame branch above, which has no console header
+              to host it — putting it inside the fake handset would read as part
+              of the app being previewed. */}
+          <AdminTopBar
+            counts={counts}
+            onMenu={() => setNavOpen(true)}
+            shellMode="web"
+            onShellModeChange={setMode}
+            shellHydrated={hydrated}
+          />
           <main className="admin-main @container">{children}</main>
         </div>
       </div>
       <AdminNavDrawer open={navOpen} onClose={closeNav} counts={counts} />
-      <DesktopShellSwitcher
-        mode="web"
-        onChange={setMode}
-        hydrated={hydrated}
-      />
+      {/* Carries `console-theme` itself: it sits outside the shell div that
+          would otherwise hand it the console palette. */}
+      <FoodUploadDock className="console-theme" />
     </>
   );
 }

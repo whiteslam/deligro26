@@ -8,8 +8,23 @@ import {
   updateMenuItemAction,
 } from "@/app/vendor/actions";
 import { createClient } from "@/lib/supabase/client";
+import { FoodImagePicker } from "@/components/admin/food-image-picker";
+import {
+  searchVendorFoodImages,
+  suggestVendorFoodImages,
+} from "@/app/vendor/menu/actions";
 import type { VendorMenuItem } from "@/lib/data-access/vendor-menu";
 import { formatINR } from "@/lib/utils/format";
+
+/**
+ * The vendor-gated door onto the shared photo library. Same picker the admin
+ * console uses; a different pair of Server Actions behind it, because a vendor
+ * is not an admin (see the picker's ImageLibrarySource).
+ */
+const LIBRARY = {
+  suggest: suggestVendorFoodImages,
+  search: searchVendorFoodImages,
+};
 
 const INPUT =
   "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent";
@@ -117,6 +132,7 @@ export function MenuItemFormSheet({
   const [values, setValues] = useState<MenuFormValues>(() => toFormValues(item));
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
   const [pending, startTransition] = useTransition();
 
   if (!open) return null;
@@ -328,6 +344,14 @@ export function MenuItemFormSheet({
                 >
                   {uploading ? "Uploading…" : "Upload photo"}
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowLibrary((v) => !v)}
+                >
+                  Choose from storage
+                </Button>
                 {values.imageUrl ? (
                   <Button
                     type="button"
@@ -341,6 +365,28 @@ export function MenuItemFormSheet({
                 <p className="text-[11px] text-muted">JPEG/PNG/WebP · max 2 MB</p>
               </div>
             </div>
+
+            {/* The shared library. Opens on this dish's own name, so a wrongly
+                matched photo is one tap from the right one — and searching
+                "biryani" shows every kind so the correct variant can be picked
+                rather than guessed at. */}
+            {showLibrary ? (
+              <FoodImagePicker
+                dishName={values.name}
+                current={
+                  values.imageUrl
+                    ? { imageUrl: values.imageUrl, libraryId: null }
+                    : null
+                }
+                source={LIBRARY}
+                onPick={(picked) => {
+                  set("imageUrl", picked?.imageUrl ?? "");
+                  setShowLibrary(false);
+                }}
+                onClose={() => setShowLibrary(false)}
+              />
+            ) : null}
+
             <Field label="Or paste image URL">
               <input
                 value={values.imageUrl}

@@ -13,6 +13,10 @@ import {
   X,
 } from "lucide-react";
 import { activeNavItem } from "@/components/admin/admin-nav";
+import {
+  ShellModeToggle,
+  type ShellMode,
+} from "@/components/shared/desktop-shell-switcher";
 import type { AdminNavCounts } from "@/lib/data-access/admin-stats";
 import { cn } from "@/lib/utils/cn";
 
@@ -38,9 +42,17 @@ type ScopeId = (typeof SCOPES)[number]["id"];
 export function AdminTopBar({
   counts,
   onMenu,
+  shellMode,
+  onShellModeChange,
+  shellHydrated,
 }: {
   counts: AdminNavCounts;
   onMenu: () => void;
+  /** Current layout, so the toggle can live in the header rather than float. */
+  shellMode: ShellMode;
+  onShellModeChange: (mode: ShellMode) => void;
+  /** False until the stored preference has loaded; the toggle stays inert. */
+  shellHydrated: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -175,6 +187,20 @@ export function AdminTopBar({
             <Plus className="size-3.5" strokeWidth={2.4} />
             New campaign
           </Link>
+
+          {/* The layout switch, in the header rather than floating over the
+              page. It belongs with the other controls that change what you are
+              looking at, and a fixed pill in the bottom-right corner sat on top
+              of table footers and action docks on every screen. */}
+          <span
+            aria-hidden
+            className="mx-1 hidden h-5 w-px bg-line min-[480px]:block"
+          />
+          <ShellModeToggle
+            mode={shellMode}
+            onChange={onShellModeChange}
+            hydrated={shellHydrated}
+          />
         </div>
       </div>
     </header>

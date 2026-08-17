@@ -113,7 +113,7 @@ export function VendorSidebar({
             )}
           </div>
           {isSupabaseConfigured ? (
-            <form action="/auth/signout" method="post">
+            <form action="/auth/signout?next=/vendor/login" method="post">
               <button
                 type="submit"
                 className="press flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-muted hover:bg-surface-2 hover:text-ink"

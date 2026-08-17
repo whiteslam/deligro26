@@ -67,7 +67,7 @@ function TooltipBox({
         <p className="mb-1 text-[11px] font-semibold text-muted">{label}</p>
       ) : null}
       <p className="text-data text-[13px] font-bold text-ink">
-        {formatINR(find("gmv"))}
+        {formatINR(find("gmv"))} sales
       </p>
       <p className="text-data text-[11.5px] text-muted">
         {nf.format(find("orders"))} orders

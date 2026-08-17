@@ -15,6 +15,11 @@ import {
   type VendorStatus,
 } from "@/lib/data-access/admin-vendors";
 import {
+  DEFAULT_SETTLEMENT_CYCLE,
+  isSettlementCycle,
+  type SettlementCycle,
+} from "@/lib/settlements/cycle";
+import {
   createCategory,
   updateCategory,
   setCategoryEnabled,
@@ -111,6 +116,18 @@ function parseVendor(form: FormData): VendorInput {
     fssaiNumber: strOrNull(form, "fssaiNumber"),
     gstNumber: strOrNull(form, "gstNumber"),
     panNumber: strOrNull(form, "panNumber"),
+    // Payment rules & payout terms (0034). Toggles arrive as "on"/absent, so an
+    // unchecked box reads as false — which is the whole point of the control.
+    acceptCod: bool(form, "acceptCod"),
+    acceptOnline: bool(form, "acceptOnline"),
+    codMaxOrder: Math.max(0, Math.trunc(num(form, "codMaxOrder"))),
+    otherChargesPerOrder: Math.max(
+      0,
+      Math.trunc(num(form, "otherChargesPerOrder"))
+    ),
+    settlementCycle: isSettlementCycle(form.get("settlementCycle"))
+      ? (form.get("settlementCycle") as SettlementCycle)
+      : DEFAULT_SETTLEMENT_CYCLE,
   };
 }
 
@@ -135,6 +152,14 @@ function validateVendor(input: VendorInput): string | null {
     return "Commission must be between 0 and 100%.";
   if (input.ownerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.ownerEmail))
     return "That email address doesn't look right.";
+  // A shop with both methods off cannot take a single order. Refuse the save
+  // rather than let the operator discover it from a customer complaint.
+  if (!input.acceptCod && !input.acceptOnline)
+    return "Turn on at least one payment method — cash on delivery or online payment.";
+  // A cash limit with cash switched off is a setting that does nothing. Saying
+  // so is cheaper than letting someone believe the limit is in force.
+  if (input.codMaxOrder > 0 && !input.acceptCod)
+    return "The cash limit only applies when cash on delivery is on. Turn it on, or clear the limit.";
   return null;
 }
 

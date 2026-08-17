@@ -120,24 +120,40 @@ function deltaTone(d: KpiDelta): "up" | "down" | "flat" {
  * The dashboard's top band: five figures in one bordered container, split by
  * hairlines.
  *
- * The dividers are `box-shadow: 0 0 0 1px` on each cell over a 1px gap rather
- * than the usual "gap over a tinted background" trick. That is deliberate and
- * called out in the handoff: these cells wrap, and a wrapping partial row has
- * to leave plain white space at the end of the line, not a tinted empty cell.
+ * The dividers are the 1px gaps between cells, showing the container's own
+ * `--line` background through.
+ *
+ * They used to be a `box-shadow: 0 0 0 1px` ring on each cell, which drew a
+ * SQUARE outline on every side — including the outer edges, where it landed on
+ * top of the container's rounded border. On a straight edge the two coincided
+ * and nobody noticed; at the four corners the square ring cut across the 12px
+ * arc and the corner rendered doubled and notched.
+ *
+ * The original reason for the ring was that these cells wrap, and a partial
+ * last row must not leave a tinted empty cell at the end of the line. That does
+ * not arise: the cells are `flex-1`, so a wrapping row's cells grow to fill the
+ * width and there is no leftover space for the tint to show through. One thing
+ * draws the outline (the container border, which follows the radius), one thing
+ * draws the dividers (the gaps), and they never overlap.
  */
 export function KpiStrip({ items }: { items: KpiItem[] }) {
   if (!items.length) return null;
   return (
-    <div className="flex flex-wrap gap-px overflow-hidden rounded-xl border border-line bg-surface">
+    <div className="flex flex-wrap gap-px overflow-hidden rounded-xl border border-line bg-[var(--line)]">
       {items.map((k) => {
         const tone = k.delta ? deltaTone(k.delta) : "flat";
         return (
           <div
             key={k.label}
-            className="flex min-w-0 flex-1 basis-44 flex-col gap-[9px] bg-surface px-[15px] pb-3 pt-3.5 shadow-[0_0_0_1px_var(--line)]"
+            className="flex min-w-0 flex-1 basis-52 flex-col gap-[9px] bg-surface px-[15px] pb-3 pt-3.5"
           >
             <div className="flex items-baseline justify-between gap-2">
-              <span className="truncate text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted">
+              {/* Sentence case, wrapping to a second line rather than
+                  truncating. These labels are now plain English — "Riders
+                  currently delivering", not "RIDERS ON DELIVERY" — and a plain
+                  sentence clipped to "RIDERS CURRENTLY DELIV…" is harder to
+                  read than the jargon it replaced. */}
+              <span className="min-w-0 text-[11.5px] font-semibold leading-tight text-muted">
                 {k.label}
               </span>
               {k.delta ? (
@@ -194,22 +210,29 @@ export function StatTile({
   note?: string;
 }) {
   return (
-    <div className="rounded-[11px] border border-line bg-surface px-[15px] py-[13px]">
-      <p className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted">
+    <div className="rounded-[10px] border border-line bg-surface px-3 py-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">
         {label}
       </p>
-      <p className="mt-1.5 text-[21px] font-bold leading-none tracking-[-0.02em] tabular-nums text-ink">
+      <p className="mt-1 text-[18px] font-bold leading-none tracking-[-0.02em] tabular-nums text-ink">
         {value}
       </p>
-      {note ? <p className="mt-1.5 text-[11.5px] text-muted">{note}</p> : null}
+      {note ? (
+        <p className="mt-1 text-[11px] leading-snug text-muted">{note}</p>
+      ) : null}
     </div>
   );
 }
 
-/** A row of summary tiles, sized so they reflow rather than squash. */
+/**
+ * A row of summary tiles, sized so they reflow rather than squash.
+ *
+ * Deliberately tight: these are a band above a table, not the page's subject,
+ * and at the old size eight of them pushed the list they summarise off screen.
+ */
 export function StatTiles({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(178px,1fr))] gap-2">
       {children}
     </div>
   );

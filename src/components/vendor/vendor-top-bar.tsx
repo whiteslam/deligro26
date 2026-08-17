@@ -59,7 +59,7 @@ export function VendorTopBar({
           {showControls ? <RestaurantOpenToggle isOpen={isOpen} /> : null}
           <ThemeToggle />
           {isSupabaseConfigured ? (
-            <form action="/auth/signout" method="post">
+            <form action="/auth/signout?next=/vendor/login" method="post">
               <button
                 type="submit"
                 className="press grid size-9 place-items-center rounded-full border border-line bg-surface text-muted"

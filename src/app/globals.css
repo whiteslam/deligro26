@@ -1171,13 +1171,12 @@ body:has(.dashboard-shell) {
       #8B8F98 (5.3:1). The hue is the handoff's, the value is ours.
    ------------------------------------------------------------ */
 .console-theme {
-  /* A console is read for a whole shift, so the ground is pulled down and the
-     card off pure white: the old pairing was #ffffff cards at 1.100:1 over the
-     page, which on a wall-to-wall dashboard is a lot of raw white for very
-     little hierarchy. Card still reads as raised, with less to squint through. */
-  --bg: #eeece7;
-  --surface: #fbfaf8;
-  --surface-2: #f4f2ee;
+  /* Cool gray page, white cards. The previous ground (#eeece7) read as a
+     creamy off-white next to the dark rail; this pairing keeps hierarchy
+     without the paper tint. */
+  --bg: #f3f4f6;
+  --surface: #ffffff;
+  --surface-2: #f4f5f7;
   --ink: #14171c;
   /* 4.44:1 on the page ground and 4.22:1 on --c-divider under the old #6e7178,
      i.e. failing AA exactly where the console puts most of its 10.5–12px
@@ -1193,17 +1192,17 @@ body:has(.dashboard-shell) {
   --pop: #b45309;
   --pop-ink: #ffffff;
   --blue: #2b5f8e;
-  --line: #dbd7ce;
+  --line: #e2e4e8;
 
   /* Console-only values Tailwind has no token for. */
-  --c-hover: #f3f1ec; /* row hover */
-  --c-divider: #e8e5df; /* inner hairline, lighter than --line */
-  --c-divider-2: #efede7; /* table body row rule, lighter still */
-  --c-border-strong: #d3cfc6; /* outlined buttons */
-  --c-border-hover: #bdb9b0;
-  --c-faint: #a8a49c; /* non-text only: em-dash placeholders, tracks */
-  --c-bar: #ddd9d1; /* chart bars */
-  --c-bar-peak: #bcb8ae;
+  --c-hover: #f3f4f6; /* row hover */
+  --c-divider: #eceef1; /* inner hairline, lighter than --line */
+  --c-divider-2: #f1f2f4; /* table body row rule, lighter still */
+  --c-border-strong: #d4d7dc; /* outlined buttons */
+  --c-border-hover: #c0c4ca;
+  --c-faint: #9aa0a8; /* non-text only: em-dash placeholders, tracks */
+  --c-bar: #e2e4e8; /* chart bars */
+  --c-bar-peak: #c5c9d0;
   --c-tint-blue: #e6eef7;
   --c-tint-amber: #fbf0dd;
   --c-ink-amber: #8a3f06;
@@ -1885,4 +1884,107 @@ input:focus-visible + .c-switch {
   font-size: 0.8125rem;
   font-weight: 700;
   line-height: 1;
+}
+
+/* ------------------------------------------------------------
+   Print
+   ------------------------------------------------------------
+   Reports are exported as PDF through the browser's own print dialogue rather
+   than a bundled PDF renderer (see report-export.tsx for why). That makes this
+   block the export format: what a shop owner or an accountant receives is
+   whatever these rules produce.
+
+   Two jobs. Strip the console — rail, top bar, filters, buttons are navigation,
+   and navigation on paper is just ink. And undo the screen's dark-ready,
+   scroll-clipped layout, because a table inside `overflow-x: auto` prints
+   cropped at the viewport width, silently losing the right-hand columns. That
+   failure is invisible until someone reconciles a payout against a PDF whose
+   "Shop earned" column was never printed.
+
+   Scoped to `@media print` only, so nothing here can affect the screen.
+   ------------------------------------------------------------ */
+@media print {
+  /* Force the light palette. A dark-mode print is a page of black toner and,
+     on many printers, illegible grey-on-grey figures. */
+  :root,
+  :root[data-theme="dark"],
+  .console-theme {
+    color-scheme: light !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* The console chrome. */
+  .admin-sidebar,
+  .admin-top-bar,
+  .admin-tab-bar,
+  .admin-hero,
+  .action-dock,
+  .shell-switcher {
+    display: none !important;
+  }
+
+  /* Anything the page itself marked as screen-only (filter rows, export
+     buttons) — Tailwind's `print:hidden` already emits this, listed here so
+     the intent is findable from one place. */
+  [data-print="hide"] {
+    display: none !important;
+  }
+
+  .admin-shell {
+    display: block !important;
+    min-height: 0 !important;
+  }
+  .admin-main {
+    max-width: none !important;
+    padding: 0 !important;
+    gap: 12px !important;
+    /* The screen clips horizontal overflow; paper must not. */
+    overflow: visible !important;
+  }
+
+  /* Tables scroll sideways on screen and must lay flat on paper. */
+  .overflow-x-auto,
+  .overflow-hidden,
+  .overflow-auto {
+    overflow: visible !important;
+  }
+  table {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 10.5px !important;
+    border-collapse: collapse !important;
+  }
+  th,
+  td {
+    padding: 4px 6px !important;
+    border-bottom: 1px solid #ddd !important;
+  }
+  /* A multi-page table with no header on page 2 is a page of unlabelled
+     numbers. `thead` repeats; rows are kept whole. */
+  thead {
+    display: table-header-group;
+  }
+  tr,
+  img {
+    break-inside: avoid;
+  }
+
+  /* Cards lose their shadows and tints — both cost toner and neither carries
+     information on paper. */
+  .card,
+  .rounded-xl,
+  .rounded-2xl {
+    box-shadow: none !important;
+    border-color: #ddd !important;
+    background: #fff !important;
+  }
+
+  @page {
+    margin: 14mm;
+  }
 }

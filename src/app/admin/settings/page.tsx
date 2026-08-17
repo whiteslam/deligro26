@@ -1,18 +1,12 @@
 import Link from "next/link";
-import {
-  ChevronRight,
-  ShieldCheck,
-  SlidersHorizontal,
-  UserCog,
-} from "lucide-react";
+import { ChevronRight, SlidersHorizontal, UserCog } from "lucide-react";
 import { AdminHero } from "@/components/admin/admin-ui";
 import { settingsBackendReady } from "@/lib/settings";
-import { getMfaStatus } from "@/lib/data-access/mfa";
 
 /**
  * Settings home = a menu, not a form. Each row is a tap target that routes to
- * the screen that owns it (platform config, the ops shortcuts, security). The
- * actual editing lives on the sub-pages so this stays a clean settings tab.
+ * the screen that owns it (platform config, the ops shortcuts). The actual
+ * editing lives on the sub-pages so this stays a clean settings tab.
  *
  * Rows marked `phoneOnly` are the ones the console's sidebar now lists as
  * destinations of their own (Team, Platform config — see admin-nav.ts). They
@@ -35,10 +29,7 @@ const ICON_TONE = {
 type IconTone = keyof typeof ICON_TONE;
 
 export default async function AdminSettingsPage() {
-  const [backendReady, mfa] = await Promise.all([
-    settingsBackendReady(),
-    getMfaStatus(),
-  ]);
+  const backendReady = await settingsBackendReady();
 
   return (
     <div className="admin-measure space-y-6">
@@ -69,17 +60,6 @@ export default async function AdminSettingsPage() {
         />
       </Group>
 
-      <Group label="Account">
-        <Row
-          href="/admin/settings/security"
-          icon={ShieldCheck}
-          label="Security"
-          desc="Two-factor authentication"
-          tone="violet"
-          badge={mfa ? (mfa.enrolled ? "On" : "Off") : undefined}
-          badgeTone={mfa?.enrolled ? "green" : "muted"}
-        />
-      </Group>
     </div>
   );
 }

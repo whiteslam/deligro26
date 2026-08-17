@@ -44,7 +44,8 @@ function isMissingCommissionColumn(
   if (error.code === "PGRST204") return true;
   const msg = (error.message ?? "").toLowerCase();
   return (
-    msg.includes("vendor_commission_pct") &&
+    (msg.includes("vendor_commission_pct") ||
+      msg.includes("commission_gst_pct")) &&
     (msg.includes("schema cache") || msg.includes("does not exist"))
   );
 }
@@ -90,6 +91,43 @@ export async function getVendorCommissionDefault(): Promise<number> {
   if (error) return COMMISSION_FALLBACK_PCT;
   if (!data) return COMMISSION_FALLBACK_PCT;
   return clampCommissionPct(Number(data.vendor_commission_pct));
+}
+
+/**
+ * GST charged on the platform commission (18% in India), whole percent.
+ *
+ * Same visibility rules as the commission itself — 0035 keeps it off the
+ * anon/authenticated grant list — and the same fallback direction: a database
+ * that cannot tell us the rate charges none, rather than guessing 18 and
+ * deducting a tax nobody configured from a vendor's payout.
+ */
+export async function getCommissionGstPct(): Promise<number> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("platform_settings")
+    .select("commission_gst_pct")
+    .eq("id", true)
+    .maybeSingle();
+
+  if (error || !data) return 0;
+  return clampCommissionPct(Number(data.commission_gst_pct));
+}
+
+/** Loud on failure, for the same reason setVendorCommissionDefault is. */
+export async function setCommissionGstPct(pct: number): Promise<void> {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("platform_settings")
+    .update({
+      commission_gst_pct: clampCommissionPct(pct),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", true);
+
+  if (error) {
+    if (isMissingCommissionColumn(error)) throw new CommissionNotMigratedError();
+    throw error;
+  }
 }
 
 export class CommissionNotMigratedError extends Error {

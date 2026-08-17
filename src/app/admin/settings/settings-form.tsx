@@ -148,6 +148,7 @@ export function SettingsForm({
   settings,
   razorpayConfigured = false,
   vendorCommissionPct = 0,
+  commissionGstPct = 0,
   commissionCoverage = { inheriting: 0, overridden: 0, migrated: true },
 }: {
   settings: PlatformSettings;
@@ -159,6 +160,8 @@ export function SettingsForm({
    * vendors is not storefront config. See `admin-commission.ts`.
    */
   vendorCommissionPct?: number;
+  /** GST charged on that commission — the second deduction on a payout. */
+  commissionGstPct?: number;
   /** How many vendors track the platform rate vs hold their own. */
   commissionCoverage?: {
     inheriting: number;
@@ -200,6 +203,19 @@ export function SettingsForm({
               id="vendorCommissionPct"
               name="vendorCommissionPct"
               defaultValue={vendorCommissionPct}
+              max={100}
+              step={0.5}
+            />
+          </Row>
+          <Row
+            label="GST on commission"
+            hint="Percent of the commission, not of the food. 18 in India."
+            htmlFor="commissionGstPct"
+          >
+            <Num
+              id="commissionGstPct"
+              name="commissionGstPct"
+              defaultValue={commissionGstPct}
               max={100}
               step={0.5}
             />

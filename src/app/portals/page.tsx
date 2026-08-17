@@ -1,33 +1,55 @@
 import Link from "next/link";
-import { UtensilsCrossed, Store, Bike, ShieldCheck, ArrowRight } from "lucide-react";
+import type { Metadata } from "next";
+import {
+  UtensilsCrossed,
+  Store,
+  Bike,
+  ShieldCheck,
+  ClipboardList,
+  ArrowRight,
+} from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { PORTALS } from "@/lib/auth/portals";
 
-const PORTALS = [
+export const metadata: Metadata = { title: "Sign in · Deligro" };
+
+/**
+ * The directory of front doors. Each portal has its own sign-in page and its own
+ * accounts — there is no single global login that decides where you belong.
+ */
+const DOORS = [
   {
-    href: "/",
+    href: "/login",
     label: "Customer",
-    desc: "Browse, order & track — the main app",
+    desc: "Browse, order & track — phone OTP",
     icon: UtensilsCrossed,
     color: "var(--accent)",
   },
   {
-    href: "/vendor",
+    href: PORTALS.vendor.login,
     label: "Restaurant",
-    desc: "Accept orders, manage menu & earnings",
+    desc: PORTALS.vendor.blurb,
     icon: Store,
     color: "var(--accent)",
   },
   {
-    href: "/driver",
+    href: PORTALS.manager.login,
+    label: "Manager",
+    desc: PORTALS.manager.blurb,
+    icon: ClipboardList,
+    color: "var(--pop)",
+  },
+  {
+    href: PORTALS.driver.login,
     label: "Driver",
-    desc: "Available orders, accept & deliver",
+    desc: PORTALS.driver.blurb,
     icon: Bike,
     color: "var(--blue)",
   },
   {
-    href: "/admin",
+    href: PORTALS.admin.login,
     label: "Admin",
-    desc: "Overview, orders, refunds & approvals",
+    desc: PORTALS.admin.blurb,
     icon: ShieldCheck,
     color: "var(--green)",
   },
@@ -41,36 +63,36 @@ export default function PortalsPage() {
           <div>
             <p className="text-display">Deligro</p>
             <p className="text-sm text-muted">
-              One app · four surfaces, chosen by role at login.
+              One app · five surfaces, each with its own sign-in.
             </p>
           </div>
           <ThemeToggle />
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {PORTALS.map((p) => {
-            const Icon = p.icon;
+          {DOORS.map((d) => {
+            const Icon = d.icon;
             return (
-              <Link key={p.href} href={p.href} className="press card block p-5">
+              <Link key={d.href} href={d.href} className="press card block p-5">
                 <span
                   className="grid size-11 place-items-center rounded-xl"
-                  style={{ background: "var(--surface-2)", color: p.color }}
+                  style={{ background: "var(--surface-2)", color: d.color }}
                 >
                   <Icon className="size-5" />
                 </span>
                 <p className="mt-3 flex items-center gap-1 font-bold">
-                  {p.label} <ArrowRight className="size-4 text-muted" />
+                  {d.label} <ArrowRight className="size-4 text-muted" />
                 </p>
-                <p className="mt-0.5 text-sm text-muted">{p.desc}</p>
+                <p className="mt-0.5 text-sm text-muted">{d.desc}</p>
               </Link>
             );
           })}
         </div>
 
         <p className="mt-6 text-center text-xs text-muted">
-          Role routing is a UI convenience. In production, the server enforces
-          role + resource-ownership checks on every request — the real security
-          boundary.
+          Signing in at a portal only gets you that portal. The server enforces
+          role + resource-ownership checks on every request — that, and RLS
+          underneath it, is the real security boundary.
         </p>
       </main>
     </div>

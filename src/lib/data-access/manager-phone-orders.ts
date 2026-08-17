@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAccountByPhone } from "@/lib/auth/customer-account";
 import { toE164 } from "@/lib/auth/phone";
+import { getVendorPaymentRules } from "@/lib/payments/vendor-rules";
+import { refusePayment } from "@/lib/payments/cod-rules";
 import { computeChargesWith, type OrderCharges } from "@/lib/pricing";
 import { getSettings } from "@/lib/settings";
 import { shortOrderId } from "@/lib/utils/order-map";
@@ -284,6 +286,8 @@ export type PhoneOrderError =
   | "invalid_items"
   | "too_many_items"
   | "account_failed"
+  | "cod_not_accepted"
+  | "cod_over_limit"
   | "order_not_created";
 
 class PhoneOrderFailure extends Error {
@@ -424,6 +428,19 @@ export async function placePhoneOrder(
     // adding a charge the caller never agreed to.
     0
   );
+
+  // ---- can this shop take cash for this amount? -----------------------
+  // A phone order is always COD (see the insert below), so the shop's cash
+  // rules decide whether it can be taken at all. Checked here rather than left
+  // to the app checkout's copy of the rule: an operator on a live call needs to
+  // hear "that shop only takes cash up to ₹300" while the caller is still on
+  // the line, not after the order has been written.
+  const rules = await getVendorPaymentRules(restaurant.id);
+  const refusal = refusePayment(rules, "cod", charges.total);
+  if (refusal === "cod_limit_exceeded") {
+    throw new PhoneOrderFailure("cod_over_limit");
+  }
+  if (refusal) throw new PhoneOrderFailure("cod_not_accepted");
 
   // ---- the customer ---------------------------------------------------
   // After the validation above, so a mistyped dish doesn't leave a new account
