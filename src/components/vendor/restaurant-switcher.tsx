@@ -9,10 +9,12 @@ export function RestaurantSwitcher({
   restaurants,
   activeSlug,
   fullWidth = false,
+  className,
 }: {
   restaurants: OwnedRestaurant[];
   activeSlug: string;
   fullWidth?: boolean;
+  className?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -33,9 +35,10 @@ export function RestaurantSwitcher({
           });
         }}
         className={
-          fullWidth
+          className ??
+          (fullWidth
             ? "w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-ink"
-            : "max-w-[180px] truncate rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink"
+            : "max-w-[180px] truncate rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink")
         }
       >
         {restaurants.map((r) => (

@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PortalToShell } from "@/components/shared/portal-to-shell";
 import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 import type { KitchenOrder } from "@/lib/roles-data";
@@ -227,6 +228,7 @@ export function VendorOrderHistoryDialog({
   if (!open) return null;
 
   return (
+    <PortalToShell>
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 sm:items-center sm:p-4">
       <div
         role="dialog"
@@ -330,5 +332,6 @@ export function VendorOrderHistoryDialog({
         </div>
       </div>
     </div>
+    </PortalToShell>
   );
 }

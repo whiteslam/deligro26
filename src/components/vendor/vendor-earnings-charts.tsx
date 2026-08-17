@@ -299,7 +299,7 @@ export function VendorEarningsCharts({
   );
 
   return (
-    <div className="min-w-0 space-y-4 overflow-x-hidden lg:space-y-6">
+    <>
       <VendorHero
         title="Earnings"
         subtitle={
@@ -357,7 +357,7 @@ export function VendorEarningsCharts({
       ) : null}
       {error ? <p className="text-sm text-red-500">{error}</p> : null}
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 @3xl:grid-cols-4">
         <VendorMetricCard
           label={stats.rangeLabel}
           value={formatINR(stats.periodRevenue)}
@@ -399,7 +399,7 @@ export function VendorEarningsCharts({
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 @3xl:grid-cols-2">
         <ChartCard
           title="Revenue trend"
           hint={
@@ -528,7 +528,7 @@ export function VendorEarningsCharts({
         </ChartCard>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 @3xl:grid-cols-2">
         <ChartCard
           title="Fee breakdown"
           hint="How order totals split in this period"
@@ -617,7 +617,7 @@ export function VendorEarningsCharts({
         )}
       </ChartCard>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 @3xl:grid-cols-2">
         <VendorPanel
           title="Top dishes"
           subtitle="By revenue in this period"
@@ -697,7 +697,7 @@ export function VendorEarningsCharts({
         </VendorPanel>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 @3xl:grid-cols-4">
         <VendorPanel title="Prior period">
           <p className="text-data text-xl font-bold">
             {formatINR(stats.prevPeriodRevenue)}
@@ -744,6 +744,6 @@ export function VendorEarningsCharts({
           CSV for your accountant.
         </p>
       </VendorPanel>
-    </div>
+    </>
   );
 }

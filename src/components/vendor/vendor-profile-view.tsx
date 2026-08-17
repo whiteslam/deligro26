@@ -136,7 +136,7 @@ export function VendorProfileView({
         : "muted";
 
   return (
-    <div className="vendor-profile min-w-0 space-y-6 overflow-x-hidden pb-8 lg:space-y-8">
+    <div className="vendor-profile flex min-w-0 flex-col gap-[18px]">
       {/* Full-bleed storefront hero */}
       <section className="vendor-profile-hero relative isolate overflow-hidden rounded-[var(--radius-sheet)]">
         {r?.imageUrl ? (
@@ -276,7 +276,7 @@ export function VendorProfileView({
       {r ? (
         <>
           {/* Snapshot metrics */}
-          <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <section className="grid grid-cols-2 gap-3 @3xl:grid-cols-4">
             {[
               {
                 label: "Rating",
@@ -313,7 +313,7 @@ export function VendorProfileView({
             ))}
           </section>
 
-          <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr] lg:gap-6">
+          <div className="grid gap-4 @3xl:grid-cols-[1.4fr_1fr] @3xl:gap-6">
             {/* Listing details */}
             <section className="vendor-profile-panel space-y-5 rounded-[var(--radius-block)] border border-line bg-surface p-5">
               <div className="flex items-start justify-between gap-3">
@@ -473,6 +473,11 @@ export function VendorProfileView({
                   href="/vendor/earnings"
                   label="Earnings"
                   hint="Settlements & sales trends"
+                />
+                <QuickLink
+                  href="/vendor/settings"
+                  label="Settings"
+                  hint="Shop pin & two-factor login"
                 />
                 {live ? (
                   <QuickLink

@@ -2,21 +2,25 @@ import Link from "next/link";
 import { EyeOff, Store } from "lucide-react";
 import {
   listAssignableVendors,
+  listFeedTail,
   listSlotBoard,
   vendorPositionsReady,
   SLOT_COUNT,
   type FeaturedSlot,
 } from "@/lib/data-access/vendor-positions";
+import { listVendorRanking } from "@/lib/data-access/admin-vendor-ranking";
 import {
   AdminHero,
   EmptyState,
   LiveDot,
   PreviewNotice,
 } from "@/components/admin/admin-ui";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { cn } from "@/lib/utils/cn";
 import { SlotBoard } from "./slot-board";
+import { SlotRanking } from "./slot-ranking";
 import { FeedPreview } from "./feed-preview";
 
 /**
@@ -43,10 +47,16 @@ const REFRESH_MS = 8000;
 
 export default async function VendorSlotsPage() {
   const ready = await vendorPositionsReady();
-  const [slots, vendors] = await Promise.all([
+  const [slots, vendors, ranking] = await Promise.all([
     listSlotBoard(),
     listAssignableVendors(),
+    listVendorRanking(),
   ]);
+
+  // The fall-through can only be computed once we know who is pinned, so this
+  // one waits on `slots` rather than joining the batch above.
+  const pinnedIds = slots.flatMap((s) => s.vendors.map((v) => v.id));
+  const tail = await listFeedTail(pinnedIds, 3);
 
   const filled = slots.filter((s) => s.vendors.length > 0).length;
   const live = isSupabaseConfigured && ready;
@@ -74,36 +84,70 @@ export default async function VendorSlotsPage() {
         </PreviewNotice>
       ) : null}
 
-      {/* Board left, feed preview right — the preview is a narrow fixed column
-          because it is a phone-width sketch, and it stacks under the board below
-          @4xl where a 240px sidecar would squeeze the rows it explains. */}
-      <div className="grid gap-4 @4xl:grid-cols-[minmax(0,1fr)_236px] @4xl:items-start">
-        <div className="min-w-0">
-          {ready && vendors.length === 0 ? (
-            <EmptyState
-              icon={Store}
-              title="No shops to feature"
-              description="Add and approve a vendor first — then pin it to a slot here."
-              action={
-                <Link href="/admin/vendors" className="c-btn c-btn-dark press">
-                  Go to vendors
-                </Link>
-              }
-            />
-          ) : (
-            <SlotBoard slots={slots} vendors={vendors} disabled={!ready} />
-          )}
+      {/* The editor is console-only: ten reorder rows beside a 236px feed
+          sketch, with a searchable picker modal per slot. SlotSummary above
+          answers the question a phone actually asks — who is pinned, and where
+          — and keeps refreshing, so the screen is still worth opening. */}
+      <ConsoleOnly
+        tool="Editing featured slots"
+        why="The order above stays live here."
+      >
+        {/* Board left, feed preview right — the preview is a narrow fixed column
+            because it is a phone-width sketch, and it stacks under the board below
+            @4xl where a 260px sidecar would squeeze the rows it explains. */}
+        <div className="grid gap-4 @4xl:grid-cols-[minmax(0,1fr)_260px] @4xl:items-start">
+          <div className="min-w-0 space-y-4">
+            {ready && vendors.length === 0 ? (
+              <EmptyState
+                icon={Store}
+                title="No shops to feature"
+                description="Add and approve a vendor first — then pin it to a slot here."
+                action={
+                  <Link href="/admin/vendors" className="c-btn c-btn-dark press">
+                    Go to vendors
+                  </Link>
+                }
+              />
+            ) : (
+              <>
+                <SlotBoard
+                  slots={slots}
+                  vendors={vendors}
+                  metrics={ranking.byId}
+                  disabled={!ready}
+                />
+
+                {/* Under the board, not above it: the board is what the operator
+                    came to edit, and the ranking is the argument for editing it
+                    one way rather than another. */}
+                <SlotRanking
+                  rows={ranking.vendors}
+                  slotCount={SLOT_COUNT}
+                  truncated={ranking.truncated}
+                  disabled={!ready}
+                />
+              </>
+            )}
+          </div>
+
+          <FeedPreview
+            slots={slots}
+            metrics={ranking.byId}
+            tail={tail}
+            slotCount={SLOT_COUNT}
+          />
         </div>
 
-        <FeedPreview slots={slots} />
-      </div>
-
-      <p className="text-xs text-muted">
-        Slot 1 shows first. Unpinned shops keep the feed&rsquo;s default order
-        below the ten. A shop can hold one slot at a time — pinning it somewhere
-        else moves it rather than duplicating it, and dropping it on an occupied
-        slot frees that slot first.
-      </p>
+        <p className="text-xs text-muted">
+          Slot 1 shows first. Drag a row by its handle to move a shop to another
+          slot — the rows in between shift by one; the arrows step one slot at a
+          time and are the keyboard and touch path, since dragging is neither.
+          Unpinned shops keep the feed&rsquo;s default order below the ten. A shop
+          can hold one slot at a time — pinning it somewhere else moves it rather
+          than duplicating it, and dropping it on an occupied slot frees that slot
+          first.
+        </p>
+      </ConsoleOnly>
     </div>
   );
 }

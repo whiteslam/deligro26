@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PortalToShell } from "@/components/shared/portal-to-shell";
 import {
   createMenuItemAction,
   updateMenuItemAction,
@@ -180,6 +181,7 @@ export function MenuItemFormSheet({
   }
 
   return (
+    <PortalToShell>
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
       <div
         className="card w-full max-w-lg max-h-[92dvh] overflow-y-auto rounded-t-2xl p-4 sm:rounded-2xl sm:max-h-[90vh]"
@@ -400,6 +402,7 @@ export function MenuItemFormSheet({
         </form>
       </div>
     </div>
+    </PortalToShell>
   );
 }
 

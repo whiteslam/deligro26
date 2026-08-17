@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Banknote, Plus } from "lucide-react";
 import { AdminHero, EmptyState } from "@/components/admin/admin-ui";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { StatTile, StatTiles } from "@/components/admin/console-ui";
 import {
   DataTable,
@@ -183,10 +184,12 @@ export default async function AdminSettlementsPage({
         tag={stats.draftCount > 0 ? `${stats.draftCount} draft` : "All settled"}
         subtitle="Vendor payouts and holds, batched by date range"
         action={
-          <Link href="/admin/settlements/new" className="c-btn c-btn-dark press">
-            <Plus className="size-3.5" strokeWidth={2.4} />
-            New settlement
-          </Link>
+          <ConsoleOnly tool="Building a settlement" notice={false}>
+            <Link href="/admin/settlements/new" className="c-btn c-btn-dark press">
+              <Plus className="size-3.5" strokeWidth={2.4} />
+              New settlement
+            </Link>
+          </ConsoleOnly>
         }
       />
 
@@ -195,6 +198,14 @@ export default async function AdminSettlementsPage({
           {loadError}
         </p>
       ) : null}
+
+      {/* Reading payouts works on a phone; composing a batch is console work,
+          so the New settlement button drops out of the header and says why
+          here — once, rather than at both of its two call sites. */}
+      <ConsoleOnly
+        tool="Building a settlement"
+        why="Reading and tracking existing payouts works fine here."
+      />
 
       {counts.length > 1 ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -216,9 +227,11 @@ export default async function AdminSettlementsPage({
           title="No settlements yet"
           description="Pick a vendor and a date range to build a draft from delivered orders that have not been settled."
           action={
-            <Link href="/admin/settlements/new" className="c-btn c-btn-dark press">
-              New settlement
-            </Link>
+            <ConsoleOnly tool="Building a settlement" notice={false}>
+              <Link href="/admin/settlements/new" className="c-btn c-btn-dark press">
+                New settlement
+              </Link>
+            </ConsoleOnly>
           }
         />
       ) : rows.length > 0 ? (

@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { ListOrdered, Plus, Store, Tags } from "lucide-react";
+import {
+  CheckCircle2,
+  ListOrdered,
+  Plus,
+  Store,
+  Tags,
+} from "lucide-react";
 import {
   getVendorCounts,
   listAwaitingApproval,
@@ -9,50 +15,25 @@ import {
 } from "@/lib/data-access/admin-vendors";
 import { listCategories } from "@/lib/data-access/vendor-categories";
 import { AdminHero, EmptyState } from "@/components/admin/admin-ui";
-import { StatTile, StatTiles } from "@/components/admin/console-ui";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { VendorApprovalCards } from "@/components/admin/vendor-approval-cards";
-import {
-  DataTable,
-  TableFooter,
-  type Column,
-} from "@/components/admin/data-table";
+import { VendorStorefrontCard } from "@/components/admin/vendor-storefront-card";
+import { AdminQuickLink } from "@/components/admin/admin-quick-link";
+import { TableFooter } from "@/components/admin/data-table";
 import { formatWaited } from "@/lib/utils/format";
 import { VendorSearchBar } from "./vendor-search-bar";
-import { VendorRowActions } from "./vendor-row-actions";
-import { VendorPositionSelect } from "./vendor-position-select";
 
 /**
- * Admin → Vendors. Two jobs on one screen, in the order they matter.
+ * Admin → Vendors, laid out like a partner storefront rather than a spreadsheet.
  *
- * First the approval backlog as decision cards — the redesign's "clear the
- * queue" screen, which is what an operator opens this page to do on most days.
- * Then the full catalogue as a table, which is the management tool: sorting,
- * paging, featured slots, owner contact, suspend and delete. The design showed
- * only the card grid; a grid cannot hold those columns, and dropping them to
- * match a mockup would take real capability out of an ops console.
- *
- * There is no "Approve all". It would mean approving every unreviewed signup
- * in one unconfirmed click, against a schema with no notion of "already
- * verified" to scope it to — a bulk irreversible write with nothing behind it
- * but a count.
+ * Cover-first shop cards (the same language as /vendor/profile), a snapshot
+ * strip, and the approval queue as mini storefronts. Search, paging, featured
+ * slots, suspend and delete stay — they just sit on the card instead of in a
+ * 960px table the phone frame cannot hold.
  */
 export const dynamic = "force-dynamic";
 
-/** How many signups the approval grid shows before deferring to the table. */
 const QUEUE_SHOWN = 6;
-
-const STATUS_PILL: Record<VendorStatus, string> = {
-  active: "pill pill-green",
-  pending: "pill pill-pop",
-  inactive: "pill pill-muted",
-  suspended: "pill pill-deal",
-};
-
-const dateFmt = new Intl.DateTimeFormat("en-IN", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
 
 type Search = { [key: string]: string | string[] | undefined };
 
@@ -76,7 +57,7 @@ export default async function AdminVendorsPage({
     | "status"
     | undefined;
   const page = Math.max(1, Number(one(sp.page) ?? "1") || 1);
-  const pageSize = 20;
+  const pageSize = 12;
 
   const [counts, result, categories, awaiting] = await Promise.all([
     getVendorCounts(),
@@ -85,8 +66,6 @@ export default async function AdminVendorsPage({
     listAwaitingApproval().catch(() => [] as VendorListItem[]),
   ]);
 
-  // Median, not mean: one shop that signed up in March and was forgotten would
-  // drag an average until the figure describes nothing.
   const medianWait = (() => {
     if (!awaiting.length) return null;
     const ages = awaiting
@@ -111,103 +90,26 @@ export default async function AdminVendorsPage({
     return query ? `/admin/vendors?${query}` : "/admin/vendors";
   };
 
-  const columns: Column<VendorListItem>[] = [
+  const snapshots = [
     {
-      key: "name",
-      header: "Shop",
-      role: "title",
-      cell: (v) => (
-        <div className="flex min-w-0 items-center gap-3">
-          <span
-            className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-cover bg-center text-sm font-bold text-white"
-            style={
-              v.imageUrl
-                ? { backgroundImage: `url(${v.imageUrl})` }
-                : { background: v.accentTint ?? "var(--accent)" }
-            }
-          >
-            {v.imageUrl ? "" : v.name.charAt(0).toUpperCase()}
-          </span>
-          <span className="min-w-0">
-            <span className="flex items-center gap-1.5">
-              <span className="truncate font-semibold">{v.name}</span>
-              <span className="shrink-0 @3xl:hidden">
-                <span className={STATUS_PILL[v.status]}>{v.status}</span>
-              </span>
-            </span>
-            <span className="block truncate text-xs text-muted">/{v.slug}</span>
-          </span>
-        </div>
-      ),
+      label: "All vendors",
+      value: String(counts.total),
+      hint: "On the platform",
     },
     {
-      key: "owner",
-      header: "Owner",
-      cell: (v) => (
-        <span className="block min-w-0">
-          <span className="block truncate text-[13px]">
-            {v.ownerName ?? "—"}
-          </span>
-          {v.ownerMobile ? (
-            <span className="text-data block truncate text-[11px] text-muted">
-              {v.ownerMobile}
-            </span>
-          ) : null}
-        </span>
-      ),
+      label: "Active",
+      value: String(counts.active),
+      hint: "Taking orders",
     },
     {
-      key: "category",
-      header: "Category",
-      cell: (v) => (
-        <span className="truncate text-[13px] text-muted">
-          {v.category ?? "Uncategorised"}
-        </span>
-      ),
+      label: "Needs attention",
+      value: String(counts.inactive + counts.suspended + awaiting.length),
+      hint: `${awaiting.length} waiting · ${counts.suspended} suspended`,
     },
     {
-      key: "commission",
-      header: "Commission",
-      align: "right",
-      cell: (v) => (
-        <span className="text-data text-[13px] font-semibold">
-          {v.effectiveCommissionPct}%
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      role: "trailing",
-      cell: (v) => (
-        <span className="hidden @3xl:inline">
-          <span className={STATUS_PILL[v.status]}>{v.status}</span>
-        </span>
-      ),
-    },
-    {
-      key: "created",
-      header: "Added",
-      cell: (v) => (
-        <span className="whitespace-nowrap text-[13px] text-muted">
-          {dateFmt.format(new Date(v.createdAt))}
-        </span>
-      ),
-    },
-    {
-      key: "slot",
-      header: "Slot",
-      cell: (v) => <VendorPositionSelect id={v.id} position={v.sortPosition} />,
-    },
-    {
-      key: "actions",
-      header: "",
-      role: "actions",
-      align: "right",
-      width: "w-[56px]",
-      cell: (v) => (
-        <VendorRowActions id={v.id} name={v.name} status={v.status} />
-      ),
+      label: "Categories",
+      value: String(counts.categories),
+      hint: "Used to group the customer feed",
     },
   ];
 
@@ -216,109 +118,133 @@ export default async function AdminVendorsPage({
       <AdminHero
         title="Vendors"
         tag={awaiting.length > 0 ? `${awaiting.length} waiting` : "Queue clear"}
-        subtitle="Approve restaurant signups, then manage the catalogue"
+        subtitle="Approve signups, then manage each shop like a storefront"
         action={
-          <Link href="/admin/vendors/new" className="c-btn c-btn-dark press">
-            <Plus className="size-3.5" strokeWidth={2.4} /> Add vendor
-          </Link>
+          <ConsoleOnly tool="Vendor onboarding" notice={false}>
+            <Link href="/admin/vendors/new" className="c-btn c-btn-dark press">
+              <Plus className="size-3.5" strokeWidth={2.4} /> Add vendor
+            </Link>
+          </ConsoleOnly>
         }
       />
 
+      <ConsoleOnly
+        tool="Vendor onboarding"
+        why="Approving, suspending and searching all work here."
+      />
+
+      {awaiting.length > 0 ? (
+        <section className="vendor-profile-panel flex flex-col gap-4 rounded-[var(--radius-block)] border border-line bg-surface p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div>
+            <p className="text-sm font-bold">
+              {awaiting.length} shop{awaiting.length === 1 ? "" : "s"} waiting
+              to go live
+            </p>
+            <p className="mt-0.5 text-xs text-muted">
+              {medianWait
+                ? `Median wait ${medianWait} · approving puts the storefront on the customer feed immediately`
+                : "Approving puts the storefront on the customer feed immediately"}
+            </p>
+          </div>
+          <span className="pill pill-pop shrink-0">
+            {awaiting.length} in queue
+          </span>
+        </section>
+      ) : counts.total > 0 ? (
+        <section className="vendor-profile-panel flex items-center gap-3 rounded-[var(--radius-block)] border border-green/25 bg-green/5 px-4 py-3">
+          <CheckCircle2 className="size-5 shrink-0 text-green" />
+          <p className="text-sm font-medium text-green">
+            Approval queue is clear — every signup has been reviewed.
+          </p>
+        </section>
+      ) : null}
+
       {awaiting.length > 0 ? (
         <>
-          <div className="flex flex-wrap items-center gap-2.5 rounded-[11px] bg-ink px-[15px] py-[11px]">
-            <p className="text-[12.5px] font-semibold text-[color:var(--surface)]">
-              {awaiting.length} shop{awaiting.length === 1 ? "" : "s"} waiting to
-              go live
-            </p>
-            {medianWait ? (
-              <p className="text-xs text-[color:var(--c-faint)]">
-                Median wait {medianWait}
-              </p>
-            ) : null}
-            <span className="ml-auto text-xs text-[color:var(--c-faint)]">
-              Approving puts the storefront on the customer feed immediately
-            </span>
-          </div>
-
           <VendorApprovalCards vendors={awaiting.slice(0, QUEUE_SHOWN)} />
-
           {awaiting.length > QUEUE_SHOWN ? (
             <p className="text-xs text-muted">
-              Showing the {QUEUE_SHOWN} longest-waiting of {awaiting.length}. The
-              rest are in the table below, filtered to Pending.
+              Showing the {QUEUE_SHOWN} longest-waiting of {awaiting.length}.
+              The rest are in the catalogue below, filtered to Pending.
             </p>
           ) : null}
         </>
       ) : null}
 
-      <StatTiles>
-        <StatTile label="All vendors" value={counts.total} note="On the platform" />
-        <StatTile label="Active" value={counts.active} note="Taking orders" />
-        <StatTile
-          label="Suspended or inactive"
-          value={counts.inactive + counts.suspended}
-          note={`${counts.suspended} suspended, ${counts.inactive} inactive`}
-        />
-        <StatTile
-          label="Categories"
-          value={counts.categories}
-          note="Used to group the customer feed"
-        />
-      </StatTiles>
+      <section className="grid grid-cols-2 gap-3 @3xl:grid-cols-4">
+        {snapshots.map((m, i) => (
+          <div
+            key={m.label}
+            className="vendor-profile-stat rounded-[var(--radius-block)] border border-line bg-surface p-4"
+            style={{ animationDelay: `${i * 60}ms` }}
+          >
+            <p className="text-label">{m.label}</p>
+            <p className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
+              {m.value}
+            </p>
+            <p className="mt-1 text-[11px] text-muted">{m.hint}</p>
+          </div>
+        ))}
+      </section>
 
-      <VendorSearchBar categories={categoryNames} />
+      <section className="rounded-[var(--radius-block)] border border-line bg-surface p-3.5">
+        <VendorSearchBar categories={categoryNames} />
+      </section>
 
-      <DataTable
-        caption="Vendors"
-        columns={columns}
-        rows={result.items}
-        rowKey={(v) => v.id}
-        rowHref={(v) => `/admin/vendors/${v.id}?tab=overview`}
-        minWidth={960}
-        footer={
+      {result.items.length === 0 ? (
+        <EmptyState
+          icon={Store}
+          title={filtered ? "No vendors match" : "No vendors yet"}
+          description={
+            filtered
+              ? "Try a different search or filter."
+              : "Add your first shop to start taking orders."
+          }
+          action={
+            !filtered ? (
+              <ConsoleOnly tool="Vendor onboarding" notice={false}>
+                <Link
+                  href="/admin/vendors/new"
+                  className="c-btn c-btn-dark press"
+                >
+                  <Plus className="size-3.5" strokeWidth={2.4} /> Add vendor
+                </Link>
+              </ConsoleOnly>
+            ) : null
+          }
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-2 @5xl:grid-cols-3">
+          {result.items.map((v) => (
+            <VendorStorefrontCard key={v.id} vendor={v} />
+          ))}
+        </div>
+      )}
+
+      {result.items.length > 0 ? (
+        <div className="rounded-[var(--radius-block)] border border-line bg-surface px-4 py-3">
           <TableFooter
             page={page}
             totalPages={totalPages}
             hrefFor={pageHref}
             summary={`${result.total} vendor${result.total === 1 ? "" : "s"}${filtered ? " matching" : ""}`}
           />
-        }
-        empty={
-          <EmptyState
-            icon={Store}
-            title={filtered ? "No vendors match" : "No vendors yet"}
-            description={
-              filtered
-                ? "Try a different search or filter."
-                : "Add your first shop to start taking orders."
-            }
-            action={
-              !filtered ? (
-                <Link href="/admin/vendors/new" className="c-btn c-btn-dark press">
-                  <Plus className="size-3.5" strokeWidth={2.4} /> Add vendor
-                </Link>
-              ) : null
-            }
-          />
-        }
-      />
+        </div>
+      ) : null}
 
-      <div className="flex flex-wrap items-center gap-4">
-        <Link
+      <div className="grid gap-2 @3xl:grid-cols-2">
+        <AdminQuickLink
           href="/admin/vendors/categories"
-          className="press inline-flex items-center gap-1.5 text-xs font-semibold text-accent-ink"
-        >
-          <Tags className="size-3.5" />
-          Manage categories
-        </Link>
-        <Link
+          label="Categories"
+          hint="Group shops on the customer feed"
+          icon={Tags}
+        />
+        <AdminQuickLink
           href="/admin/vendors/slots"
-          className="press inline-flex items-center gap-1.5 text-xs font-semibold text-accent-ink"
-        >
-          <ListOrdered className="size-3.5" />
-          Featured slots
-        </Link>
+          label="Featured slots"
+          hint="Pin up to ten shops at the top of the feed"
+          icon={ListOrdered}
+        />
       </div>
     </>
   );

@@ -15,8 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, fieldCls } from "@/components/ui/field";
-import { useIsDesktop } from "@/hooks/use-is-desktop";
-import { useAdminShell } from "@/stores/admin-shell-store";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { cn } from "@/lib/utils/cn";
 import { createEmployeeAction } from "./actions";
 import type { EmployeeRole } from "@/lib/data-access/employees";
@@ -37,6 +36,15 @@ const ROLE_META: Record<
   },
 };
 
+/**
+ * Console-only. Creating a staff account is an eight-field form that ends in a
+ * credential shown exactly once (AGENTS.md rule 4) — do that where you can read
+ * it down, not on a handset. Reading the team list works on a phone and stays.
+ *
+ * The button lives in a header's `shrink-0` action slot, which has no room for
+ * a notice card, so it simply drops out on a phone; the page carries the
+ * explanation once, in its body.
+ */
 export function CreateEmployeeButton({
   configured,
 }: {
@@ -45,7 +53,7 @@ export function CreateEmployeeButton({
   const [open, setOpen] = useState(false);
 
   return (
-    <>
+    <ConsoleOnly tool="Creating an employee" notice={false}>
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -55,16 +63,22 @@ export function CreateEmployeeButton({
         <UserPlus className="size-3.5" strokeWidth={2.4} /> Create employee
       </button>
       {open ? (
-        <CreateEmployeeSheet
+        <CreateEmployeeDialog
           onClose={() => setOpen(false)}
           onCreated={() => setOpen(false)}
         />
       ) : null}
-    </>
+    </ConsoleOnly>
   );
 }
 
-function CreateEmployeeSheet({
+/**
+ * Console-only by construction: the only thing that opens it is gated above, so
+ * this is a centred dialog and nothing else. It used to carry a parallel
+ * bottom-sheet layout for the phone frame; that branch is unreachable now and
+ * has been removed rather than left as a second way to draw the same form.
+ */
+function CreateEmployeeDialog({
   onClose,
   onCreated,
 }: {
@@ -72,9 +86,6 @@ function CreateEmployeeSheet({
   onCreated: () => void;
 }) {
   const router = useRouter();
-  const isDesktop = useIsDesktop();
-  const shellMode = useAdminShell((s) => s.mode);
-  const isWeb = isDesktop && shellMode !== "app";
   const [role, setRole] = useState<EmployeeRole>("manager");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -121,13 +132,7 @@ function CreateEmployeeSheet({
   }, [created, onCreated, onClose]);
 
   const overlay = (
-    <div
-      className={
-        isWeb
-          ? "fixed inset-0 z-50 flex items-center justify-center p-6"
-          : "fixed inset-0 z-50"
-      }
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
       <button
         type="button"
         aria-label="Close"
@@ -137,19 +142,9 @@ function CreateEmployeeSheet({
       <div
         role="dialog"
         aria-modal="true"
-        className={
-          isWeb
-            ? "relative z-10 flex w-full max-w-lg max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-xl"
-            : "bolt-sheet animate-sheet-in absolute inset-x-0 bottom-0 max-h-[90vh] overflow-y-auto p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
-        }
+        className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-xl"
       >
-        <div
-          className={
-            isWeb
-              ? "flex items-center justify-between border-b border-line px-5 py-3.5"
-              : "mb-4 flex items-center justify-between"
-          }
-        >
+        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h2 className="text-heading">
             {created ? "Employee created" : "Create employee"}
           </h2>
@@ -163,27 +158,18 @@ function CreateEmployeeSheet({
         </div>
 
         {created ? (
-          <div className={isWeb ? "overflow-y-auto p-5" : undefined}>
+          <div className="overflow-y-auto p-5">
             <CreatedPanel
               role={role}
               email={created.email}
               password={created.password}
               onDone={dismiss}
-              isWeb={isWeb}
             />
           </div>
         ) : (
-          <div
-            className={
-              isWeb ? "flex min-h-0 flex-1 flex-col" : "space-y-4"
-            }
-          >
-            <div
-              className={
-                isWeb ? "grid gap-4 overflow-y-auto px-5 py-4 sm:grid-cols-2" : "space-y-4"
-              }
-            >
-              <div className={isWeb ? "sm:col-span-2" : undefined}>
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="grid gap-4 overflow-y-auto px-5 py-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
                 <span className="text-xs font-semibold text-muted">Role</span>
                 <div className="mt-1.5 grid grid-cols-2 gap-2">
                   {(Object.keys(ROLE_META) as EmployeeRole[]).map((r) => {
@@ -196,8 +182,7 @@ function CreateEmployeeSheet({
                         type="button"
                         onClick={() => setRole(r)}
                         className={cn(
-                          "press rounded-xl border p-3 text-left transition-colors",
-                          isWeb && "p-2.5",
+                          "press rounded-xl border p-2.5 text-left transition-colors",
                           active
                             ? "border-accent bg-accent-soft"
                             : "border-line bg-surface-2"
@@ -272,44 +257,31 @@ function CreateEmployeeSheet({
               ) : null}
             </div>
 
-            {isWeb ? (
-              <div className="flex justify-end gap-2 border-t border-line px-5 py-3.5">
-                <Button size="sm" variant="secondary" onClick={onClose} disabled={pending}>
-                  Cancel
-                </Button>
-                <Button size="sm" disabled={pending} onClick={submit}>
-                  {pending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <>
-                      <UserPlus className="size-3.5" /> Create{" "}
-                      {ROLE_META[role].label.toLowerCase()}
-                    </>
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <Button className="mt-4 w-full" disabled={pending} onClick={submit}>
+            <div className="flex justify-end gap-2 border-t border-line px-5 py-3.5">
+              <Button size="sm" variant="secondary" onClick={onClose} disabled={pending}>
+                Cancel
+              </Button>
+              <Button size="sm" disabled={pending} onClick={submit}>
                 {pending ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
                   <>
-                    <UserPlus className="size-4" /> Create{" "}
+                    <UserPlus className="size-3.5" /> Create{" "}
                     {ROLE_META[role].label.toLowerCase()}
                   </>
                 )}
               </Button>
-            )}
+            </div>
           </div>
         )}
       </div>
     </div>
   );
 
-  if (isWeb && typeof document !== "undefined") {
-    return createPortal(overlay, document.body);
-  }
-  return overlay;
+  // Portalled to the body: the console's content column is a container and a
+  // scroll parent, so a dialog rendered in place would be trapped by it.
+  if (typeof document === "undefined") return overlay;
+  return createPortal(overlay, document.body);
 }
 
 function CreatedPanel({
@@ -317,13 +289,11 @@ function CreatedPanel({
   email,
   password,
   onDone,
-  isWeb,
 }: {
   role: EmployeeRole;
   email: string;
   password: string;
   onDone: () => void;
-  isWeb: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -338,17 +308,11 @@ function CreatedPanel({
       <CopyRow label="Email" value={email} />
       <CopyRow label="Temporary password" value={password} mono icon />
 
-      {isWeb ? (
-        <div className="flex justify-end">
-          <Button size="sm" variant="secondary" onClick={onDone}>
-            Done
-          </Button>
-        </div>
-      ) : (
-        <Button className="w-full" variant="secondary" onClick={onDone}>
+      <div className="flex justify-end">
+        <Button size="sm" variant="secondary" onClick={onDone}>
           Done
         </Button>
-      )}
+      </div>
     </div>
   );
 }

@@ -34,6 +34,8 @@ import {
   duplicateMenuItemAction,
   reorderMenuItemsAction,
 } from "@/app/vendor/actions";
+import { PortalToShell } from "@/components/shared/portal-to-shell";
+import { useVendorShellMode } from "@/hooks/use-vendor-shell-mode";
 import type { VendorMenuItem } from "@/lib/data-access/vendor-menu";
 import {
   downloadTextFile,
@@ -60,6 +62,7 @@ export function VendorMenuBoard({
   live?: boolean;
 }) {
   const router = useRouter();
+  const shellMode = useVendorShellMode();
   const [items, setItems] = useState(initialItems);
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -328,7 +331,7 @@ export function VendorMenuBoard({
   ];
 
   return (
-    <div className="min-w-0 space-y-4 overflow-x-hidden lg:space-y-6">
+    <>
       <VendorHero
         title="Menu"
         subtitle={`${restaurantName} — dishes, pricing, stock & sheet import.`}
@@ -340,7 +343,7 @@ export function VendorMenuBoard({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="hidden sm:inline-flex"
+                  className="hidden @3xl:inline-flex"
                   onClick={() =>
                     window.open(
                       `/restaurant/${restaurantSlug}`,
@@ -356,7 +359,7 @@ export function VendorMenuBoard({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="hidden sm:inline-flex"
+                className="hidden @3xl:inline-flex"
                 onClick={() => setImportOpen(true)}
               >
                 <FileUp className="size-4" /> Import sheet
@@ -373,7 +376,7 @@ export function VendorMenuBoard({
         }
       />
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 @3xl:grid-cols-4">
         <VendorMetricCard
           label="Total items"
           value={String(items.length)}
@@ -491,7 +494,7 @@ export function VendorMenuBoard({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="hidden sm:inline-flex"
+                className="hidden @3xl:inline-flex"
                 onClick={handleExport}
               >
                 <Download className="size-4" /> Export
@@ -744,15 +747,17 @@ export function VendorMenuBoard({
         })
       )}
 
-      {live ? (
-        <Button
-          size="lg"
-          className="vendor-fab fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] right-4 z-30 size-14 rounded-full p-0 lg:hidden"
-          onClick={() => setSheet({ mode: "create" })}
-          aria-label="Add menu item"
-        >
-          <Plus className="size-6" />
-        </Button>
+      {live && shellMode === "app" ? (
+        <PortalToShell>
+          <Button
+            size="lg"
+            className="vendor-fab fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] right-4 z-30 size-14 rounded-full p-0"
+            onClick={() => setSheet({ mode: "create" })}
+            aria-label="Add menu item"
+          >
+            <Plus className="size-6" />
+          </Button>
+        </PortalToShell>
       ) : null}
 
       {sheet ? (
@@ -791,6 +796,6 @@ export function VendorMenuBoard({
         restaurantSlug={restaurantSlug}
         onClose={() => setPreviewItem(null)}
       />
-    </div>
+    </>
   );
 }

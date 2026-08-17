@@ -156,6 +156,105 @@ export async function swapVendorSlots(a: number, b: number): Promise<void> {
 }
 
 /**
+ * Read the board as a fixed-length layout: index 0 = slot 1, null = empty.
+ *
+ * Only the primary occupant of each slot appears. Legacy collisions (two shops
+ * on one slot, from before pinning became exclusive) are deliberately left out —
+ * a reorder must not silently unpin the shop the board is showing an operator an
+ * explicit "unpin" button for.
+ */
+async function readSlotLayout(): Promise<(string | null)[]> {
+  const layout: (string | null)[] = Array(SLOT_COUNT).fill(null);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("restaurants")
+    .select("id, name, sort_position")
+    .not("sort_position", "is", null)
+    .order("sort_position", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) throw error;
+
+  for (const row of (data ?? []) as {
+    id: string;
+    sort_position: number | null;
+  }[]) {
+    const index = (row.sort_position ?? 0) - 1;
+    if (index < 0 || index >= SLOT_COUNT) continue;
+    // First one wins — the same rule listSlotBoard renders by.
+    if (layout[index] == null) layout[index] = row.id;
+  }
+  return layout;
+}
+
+/**
+ * Drag-and-drop reorder: lift the shop out of slot `from` and drop it into slot
+ * `to`, shifting everything between them by one.
+ *
+ * This is a move, not the swap that the up/down arrows do. Dragging #7 to #2
+ * should leave the shops that were at #2–#6 in the same relative order one place
+ * lower — a swap would instead fling the #2 shop down to #7, which is never what
+ * dropping a row on a list means.
+ *
+ * Empty slots are part of the layout and move with it, so the number of free
+ * slots cannot change. Writes are resolved by id and only for rows whose slot
+ * actually changed: there is no unique constraint on the column (0021), so a
+ * blanket rewrite would be both wasteful and destructive to collisions.
+ */
+export async function moveVendorSlot(from: number, to: number): Promise<void> {
+  const a = Math.trunc(from);
+  const b = Math.trunc(to);
+  if (a === b) return;
+  if (a < 1 || a > SLOT_COUNT || b < 1 || b > SLOT_COUNT) return;
+
+  const before = await readSlotLayout();
+  const layout = [...before];
+  const [moved] = layout.splice(a - 1, 1);
+  layout.splice(b - 1, 0, moved ?? null);
+
+  const supabase = await createClient();
+  for (let i = 0; i < SLOT_COUNT; i += 1) {
+    const id = layout[i];
+    if (id == null || before[i] === id) continue;
+    const { error } = await supabase
+      .from("restaurants")
+      .update({ sort_position: i + 1 })
+      .eq("id", id);
+    if (error) throw error;
+  }
+}
+
+/**
+ * Replace the whole board with `ids`, in order — slot 1 is ids[0].
+ *
+ * Unlike moveVendorSlot this is deliberately destructive: every existing pin is
+ * cleared first, collisions included. That is what "auto-fill the slots" means,
+ * and clearing first is also what makes the result match the requested order
+ * exactly rather than merging into whatever was already there.
+ *
+ * Returns how many slots ended up filled, which can be fewer than SLOT_COUNT
+ * when fewer shops qualified.
+ */
+export async function setVendorSlotOrder(ids: string[]): Promise<number> {
+  const supabase = await createClient();
+
+  const { error: clearErr } = await supabase
+    .from("restaurants")
+    .update({ sort_position: null })
+    .not("sort_position", "is", null);
+  if (clearErr) throw clearErr;
+
+  const take = ids.slice(0, SLOT_COUNT);
+  for (let i = 0; i < take.length; i += 1) {
+    const { error } = await supabase
+      .from("restaurants")
+      .update({ sort_position: i + 1 })
+      .eq("id", take[i]);
+    if (error) throw error;
+  }
+  return take.length;
+}
+
+/**
  * A shop as the slots board shows it. Only 0024-safe columns.
  *
  * Carries the card fields (cuisines, ETA) and `approved` because the board
@@ -262,6 +361,49 @@ export async function listSlotBoard(): Promise<FeaturedSlot[]> {
     slot.vendors.push(mapSlotVendor(row));
   }
   return slots;
+}
+
+/**
+ * The shops the customer feed falls through to, just under the pinned ten.
+ *
+ * The preview used to end at the last pinned shop and assert in prose that
+ * "everything below keeps the feed's usual order" — which is the one claim on
+ * that panel an operator could not check. Showing the first few unpinned shops
+ * makes the boundary visible, and makes the common mistake obvious: pinning a
+ * shop that was already going to be near the top anyway, spending a slot to
+ * achieve nothing.
+ *
+ * Ordered exactly as listRestaurantsFromDb orders the feed (promoted first, then
+ * name) so the sketch and the storefront cannot disagree. `approved = true`
+ * because the feed reads it too.
+ */
+export async function listFeedTail(
+  excludeIds: string[],
+  limit = 3
+): Promise<SlotVendor[]> {
+  if (hasColumn === false) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("restaurants")
+    .select(SLOT_SELECT)
+    .eq("approved", true)
+    .order("promoted", { ascending: false })
+    .order("name", { ascending: true })
+    // Filtered in JS rather than with `not.in`: the exclusion list is at most
+    // SLOT_COUNT ids, so over-fetching by that much is cheaper than building a
+    // PostgREST list literal, and it cannot break on an empty list.
+    .limit(limit + SLOT_COUNT);
+
+  if (error) {
+    if (error.code === UNDEFINED_COLUMN) hasColumn = false;
+    return [];
+  }
+
+  const skip = new Set(excludeIds);
+  return ((data as SlotRow[] | null) ?? [])
+    .filter((row) => !skip.has(row.id))
+    .slice(0, limit)
+    .map(mapSlotVendor);
 }
 
 /** A shop in the board's assign dropdown. */

@@ -2,26 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ADMIN_PHONE_TABS } from "@/components/admin/admin-nav";
+import { VENDOR_PHONE_TABS } from "@/components/vendor/vendor-nav";
 import { cn } from "@/lib/utils/cn";
 
 /**
  * Bottom nav for the phone shell. Five slots is all a handset has room for, so
- * it renders `ADMIN_PHONE_TABS` — the subset flagged `primary` in admin-nav.
- * The console's rail carries the full set; nothing is reachable only here, and
- * the rest of what a phone can use is listed in the Settings menu. Some
- * destinations are console-only in the other direction — see ConsoleOnly.
- *
- * Each tab owns a colour, echoing the dashboard's metric cards
- * (Vendors = orange, Orders = blue, …). The class strings are written out in
- * full so Tailwind keeps them in the build.
+ * it renders `VENDOR_PHONE_TABS`. The console's rail carries the full set.
  */
 const COLORS = {
   green: { text: "text-green", chip: "bg-green/15", bar: "bg-green" },
   blue: { text: "text-blue", chip: "bg-blue/15", bar: "bg-blue" },
   accent: { text: "text-accent", chip: "bg-accent/15", bar: "bg-accent" },
   deal: { text: "text-deal", chip: "bg-deal/15", bar: "bg-deal" },
-  pop: { text: "text-pop-ink", chip: "bg-pop/25", bar: "bg-pop" },
   violet: {
     text: "text-violet-500",
     chip: "bg-violet-500/15",
@@ -29,15 +21,15 @@ const COLORS = {
   },
 } as const;
 
-export function AdminTabBar() {
+export function VendorTabBar() {
   const pathname = usePathname();
 
   return (
     <nav
       className="tab-bar-shell absolute inset-x-0 bottom-0 z-30 flex items-stretch justify-around px-1 pb-[env(safe-area-inset-bottom)]"
-      aria-label="Admin"
+      aria-label="Vendor"
     >
-      {ADMIN_PHONE_TABS.map((tab) => {
+      {VENDOR_PHONE_TABS.map((tab) => {
         const active = tab.match(pathname);
         const color = COLORS[tab.tone];
         const Icon = tab.icon;

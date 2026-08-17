@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AdminHero } from "@/components/admin/admin-ui";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { istDateKey, startOfIstWeek, addIstDays } from "@/lib/utils/ist-time";
 import {
   listSettlementVendors,
@@ -66,36 +67,41 @@ export default async function NewSettlementPage({
         subtitle="Pick a vendor and IST date range — only unsettled delivered orders are included"
       />
 
-      <NewSettlementForm
-        vendors={vendors}
-        restaurantId={restaurantId}
-        fromDate={fromDate}
-        toDate={toDate}
-      />
-
-      {previewError ? (
-        <p className="rounded-xl border border-deal/30 bg-deal-soft px-3.5 py-3 text-sm text-deal">
-          {previewError}
-        </p>
-      ) : null}
-
-      {preview ? (
-        <SettlementPreviewPanel
-          preview={preview}
+      {/* Console-only: a vendor picker, an IST range and a four-column preview
+          of every order in the run. Composing a money-movement batch is not
+          triage — reading settlements on a phone is (see /admin/settlements). */}
+      <ConsoleOnly variant="page" tool="Building a settlement">
+        <NewSettlementForm
+          vendors={vendors}
+          restaurantId={restaurantId}
           fromDate={fromDate}
           toDate={toDate}
         />
-      ) : null}
 
-      {!restaurantId ? (
-        <p className="text-sm text-muted">
-          Or open a vendor from{" "}
-          <Link href="/admin/vendors" className="font-medium text-accent-ink">
-            Vendors
-          </Link>{" "}
-          after you know who needs a payout.
-        </p>
-      ) : null}
+        {previewError ? (
+          <p className="rounded-xl border border-deal/30 bg-deal-soft px-3.5 py-3 text-sm text-deal">
+            {previewError}
+          </p>
+        ) : null}
+
+        {preview ? (
+          <SettlementPreviewPanel
+            preview={preview}
+            fromDate={fromDate}
+            toDate={toDate}
+          />
+        ) : null}
+
+        {!restaurantId ? (
+          <p className="text-sm text-muted">
+            Or open a vendor from{" "}
+            <Link href="/admin/vendors" className="font-medium text-accent-ink">
+              Vendors
+            </Link>{" "}
+            after you know who needs a payout.
+          </p>
+        ) : null}
+      </ConsoleOnly>
     </div>
   );
 }

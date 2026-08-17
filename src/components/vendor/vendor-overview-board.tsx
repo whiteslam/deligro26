@@ -592,7 +592,7 @@ export function VendorOverviewBoard({
   );
 
   return (
-    <div className="min-w-0 space-y-4 overflow-x-hidden lg:space-y-6">
+    <>
       <VendorHero
         title="Overview"
         subtitle={
@@ -622,7 +622,7 @@ export function VendorOverviewBoard({
         }
       />
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 @3xl:grid-cols-4">
         <VendorMetricCard
           label="This week"
           value={String(stats.weekOrders)}
@@ -665,7 +665,7 @@ export function VendorOverviewBoard({
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 @3xl:grid-cols-2">
         <ChartCard title="Orders this week" hint="Area chart · rise = busier days">
           <OrdersAreaChart data={daily} />
         </ChartCard>
@@ -684,7 +684,7 @@ export function VendorOverviewBoard({
         <TrendAreaChart data={weekly} />
       </ChartCard>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 @3xl:grid-cols-2">
         <ChartCard
           title="Bestsellers this month"
           hint="Treemap · larger block = more sold"
@@ -706,7 +706,7 @@ export function VendorOverviewBoard({
         </ChartCard>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 @3xl:grid-cols-2">
         <ChartCard
           title="Customer loyalty"
           hint="Donut · who comes back vs one-time"
@@ -785,6 +785,6 @@ export function VendorOverviewBoard({
           </ul>
         )}
       </VendorPanel>
-    </div>
+    </>
   );
 }

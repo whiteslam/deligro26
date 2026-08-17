@@ -15,14 +15,25 @@ import {
 /**
  * One nav definition, three consumers: the web sidebar, the phone bottom tabs,
  * and the top bar's page title. The phone frame can only carry five tabs, so
- * `primary` marks the five that earn a slot there — everything else is still
- * one tap away inside Settings and on the sidebar.
+ * `primary` marks the five that earn a slot there — everything else the phone
+ * can use is one tap away inside Settings, and the rail lists all of it.
+ *
+ * The five tabs are chosen for what an operator does *away from a desk*:
+ * Dashboard, Orders, Refunds, Vendors, Settings. Campaigns is a rail item
+ * rather than a tab because both of its authoring routes are console-only —
+ * spending a fifth of the phone's navigation on "pause a banner" is a poor
+ * trade against Refunds, which is a pure decision queue and carries a badge.
  *
  * Team and Platform configuration are settings *sub*-pages that the rail lists
  * directly: the console has the room, and burying a daily job like creating a
  * staff login two taps deep is only a phone compromise. The Settings menu drops
  * those rows in web mode (see admin/settings/page.tsx) so the rail is the one
  * place they appear there.
+ *
+ * `reach: "console"` marks the rail entries a phone should never be offered at
+ * all, because the screen behind them is console-only (see ConsoleOnly). They
+ * stay in the rail and keep their page title; they just don't appear in the
+ * phone's Settings menu, where tapping through would only find a notice.
  */
 export type BadgeKey = "pendingApprovals" | "pendingRefunds" | "liveOrders";
 
@@ -34,6 +45,8 @@ export interface AdminNavItem {
   group: "Overview" | "Operations" | "Catalogue" | "People" | "System";
   /** Shown on the phone's five-slot bottom bar. */
   primary?: boolean;
+  /** Rail and drawer only — never offered as a phone destination. */
+  reach?: "console";
   /** Live count rendered as a pill. */
   badge?: BadgeKey;
   /** Colour used by the phone tab bar and the sidebar's active state. */
@@ -66,6 +79,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
     label: "Refunds",
     icon: RotateCcw,
     group: "Operations",
+    primary: true,
     badge: "pendingRefunds",
     tone: "deal",
     match: (p) => p.startsWith("/admin/refunds"),
@@ -104,7 +118,6 @@ export const ADMIN_NAV: AdminNavItem[] = [
     label: "Campaigns",
     icon: Megaphone,
     group: "Catalogue",
-    primary: true,
     tone: "pop",
     match: (p) => p.startsWith("/admin/banners"),
   },
@@ -129,6 +142,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
     label: "Platform config",
     icon: SlidersHorizontal,
     group: "System",
+    reach: "console",
     tone: "blue",
     match: (p) => p.startsWith("/admin/settings/platform"),
   },
@@ -158,6 +172,16 @@ export const ADMIN_NAV_GROUPS = [
 
 /** The five that fit the phone's bottom bar. */
 export const ADMIN_PHONE_TABS = ADMIN_NAV.filter((i) => i.primary);
+
+/**
+ * Everything else the phone can actually use, for the Settings menu to list.
+ * Derived rather than hand-written so a new nav item can't quietly become
+ * unreachable on a handset — which is what happened to Refunds, Settlements,
+ * Featured slots and Customers before this existed.
+ */
+export const ADMIN_PHONE_MENU = ADMIN_NAV.filter(
+  (i) => !i.primary && i.reach !== "console"
+);
 
 /** Longest matching route wins, so /admin doesn't claim /admin/orders. */
 export function activeNavItem(pathname: string): AdminNavItem | null {

@@ -3,6 +3,7 @@
 import { Eye, Star, X } from "lucide-react";
 import { VegMark } from "@/components/shared/veg-mark";
 import { Button } from "@/components/ui/button";
+import { PortalToShell } from "@/components/shared/portal-to-shell";
 import type { VendorMenuItem } from "@/lib/data-access/vendor-menu";
 import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
@@ -24,6 +25,7 @@ export function MenuCustomerPreview({
   if (!open || !item) return null;
 
   return (
+    <PortalToShell>
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
       <div
         className="card w-full max-w-md overflow-hidden rounded-t-2xl sm:rounded-2xl"
@@ -122,5 +124,6 @@ export function MenuCustomerPreview({
         </div>
       </div>
     </div>
+    </PortalToShell>
   );
 }

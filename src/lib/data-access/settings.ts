@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_SETTINGS } from "@/lib/settings-defaults";
 import {
   columnKnownMissing,
+  columnKnownPresent,
   isMissingColumn,
   rememberColumn,
 } from "@/lib/data-access/schema-probe";
@@ -57,20 +58,89 @@ interface SettingsRow {
   rider_commission: number | string;
   rider_min_payout: number;
   feature_online_payment?: boolean;
+  review_window_days?: number;
+  review_edit_window_hours?: number;
 }
 
-/** `feature_online_payment` only exists once migration 0025 has been applied. */
-const ONLINE_PAYMENT_COLUMN = "platform_settings.feature_online_payment";
+/**
+ * Columns that postdate `platform_settings` itself. Each group sits behind its
+ * own probe key, so one un-applied migration costs that group and nothing else.
+ *
+ * Grouped rather than listed per-column because the columns in a group arrive in
+ * the same migration — if one is there they all are, so one probe answers for
+ * the set.
+ */
+const OPTIONAL_GROUPS = [
+  {
+    /** Migration 0025. */
+    key: "platform_settings.feature_online_payment",
+    select: "feature_online_payment",
+    write: (input: PlatformSettings): Record<string, unknown> => ({
+      feature_online_payment: input.featureOnlinePayment,
+    }),
+  },
+  {
+    /** Migration 0033. */
+    key: "platform_settings.review_window_days",
+    select: "review_window_days, review_edit_window_hours",
+    write: (input: PlatformSettings): Record<string, unknown> => ({
+      review_window_days: input.reviewWindowDays,
+      review_edit_window_hours: input.reviewEditWindowHours,
+    }),
+  },
+] as const;
 
-function select(withOnlinePayment: boolean): string {
-  return `
+type OptionalGroup = (typeof OPTIONAL_GROUPS)[number];
+
+const BASE_SELECT = `
   delivery_fee, tax_rate, free_delivery_threshold, min_order,
   business_name, support_phone, support_email, support_whatsapp, business_address,
   accepting_orders, maintenance_message,
   feature_grocery, feature_pharmacy, feature_pick_drop,
   default_prep_minutes, delivery_radius_km, rider_commission, rider_min_payout
-  ${withOnlinePayment ? ", feature_online_payment" : ""}
 `;
+
+/**
+ * Which optional groups this database actually has.
+ *
+ * Probed one group at a time rather than inferred from a failed combined read.
+ * A single 42703 says "some column in this list is missing" but not which, so
+ * dropping a group on that signal is a guess — and guessing wrong marks a
+ * present column absent, which silently substitutes a default for a value the
+ * admin configured. That is the exact failure the online-payment comment below
+ * was written about, so it is not repeated here.
+ *
+ * The probes latch in `schema-probe`, so this costs one HEAD request per group
+ * once per process, and nothing thereafter. A transient failure does not latch.
+ */
+async function availableGroups(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<OptionalGroup[]> {
+  const available: OptionalGroup[] = [];
+
+  for (const group of OPTIONAL_GROUPS) {
+    if (columnKnownMissing(group.key)) continue;
+    if (columnKnownPresent(group.key)) {
+      available.push(group);
+      continue;
+    }
+
+    const { error } = await supabase
+      .from("platform_settings")
+      .select(group.select, { head: true, count: "exact" })
+      .limit(1);
+
+    if (!error) {
+      rememberColumn(group.key, true);
+      available.push(group);
+    } else if (isMissingColumn(error)) {
+      rememberColumn(group.key, false);
+    }
+    // Anything else is transient: skip the group for this read without
+    // latching, so the next request probes again instead of writing it off.
+  }
+
+  return available;
 }
 
 function mapSettings(row: SettingsRow): PlatformSettings {
@@ -95,34 +165,38 @@ function mapSettings(row: SettingsRow): PlatformSettings {
     riderMinPayout: Number(row.rider_min_payout),
     // Absent column (pre-0025) reads as off, which is the safe direction.
     featureOnlinePayment: row.feature_online_payment ?? false,
+    // Absent columns (pre-0033) fall back to the shared defaults, so the review
+    // windows behave identically before the migration lands.
+    reviewWindowDays: Number(
+      row.review_window_days ?? DEFAULT_SETTINGS.reviewWindowDays
+    ),
+    reviewEditWindowHours: Number(
+      row.review_edit_window_hours ?? DEFAULT_SETTINGS.reviewEditWindowHours
+    ),
   };
 }
 
 export async function getSettingsFromDb(): Promise<PlatformSettings> {
   const supabase = await createClient();
+  const groups = await availableGroups(supabase);
 
-  const read = (withOnlinePayment: boolean) =>
-    supabase
-      .from("platform_settings")
-      .select(select(withOnlinePayment))
-      .eq("id", true)
-      .maybeSingle();
-
-  const asked = !columnKnownMissing(ONLINE_PAYMENT_COLUMN);
-  let result = await read(asked);
-
-  // Checked BEFORE isMissingTable: PostgREST's missing-column message also
-  // contains "does not exist", so the table check would swallow it and hand
-  // back DEFAULT_SETTINGS — quietly billing default fees on a database whose
-  // admin had configured real ones. A missing column costs the one column.
-  if (asked && result.error && isMissingColumn(result.error)) {
-    rememberColumn(ONLINE_PAYMENT_COLUMN, false);
-    result = await read(false);
-  } else if (asked && !result.error) {
-    rememberColumn(ONLINE_PAYMENT_COLUMN, true);
-  }
+  const columns = [BASE_SELECT, ...groups.map((g) => g.select)].join(", ");
+  const result = await supabase
+    .from("platform_settings")
+    .select(columns)
+    .eq("id", true)
+    .maybeSingle();
 
   if (result.error) {
+    // Checked BEFORE isMissingTable: PostgREST's missing-column message also
+    // contains "does not exist", so the table check would swallow it and hand
+    // back DEFAULT_SETTINGS — quietly billing default fees on a database whose
+    // admin had configured real ones. A missing column costs the one column.
+    //
+    // With the groups probed up front this should now be unreachable, so it is
+    // treated as the transient failure it must be rather than latched as a
+    // permanent absence.
+    if (isMissingColumn(result.error)) return DEFAULT_SETTINGS;
     if (isMissingTable(result.error)) throw new SettingsNotMigratedError();
     // A configured-but-failing read shouldn't crash the app it configures.
     return DEFAULT_SETTINGS;
@@ -157,27 +231,19 @@ export async function updateSettings(
       updated_at: new Date().toISOString(),
   };
 
-  const write = (withOnlinePayment: boolean) =>
-    supabase
-      .from("platform_settings")
-      .update(
-        withOnlinePayment
-          ? { ...base, feature_online_payment: input.featureOnlinePayment }
-          : base
-      )
-      .eq("id", true);
+  // Same probe as the read: only write columns this database actually has, so a
+  // pre-0025 or pre-0033 install saves everything else rather than failing the
+  // whole form over a field whose only honest value there is the default.
+  const groups = await availableGroups(supabase);
+  const payload = groups.reduce<Record<string, unknown>>(
+    (acc, group) => Object.assign(acc, group.write(input)),
+    { ...base }
+  );
 
-  const asked = !columnKnownMissing(ONLINE_PAYMENT_COLUMN);
-  const { error } = await write(asked);
-
-  if (asked && error && isMissingColumn(error)) {
-    // Pre-0025. Save everything else rather than failing the whole form over a
-    // toggle whose only honest value on this database is "off" anyway.
-    rememberColumn(ONLINE_PAYMENT_COLUMN, false);
-    const { error: retry } = await write(false);
-    if (retry) throw retry;
-    return;
-  }
+  const { error } = await supabase
+    .from("platform_settings")
+    .update(payload)
+    .eq("id", true);
 
   if (error) throw error;
 }

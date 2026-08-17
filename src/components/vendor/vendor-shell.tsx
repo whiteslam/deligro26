@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { StatusBar } from "@/components/layout/status-bar";
+import { VendorHeader } from "@/components/vendor/vendor-header";
+import { VendorTabBar } from "@/components/vendor/vendor-tab-bar";
+import { VendorSidebar } from "@/components/vendor/vendor-sidebar";
+import { VendorNavDrawer } from "@/components/vendor/vendor-nav-drawer";
 import { VendorTopBar } from "@/components/vendor/vendor-top-bar";
-import {
-  VendorBottomNav,
-  VendorSidebar,
-} from "@/components/vendor/vendor-sidebar";
 import { DesktopShellSwitcher } from "@/components/shared/desktop-shell-switcher";
-import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { useVendorShellMode } from "@/hooks/use-vendor-shell-mode";
 import { useVendorShell } from "@/stores/vendor-shell-store";
 import type { OwnedRestaurant } from "@/lib/data-access/vendor-restaurant";
 
@@ -18,56 +18,96 @@ export type VendorShellProps = {
   restaurants: OwnedRestaurant[];
   activeSlug: string;
   showControls: boolean;
+  name: string;
+  email: string | null;
   children: React.ReactNode;
 };
 
 /**
  * Vendor chrome with an app ↔ web switch (desktop/laptop only).
- * - web (default): sidebar + responsive dashboard
- * - app: phone frame with mobile top bar + bottom tabs
- * On real phones the switcher is hidden and the normal mobile dashboard is used.
+ *
+ * - web (default on a computer): sidebar + top bar console, same structure as
+ *   the admin ops console
+ * - app: the phone frame, for checking how the portal reads on a handset
+ *
+ * On a real phone the switcher is hidden and the phone shell is forced.
+ * Both branches wrap page content in `@container` so pages size themselves
+ * against the column they are in, not the browser window.
+ *
+ * `console-theme` is on the web branch only, so the phone frame keeps the
+ * app's own look.
  */
 export function VendorShell({
   children,
-  ...shellProps
+  restaurantName,
+  isOpen,
+  restaurants,
+  activeSlug,
+  showControls,
+  name,
+  email,
 }: VendorShellProps) {
-  const mode = useVendorShell((s) => s.mode);
   const hydrated = useVendorShell((s) => s.hydrated);
   const setMode = useVendorShell((s) => s.setMode);
   const init = useVendorShell((s) => s.init);
-  const isDesktop = useIsDesktop();
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     init();
   }, [init]);
 
-  const effective = isDesktop && mode === "app" ? "app" : "web";
+  const closeNav = useCallback(() => setNavOpen(false), []);
+  const effective = useVendorShellMode();
+
+  const shellProps = {
+    restaurantName,
+    isOpen,
+    restaurants,
+    activeSlug,
+    showControls,
+  };
+
+  if (effective === "app") {
+    return (
+      <>
+        <div className="device">
+          <div className="app-shell">
+            <div className="app-scroll no-scrollbar pb-[80px]">
+              <VendorHeader
+                title={restaurantName}
+                subtitle={isOpen ? "Accepting orders" : "Store paused"}
+                isOpen={isOpen}
+                showControls={showControls}
+              />
+              <div className="@container flex flex-col gap-5 px-4 pb-6 pt-4">
+                {children}
+              </div>
+            </div>
+            <StatusBar />
+            <VendorTabBar />
+          </div>
+        </div>
+        <DesktopShellSwitcher
+          mode="app"
+          onChange={setMode}
+          hydrated={hydrated}
+        />
+      </>
+    );
+  }
 
   return (
     <>
-      {effective === "app" ? (
-        <div className="device">
-          <div className="app-shell">
-            <div className="app-scroll no-scrollbar pb-[88px]">
-              <VendorTopBar {...shellProps} phoneFrame />
-              <main className="px-4 pb-6 pt-3">{children}</main>
-            </div>
-            <StatusBar />
-            <VendorBottomNav phoneFrame />
-          </div>
+      <div className="console-theme dashboard-shell vendor-shell">
+        <VendorSidebar {...shellProps} name={name} email={email} />
+        <div className="vendor-content">
+          <VendorTopBar {...shellProps} onMenu={() => setNavOpen(true)} />
+          <main className="vendor-main @container">{children}</main>
         </div>
-      ) : (
-        <div className="dashboard-shell vendor-shell">
-          <VendorSidebar {...shellProps} />
-          <div className="vendor-content">
-            <VendorTopBar {...shellProps} />
-            <main className="dashboard-main vendor-main">{children}</main>
-          </div>
-          <VendorBottomNav />
-        </div>
-      )}
+      </div>
+      <VendorNavDrawer open={navOpen} onClose={closeNav} />
       <DesktopShellSwitcher
-        mode={effective === "app" ? "app" : mode}
+        mode="web"
         onChange={setMode}
         hydrated={hydrated}
       />

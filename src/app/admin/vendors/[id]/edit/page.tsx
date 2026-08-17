@@ -3,6 +3,7 @@ import { getVendorDetail } from "@/lib/data-access/admin-vendors";
 import { listCategories } from "@/lib/data-access/vendor-categories";
 import { getVendorCommissionDefault } from "@/lib/data-access/admin-commission";
 import { AdminHero } from "@/components/admin/admin-ui";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { VendorForm } from "./vendor-form";
 import { VendorCredentials } from "./vendor-credentials";
 
@@ -29,17 +30,28 @@ export default async function EditVendorPage({
         title="Edit vendor"
         subtitle="Update shop details, credentials & status"
       />
+      {/* Credentials stay on the phone on purpose: "I can't log in" is a support
+          call, and support calls happen away from a desk. */}
       <VendorCredentials
         id={vendor.id}
         passwordResetAt={vendor.passwordResetAt}
         ownerMobile={vendor.ownerMobile}
         ownerPhoneVerified={vendor.ownerPhoneVerified}
       />
-      <VendorForm
-        vendor={vendor}
-        categories={categories.map((c) => c.name)}
-        platformCommissionPct={platformCommissionPct}
-      />
+
+      {/* Authoring shop details and overriding commission is console work.
+          Suspending or reactivating a shop — the urgent half — is already a row
+          action on /admin/vendors, so nothing time-critical is behind this. */}
+      <ConsoleOnly
+        tool="Editing vendor details"
+        why="Password resets above still work here."
+      >
+        <VendorForm
+          vendor={vendor}
+          categories={categories.map((c) => c.name)}
+          platformCommissionPct={platformCommissionPct}
+        />
+      </ConsoleOnly>
     </div>
   );
 }

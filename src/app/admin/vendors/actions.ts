@@ -23,10 +23,19 @@ import {
 } from "@/lib/data-access/vendor-categories";
 import {
   clearVendorSlot,
+  moveVendorSlot,
   setVendorPosition,
+  setVendorSlotOrder,
   swapVendorSlots,
   SLOT_COUNT,
 } from "@/lib/data-access/vendor-positions";
+import {
+  isRankBasis,
+  listVendorRanking,
+  pickSlotOrder,
+  RANKING_WINDOW_DAYS,
+  type RankBasis,
+} from "@/lib/data-access/admin-vendor-ranking";
 import {
   saveDraft,
   deleteDraft,
@@ -217,6 +226,75 @@ export async function swapVendorSlotsAction(
     return { ok: false, error: `Position must be between 1 and ${SLOT_COUNT}.` };
   }
   return mutate(() => swapVendorSlots(a, b));
+}
+
+/**
+ * Slots board: drag row `from` and drop it on row `to`.
+ *
+ * A move, not a swap — see moveVendorSlot. The arrows keep using
+ * swapVendorSlotsAction because an adjacent swap and an adjacent move are the
+ * same operation, and the arrows are also the keyboard path to it.
+ */
+export async function moveVendorSlotAction(
+  from: number,
+  to: number
+): Promise<ActionResult> {
+  if (!validSlot(from) || !validSlot(to)) {
+    return { ok: false, error: `Position must be between 1 and ${SLOT_COUNT}.` };
+  }
+  if (from === to) return { ok: true };
+  return mutate(() => moveVendorSlot(from, to));
+}
+
+export interface AutoFillActionResult extends ActionResult {
+  /** How many slots ended up filled. */
+  filled?: number;
+  /** How many slots the board holds, so the caller can phrase "6 of 10". */
+  slots?: number;
+}
+
+/**
+ * Slots board: rank the catalogue and pin the top shops to slots 1…N.
+ *
+ * Destructive by design — it clears the board first, so the result is exactly
+ * the requested ranking rather than a merge into whatever an operator had
+ * arranged by hand. The UI confirms before calling it.
+ *
+ * Fills fewer than SLOT_COUNT when fewer shops qualify (no sales in the window,
+ * or too few ratings to rank honestly), and returns the count so the UI can say
+ * so instead of implying a full board.
+ */
+export async function autoFillVendorSlotsAction(
+  basis: RankBasis
+): Promise<AutoFillActionResult> {
+  await requireRole("admin");
+  if (!isSupabaseConfigured) return { ok: false, error: DEMO };
+  if (!isRankBasis(basis)) {
+    return { ok: false, error: "Unknown ranking basis." };
+  }
+
+  let filled = 0;
+  try {
+    const ranking = await listVendorRanking();
+    const picks = pickSlotOrder(ranking, basis);
+    if (picks.length === 0) {
+      return {
+        ok: false,
+        error:
+          basis === "sales"
+            ? `No approved shop has a delivered order in the last ${RANKING_WINDOW_DAYS} days, so there is nothing to rank by sales.`
+            : "No approved shop has enough ratings to be ranked yet.",
+      };
+    }
+    filled = await setVendorSlotOrder(picks.map((v) => v.id));
+  } catch {
+    return { ok: false, error: "That didn't go through. Try again." };
+  }
+
+  revalidatePath("/admin/vendors");
+  revalidatePath("/admin/vendors/slots");
+  revalidatePath("/", "layout");
+  return { ok: true, filled, slots: SLOT_COUNT };
 }
 
 export interface DeleteVendorActionResult extends ActionResult {

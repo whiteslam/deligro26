@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { Download, FileSpreadsheet, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PortalToShell } from "@/components/shared/portal-to-shell";
 import { importMenuCsvAction } from "@/app/vendor/actions";
 import {
   downloadTextFile,
@@ -92,6 +93,7 @@ export function MenuImportDialog({
   }
 
   return (
+    <PortalToShell>
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
       <div
         className="card flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl sm:max-h-[90vh] sm:rounded-2xl"
@@ -234,5 +236,6 @@ export function MenuImportDialog({
         </div>
       </div>
     </div>
+    </PortalToShell>
   );
 }

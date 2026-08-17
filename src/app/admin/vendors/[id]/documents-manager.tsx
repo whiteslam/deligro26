@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Download, FileText, Loader2, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { fieldCls, labelCls } from "@/components/ui/field";
 import type { VendorDocument } from "@/lib/data-access/vendor-documents";
 import { deleteDocumentAction } from "./manage-actions";
@@ -88,46 +89,56 @@ export function DocumentsManager({
 
   return (
     <div className="space-y-3">
-      <div className="card space-y-3 p-4">
-        <p className={labelCls}>Upload document</p>
-        <select
-          className={fieldCls}
-          value={docType}
-          onChange={(e) => setDocType(e.target.value)}
-        >
-          {DOC_TYPES.map((d) => (
-            <option key={d.value} value={d.value}>
-              {d.label}
-            </option>
-          ))}
-        </select>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,application/pdf"
-          onChange={onFile}
-          className="hidden"
-        />
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => fileRef.current?.click()}
-          disabled={uploading}
-        >
-          {uploading ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Upload className="size-4" />
-          )}
-          {uploading ? "Uploading…" : "Choose file"}
-        </Button>
-        <p className="text-[11px] text-muted">JPG, PNG, WebP or PDF · up to 10 MB.</p>
-        {error ? (
-          <p className="rounded-xl border border-deal/30 bg-deal/10 px-3 py-2 text-sm font-medium text-deal">
-            {error}
+      {/* Console-only: filing and removing paperwork. Reading it is not — "did
+          they send the FSSAI?" is a fair question to answer from a phone, so
+          the list below and its download links stay. */}
+      <ConsoleOnly
+        tool="Uploading and removing documents"
+        why="You can still open anything already filed."
+      >
+        <div className="card space-y-3 p-4">
+          <p className={labelCls}>Upload document</p>
+          <select
+            className={fieldCls}
+            value={docType}
+            onChange={(e) => setDocType(e.target.value)}
+          >
+            {DOC_TYPES.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            onChange={onFile}
+            className="hidden"
+          />
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Upload className="size-4" />
+            )}
+            {uploading ? "Uploading…" : "Choose file"}
+          </Button>
+          <p className="text-[11px] text-muted">
+            JPG, PNG, WebP or PDF · up to 10 MB.
           </p>
-        ) : null}
-      </div>
+          {error ? (
+            <p className="rounded-xl border border-deal/30 bg-deal/10 px-3 py-2 text-sm font-medium text-deal">
+              {error}
+            </p>
+          ) : null}
+        </div>
+      </ConsoleOnly>
 
       {documents.length === 0 ? (
         <p className="rounded-xl border border-line bg-surface px-4 py-8 text-center text-sm text-muted">
@@ -162,15 +173,19 @@ export function DocumentsManager({
                   <Download className="size-4" />
                 </a>
               ) : null}
-              <button
-                type="button"
-                onClick={() => remove(doc)}
-                disabled={pending}
-                className="press grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-muted hover:text-deal"
-                aria-label="Delete document"
-              >
-                <Trash2 className="size-4" />
-              </button>
+              {/* Silent: a notice per row would be absurd, and the one above
+                  already says removing documents is console work. */}
+              <ConsoleOnly tool="Removing documents" notice={false}>
+                <button
+                  type="button"
+                  onClick={() => remove(doc)}
+                  disabled={pending}
+                  className="press grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-muted hover:text-deal"
+                  aria-label="Delete document"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </ConsoleOnly>
             </li>
           ))}
         </ul>

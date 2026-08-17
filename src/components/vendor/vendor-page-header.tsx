@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 import { StatCard } from "@/components/roles/role-ui";
+import { VendorHero } from "@/components/vendor/vendor-ui";
 import { cn } from "@/lib/utils/cn";
 
 export function VendorPageHeader({
@@ -13,17 +14,7 @@ export function VendorPageHeader({
   subtitle?: string;
   action?: React.ReactNode;
 }) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0 flex-1">
-        <h1 className="text-xl font-bold tracking-tight md:text-heading">{title}</h1>
-        {subtitle ? (
-          <p className="mt-0.5 line-clamp-2 text-sm text-muted">{subtitle}</p>
-        ) : null}
-      </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
-    </div>
-  );
+  return <VendorHero title={title} subtitle={subtitle} action={action} />;
 }
 
 export function VendorStatGrid({
@@ -44,7 +35,7 @@ export function VendorStatGrid({
       className={cn(
         "grid gap-2 sm:gap-3",
         columns === 4
-          ? "grid-cols-2 lg:grid-cols-4"
+          ? "grid-cols-2 @3xl:grid-cols-4"
           : "grid-cols-2"
       )}
     >
@@ -90,7 +81,7 @@ export function VendorSegmentedTabs<T extends string>({
 
   return (
     <div
-      className="sticky top-[var(--vendor-top-offset,52px)] z-20 -mx-1 min-w-0 md:static md:mx-0"
+      className="sticky top-[var(--vendor-top-offset,52px)] z-20 -mx-1 min-w-0 @3xl:static @3xl:mx-0"
       role="tablist"
     >
       <div
