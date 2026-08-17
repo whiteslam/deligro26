@@ -81,12 +81,24 @@ export function BackLink({
  * `tag` is the console's status chip ("18 in flight", "6 open") — a live count
  * belongs next to the title, not buried in the body. On the phone it falls
  * back to the same row as `badge`, where the card has room for it.
+ *
+ * `badge` is the phone's coloured status pill and renders in the phone frame
+ * only. Callers that also want it in the console pass `tag` for the outlined
+ * console chip, or drop a `hidden @3xl:inline-flex` copy into `action` when the
+ * colour is load-bearing — see admin/orders/[id] and admin/vendors/[id]. Do not
+ * make `badge` render in both: every caller today passes the same content to
+ * `badge` and `tag`, and it would show up twice.
+ *
+ * `leading` is a fixed-size slot before the title column — an avatar or logo
+ * tile. It is the one thing a page header can need that the title/tag/subtitle
+ * vocabulary cannot express.
  */
 export function AdminHero({
   title,
   subtitle,
   tag,
   badge,
+  leading,
   action,
   live,
   backHref,
@@ -96,6 +108,8 @@ export function AdminHero({
   subtitle?: string;
   tag?: string;
   badge?: React.ReactNode;
+  /** Fixed-size visual before the title — an avatar or logo tile. */
+  leading?: React.ReactNode;
   action?: React.ReactNode;
   live?: boolean;
   backHref?: string;
@@ -111,6 +125,7 @@ export function AdminHero({
           </div>
         ) : null}
         <div className="flex flex-wrap items-start justify-between gap-3">
+          {leading ? <div className="shrink-0">{leading}</div> : null}
           <div className="min-w-0 flex-1">
             {live || badge ? (
               <div className="mb-1.5 flex flex-wrap items-center gap-2 @3xl:hidden">

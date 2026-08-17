@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BackLink } from "@/components/admin/admin-ui";
+import { AdminHero } from "@/components/admin/admin-ui";
 import {
   getVendorDetail,
   type VendorDetail,
@@ -12,6 +12,7 @@ import { listMenuItems } from "@/lib/data-access/admin-menu";
 import { listCategories } from "@/lib/data-access/vendor-categories";
 import { listVendorDocuments, type VendorDocument } from "@/lib/data-access/vendor-documents";
 import { VendorRowActions } from "../vendor-row-actions";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { MenuManager } from "./menu-manager";
 import { DocumentsManager } from "./documents-manager";
 
@@ -78,52 +79,50 @@ export default async function VendorDetailPage({
 
   return (
     <div className="space-y-4">
-      {/* Header — matches AdminHero: a gradient card in the phone frame, a
-          plain title row in the console (see .admin-hero). */}
-      <div className="admin-hero relative overflow-hidden rounded-[var(--radius-sheet)] border border-line p-4">
-        <div className="admin-hero-glow vendor-hero-glow pointer-events-none absolute inset-0" />
-        <div className="relative">
-          <div className="mb-3">
-            <BackLink href="/admin/vendors">Vendors</BackLink>
+      <AdminHero
+        backHref="/admin/vendors"
+        backLabel="Vendors"
+        title={vendor.name}
+        subtitle={`/${vendor.slug} · ${vendor.category ?? "Uncategorised"} · ${vendor.effectiveCommissionPct}% commission`}
+        badge={
+          <span className={STATUS_PILL[vendor.status]}>{vendor.status}</span>
+        }
+        leading={
+          <div
+            className="grid size-12 place-items-center overflow-hidden rounded-xl bg-cover bg-center text-lg font-bold text-white"
+            style={
+              vendor.imageUrl
+                ? { backgroundImage: `url(${vendor.imageUrl})` }
+                : { background: vendor.accentTint ?? "var(--accent)" }
+            }
+          >
+            {vendor.imageUrl ? "" : vendor.name.charAt(0).toUpperCase()}
           </div>
-          <div className="flex items-start gap-3">
-            <div
-              className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-cover bg-center text-lg font-bold text-white"
-              style={
-                vendor.imageUrl
-                  ? { backgroundImage: `url(${vendor.imageUrl})` }
-                  : { background: vendor.accentTint ?? "var(--accent)" }
-              }
+        }
+        action={
+          <div className="flex items-center gap-2">
+            {/* The console copy of `badge`. A vendor's status is colour-coded
+                (live / suspended / pending), which StatusTag's outlined grey
+                can't carry, so it rides in the action slot the way the late
+                pill does on admin/orders/[id]. */}
+            <span
+              className={`${STATUS_PILL[vendor.status]} hidden shrink-0 @3xl:inline-flex`}
             >
-              {vendor.imageUrl ? "" : vendor.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-xl font-extrabold tracking-tight @3xl:text-[25px] @3xl:tracking-[-0.025em]">
-                  {vendor.name}
-                </h1>
-                <span className={STATUS_PILL[vendor.status]}>{vendor.status}</span>
-              </div>
-              <p className="mt-1 truncate text-[13px] text-muted">
-                /{vendor.slug} · {vendor.category ?? "Uncategorised"} ·{" "}
-                {vendor.effectiveCommissionPct}% commission
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2 self-start">
-              <Link href={`/admin/vendors/${id}/edit`}>
-                <Button size="sm" variant="outline">
-                  <Pencil className="size-3.5" /> Edit
-                </Button>
-              </Link>
-              <VendorRowActions
-                id={vendor.id}
-                name={vendor.name}
-                status={vendor.status}
-              />
-            </div>
+              {vendor.status}
+            </span>
+            <Link href={`/admin/vendors/${id}/edit`}>
+              <Button size="sm" variant="outline">
+                <Pencil className="size-3.5" /> Edit
+              </Button>
+            </Link>
+            <VendorRowActions
+              id={vendor.id}
+              name={vendor.name}
+              status={vendor.status}
+            />
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Tabs — the same segmented control the dashboard uses for its range
           picker, so "pick one of a set" looks like one thing across the console. */}
@@ -152,8 +151,12 @@ export default async function VendorDetailPage({
 
       {active === "overview" ? <OverviewTab v={vendor} /> : null}
       {active === "business" ? <BusinessTab v={vendor} /> : null}
+      {/* Menu authoring is console work: inline CRUD across every dish plus an
+          xlsx template → upload → validate → bulk-insert import. */}
       {active === "menu" ? (
-        <MenuManager restaurantId={id} items={menuItems} categories={menuCategories} />
+        <ConsoleOnly variant="page" tool="The menu editor">
+          <MenuManager restaurantId={id} items={menuItems} categories={menuCategories} />
+        </ConsoleOnly>
       ) : null}
       {active === "payment" ? <PaymentTab v={vendor} /> : null}
       {active === "documents" ? <DocumentsTab v={vendor} documents={documents} /> : null}

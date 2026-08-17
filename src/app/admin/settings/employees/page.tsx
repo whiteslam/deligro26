@@ -4,6 +4,7 @@ import {
   EmptyState,
   PreviewNotice,
 } from "@/components/admin/admin-ui";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { StatTile, StatTiles } from "@/components/admin/console-ui";
 import {
   DataTable,
@@ -124,6 +125,14 @@ export default async function AdminEmployeesPage() {
           Connect Supabase to create and manage employees.
         </PreviewNotice>
       ) : null}
+
+      {/* The one explanation for the Create button that drops out of the header
+          on a phone. Reading the list is the phone job; issuing a credential is
+          not. */}
+      <ConsoleOnly
+        tool="Creating an employee"
+        why="The temporary password is shown only once."
+      />
 
       {employees.length === 0 ? (
         <EmptyState

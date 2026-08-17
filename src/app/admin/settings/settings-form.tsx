@@ -420,6 +420,44 @@ export function SettingsForm({
 
         <Card
           className="@3xl:order-4"
+          title="Reviews"
+          desc="How long a customer has to review an order, and to change their mind afterwards. Both are enforced by the database, not just the app."
+        >
+          <Row
+            label="Review window"
+            hint="Days after delivery that an order can still be reviewed."
+            htmlFor="reviewWindowDays"
+          >
+            <Num
+              id="reviewWindowDays"
+              name="reviewWindowDays"
+              defaultValue={settings.reviewWindowDays}
+              min={1}
+              max={365}
+            />
+          </Row>
+          <Row
+            label="Edit window"
+            hint="Hours after posting that a customer can edit or withdraw their review. 0 locks it immediately."
+            htmlFor="reviewEditWindowHours"
+          >
+            <Num
+              id="reviewEditWindowHours"
+              name="reviewEditWindowHours"
+              defaultValue={settings.reviewEditWindowHours}
+              min={0}
+              max={720}
+            />
+          </Row>
+          <Note>
+            Changing these takes effect immediately, for reviews already posted as
+            well as new ones — shortening the edit window can lock a review a
+            customer was part-way through changing.
+          </Note>
+        </Card>
+
+        <Card
+          className="@3xl:order-4"
           title="Support and brand"
           desc="Shown to customers on the Help and Profile screens."
         >

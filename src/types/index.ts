@@ -269,6 +269,16 @@ export interface PlatformSettings {
   riderCommission: number;
   /** Floor on any single delivery payout, in rupees. */
   riderMinPayout: number;
+
+  // ---- Reviews ----
+  /**
+   * Days after delivery that a customer may still review an order. Enforced in
+   * RLS by `review_window_open()` (0033), not only here — the publishable key
+   * lets a customer reach PostgREST without executing our code.
+   */
+  reviewWindowDays: number;
+  /** Hours after posting that a customer may still edit or withdraw a review. */
+  reviewEditWindowHours: number;
 }
 
 /** How the customer intends to pay. Mirrors the `payment_method` enum (0025). */

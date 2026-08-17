@@ -9,7 +9,7 @@ import { AdminNavDrawer } from "@/components/admin/admin-nav-drawer";
 import { AdminTopBar } from "@/components/admin/admin-top-bar";
 import { FoodUploadDock } from "@/components/admin/food-upload-dock";
 import { DesktopShellSwitcher } from "@/components/shared/desktop-shell-switcher";
-import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { useAdminShellMode } from "@/hooks/use-admin-shell-mode";
 import { useAdminShell } from "@/stores/admin-shell-store";
 import type { AdminNavCounts } from "@/lib/data-access/admin-stats";
 import type { ConsoleHealth } from "@/lib/console-health";
@@ -46,11 +46,9 @@ export function AdminShell({
   name: string;
   email: string | null;
 }) {
-  const mode = useAdminShell((s) => s.mode);
   const hydrated = useAdminShell((s) => s.hydrated);
   const setMode = useAdminShell((s) => s.setMode);
   const init = useAdminShell((s) => s.init);
-  const isDesktop = useIsDesktop();
   const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
@@ -59,8 +57,9 @@ export function AdminShell({
 
   const closeNav = useCallback(() => setNavOpen(false), []);
 
-  // Phones never get the console — the switcher is desktop-only.
-  const effective = isDesktop && mode !== "app" ? "web" : "app";
+  // Phones never get the console — the switcher is desktop-only. Page tools
+  // read the same hook, so a screen can never disagree with its own chrome.
+  const effective = useAdminShellMode();
 
   if (effective === "app") {
     return (

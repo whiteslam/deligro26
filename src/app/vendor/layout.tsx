@@ -4,7 +4,21 @@ import {
   listOwnedRestaurants,
   resolveVendorRestaurant,
 } from "@/lib/data-access/vendor-restaurant";
+import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+
+async function ownerEmail(): Promise<string | null> {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return user?.email ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export default async function RestaurantLayout({
   children,
@@ -12,7 +26,9 @@ export default async function RestaurantLayout({
   children: React.ReactNode;
 }) {
   // Vendor accounts OR any shop owner (a customer who also runs a shop).
-  await requireVendorAccess();
+  // No MFA challenge follows it: the optional vendor enrolment went with
+  // migration 0033, so vendor access is this check and nothing else.
+  const profile = await requireVendorAccess();
 
   let restaurantName = "";
   let isOpen = false;
@@ -33,6 +49,8 @@ export default async function RestaurantLayout({
     }
   }
 
+  const email = await ownerEmail();
+
   return (
     <VendorShell
       restaurantName={restaurantName || "No restaurant"}
@@ -40,6 +58,8 @@ export default async function RestaurantLayout({
       restaurants={restaurants}
       activeSlug={activeSlug}
       showControls={isSupabaseConfigured && restaurants.length > 0}
+      name={profile.full_name?.trim() || "Vendor"}
+      email={email}
     >
       {children}
     </VendorShell>

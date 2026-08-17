@@ -1,88 +1,82 @@
 "use client";
 
-import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { Menu } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { activeVendorNavItem } from "@/components/vendor/vendor-nav";
 import { RestaurantOpenToggle } from "@/components/vendor/restaurant-open-toggle";
 import { RestaurantSwitcher } from "@/components/vendor/restaurant-switcher";
-import { LivePulse } from "@/components/vendor/vendor-ui";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { OwnedRestaurant } from "@/lib/data-access/vendor-restaurant";
-import Link from "next/link";
-import { LogOut } from "lucide-react";
 
+/**
+ * The console's top bar: current page, store switcher, live status, and the
+ * open/closed control. Account lives on the rail, matching the admin console.
+ */
 export function VendorTopBar({
   restaurantName,
   isOpen,
   restaurants,
   activeSlug,
   showControls,
-  phoneFrame = false,
+  onMenu,
 }: {
   restaurantName: string;
   isOpen: boolean;
   restaurants: OwnedRestaurant[];
   activeSlug: string;
   showControls: boolean;
-  /** Keep mobile chrome visible inside the desktop phone-frame preview. */
-  phoneFrame?: boolean;
+  onMenu: () => void;
 }) {
+  const pathname = usePathname();
+  const active = activeVendorNavItem(pathname);
   const multiStore = restaurants.length > 1;
 
   return (
-    <header
-      className={
-        phoneFrame
-          ? "vendor-top-bar glass sticky top-0 z-30 border-x-0 border-t-0"
-          : "vendor-top-bar glass sticky top-0 z-30 border-x-0 border-t-0 lg:hidden"
-      }
-    >
-      <div className="flex items-center gap-2 px-4 py-2.5">
-        <div className="min-w-0 flex-1">
-          {multiStore && showControls ? (
+    <header className="vendor-top-bar sticky top-0 z-30 border-b border-line bg-[color:var(--bg)]/92 backdrop-blur-lg">
+      <div className="flex items-center gap-3.5 px-4 py-[11px] lg:px-6">
+        <button
+          type="button"
+          onClick={onMenu}
+          aria-label="Open navigation"
+          className="press grid size-9 shrink-0 place-items-center rounded-lg border border-line bg-surface text-muted lg:hidden"
+        >
+          <Menu className="size-4" />
+        </button>
+
+        <p className="shrink-0 text-[15px] font-bold tracking-tight lg:hidden">
+          {active?.label ?? "Vendor"}
+        </p>
+
+        {showControls && multiStore ? (
+          <div className="hidden min-w-0 sm:block lg:ml-0">
             <RestaurantSwitcher
               restaurants={restaurants}
               activeSlug={activeSlug}
-              fullWidth
             />
+          </div>
+        ) : (
+          <p className="hidden min-w-0 truncate text-[13px] font-medium text-muted lg:block">
+            {restaurantName}
+          </p>
+        )}
+
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {isOpen ? (
+            <span className="hidden items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs font-medium text-ink sm:inline-flex">
+              <span className="c-dot bg-green" />
+              Accepting orders
+            </span>
           ) : (
-            <>
-              <div className="flex items-center gap-2">
-                {isOpen ? <LivePulse className="scale-90" /> : null}
-                <p className="truncate text-sm font-bold">{restaurantName}</p>
-              </div>
-              <p className="text-[11px] text-muted">
-                {isOpen ? "Accepting orders" : "Store paused"}
-              </p>
-            </>
+            <span className="hidden items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs font-medium text-muted sm:inline-flex">
+              Store paused
+            </span>
           )}
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
+
+          {/* Theme and sign-out are the rail's, not this bar's — VendorTopBar
+              only ever renders beside VendorSidebar (see VendorShell), and the
+              same two controls in both places was one pair too many. */}
           {showControls ? <RestaurantOpenToggle isOpen={isOpen} /> : null}
-          <ThemeToggle />
-          {isSupabaseConfigured ? (
-            <form action="/auth/signout?next=/vendor/login" method="post">
-              <button
-                type="submit"
-                className="press grid size-9 place-items-center rounded-full border border-line bg-surface text-muted"
-                aria-label="Sign out"
-              >
-                <LogOut className="size-3.5" />
-              </button>
-            </form>
-          ) : (
-            <Link
-              href="/"
-              className="press rounded-full border border-line bg-surface px-3 py-2 text-xs font-semibold text-muted"
-            >
-              Exit
-            </Link>
-          )}
         </div>
       </div>
-      {multiStore && showControls ? (
-        <p className="border-t border-line px-4 py-1.5 text-[11px] text-muted">
-          {isOpen ? "Accepting orders" : "Store paused"}
-        </p>
-      ) : null}
     </header>
   );
 }

@@ -7,6 +7,7 @@ import {
   EmptyState,
   PreviewNotice,
 } from "@/components/admin/admin-ui";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { StatTile, StatTiles } from "@/components/admin/console-ui";
 import { PromoBannerCarousel } from "@/components/home/promo-banner-carousel";
 import { BannerRowActions } from "./banner-row-actions";
@@ -83,10 +84,19 @@ export default async function AdminBannersPage() {
         tag={live.length > 0 ? `${live.length} running` : "None running"}
         subtitle="Banners and sponsored slots across the customer app"
         action={
-          <Link href="/admin/banners/new" className="c-btn c-btn-dark press">
-            <Plus className="size-3.5" strokeWidth={2.4} /> New campaign
-          </Link>
+          <ConsoleOnly tool="Designing a campaign" notice={false}>
+            <Link href="/admin/banners/new" className="c-btn c-btn-dark press">
+              <Plus className="size-3.5" strokeWidth={2.4} /> New campaign
+            </Link>
+          </ConsoleOnly>
         }
+      />
+
+      {/* Pausing or ending a live campaign is a phone job and stays below.
+          Authoring one — creative, placements, schedule — is not. */}
+      <ConsoleOnly
+        tool="Designing a campaign"
+        why="Pausing or ending a running one works here."
       />
 
       {!backendReady ? (
@@ -105,9 +115,11 @@ export default async function AdminBannersPage() {
           title="No campaigns yet"
           description="Create a banner and it shows in the customer app."
           action={
-            <Link href="/admin/banners/new" className="c-btn c-btn-dark press">
-              <Plus className="size-3.5" strokeWidth={2.4} /> New campaign
-            </Link>
+            <ConsoleOnly tool="Designing a campaign" notice={false}>
+              <Link href="/admin/banners/new" className="c-btn c-btn-dark press">
+                <Plus className="size-3.5" strokeWidth={2.4} /> New campaign
+              </Link>
+            </ConsoleOnly>
           }
         />
       ) : (
@@ -153,10 +165,17 @@ function CampaignCard({ banner: b }: { banner: Banner }) {
       {/* The slide itself, rendered by the customer component so what an
           operator approves here cannot drift from what ships. `analytics={false}`
           because a campaigns list that logged an impression per card would be
-          measuring its own audience. */}
-      <div className="pointer-events-none -mx-[17px] -mt-4 overflow-hidden rounded-t-xl [&_a]:rounded-none">
-        <PromoBannerCarousel banners={[b]} placement="preview" analytics={false} />
-      </div>
+          measuring its own audience.
+
+          Console-only, and silently so: this is a preview, not a tool — nobody
+          goes looking for it — and it is the expensive half of the card. One
+          live carousel per campaign inside a 370px frame is a lot of mounted
+          client component for a picture that would be too small to judge. */}
+      <ConsoleOnly tool="Campaign previews" notice={false}>
+        <div className="pointer-events-none -mx-[17px] -mt-4 overflow-hidden rounded-t-xl [&_a]:rounded-none">
+          <PromoBannerCarousel banners={[b]} placement="preview" analytics={false} />
+        </div>
+      </ConsoleOnly>
 
       <div className="flex items-start gap-3">
         <span
@@ -185,7 +204,9 @@ function CampaignCard({ banner: b }: { banner: Banner }) {
         </div>
       </div>
 
-      <dl className="grid grid-cols-4 gap-2">
+      {/* Two up in the phone column, four across in the console — the figures
+          are worth keeping on a phone, they just don't fit in one row there. */}
+      <dl className="grid grid-cols-2 gap-2 @3xl:grid-cols-4">
         <Figure label="Shown" value={nf.format(a?.impressions ?? 0)} />
         <Figure label="Clicks" value={nf.format(a?.clicks ?? 0)} />
         <Figure label="CTR" value={pct(a?.ctr ?? 0)} />

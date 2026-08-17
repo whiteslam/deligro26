@@ -45,41 +45,77 @@ export function LivePulse({ className }: { className?: string }) {
   );
 }
 
+function LiveBadge() {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-green/15 px-2.5 py-1 text-[11px] font-bold text-green">
+      <LivePulse />
+      Live
+    </span>
+  );
+}
+
+function StatusTag({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-[5px] border border-line bg-surface px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted">
+      {children}
+    </span>
+  );
+}
+
+/**
+ * Page header with two faces, matching AdminHero:
+ * - phone frame — gradient card
+ * - console — plain title row (driven by `.vendor-hero` container query)
+ */
 export function VendorHero({
   title,
   subtitle,
+  tag,
   badge,
+  leading,
   action,
   live,
 }: {
   title: string;
   subtitle?: string;
+  tag?: string;
   badge?: React.ReactNode;
+  leading?: React.ReactNode;
   action?: React.ReactNode;
   live?: boolean;
 }) {
   return (
-    <div className="vendor-hero relative overflow-hidden rounded-[var(--radius-sheet)] border border-line p-4 sm:p-5">
+    <div className="vendor-hero relative overflow-hidden rounded-[var(--radius-sheet)] border border-line p-4">
       <div className="vendor-hero-glow pointer-events-none absolute inset-0" />
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            {live ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-green/15 px-2.5 py-1 text-[11px] font-bold text-green">
-                <LivePulse />
-                Live
-              </span>
+      <div className="relative">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          {leading ? <div className="shrink-0">{leading}</div> : null}
+          <div className="min-w-0 flex-1">
+            {live || badge ? (
+              <div className="mb-1.5 flex flex-wrap items-center gap-2 @3xl:hidden">
+                {live ? <LiveBadge /> : null}
+                {badge}
+              </div>
             ) : null}
-            {badge}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-2xl font-extrabold tracking-tight @3xl:text-[25px] @3xl:tracking-[-0.025em]">
+                {title}
+              </h1>
+              {live ? (
+                <span className="hidden @3xl:inline">
+                  <LiveBadge />
+                </span>
+              ) : null}
+              {tag ? <StatusTag>{tag}</StatusTag> : null}
+            </div>
+            {subtitle ? (
+              <p className="mt-1 text-sm text-muted @3xl:text-[13px]">
+                {subtitle}
+              </p>
+            ) : null}
           </div>
-          <h1 className="text-display text-2xl font-bold tracking-tight sm:text-3xl">
-            {title}
-          </h1>
-          {subtitle ? (
-            <p className="mt-1.5 max-w-lg text-sm text-muted">{subtitle}</p>
-          ) : null}
+          {action ? <div className="shrink-0">{action}</div> : null}
         </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
       </div>
     </div>
   );
@@ -151,7 +187,10 @@ export function VendorMetricCard({
       </div>
       <p className="text-data mt-3 text-xl font-bold tracking-tight">{value}</p>
       <p className="text-label mt-0.5">{label}</p>
-      <div className="mt-3 h-1 overflow-hidden rounded-full bg-surface-2">
+      <div
+        data-metric-bar
+        className="mt-3 h-1 overflow-hidden rounded-full bg-surface-2"
+      >
         <div
           className={cn("h-full rounded-full transition-all duration-700", t.bar)}
           style={{ width: `${Math.min(100, Math.max(8, barPct))}%` }}

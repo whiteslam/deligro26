@@ -41,4 +41,10 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   deliveryRadiusKm: 8,
   riderCommission: RIDER_COMMISSION,
   riderMinPayout: RIDER_MIN_PAYOUT,
+
+  // Mirrors the 0033 column defaults, and the fallbacks baked into
+  // `review_window_open()` / `review_edit_open()` — three places that must agree,
+  // so changing one means changing all three.
+  reviewWindowDays: 14,
+  reviewEditWindowHours: 48,
 };

@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PortalToShell } from "@/components/shared/portal-to-shell";
 import { updateVendorRestaurantAction } from "@/app/vendor/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { VendorRestaurantDetail } from "@/lib/data-access/vendor-profile";
@@ -169,6 +170,7 @@ export function VendorStoreEditSheet({
   }
 
   return (
+    <PortalToShell>
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
       <div
         className="card flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl sm:max-h-[90vh] sm:rounded-2xl"
@@ -379,5 +381,6 @@ export function VendorStoreEditSheet({
         </form>
       </div>
     </div>
+    </PortalToShell>
   );
 }

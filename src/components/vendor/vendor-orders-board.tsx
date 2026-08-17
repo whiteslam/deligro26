@@ -812,11 +812,12 @@ export function VendorOrdersBoard({
   );
 
   return (
-    <div className="min-w-0 space-y-4 overflow-x-hidden lg:space-y-6">
+    <>
       {live ? <AutoRefresh interval={8000} /> : null}
 
       <VendorHero
         live={live}
+        tag={live ? "Live" : undefined}
         title="Live orders"
         subtitle={
           restaurantName
@@ -841,7 +842,7 @@ export function VendorOrdersBoard({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 @3xl:grid-cols-4">
         <VendorMetricCard
           label="New"
           value={String(incoming.length)}
@@ -872,7 +873,7 @@ export function VendorOrdersBoard({
         />
       </div>
 
-      <div className="space-y-4 lg:hidden">
+      <div className="space-y-4 @3xl:hidden">
         <VendorSegmentedTabs
           tabs={mobileTabs}
           active={mobileTab}
@@ -905,7 +906,7 @@ export function VendorOrdersBoard({
         ) : null}
       </div>
 
-      <div className="hidden gap-4 lg:grid lg:grid-cols-3">
+      <div className="hidden gap-4 @3xl:grid @3xl:grid-cols-3">
         <VendorKanbanColumn title="New orders" count={incoming.length} tone="accent">
           <IncomingList orders={incoming} busy={busy} onPatch={patchStatus} />
         </VendorKanbanColumn>
@@ -918,7 +919,7 @@ export function VendorOrdersBoard({
       </div>
 
       {live ? (
-        <div className="hidden gap-4 lg:grid lg:grid-cols-2">
+        <div className="hidden gap-4 @3xl:grid @3xl:grid-cols-2">
           <VendorPanel
             title="Cancelled"
             accent="red"
@@ -969,6 +970,6 @@ export function VendorOrdersBoard({
           onClose={() => setHistoryDialog(null)}
         />
       ) : null}
-    </div>
+    </>
   );
 }

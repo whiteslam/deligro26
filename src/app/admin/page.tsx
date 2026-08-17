@@ -23,6 +23,7 @@ import {
   type KpiItem,
   type ShareSegment,
 } from "@/components/admin/console-ui";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { GmvOrdersChart } from "@/components/admin/admin-charts";
 import { LiveBoard } from "@/components/admin/live-board";
 import { ApprovalQueue } from "@/components/admin/approval-queue";
@@ -263,7 +264,16 @@ export default async function AdminOverviewPage({
               </div>
             }
           >
-            <LiveBoard rows={board.rows} />
+            {/* Console-only: a 660px-wide table with no card layout and no
+                pagination — it scrolls sideways by design. The panel keeps its
+                at-risk count and its "Open board" link on a phone, and
+                /admin/orders is the same data in a form that stacks. */}
+            <ConsoleOnly
+              tool="The live order board"
+              why="Open board, above, works on a phone."
+            >
+              <LiveBoard rows={board.rows} />
+            </ConsoleOnly>
           </Panel>
         </div>
 
@@ -328,7 +338,15 @@ export default async function AdminOverviewPage({
               </div>
             }
           >
-            <GmvOrdersChart days={series.days} />
+            {/* The two headline figures in the action slot are the part worth
+                reading on a phone; a 60-day bar-and-line plot in a 370px column
+                is not, and it costs a charting library to draw. */}
+            <ConsoleOnly
+              tool="The GMV chart"
+              why="The totals beside this heading are the same period."
+            >
+              <GmvOrdersChart days={series.days} />
+            </ConsoleOnly>
           </ChartCard>
         </div>
 

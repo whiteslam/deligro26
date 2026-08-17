@@ -1096,7 +1096,7 @@ body:has(.dashboard-shell) {
   }
 }
 
-/* Vendor portal — mobile-first with bottom tab bar + desktop sidebar */
+/* Vendor portal — same chrome as the admin console (web rail + fluid column). */
 .vendor-shell {
   display: flex;
   min-height: 100dvh;
@@ -1107,6 +1107,7 @@ body:has(.dashboard-shell) {
   top: 0;
   height: 100dvh;
   flex-shrink: 0;
+  z-index: 20;
 }
 .vendor-content {
   display: flex;
@@ -1114,35 +1115,25 @@ body:has(.dashboard-shell) {
   flex: 1;
   flex-direction: column;
 }
-.vendor-shell .dashboard-main.vendor-main {
+.vendor-main {
   flex: 1;
-  width: 100%;
-  max-width: none;
-  margin-inline: 0;
   min-width: 0;
+  width: 100%;
+  max-width: 1600px;
+  margin-inline: auto;
+  padding: 18px 16px 40px;
   overflow-x: clip;
-  padding: 16px 16px calc(92px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 @media (min-width: 1024px) {
-  .vendor-shell .dashboard-main.vendor-main {
-    padding: 28px 32px 40px;
+  .vendor-main {
+    padding: 22px 24px 40px;
   }
-}
-.vendor-bottom-nav {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .vendor-top-bar {
   --vendor-top-offset: 56px;
-}
-@media (min-width: 640px) {
-  .vendor-top-bar {
-    --vendor-top-offset: 52px;
-  }
-}
-@media (min-width: 768px) {
-  .vendor-top-bar {
-    --vendor-top-offset: 60px;
-  }
 }
 
 /* ============================================================
@@ -1150,9 +1141,9 @@ body:has(.dashboard-shell) {
    ============================================================
    A warm paper palette (page #F5F4F1, warm-grey hairlines, near-black ink)
    over the app's bright white one. It is applied by adding `.console-theme`,
-   which the web AdminShell puts on the shell and the nav drawer — NOT on the
-   phone frame, and nowhere near the customer or vendor apps. Those keep the
-   original tokens untouched.
+   which the web AdminShell and VendorShell put on the shell and the nav
+   drawer — NOT on the phone frame, and nowhere near the customer app. The
+   customer app keeps the original tokens untouched.
 
    The override works because `@theme inline` (top of this file) compiles
    Tailwind's colour utilities to `var(--bg)` / `var(--line)` / … rather than to
@@ -1312,17 +1303,25 @@ body:has(.dashboard-shell) {
   padding: 14px 16px;
   box-shadow: none;
 }
-
-/* Likewise the shell's own surfaces, which the app gives a gradient wash. In
-   an ops console a tinted banner on every screen is noise, and the handoff
-   drops it — the page header is already plain here via .admin-hero. */
-.console-theme .admin-today,
-.console-theme .vendor-hero {
-  background: var(--surface);
+.console-theme .vendor-metric {
+  border-radius: 12px;
+  padding: 12px 16px;
   box-shadow: none;
 }
-.console-theme .vendor-hero-glow {
+.console-theme .vendor-metric:hover {
+  box-shadow: none;
+}
+.console-theme .vendor-metric [data-metric-bar] {
   display: none;
+}
+.console-theme .vendor-kanban-col {
+  border-radius: 12px;
+  backdrop-filter: none;
+}
+.console-theme .vendor-profile-hero {
+  min-height: 220px;
+  border-radius: 12px;
+  box-shadow: none;
 }
 
 /* A dot that breathes, for "live" and "healthy". */
@@ -1637,9 +1636,11 @@ input:focus-visible + .c-switch {
 @container (min-width: 768px) {
   .admin-hero {
     background: none;
-    border-color: transparent;
+    border: 0;
+    border-radius: 0;
     box-shadow: none;
     padding: 0;
+    overflow: visible;
   }
   .admin-hero-glow {
     display: none;
@@ -1654,13 +1655,6 @@ input:focus-visible + .c-switch {
   .admin-measure {
     max-width: 1000px;
   }
-}
-
-/* The dashboard's "today" band. Keeps its gradient at every width — unlike the
-   page header, this one IS a card, and it is the screen's focal point. */
-.admin-today {
-  background: linear-gradient(135deg, var(--surface) 0%, var(--accent-soft) 120%);
-  box-shadow: var(--shadow-md);
 }
 
 /* Vendor UI primitives */
@@ -1678,6 +1672,22 @@ input:focus-visible + .c-switch {
     color-mix(in srgb, var(--accent) 18%, transparent),
     transparent 70%
   );
+}
+
+/* Same two-face header as `.admin-hero`. Overlays portal out of this
+   container (see PortalToShell), so `@container` on `.vendor-main` is safe. */
+@container (min-width: 768px) {
+  .vendor-hero {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    overflow: visible;
+  }
+  .vendor-hero-glow {
+    display: none;
+  }
 }
 .vendor-metric {
   border-radius: var(--radius-block);

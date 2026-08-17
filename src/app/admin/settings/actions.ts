@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { updateSettings } from "@/lib/data-access/settings";
+import { DEFAULT_SETTINGS } from "@/lib/settings-defaults";
 import {
   CommissionNotMigratedError,
   clampCommissionPct,
@@ -63,6 +64,24 @@ function parse(form: FormData): PlatformSettings {
     deliveryRadiusKm: Math.max(0, num(form.get("deliveryRadiusKm"), 8)),
     riderCommission: Math.min(1, Math.max(0, commissionPct / 100)),
     riderMinPayout: int(form.get("riderMinPayout"), 30),
+
+    // Clamped to the same bounds as the 0033 CHECK constraints. A value outside
+    // them would be rejected by the database anyway; clamping here turns that
+    // into a saved form rather than a thrown error on an unrelated field.
+    reviewWindowDays: Math.min(
+      365,
+      Math.max(1, int(form.get("reviewWindowDays"), DEFAULT_SETTINGS.reviewWindowDays))
+    ),
+    reviewEditWindowHours: Math.min(
+      720,
+      Math.max(
+        0,
+        int(
+          form.get("reviewEditWindowHours"),
+          DEFAULT_SETTINGS.reviewEditWindowHours
+        )
+      )
+    ),
   };
 }
 

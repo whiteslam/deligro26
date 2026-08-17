@@ -11,6 +11,7 @@ import {
 } from "@/lib/data-access/admin-settlements";
 import { formatINR } from "@/lib/utils/format";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { SettlementActions } from "./settlement-actions";
 
 export const dynamic = "force-dynamic";
@@ -149,11 +150,19 @@ export default async function SettlementDetailPage({
         ) : null}
       </div>
 
+      {/* Console-only: marking a payout paid means typing a UTR against a money
+          transfer, and a phone keyboard is the wrong place to get that right.
+          Reading the statement is exactly what a phone is for, so it stays. */}
       {settlement.status === "draft" ? (
-        <SettlementActions
-          id={settlement.id}
-          netPayable={settlement.netPayable}
-        />
+        <ConsoleOnly
+          tool="Settling a payout"
+          why="Recording a UTR or voiding a batch is money movement."
+        >
+          <SettlementActions
+            id={settlement.id}
+            netPayable={settlement.netPayable}
+          />
+        </ConsoleOnly>
       ) : null}
 
       {settlement.lines.length === 1 ? (

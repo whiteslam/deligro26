@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Banknote, CheckCircle2, Plus } from "lucide-react";
 import { AdminHero, EmptyState } from "@/components/admin/admin-ui";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { StatTile, StatTiles } from "@/components/admin/console-ui";
 import {
   DataTable,
@@ -491,13 +492,18 @@ export default async function AdminSettlementsPage({
         subtitle="What each vendor is owed right now, and the batches already built"
         action={
           <div className="flex items-center gap-2">
+            {/* Reading a payout is phone work; composing a batch is not, so
+                only the second one drops out. `notice={false}` — the header has
+                no room for the explanation, and it is given once in the body. */}
             <Link href="/admin/settlements/orders" className="c-btn press">
               Order payouts
             </Link>
-            <Link href="/admin/settlements/new" className="c-btn c-btn-dark press">
-              <Plus className="size-3.5" strokeWidth={2.4} />
-              New settlement
-            </Link>
+            <ConsoleOnly tool="Building a settlement" notice={false}>
+              <Link href="/admin/settlements/new" className="c-btn c-btn-dark press">
+                <Plus className="size-3.5" strokeWidth={2.4} />
+                New settlement
+              </Link>
+            </ConsoleOnly>
           </div>
         }
       />
@@ -507,6 +513,14 @@ export default async function AdminSettlementsPage({
           {loadError}
         </p>
       ) : null}
+
+      {/* Reading payouts works on a phone; composing a batch is console work,
+          so the New settlement button drops out of the header and the reason is
+          given here once, rather than at each of its call sites. */}
+      <ConsoleOnly
+        tool="Building a settlement"
+        why="Reading and tracking existing payouts works fine here."
+      />
 
       {/* The figures come first: what is owed in total, before the list of who
           it is owed to. Below the tables they were three scrolls away on a

@@ -25,6 +25,15 @@ export function columnKnownMissing(key: string): boolean {
   return known.get(key) === false;
 }
 
+/**
+ * Confirmed present, as opposed to merely not-known-missing. The difference
+ * matters when a caller wants to probe an unknown column deliberately rather
+ * than discover it by having a real query fail.
+ */
+export function columnKnownPresent(key: string): boolean {
+  return known.get(key) === true;
+}
+
 export function rememberColumn(key: string, present: boolean): void {
   known.set(key, present);
 }

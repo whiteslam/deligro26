@@ -1,19 +1,29 @@
 import Link from "next/link";
-import { ChevronRight, SlidersHorizontal, UserCog } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { AdminHero } from "@/components/admin/admin-ui";
-import { settingsBackendReady } from "@/lib/settings";
+import { ConsoleOnlyNotice } from "@/components/admin/console-only";
+import { ADMIN_PHONE_MENU } from "@/components/admin/admin-nav";
 
 /**
  * Settings home = a menu, not a form. Each row is a tap target that routes to
  * the screen that owns it (platform config, the ops shortcuts). The actual
  * editing lives on the sub-pages so this stays a clean settings tab.
  *
- * Rows marked `phoneOnly` are the ones the console's sidebar now lists as
- * destinations of their own (Team, Platform config — see admin-nav.ts). They
- * survive here purely for the phone frame, where five bottom tabs are the whole
- * navigation and this menu is the only way to reach them; showing them in web
- * mode as well would give the operator the same link in two places. Refunds is
- * gone entirely: it has been a rail item and a top-bar queue all along.
+ * There is no Account section: MFA was removed in migration 0033 and the
+ * security screen with it, so a row leading there would be a dead link. Admin
+ * sign-in is a password alone — that is logged as accepted risk P-1 in
+ * docs/SECURITY_AUDIT.md, which is where it belongs, not in a settings menu
+ * that would imply there is something here to configure.
+ *
+ * Sections marked `phoneOnly` are the phone's second half of its navigation.
+ * Five bottom tabs cannot carry eleven destinations, so everything without a
+ * tab is listed here — derived from ADMIN_PHONE_MENU rather than hand-written,
+ * so adding a nav item cannot silently strand it on a handset. In the console
+ * the rail already lists all of it, and showing the same link twice there would
+ * only be noise, so these sections drop out at `@3xl`.
+ *
+ * Platform configuration is the exception: it is console-only, so the phone
+ * gets a note explaining where it went instead of a row that leads to one.
  */
 export const dynamic = "force-dynamic";
 
@@ -24,13 +34,28 @@ const ICON_TONE = {
   blue: "bg-blue/12 text-blue",
   deal: "bg-deal/12 text-deal",
   violet: "bg-violet-500/15 text-violet-500",
+  // Amber on a pale chip fails contrast, so this one takes its dark ink — the
+  // same pairing the phone tab bar uses for the Campaigns tone.
+  pop: "bg-pop/25 text-pop-ink",
 } as const;
 
 type IconTone = keyof typeof ICON_TONE;
 
-export default async function AdminSettingsPage() {
-  const backendReady = await settingsBackendReady();
+/**
+ * One line of "what is this" per derived row. Kept here rather than on the nav
+ * item: the rail and the tab bar show a label alone, and only this menu has the
+ * room to explain. A missing entry just renders the label, so a new nav item
+ * degrades quietly instead of breaking the page.
+ */
+const MENU_DESC: Record<string, string> = {
+  "/admin/settlements": "Vendor payout batches & statements",
+  "/admin/vendors/slots": "What the customer app features, and in what order",
+  "/admin/banners": "Pause or end a live campaign",
+  "/admin/customers": "Directory, order history & contact",
+  "/admin/settings/employees": "Create manager & driver logins",
+};
 
+export default function AdminSettingsPage() {
   return (
     <div className="admin-measure space-y-6">
       <AdminHero
@@ -38,28 +63,31 @@ export default async function AdminSettingsPage() {
         subtitle="Platform configuration — fees, support, availability & ops"
       />
 
-      <Group label="Configuration" phoneOnly>
-        <Row
-          href="/admin/settings/platform"
-          icon={SlidersHorizontal}
-          label="Platform configuration"
-          desc="Fees, tax, support, availability & rider payout"
-          tone="blue"
-          badge={backendReady ? undefined : "Preview"}
-          badgeTone="deal"
+      {/* Platform config is console-only (see its page), so the phone gets the
+          reason rather than a row that leads to a notice. This is the whole
+          Configuration group — there is nothing else in it. */}
+      <section className="@3xl:hidden">
+        <h2 className="text-label mb-2">Configuration</h2>
+        <ConsoleOnlyNotice
+          tool="Platform configuration"
+          why="Fees, tax, support, availability and the rider payout formula."
         />
-      </Group>
+      </section>
 
+      {/* Everything the phone can use that has no bottom tab. Derived from the
+          nav so a new destination can't quietly become unreachable here. */}
       <Group label="Manage" phoneOnly>
-        <Row
-          href="/admin/settings/employees"
-          icon={UserCog}
-          label="Team & staff"
-          desc="Create manager & driver logins"
-          tone="green"
-        />
+        {ADMIN_PHONE_MENU.map((item) => (
+          <Row
+            key={item.href}
+            href={item.href}
+            icon={item.icon}
+            label={item.label}
+            desc={MENU_DESC[item.href]}
+            tone={item.tone}
+          />
+        ))}
       </Group>
-
     </div>
   );
 }
@@ -97,16 +125,12 @@ function Row({
   label,
   desc,
   tone = "accent",
-  badge,
-  badgeTone = "muted",
 }: {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   desc?: string;
   tone?: IconTone;
-  badge?: string;
-  badgeTone?: "green" | "muted" | "deal";
 }) {
   return (
     <Link
@@ -124,7 +148,6 @@ function Row({
           <span className="block truncate text-xs text-muted">{desc}</span>
         ) : null}
       </span>
-      {badge ? <span className={`pill pill-${badgeTone}`}>{badge}</span> : null}
       <ChevronRight className="size-4 shrink-0 text-muted" />
     </Link>
   );
