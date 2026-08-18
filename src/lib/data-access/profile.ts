@@ -5,6 +5,8 @@ import { checkOtp } from "@/lib/data-access/otp";
 import { toE164 } from "@/lib/auth/phone";
 import { assertRealType } from "@/lib/utils/file-signature";
 import { isDeveloperPhone } from "@/lib/developers";
+import { ownsAnyRestaurant } from "@/lib/auth/vendor-access";
+import type { Role } from "@/lib/auth";
 
 /**
  * Summary shown on the customer Profile tab. Everything here is the signed-in
@@ -21,6 +23,10 @@ export interface ProfileSummary {
   addresses: number;
   favorites: number;
   isDeveloper: boolean; // one of ours — drives the Developer badge + golden ring
+  /** Drives the "Consoles" rows — which other surfaces this account can open. */
+  role: Role;
+  /** Owns at least one shop, so the vendor portal is theirs regardless of role. */
+  ownsRestaurant: boolean;
 }
 
 export interface ProfileUpdateInput {
@@ -47,15 +53,19 @@ export async function getProfileSummary(): Promise<ProfileSummary | null> {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, phone, avatar_url, created_at")
+    .select("full_name, phone, avatar_url, created_at, role")
     .eq("id", user.id)
     .maybeSingle();
 
-  const [{ count: orderCount }, { count: addressCount }, favorites] = await Promise.all([
-    supabase.from("orders").select("id", { count: "exact", head: true }),
-    supabase.from("addresses").select("id", { count: "exact", head: true }),
-    countFavorites(),
-  ]);
+  const [{ count: orderCount }, { count: addressCount }, favorites, ownsRestaurant] =
+    await Promise.all([
+      supabase.from("orders").select("id", { count: "exact", head: true }),
+      supabase.from("addresses").select("id", { count: "exact", head: true }),
+      countFavorites(),
+      // Chrome, not access: it only decides whether a "Restaurant portal" row is
+      // offered. A failure here drops the row rather than the profile tab.
+      ownsAnyRestaurant(user.id).catch(() => false),
+    ]);
 
   const name = profile?.full_name?.trim() || "Deligro Customer";
   const phone = profile?.phone ?? user.phone ?? null;
@@ -73,6 +83,8 @@ export async function getProfileSummary(): Promise<ProfileSummary | null> {
     addresses: addressCount ?? 0,
     favorites,
     isDeveloper: isDeveloperPhone(phone),
+    role: ((profile?.role as Role | null) ?? "customer") as Role,
+    ownsRestaurant,
   };
 }
 

@@ -16,7 +16,9 @@ import type { Role } from "@/lib/auth";
  *   customer → /login          (phone OTP, or browse as guest)
  *
  * The same account may hold more than one of these — signing in at a door does
- * not change who you are, only where you land.
+ * not change who you are, only where you land. Moving *between* the surfaces one
+ * account holds is `surfaces.ts` + the `/switch` chooser; it navigates, it does
+ * not grant.
  *
  * `roles` here is for *routing* — which front door leads where, and whether a
  * signed-in visitor should be sent straight in. It is not the security boundary:

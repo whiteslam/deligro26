@@ -213,6 +213,7 @@ role check in its layout:
 | `/manager` | `/manager/login` — email + password, or phone OTP | `requireRole(["manager","admin"])` |
 | `/driver` | `/driver/login` — email + password, or phone OTP | `requireRole("driver")` |
 | customer app | `/login` — phone OTP, or guest | none — the app is public to any account |
+| `/switch` | none — it is *behind* a door | `requireUser()`; lists only the caller's own surfaces |
 
 **No global login.** A single `/login` used to authenticate everyone and then
 route on `profiles.role`, which meant one account's role decided which app you
@@ -220,6 +221,22 @@ got: the owner's phone is an admin, so signing in to *shop* landed on the admin
 console. Each door now leads to exactly one place. A door never inspects your
 role to redirect you elsewhere — the portal's own layout decides whether to
 admit you, and bounces back to that same door with `?denied=1` if not.
+
+**Switching surfaces (`/switch`).** One person is often two things — the owner's
+phone is an admin account *and* the account they shop with — so after a customer
+sign-in `/login` lands on `/switch`, which asks which app to open. It reads
+`profiles.role` (plus restaurant ownership) for **the caller's own account** and
+renders links; `src/lib/auth/surfaces.ts` computes the list. An account with only
+the customer app is redirected straight through and never sees the screen. The
+same list drives the "Switch app" rows on the customer profile tab and the
+"Customer app" link in the admin console's chrome.
+
+This is navigation, not authorization. Every link lands on a layout that still
+runs `requireRole()` / `requireVendorAccess()`, with RLS underneath. Getting the
+list wrong can only offer a door the account cannot open — never open one. The
+old failure mode (routing *on* role) is not back: nothing here redirects an
+operator away from the customer app, and the choice is the person's, per sign-in,
+with no stored preference to poison.
 
 Every door offers phone OTP as well as a password, because operator accounts are
 not all email accounts — the owner's admin account is a phone account seeded by
