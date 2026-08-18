@@ -477,7 +477,7 @@ export function VendorProfileView({
                 <QuickLink
                   href="/vendor/settings"
                   label="Settings"
-                  hint="Shop pin & two-factor login"
+                  hint="Where your shop sits on the map"
                 />
                 {live ? (
                   <QuickLink

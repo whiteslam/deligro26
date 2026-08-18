@@ -22,13 +22,18 @@ import { useSearchParams } from "next/navigation";
  */
 function LoginForm() {
   const params = useSearchParams();
-  // Straight into the app after sign-in. A `next` set by the proxy (bounced from
+  // Where the app itself should open. A `next` set by the proxy (bounced from
   // /checkout, /orders, …) still wins, so people land where they were headed —
   // unless it points into an operator portal, which needs that portal's door.
-  const next = customerLanding(params.get("next"));
+  const target = customerLanding(params.get("next"));
+  // Sign-in lands on /switch, which asks "customer app or console?" *only* when
+  // the account holds both — the owner's phone is an admin and a shopper, and
+  // this door alone cannot know that (roles are server-side, by design). For an
+  // ordinary customer /switch is a server-side redirect straight to `target`.
+  const next = `/switch?next=${encodeURIComponent(target)}`;
   // Guest browse is only the *entry* affordance (bare /login). When we were sent
   // here to gate a specific action, `next` is set and an account is required.
-  const showGuest = next === "/";
+  const showGuest = target === "/";
 
   return (
     <div className="w-full max-w-sm">

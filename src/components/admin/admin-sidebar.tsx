@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, UtensilsCrossed } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import {
   ADMIN_NAV,
@@ -113,6 +113,17 @@ export function AdminSidebar({
             </span>
             <ThemeToggle className="size-[26px] shrink-0 rounded-md border-0 bg-transparent text-[var(--sb-meta)] hover:bg-[var(--sb-hover)]" />
           </div>
+
+          {/* The way back to the app. An operator here is often also a customer
+              — the owner's phone is both — and leaving the console used to mean
+              signing out of it. Same session, different surface. */}
+          <Link
+            href="/"
+            className="press flex w-full items-center gap-2 rounded-[7px] px-2 py-1.5 text-xs font-semibold text-[var(--sb-meta)] transition-colors hover:bg-[var(--sb-hover)] hover:text-white"
+          >
+            <UtensilsCrossed className="size-[15px]" strokeWidth={1.7} />
+            Customer app
+          </Link>
 
           {isSupabaseConfigured ? (
             <form action="/auth/signout?next=/admin/login" method="post">

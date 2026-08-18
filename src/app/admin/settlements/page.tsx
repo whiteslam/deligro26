@@ -498,6 +498,7 @@ export default async function AdminSettlementsPage({
             <Link href="/admin/settlements/orders" className="c-btn press">
               Order payouts
             </Link>
+            {/* Composing a batch is console work; reading payouts is not. */}
             <ConsoleOnly tool="Building a settlement" notice={false}>
               <Link href="/admin/settlements/new" className="c-btn c-btn-dark press">
                 <Plus className="size-3.5" strokeWidth={2.4} />
@@ -515,8 +516,8 @@ export default async function AdminSettlementsPage({
       ) : null}
 
       {/* Reading payouts works on a phone; composing a batch is console work,
-          so the New settlement button drops out of the header and the reason is
-          given here once, rather than at each of its call sites. */}
+          so the New settlement button drops out of the header and says why
+          here — once, rather than at each of its call sites. */}
       <ConsoleOnly
         tool="Building a settlement"
         why="Reading and tracking existing payouts works fine here."

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, X } from "lucide-react";
+import { LogOut, UtensilsCrossed, X } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import {
   ADMIN_NAV,
@@ -133,19 +133,30 @@ export function AdminNavDrawer({
           })}
         </nav>
 
-        <div className="mt-auto flex items-center justify-between gap-2 border-t border-[var(--sb-border)] px-3 py-3">
-          <ThemeToggle className="size-8 rounded-md border-0 bg-transparent text-[var(--sb-meta)] hover:bg-[var(--sb-hover)]" />
-          {isSupabaseConfigured ? (
-            <form action="/auth/signout?next=/admin/login" method="post">
-              <button
-                type="submit"
-                className="press flex items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-xs font-semibold text-[var(--sb-meta)] transition-colors hover:bg-[var(--sb-hover)] hover:text-white"
-              >
-                <LogOut className="size-4" strokeWidth={1.7} />
-                Sign out
-              </button>
-            </form>
-          ) : null}
+        <div className="mt-auto border-t border-[var(--sb-border)] px-3 py-3">
+          {/* Same session, different surface — see AdminSidebar. */}
+          <Link
+            href="/"
+            className="press mb-1 flex items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-xs font-semibold text-[var(--sb-meta)] transition-colors hover:bg-[var(--sb-hover)] hover:text-white"
+          >
+            <UtensilsCrossed className="size-4" strokeWidth={1.7} />
+            Customer app
+          </Link>
+
+          <div className="flex items-center justify-between gap-2">
+            <ThemeToggle className="size-8 rounded-md border-0 bg-transparent text-[var(--sb-meta)] hover:bg-[var(--sb-hover)]" />
+            {isSupabaseConfigured ? (
+              <form action="/auth/signout?next=/admin/login" method="post">
+                <button
+                  type="submit"
+                  className="press flex items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-xs font-semibold text-[var(--sb-meta)] transition-colors hover:bg-[var(--sb-hover)] hover:text-white"
+                >
+                  <LogOut className="size-4" strokeWidth={1.7} />
+                  Sign out
+                </button>
+              </form>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

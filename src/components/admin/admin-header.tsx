@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { LogOut, UtensilsCrossed } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -18,6 +18,16 @@ export function AdminHeader({
         <p className="truncate text-[15px] font-bold leading-none">{title}</p>
         <p className="text-label mt-1 truncate leading-none">{subtitle}</p>
       </div>
+      {/* Back to the app, without ending the session. On a handset this is the
+          console's only exit — the rail that carries it on desktop isn't here. */}
+      <Link
+        href="/"
+        aria-label="Open the customer app"
+        title="Customer app"
+        className="press grid size-9 shrink-0 place-items-center rounded-full border border-line bg-surface text-muted"
+      >
+        <UtensilsCrossed className="size-4" />
+      </Link>
       <ThemeToggle className="size-9" />
       {isSupabaseConfigured ? (
         <form action="/auth/signout?next=/admin/login" method="post">
@@ -29,14 +39,7 @@ export function AdminHeader({
             <LogOut className="size-4" />
           </button>
         </form>
-      ) : (
-        <Link
-          href="/"
-          className="press grid size-9 place-items-center rounded-full border border-line bg-surface text-xs font-bold text-muted"
-        >
-          ✕
-        </Link>
-      )}
+      ) : null}
     </header>
   );
 }

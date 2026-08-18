@@ -19,6 +19,8 @@ import { getProfileSummary, type ProfileSummary } from "@/lib/data-access/profil
 import { AppearanceRow } from "@/components/profile/appearance-row";
 import { ProfileAccountRows } from "@/components/profile/profile-account-rows";
 import { ProfileAvatar } from "@/components/profile/profile-avatar";
+import { SurfaceRows } from "@/components/shared/surface-switch";
+import { operatorSurfaces, surfacesForRole } from "@/lib/auth/surfaces";
 
 // Per-request: reads the auth cookie to show the signed-in user's own data.
 export const dynamic = "force-dynamic";
@@ -68,6 +70,8 @@ export default async function ProfilePage() {
         addresses: ADDRESSES.length,
         favorites: 0,
         isDeveloper: false,
+        role: "customer",
+        ownsRestaurant: false,
       };
 
   if (!summary) {
@@ -95,6 +99,13 @@ export default async function ProfilePage() {
   }
 
   const firstName = summary.name.split(" ")[0];
+
+  // The other Deligros this account opens. Empty for an ordinary customer, so
+  // the section below simply isn't rendered — and these are links, not access:
+  // each portal's layout still runs its own role check.
+  const consoles = operatorSurfaces(
+    surfacesForRole(summary.role, { vendorAccess: summary.ownsRestaurant })
+  );
 
   return (
     <div className="px-4 pb-4 pt-5">
@@ -129,6 +140,16 @@ export default async function ProfilePage() {
           </p>
         </div>
       </div>
+
+      {/* Consoles — only for accounts that hold one. This is the way back out of
+          the customer app for an operator (the owner's phone is both), so it
+          sits above the shopping rows rather than at the bottom of "Other". */}
+      {consoles.length ? (
+        <>
+          <SectionHead title="Switch app" />
+          <SurfaceRows surfaces={consoles} />
+        </>
+      ) : null}
 
       {/* Favourites */}
       <SectionHead title="Favourites" />
