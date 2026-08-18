@@ -8,6 +8,7 @@ import {
   updateMenuItem,
   deleteMenuItem,
   setMenuItemAvailable,
+  setMenuItemImage,
   bulkInsertMenuItems,
   type MenuItemInput,
   type BulkMenuItem,
@@ -95,6 +96,31 @@ export async function setMenuAvailabilityAction(
     return { ok: true };
   } catch {
     return { ok: false, error: "Couldn't update availability." };
+  }
+}
+
+/**
+ * Change which picture a menu item uses.
+ *
+ * Separate from updateMenuItemAction because the picker is used on its own,
+ * without the rest of the form being open — and because this is the one write
+ * that also records provenance, so "matched automatically" and "chosen by a
+ * person" stay distinguishable.
+ */
+export async function setMenuItemImageAction(
+  restaurantId: string,
+  itemId: string,
+  imageUrl: string | null,
+  libraryId: string | null
+): Promise<ActionResult> {
+  const demo = await guard();
+  if (demo) return { ok: false, error: demo };
+  try {
+    await setMenuItemImage(itemId, imageUrl, libraryId);
+    revalidateVendor(restaurantId);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Couldn't change the picture." };
   }
 }
 

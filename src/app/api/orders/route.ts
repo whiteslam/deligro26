@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import {
   createOrder,
   listVisibleOrders,
+  PaymentRefused,
   type CreateOrderInput,
 } from "@/lib/data-access/orders";
 
@@ -114,6 +115,16 @@ export async function POST(request: Request) {
     const order = await createOrder(body);
     return NextResponse.json({ order }, { status: 201 });
   } catch (err) {
+    // The cash ceiling is per vendor, so the sentence the customer needs
+    // ("Orders above ₹300 must be paid online") can only be written by the
+    // rules that refused the order. Pass it through verbatim rather than
+    // rebuilding it here from a code and a guess at the number.
+    if (err instanceof PaymentRefused) {
+      return NextResponse.json(
+        { error: err.reason, message: err.customerMessage },
+        { status: 400 }
+      );
+    }
     const message = err instanceof Error ? err.message : "server_error";
     const mapped = mapCreateError(message);
     return NextResponse.json({ error: mapped.error }, { status: mapped.status });

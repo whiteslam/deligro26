@@ -6,9 +6,61 @@ import { cn } from "@/lib/utils/cn";
 export type ShellMode = "app" | "web";
 
 /**
- * Floating layout switcher — only visible on computer/laptop (≥480px).
- * Hidden on real phones so operators never see a desktop-only control.
+ * The app ↔ web layout switch, in two placements.
+ *
+ * `ShellModeToggle` is the control itself, with no positioning of its own, so a
+ * shell that has a real header can sit it among that header's other controls —
+ * which is where a layout switch belongs, next to the things that change what
+ * you are looking at rather than floating over the content.
+ *
+ * `DesktopShellSwitcher` is the floating placement, still needed by shells that
+ * have no console header to put it in: the phone-frame preview is a 390px
+ * device on a bare backdrop, and the vendor console's top bar is `lg:hidden`.
+ *
+ * Both are hidden below 480px. A real phone never gets the console layout, so
+ * an operator on a handset must never see a control offering it.
  */
+export function ShellModeToggle({
+  mode,
+  onChange,
+  hydrated,
+  className,
+}: {
+  mode: ShellMode;
+  onChange: (mode: ShellMode) => void;
+  hydrated: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Layout"
+      className={cn(
+        // Same shape as RangeTabs, so the header reads as one set of controls
+        // rather than a header plus a transplanted floating widget.
+        "hidden items-center gap-0.5 rounded-lg border border-line bg-surface p-0.5 min-[480px]:flex",
+        className
+      )}
+    >
+      <ModeButton
+        active={mode === "app"}
+        disabled={!hydrated}
+        onClick={() => onChange("app")}
+        icon={<Smartphone className="size-3.5" />}
+        label="App"
+      />
+      <ModeButton
+        active={mode === "web"}
+        disabled={!hydrated}
+        onClick={() => onChange("web")}
+        icon={<Monitor className="size-3.5" />}
+        label="Web"
+      />
+    </div>
+  );
+}
+
+/** Floating placement, for shells with no header to host the toggle. */
 export function DesktopShellSwitcher({
   mode,
   onChange,
@@ -19,28 +71,13 @@ export function DesktopShellSwitcher({
   hydrated: boolean;
 }) {
   return (
-    <div
-      className="pointer-events-none fixed bottom-5 right-5 z-[100] hidden min-[480px]:block"
-      role="group"
-      aria-label="Layout switcher"
-    >
-      <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-line bg-surface/95 p-1.5 shadow-[var(--shadow-lg)] backdrop-blur-md">
-        <span className="hidden px-2 text-[11px] font-bold uppercase tracking-wide text-muted sm:inline">
-          Layout
-        </span>
-        <ModeButton
-          active={mode === "app"}
-          disabled={!hydrated}
-          onClick={() => onChange("app")}
-          icon={<Smartphone className="size-3.5" />}
-          label="App"
-        />
-        <ModeButton
-          active={mode === "web"}
-          disabled={!hydrated}
-          onClick={() => onChange("web")}
-          icon={<Monitor className="size-3.5" />}
-          label="Web"
+    <div className="pointer-events-none fixed bottom-5 right-5 z-[100] hidden min-[480px]:block">
+      <div className="pointer-events-auto rounded-2xl border border-line bg-surface/95 p-1 shadow-[var(--shadow-lg)] backdrop-blur-md">
+        <ShellModeToggle
+          mode={mode}
+          onChange={onChange}
+          hydrated={hydrated}
+          className="border-0 bg-transparent p-0"
         />
       </div>
     </div>
@@ -67,9 +104,9 @@ function ModeButton({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "press flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12px] font-bold transition-colors disabled:opacity-40",
+        "press flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-[5px] text-[12px] font-semibold transition-colors disabled:opacity-40",
         active
-          ? "bg-accent text-[var(--on-accent)] shadow-[var(--glow-accent)]"
+          ? "bg-ink text-[color:var(--surface)]"
           : "text-muted hover:bg-surface-2 hover:text-ink"
       )}
     >

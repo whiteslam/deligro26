@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import {
   createSettlementDraft,
+  markOrderPaid,
+  markOrderUnpaid,
   markSettlementPaid,
   voidSettlement,
 } from "@/lib/data-access/admin-settlements";
@@ -52,6 +54,32 @@ export async function markSettlementPaidAction(
   revalidatePath("/admin/settlements");
   revalidatePath(`/admin/settlements/${id}`);
   return { ok: true, id };
+}
+
+/**
+ * The Paid / Unpaid dropdown on a single order.
+ *
+ * "Paid" creates a one-order settlement in the paid state; "Unpaid" voids it.
+ * Both re-gate on admin — a Server Action is a public HTTP endpoint, and this
+ * one moves an order in and out of a vendor's payout (AGENTS.md §3).
+ */
+export async function setOrderPaidAction(
+  orderId: string,
+  paid: boolean,
+  paymentRef?: string
+): Promise<SettlementActionResult> {
+  const admin = await requireRole("admin");
+
+  const result = paid
+    ? await markOrderPaid({ orderId, adminId: admin.id, paymentRef })
+    : await markOrderUnpaid({ orderId, adminId: admin.id });
+
+  if ("error" in result) return { ok: false, error: result.error };
+
+  revalidatePath("/admin/settlements");
+  revalidatePath("/admin/settlements/orders");
+  revalidatePath("/admin/orders");
+  return { ok: true, id: "id" in result ? result.id : undefined };
 }
 
 export async function voidSettlementAction(

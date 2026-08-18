@@ -113,7 +113,7 @@ export default async function ManagerHome() {
         </>
       )}
 
-      <form action="/auth/signout" method="post" className="mt-8">
+      <form action="/auth/signout?next=/manager/login" method="post" className="mt-8">
         <button
           type="submit"
           className="press block w-full text-center text-sm font-semibold text-muted hover:text-ink"

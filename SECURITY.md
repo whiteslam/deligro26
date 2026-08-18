@@ -90,7 +90,8 @@ readable table), admin-only vendor creation and approval, a column guard so a
 vendor cannot rewrite an order's `total`, explicit `order_items` visibility, and
 `bump_banner_stat` off the anon grant. Application-side: fail-closed config,
 mandatory admin MFA, OTP-verified phone changes, scrypt OTP hashing, magic-byte
-upload checks, and rate limits on every write endpoint.
+upload checks, and rate limits on every write endpoint. (Admin MFA was later
+removed — see **MFA** below.)
 
 Migration **0025** adds online payment (Razorpay), shipped switched off — see
 **Payments** below.
@@ -196,21 +197,39 @@ it is a product decision rather than a default. The exploitable vector it would
 have covered (a `javascript:` banner target) is closed directly instead, at both
 the write and read ends. Tracked in `docs/SECURITY_AUDIT.md` under accepted risks.
 
-**MFA:** Supabase TOTP. Layouts call `requireOperatorMfa()`.
+**MFA: removed** (migration 0033). There is no TOTP enrollment, no challenge
+screen, and no assurance-level check anywhere in the app. `MFA_EXEMPT_EMAILS` is
+no longer read — drop it from every environment. Factors a user enrolled while
+MFA existed remain in `auth.mfa_factors` and are simply never asked for; clear
+them from the Supabase dashboard if you want them gone.
 
-- **Admin — mandatory** (`MFA_REQUIRED_ROLES` in `src/lib/auth/mfa.ts`). Not
-  enrolled → forced to `/mfa/setup`; enrolled but `aal1` → challenged at `/mfa`.
-  Cannot be switched off from settings.
-- **Restaurant / driver / manager — optional.** Opt in from settings; once
-  enrolled they are challenged like a required role.
+What guards an operator portal now is the sign-in page it is behind, plus the
+role check in its layout:
 
-Enable TOTP in the Supabase dashboard (**Authentication → Providers /
-Multi-Factor → TOTP**).
+| Portal | Door | Layout gate |
+| --- | --- | --- |
+| `/admin` | `/admin/login` — email + password, or phone OTP | `requireRole("admin")` |
+| `/vendor` | `/vendor/login` — email + password, or phone OTP | `requireVendorAccess()` (role **or** restaurant ownership) |
+| `/manager` | `/manager/login` — email + password, or phone OTP | `requireRole(["manager","admin"])` |
+| `/driver` | `/driver/login` — email + password, or phone OTP | `requireRole("driver")` |
+| customer app | `/login` — phone OTP, or guest | none — the app is public to any account |
 
-*Exemption:* the seeded QA logins (`admin`/`vendor`/`driver@deligro.demo`) skip
-the mandatory gate outside production, so `npm run test:*` can reach the admin
-portal. In production nothing is exempt unless named in `MFA_EXEMPT_EMAILS`,
-which must be left unset on the live environment.
+**No global login.** A single `/login` used to authenticate everyone and then
+route on `profiles.role`, which meant one account's role decided which app you
+got: the owner's phone is an admin, so signing in to *shop* landed on the admin
+console. Each door now leads to exactly one place. A door never inspects your
+role to redirect you elsewhere — the portal's own layout decides whether to
+admit you, and bounces back to that same door with `?denied=1` if not.
+
+Every door offers phone OTP as well as a password, because operator accounts are
+not all email accounts — the owner's admin account is a phone account seeded by
+`scripts/seed-developer.ts`, and an email-only admin door would lock it out. That
+is not new exposure (the old global `/login` already handed that account admin on
+an OTP), but it does mean **possession of an admin's phone number is possession
+of the admin console**. With MFA gone and no second factor behind it, the
+operator-account hygiene items in `docs/SECURITY_AUDIT.md` — unique addresses, no
+shared logins, rotation on offboarding, and now control of the registered mobile
+— are the whole of the account-security story.
 
 ### CSP note
 The CSP in `next.config.ts` allows `'unsafe-inline'` for scripts because of the

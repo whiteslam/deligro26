@@ -192,9 +192,9 @@ export const MILESTONES: Milestone[] = [
     goal: "Anyone can explore without an account; login is demanded only at order — via phone OTP.",
     tasks: [
       { title: "Skip onboarding for signed-in users", detail: "Gate the 3-slide carousel on auth, not just localStorage", status: "done" },
-      { title: "Phone-number OTP login", detail: "Custom Renflair SMS OTP + magic-link session; one global /login (OTP for customers, email+password for operators)", status: "done" },
+      { title: "Phone-number OTP login", detail: "Custom Renflair SMS OTP + magic-link session; the customer door at /login (operators sign in at their own portal's page)", status: "done" },
       { title: "OTP verify screen", detail: "6-digit code entry, 30s resend cooldown, DB rate limit (6/hour)", status: "done" },
-      { title: "\"Order\" triggers auth", detail: "Proxy gates checkout/orders/profile → /login?next=… (OTP first); operators use the same page", status: "done" },
+      { title: "\"Order\" triggers auth", detail: "Proxy gates checkout/orders/profile → /login?next=… (OTP first); portal paths bounce to their own login instead", status: "done" },
       { title: "Post-login profile bootstrap", detail: "First name + save on first order — edit sheet exists, still not forced", status: "todo" },
     ],
   },
@@ -287,7 +287,7 @@ export const MILESTONES: Milestone[] = [
         db: "guard_order_update() · recompute_order_total() (migration 0030)",
         status: "done",
       },
-      { title: "MFA for admin/restaurant", detail: "TOTP enroll + challenge (/mfa, /mfa/setup); portals require aal2", status: "done" },
+      { title: "Per-portal sign-in", detail: "The global /login is gone: /admin/login, /vendor/login, /manager/login, /driver/login each admit only their own portal; /login is the customer door. MFA removed with it", status: "done" },
       { title: "E2E QA + IDOR tests", detail: "npm run test:qa — RLS/HTTP cross-account 404s + E2E smoke; ZAP via test:zap on staging", status: "done" },
       {
         title: "Production deploy",
@@ -917,9 +917,9 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
           status: "active",
         },
         {
-          title: "MFA enforcement for admin",
-          detail: "TOTP required before /admin — challenge at /mfa, enroll at /mfa/setup. MFA_EXEMPT_EMAILS must be unset in production",
-          db: "auth.mfa_factors · user_mfa",
+          title: "Admin portal gate",
+          detail: "requireRole('admin') in the layout, reached only through /admin/login. MFA was removed in 0033 — a password (or the vendor door's OTP) is now the whole check, and role + RLS carry the rest",
+          db: "profiles.role · is_admin()",
           status: "done",
         },
         {
@@ -1001,12 +1001,6 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
           title: "Team management",
           detail: "/admin/settings/employees — create manager and driver accounts, one-time password shown once",
           db: "profiles.role",
-          status: "done",
-        },
-        {
-          title: "Security screen",
-          detail: "/admin/settings/security — MFA enrolment and account security in one place",
-          db: "user_mfa",
           status: "done",
         },
         {

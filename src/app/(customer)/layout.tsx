@@ -6,9 +6,7 @@ import { ItemSheet } from "@/components/restaurant/item-sheet";
 import { CartSwitchDialog } from "@/components/shared/cart-switch-dialog";
 import { SplashScreen } from "@/components/shared/splash-screen";
 import { OneSignalInit } from "@/components/notifications/onesignal-init";
-import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/auth";
-import { roleHome } from "@/lib/auth/role-home";
 
 // The customer app is per-request: it reads the auth cookie (getProfile, below)
 // and live catalog/order data. Render dynamically so cookie/Supabase access
@@ -23,14 +21,13 @@ export default async function CustomerLayout({
 }) {
   // Auth cookie gates per-user extras (push). Onboarding now lives entirely in
   // the /login entry flow — no first-run carousel over the feed.
+  //
+  // No role check here on purpose. This shell used to redirect any non-customer
+  // to their portal, which meant an operator account could not open the app it
+  // operates — the owner's phone is an admin, so signing in to shop landed on
+  // the admin console. The customer app is for everyone; the portals are the
+  // things that are gated, each behind its own door.
   const profile = await getProfile();
-
-  // Separate-entry model: an operator who lands on the customer shell (direct
-  // link, bookmark, or a stale post-login push) is sent to their own portal.
-  // The login flow already resolves this; this is the server-side safety net.
-  if (profile && profile.role !== "customer") {
-    redirect(roleHome(profile.role));
-  }
 
   return (
     <div className="device">

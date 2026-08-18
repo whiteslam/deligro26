@@ -4,6 +4,10 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { formatINR } from "@/lib/utils/format";
+import {
+  PayoutLinesTable,
+  PayoutTotals,
+} from "@/components/admin/payout-breakdown";
 import { createSettlementAction } from "@/app/admin/settlements/actions";
 import type { SettlementPreview } from "@/lib/data-access/admin-settlements";
 
@@ -65,82 +69,39 @@ export function SettlementPreviewPanel({
           </div>
         </div>
 
-        <dl className="mt-4 grid grid-cols-2 gap-3 text-sm @3xl:grid-cols-4">
-          <div>
-            <dt className="text-muted">Food gross</dt>
-            <dd className="font-semibold">{formatINR(preview.foodGross)}</dd>
-          </div>
-          <div>
-            <dt className="text-muted">Commission</dt>
-            <dd className="font-semibold">{formatINR(preview.commission)}</dd>
-          </div>
-          <div>
-            <dt className="text-muted">Refunds recovered</dt>
-            <dd className="font-semibold">
-              {formatINR(preview.refundsRecovered)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted">Payout destination</dt>
-            <dd className="font-semibold truncate">
-              {preview.payout.upiId ||
-                (preview.payout.bankAccountNumber
-                  ? `${preview.payout.bankName ?? "Bank"} ···${preview.payout.bankAccountNumber.slice(-4)}`
-                  : "Not on file")}
-            </dd>
-          </div>
-        </dl>
+        <div className="mt-4 border-t border-line pt-3">
+          <PayoutTotals
+            totals={{
+              foodGross: preview.foodGross,
+              commission: preview.commission,
+              commissionGst: preview.commissionGst,
+              otherCharges: preview.otherCharges,
+              refundsRecovered: preview.refundsRecovered,
+              netPayable: preview.netPayable,
+            }}
+            commissionPct={preview.commissionPct}
+            commissionGstPct={preview.commissionGstPct}
+            orderCount={preview.lines.length}
+          />
+        </div>
+
+        <p className="mt-3 border-t border-line pt-3 text-[12.5px] text-muted">
+          Pay to:{" "}
+          <span className="font-medium text-ink">
+            {preview.payout.upiId ||
+              (preview.payout.bankAccountNumber
+                ? `${preview.payout.bankName ?? "Bank"} ···${preview.payout.bankAccountNumber.slice(-4)}`
+                : "No payout account on file")}
+          </span>
+        </p>
       </div>
 
       {preview.lines.length === 0 ? (
         <p className="rounded-xl border border-line bg-surface-2 px-3.5 py-3 text-sm text-muted">
-          No unsettled delivered orders in this range.
+          No unpaid delivered orders in this range.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-line">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-line bg-surface-2 text-xs uppercase tracking-wide text-muted">
-              <tr>
-                <th className="px-3 py-2.5 font-medium">Order</th>
-                <th className="px-3 py-2.5 font-medium">Pay</th>
-                <th className="px-3 py-2.5 font-medium text-right">Food</th>
-                <th className="px-3 py-2.5 font-medium text-right">Comm.</th>
-                <th className="px-3 py-2.5 font-medium text-right">Refund</th>
-                <th className="px-3 py-2.5 font-medium text-right">Line</th>
-              </tr>
-            </thead>
-            <tbody>
-              {preview.lines.map((l) => (
-                <tr key={l.orderId} className="border-b border-line last:border-0">
-                  <td className="px-3 py-2.5 font-medium text-ink">{l.code}</td>
-                  <td className="px-3 py-2.5 text-muted">
-                    {l.remitsVendor
-                      ? "Online"
-                      : l.paymentMethod === "cod"
-                        ? "COD"
-                        : "Other"}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    {formatINR(l.foodGross)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    {formatINR(l.commission)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    {l.refundRecovered ? formatINR(l.refundRecovered) : "—"}
-                  </td>
-                  <td
-                    className={`px-3 py-2.5 text-right tabular-nums font-semibold ${
-                      l.contribution < 0 ? "text-deal" : "text-ink"
-                    }`}
-                  >
-                    {formatINR(l.contribution)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <PayoutLinesTable lines={preview.lines} />
       )}
 
       {preview.lines.length > 0 ? (

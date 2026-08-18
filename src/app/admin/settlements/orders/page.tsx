@@ -1,0 +1,215 @@
+import Link from "next/link";
+import { AdminHero, EmptyState } from "@/components/admin/admin-ui";
+import { Banknote } from "lucide-react";
+import { FilterChips } from "@/components/admin/admin-filters";
+import { PayoutTotals } from "@/components/admin/payout-breakdown";
+import {
+  listOrderPayouts,
+  listSettlementVendors,
+} from "@/lib/data-access/admin-settlements";
+import {
+  CYCLE_LABEL,
+  currentPeriod,
+  formatDayKey,
+  nextPayoutDay,
+} from "@/lib/settlements/cycle";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { formatINR } from "@/lib/utils/format";
+import { OrderPayoutRowCard } from "./order-payout-row";
+import { OrderPayoutFilters } from "./payout-filters";
+
+/**
+ * Admin → Settlements → Order payouts.
+ *
+ * One shop's delivered orders, each with what it is worth and a Paid / Unpaid
+ * dropdown. This is the "pay me now" screen: a shop with a single order that
+ * does not want to wait for its cycle gets paid from here, and the order drops
+ * out of the next batch by itself.
+ *
+ * Paid is not a column on the order — it is membership of a settlement. That is
+ * why this screen and the batch builder can never disagree about which orders
+ * are still owed: they are reading the same fact.
+ */
+export const dynamic = "force-dynamic";
+
+type Search = { [key: string]: string | string[] | undefined };
+
+function one(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
+export default async function OrderPayoutsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Search>;
+}) {
+  if (!isSupabaseConfigured) {
+    return (
+      <AdminHero
+        backHref="/admin/settlements"
+        backLabel="Settlements"
+        title="Order payouts"
+        subtitle="Connect Supabase to pay orders."
+      />
+    );
+  }
+
+  const sp = await searchParams;
+  const restaurantId = one(sp.vendor) ?? "";
+  const stateParam = one(sp.state);
+  const state =
+    stateParam === "paid" || stateParam === "unpaid" ? stateParam : undefined;
+  const fromDate = one(sp.from) ?? "";
+  const toDate = one(sp.to) ?? "";
+
+  const vendors = await listSettlementVendors().catch(() => []);
+  const vendor = vendors.find((v) => v.id === restaurantId);
+
+  const result = restaurantId
+    ? await listOrderPayouts(restaurantId, {
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+        state,
+      }).catch(() => ({
+        error:
+          "Could not load orders. Apply migrations 0028 and 0034 if you have not yet.",
+      }))
+    : null;
+
+  const error = result && "error" in result ? result.error : null;
+  const page = result && !("error" in result) ? result : null;
+
+  const href = (next: Record<string, string | undefined>) => {
+    const usp = new URLSearchParams();
+    const merged = {
+      vendor: restaurantId,
+      state,
+      from: fromDate,
+      to: toDate,
+      ...next,
+    };
+    for (const [k, v] of Object.entries(merged)) if (v) usp.set(k, v);
+    const qs = usp.toString();
+    return qs ? `/admin/settlements/orders?${qs}` : "/admin/settlements/orders";
+  };
+
+  const cycle = vendor?.settlementCycle;
+  const period = cycle ? currentPeriod(cycle) : null;
+
+  return (
+    <div className="space-y-4">
+      <AdminHero
+        backHref="/admin/settlements"
+        backLabel="Settlements"
+        title="Order payouts"
+        subtitle="Pay a single order early, or check what is still owed"
+        action={
+          restaurantId ? (
+            <Link
+              href={`/admin/settlements/new?restaurantId=${restaurantId}`}
+              className="c-btn c-btn-dark press"
+            >
+              Pay the whole period
+            </Link>
+          ) : null
+        }
+      />
+
+      <OrderPayoutFilters
+        vendors={vendors.map((v) => ({ id: v.id, name: v.name }))}
+        restaurantId={restaurantId}
+        fromDate={fromDate}
+        toDate={toDate}
+      />
+
+      {error ? (
+        <p className="rounded-xl border border-deal/30 bg-deal-soft px-3.5 py-3 text-sm text-deal">
+          {error}
+        </p>
+      ) : null}
+
+      {!restaurantId ? (
+        <EmptyState
+          icon={Banknote}
+          title="Pick a shop"
+          description="Choose a shop above to see every delivered order, what it is worth, and whether it has been paid."
+        />
+      ) : null}
+
+      {page && vendor && cycle && period ? (
+        <p className="rounded-xl border border-line bg-surface-2 px-3.5 py-3 text-[13px] leading-relaxed text-muted">
+          <span className="font-medium text-ink">{page.restaurantName}</span> is
+          paid {CYCLE_LABEL[cycle].toLowerCase()}. The period running now is{" "}
+          {formatDayKey(period.from)} – {formatDayKey(period.to)}, so the next
+          full payout can be built on{" "}
+          <span className="font-medium text-ink">
+            {formatDayKey(nextPayoutDay(cycle))}
+          </span>
+          . Anything marked Paid here is left out of it.
+        </p>
+      ) : null}
+
+      {page ? (
+        <>
+          <div className="rounded-xl border border-line bg-surface p-4">
+            <p className="text-sm font-semibold text-ink">
+              Still to pay {page.restaurantName}
+            </p>
+            <div className="mt-3">
+              <PayoutTotals
+                totals={page.unpaidTotals}
+                commissionPct={page.terms.commissionPct}
+                commissionGstPct={page.terms.commissionGstPct}
+                orderCount={page.unpaidCount}
+              />
+            </div>
+            {page.terms.otherChargesPerOrder > 0 ? (
+              <p className="mt-2 text-[11.5px] text-muted">
+                Other charges are{" "}
+                {formatINR(page.terms.otherChargesPerOrder)} per order for this
+                shop.
+              </p>
+            ) : null}
+          </div>
+
+          <FilterChips
+            label="Payout status"
+            options={[
+              { value: "unpaid", label: "Unpaid", count: page.unpaidCount },
+              {
+                value: "paid",
+                label: "Paid",
+                count: page.rows.filter((r) => r.paid).length,
+              },
+            ]}
+            active={state ?? null}
+            hrefFor={(v) => href({ state: v ?? undefined })}
+          />
+
+          {page.rows.length === 0 ? (
+            <p className="rounded-xl border border-line bg-surface-2 px-3.5 py-6 text-center text-sm text-muted">
+              No delivered orders match these filters.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {page.rows.map((row) => (
+                <OrderPayoutRowCard
+                  key={row.orderId}
+                  row={row}
+                  commissionPct={page.terms.commissionPct}
+                  commissionGstPct={page.terms.commissionGstPct}
+                />
+              ))}
+            </ul>
+          )}
+
+          <p className="rounded-xl border border-line bg-surface px-3.5 py-3 text-[13px] leading-relaxed text-muted">
+            Money still moves by bank or UPI outside the app. Marking an order
+            Paid records that you sent it and takes it out of the next
+            settlement — it does not transfer anything by itself.
+          </p>
+        </>
+      ) : null}
+    </div>
+  );
+}

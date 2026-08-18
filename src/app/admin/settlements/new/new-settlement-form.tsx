@@ -12,6 +12,7 @@ export function NewSettlementForm({
   restaurantId,
   fromDate,
   toDate,
+  cycleNote = null,
 }: {
   vendors: {
     id: string;
@@ -22,6 +23,8 @@ export function NewSettlementForm({
   restaurantId: string;
   fromDate: string;
   toDate: string;
+  /** Which cycle this vendor is on, and what the pre-filled dates mean. */
+  cycleNote?: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -33,18 +36,30 @@ export function NewSettlementForm({
   }) {
     const usp = new URLSearchParams();
     const rid = next.restaurantId ?? restaurantId;
-    const from = next.from ?? fromDate;
-    const to = next.to ?? toDate;
     if (rid) usp.set("restaurantId", rid);
-    if (from) usp.set("from", from);
-    if (to) usp.set("to", to);
+    // Changing the VENDOR deliberately drops the dates: the next vendor may be
+    // on a different cycle, and carrying over a weekly range onto a monthly
+    // vendor is exactly the mis-typed period the cycle exists to prevent. The
+    // server then re-derives the default for whoever was picked.
+    if (!next.restaurantId) {
+      const from = next.from ?? fromDate;
+      const to = next.to ?? toDate;
+      if (from) usp.set("from", from);
+      if (to) usp.set("to", to);
+    }
     startTransition(() => {
       router.push(`/admin/settlements/new?${usp.toString()}`);
     });
   }
 
   return (
-    <div className="grid gap-3 rounded-xl border border-line bg-surface p-4 @3xl:grid-cols-3">
+    <div className="space-y-3">
+      {cycleNote ? (
+        <p className="rounded-xl border border-line bg-surface-2 px-3.5 py-2.5 text-[13px] text-muted">
+          {cycleNote}
+        </p>
+      ) : null}
+      <div className="grid gap-3 rounded-xl border border-line bg-surface p-4 @3xl:grid-cols-3">
       <label className="block space-y-1.5 text-sm">
         <span className="font-medium text-ink">Vendor</span>
         <select
@@ -81,6 +96,7 @@ export function NewSettlementForm({
           onChange={(e) => navigate({ to: e.target.value })}
         />
       </label>
+      </div>
     </div>
   );
 }

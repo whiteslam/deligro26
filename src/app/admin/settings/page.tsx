@@ -1,14 +1,13 @@
 import Link from "next/link";
-import { ChevronRight, ShieldCheck } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { AdminHero } from "@/components/admin/admin-ui";
 import { ConsoleOnlyNotice } from "@/components/admin/console-only";
 import { ADMIN_PHONE_MENU } from "@/components/admin/admin-nav";
-import { getMfaStatus } from "@/lib/data-access/mfa";
 
 /**
  * Settings home = a menu, not a form. Each row is a tap target that routes to
- * the screen that owns it (the ops shortcuts, security). The actual editing
- * lives on the sub-pages so this stays a clean settings tab.
+ * the screen that owns it (the ops shortcuts). The actual editing lives on the
+ * sub-pages so this stays a clean settings tab.
  *
  * Sections marked `phoneOnly` are the phone's second half of its navigation.
  * Five bottom tabs cannot carry eleven destinations, so everything without a
@@ -51,8 +50,6 @@ const MENU_DESC: Record<string, string> = {
 };
 
 export default async function AdminSettingsPage() {
-  const mfa = await getMfaStatus();
-
   return (
     <div className="admin-measure space-y-6">
       <AdminHero
@@ -86,17 +83,6 @@ export default async function AdminSettingsPage() {
         ))}
       </Group>
 
-      <Group label="Account">
-        <Row
-          href="/admin/settings/security"
-          icon={ShieldCheck}
-          label="Security"
-          desc="Two-factor authentication"
-          tone="violet"
-          badge={mfa ? (mfa.enrolled ? "On" : "Off") : undefined}
-          badgeTone={mfa?.enrolled ? "green" : "muted"}
-        />
-      </Group>
     </div>
   );
 }

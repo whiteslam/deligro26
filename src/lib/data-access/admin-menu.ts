@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { autoMatchImage } from "@/lib/data-access/food-images";
 
 /**
  * Admin menu management over `menu_items`. Admins ride the "menu — owner manage"
@@ -17,6 +18,8 @@ export interface AdminMenuItem {
   available: boolean;
   category: string | null;
   imageUrl: string | null;
+  /** Which library photo this came from, or null for a vendor's own upload. */
+  imageLibraryId: string | null;
 }
 
 export interface MenuItemInput {
@@ -28,6 +31,8 @@ export interface MenuItemInput {
   available: boolean;
   category: string | null;
   imageUrl: string | null;
+  /** Which library photo this came from, or null for a vendor's own upload. */
+  imageLibraryId?: string | null;
 }
 
 interface MenuRow {
@@ -40,6 +45,7 @@ interface MenuRow {
   available: boolean;
   category: string | null;
   image_url: string | null;
+  image_library_id?: string | null;
 }
 
 const SELECT =
@@ -72,6 +78,7 @@ function mapItem(row: MenuRow): AdminMenuItem {
     available: row.available,
     category: row.category,
     imageUrl: row.image_url,
+    imageLibraryId: row.image_library_id ?? null,
   };
 }
 
@@ -91,31 +98,99 @@ function toRow(input: MenuItemInput) {
 
 export async function listMenuItems(restaurantId: string): Promise<AdminMenuItem[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("menu_items")
-    .select(SELECT)
-    .eq("restaurant_id", restaurantId)
-    .order("category", { ascending: true, nullsFirst: false })
-    .order("name", { ascending: true });
+
+  const read = (columns: string) =>
+    supabase
+      .from("menu_items")
+      .select(columns)
+      .eq("restaurant_id", restaurantId)
+      .order("category", { ascending: true, nullsFirst: false })
+      .order("name", { ascending: true });
+
+  // `image_library_id` only exists from 0035. Asked for separately from the
+  // rest so a database without it loses the provenance note, not the menu —
+  // this function answers [] on a schema error, and an empty menu screen is a
+  // far worse way to learn a migration is missing.
+  const withProvenance = await read(`${SELECT}, image_library_id`);
+  if (!withProvenance.error) {
+    return ((withProvenance.data as unknown as MenuRow[] | null) ?? []).map(
+      mapItem
+    );
+  }
+  if (!isMissingSchema(withProvenance.error)) throw withProvenance.error;
+
+  const { data, error } = await read(SELECT);
   if (error) {
     if (isMissingSchema(error)) return [];
     throw error;
   }
-  return (data as MenuRow[] | null ?? []).map(mapItem);
+  return ((data as unknown as MenuRow[] | null) ?? []).map(mapItem);
+}
+
+/**
+ * Attach the library photo this dish name matches, when nobody chose one.
+ *
+ * Only fills a blank — an explicit choice, including "no picture", is never
+ * overwritten. Returns the columns to merge into the row, or `{}`:
+ *   * before migration 0035 there is no library and no column, so `{}` keeps
+ *     the insert working exactly as it did; and
+ *   * an ambiguous name ("Biryani") deliberately matches nothing, because the
+ *     right answer to ambiguity is an empty slot someone fills, not a
+ *     confident guess that puts mutton on a vegetarian dish.
+ */
+async function autoImageColumns(
+  input: { name: string; imageUrl: string | null }
+): Promise<Record<string, unknown>> {
+  if (input.imageUrl) return {};
+  try {
+    const match = await autoMatchImage(input.name);
+    if (!match) return {};
+    return {
+      image_url: match.image.imageUrl,
+      image_library_id: match.image.id,
+    };
+  } catch {
+    // The library is a convenience. A menu item must still save without it.
+    return {};
+  }
+}
+
+/**
+ * Insert, retrying without `image_library_id` on a database that predates 0035.
+ * The photo still lands — `image_url` is what renders — only the note of where
+ * it came from is lost.
+ */
+async function insertMenuRows(
+  rows: Record<string, unknown>[]
+): Promise<{ id: string }[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("menu_items")
+    .insert(rows)
+    .select("id");
+  if (!error) return (data ?? []) as { id: string }[];
+  if (!isMissingSchema(error)) throw error;
+
+  const stripped = rows.map((row) => {
+    const rest = { ...row };
+    delete rest.image_library_id;
+    return rest;
+  });
+  const retry = await supabase.from("menu_items").insert(stripped).select("id");
+  if (retry.error) throw retry.error;
+  return (retry.data ?? []) as { id: string }[];
 }
 
 export async function createMenuItem(
   restaurantId: string,
   input: MenuItemInput
 ): Promise<string> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("menu_items")
-    .insert({ restaurant_id: restaurantId, ...toRow(input) })
-    .select("id")
-    .single();
-  if (error) throw error;
-  return data.id as string;
+  const auto = await autoImageColumns(input);
+  const [row] = await insertMenuRows([
+    { restaurant_id: restaurantId, ...toRow(input), ...auto },
+  ]);
+  if (!row) throw new Error("item_not_created");
+  return row.id;
 }
 
 export async function updateMenuItem(
@@ -123,11 +198,38 @@ export async function updateMenuItem(
   input: MenuItemInput
 ): Promise<void> {
   const supabase = await createClient();
+  // No auto-match on edit. Someone is looking at this item and has said what
+  // its picture should be; silently re-matching it would undo a correction the
+  // moment it was made.
   const { error } = await supabase
     .from("menu_items")
     .update(toRow(input))
     .eq("id", itemId);
   if (error) throw error;
+}
+
+/**
+ * Record where an item's picture came from, alongside the picture itself.
+ * `libraryId` is null when a vendor uploaded their own file.
+ */
+export async function setMenuItemImage(
+  itemId: string,
+  imageUrl: string | null,
+  libraryId: string | null
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("menu_items")
+    .update({ image_url: imageUrl, image_library_id: libraryId })
+    .eq("id", itemId);
+  if (!error) return;
+  if (!isMissingSchema(error)) throw error;
+
+  const retry = await supabase
+    .from("menu_items")
+    .update({ image_url: imageUrl })
+    .eq("id", itemId);
+  if (retry.error) throw retry.error;
 }
 
 export async function deleteMenuItem(itemId: string): Promise<void> {
@@ -158,14 +260,26 @@ export interface BulkMenuItem {
   available: boolean;
 }
 
-/** Insert many validated rows in one shot. Returns how many landed. */
+/**
+ * Insert many validated rows in one shot. Returns how many landed.
+ *
+ * This is where the photo library earns its keep: an Excel import of 120 dishes
+ * arrives with no pictures at all, and every unambiguous name gets the right
+ * one without anyone opening 120 file pickers. Matching is done concurrently
+ * per row — each is one indexed array-overlap query — and a row that matches
+ * nothing simply imports without a picture, as it would have before.
+ */
 export async function bulkInsertMenuItems(
   restaurantId: string,
   items: BulkMenuItem[]
 ): Promise<number> {
   if (items.length === 0) return 0;
-  const supabase = await createClient();
-  const rows = items.map((m) => ({
+
+  const autos = await Promise.all(
+    items.map((m) => autoImageColumns({ name: m.name, imageUrl: null }))
+  );
+
+  const rows = items.map((m, i) => ({
     restaurant_id: restaurantId,
     name: m.name.trim(),
     description: m.description,
@@ -175,11 +289,9 @@ export async function bulkInsertMenuItems(
     veg: m.veg,
     available: m.available,
     category: m.category,
+    ...autos[i],
   }));
-  const { data, error } = await supabase
-    .from("menu_items")
-    .insert(rows)
-    .select("id");
-  if (error) throw error;
-  return data?.length ?? 0;
+
+  const inserted = await insertMenuRows(rows);
+  return inserted.length;
 }

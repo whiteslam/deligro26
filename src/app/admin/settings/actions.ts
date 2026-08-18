@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS } from "@/lib/settings-defaults";
 import {
   CommissionNotMigratedError,
   clampCommissionPct,
+  setCommissionGstPct,
   setVendorCommissionDefault,
 } from "@/lib/data-access/admin-commission";
 import type { PlatformSettings } from "@/types";
@@ -103,6 +104,9 @@ export async function saveSettingsAction(
   const vendorCommissionPct = clampCommissionPct(
     num(form.get("vendorCommissionPct"), 0)
   );
+  const commissionGstPct = clampCommissionPct(
+    num(form.get("commissionGstPct"), 0)
+  );
 
   try {
     await updateSettings(parse(form));
@@ -116,12 +120,16 @@ export async function saveSettingsAction(
   // saved and the admin is told which part did not land.
   try {
     await setVendorCommissionDefault(vendorCommissionPct);
+    // Same column family, same client, same failure mode — and it deducts from
+    // every vendor payout, so it is saved with the rate rather than in a
+    // separate pass that could land while the rate did not.
+    await setCommissionGstPct(commissionGstPct);
   } catch (e) {
     if (e instanceof CommissionNotMigratedError) {
       return {
         ok: false,
         error:
-          "Saved everything except the vendor commission — apply migration 0032_platform_commission.sql to store it.",
+          "Saved everything except the vendor commission and its GST — apply migrations 0032_platform_commission.sql and 0034_vendor_payments_and_payouts.sql to store them.",
       };
     }
     return {

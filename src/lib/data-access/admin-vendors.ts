@@ -6,6 +6,16 @@ import {
   getVendorCommissionDefault,
 } from "@/lib/data-access/admin-commission";
 import { VENDOR_STATUSES, type VendorStatus } from "@/lib/vendor-status";
+import {
+  DEFAULT_SETTLEMENT_CYCLE,
+  isSettlementCycle,
+  type SettlementCycle,
+} from "@/lib/settlements/cycle";
+import {
+  columnKnownMissing,
+  isMissingColumn,
+  rememberColumn,
+} from "@/lib/data-access/schema-probe";
 import { legiblePassword } from "@/lib/utils/password";
 import { toE164 } from "@/lib/auth/phone";
 import { checkOtp } from "@/lib/data-access/otp";
@@ -91,6 +101,17 @@ export interface VendorDetail extends VendorListItem {
   panNumber: string | null;
   tcAcceptedAt: string | null;
   tcVersion: string | null;
+  /* ---- payment rules & payout terms (0034) ---- */
+  /** This shop takes cash on delivery. */
+  acceptCod: boolean;
+  /** This shop takes online payment (still ANDed with the platform switch). */
+  acceptOnline: boolean;
+  /** Highest order total payable in cash, whole rupees. 0 = no limit. */
+  codMaxOrder: number;
+  /** Fixed per-order deduction from the payout, whole rupees. */
+  otherChargesPerOrder: number;
+  /** How often this vendor is paid out. */
+  settlementCycle: SettlementCycle;
   menuItemCount: number;
   /**
    * When an admin last issued a one-time login password. The password itself is
@@ -128,6 +149,11 @@ export interface VendorInput {
   fssaiNumber: string | null;
   gstNumber: string | null;
   panNumber: string | null;
+  acceptCod: boolean;
+  acceptOnline: boolean;
+  codMaxOrder: number;
+  otherChargesPerOrder: number;
+  settlementCycle: SettlementCycle;
 }
 
 export type VendorSort = "recent" | "oldest" | "name" | "status";
@@ -165,6 +191,19 @@ const DETAIL_SELECT = `
   tc_accepted_at, tc_version, created_at,
   password_reset_at, owner_phone_verified
 `;
+
+/**
+ * The 0034 columns, asked for separately.
+ *
+ * Not folded into DETAIL_SELECT because `getVendorDetail` treats a missing
+ * column as "return null", i.e. a 404 on the vendor page. A database that has
+ * 0017 but not 0034 would lose the entire vendor screen over a payment toggle,
+ * which is a far worse outcome than showing the defaults. Probed once and
+ * remembered, so the cost is one extra round trip on a cold process.
+ */
+const PAYMENT_RULE_COLUMNS = "restaurants.settlement_cycle";
+const PAYMENT_RULE_SELECT =
+  "accept_cod, accept_online, cod_max_order, other_charges_per_order, settlement_cycle";
 
 interface VendorRow {
   id: string;
@@ -208,6 +247,12 @@ interface VendorRow {
   created_at: string;
   password_reset_at?: string | null;
   owner_phone_verified?: boolean | null;
+  // 0034 — read through a separate probe, see PAYMENT_RULE_SELECT.
+  accept_cod?: boolean | null;
+  accept_online?: boolean | null;
+  cod_max_order?: number | null;
+  other_charges_per_order?: number | null;
+  settlement_cycle?: SettlementCycle | null;
 }
 
 /** Table missing (42P01/PGRST205) or a 0017 column missing (42703). */
@@ -290,6 +335,19 @@ function mapDetail(
     panNumber: row.pan_number ?? null,
     tcAcceptedAt: row.tc_accepted_at ?? null,
     tcVersion: row.tc_version ?? null,
+    // Absent columns (pre-0034) read as the permissive defaults, which is how
+    // the app behaved before the feature existed. A missing migration must not
+    // start refusing payment methods.
+    acceptCod: row.accept_cod ?? true,
+    acceptOnline: row.accept_online ?? true,
+    codMaxOrder: Math.max(0, Math.round(Number(row.cod_max_order ?? 0))),
+    otherChargesPerOrder: Math.max(
+      0,
+      Math.round(Number(row.other_charges_per_order ?? 0))
+    ),
+    settlementCycle: isSettlementCycle(row.settlement_cycle)
+      ? row.settlement_cycle
+      : DEFAULT_SETTLEMENT_CYCLE,
     menuItemCount,
     passwordResetAt: row.password_reset_at ?? null,
     ownerPhoneVerified: row.owner_phone_verified ?? false,
@@ -481,10 +539,39 @@ export async function getVendorDetail(id: string): Promise<VendorDetail | null> 
     .eq("restaurant_id", id);
 
   const platformDefault = await getVendorCommissionDefault();
-  const detail = mapDetail(data as VendorRow, count ?? 0, platformDefault);
+  const rules = await readPaymentRuleColumns(id);
+  const detail = mapDetail(
+    { ...(data as VendorRow), ...rules },
+    count ?? 0,
+    platformDefault
+  );
   const { byId } = await getVendorPositions();
   detail.sortPosition = byId.get(id) ?? null;
   return detail;
+}
+
+/**
+ * The 0034 payment/payout columns for one vendor, or `{}` on a database that
+ * predates them. Separated from DETAIL_SELECT so a missing migration costs the
+ * five toggles rather than the whole vendor page — see PAYMENT_RULE_SELECT.
+ */
+async function readPaymentRuleColumns(id: string): Promise<Partial<VendorRow>> {
+  if (columnKnownMissing(PAYMENT_RULE_COLUMNS)) return {};
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("restaurants")
+    .select(PAYMENT_RULE_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) {
+    if (isMissingColumn(error) || isMissingSchema(error)) {
+      rememberColumn(PAYMENT_RULE_COLUMNS, false);
+      return {};
+    }
+    throw error;
+  }
+  rememberColumn(PAYMENT_RULE_COLUMNS, true);
+  return (data ?? {}) as Partial<VendorRow>;
 }
 
 /** Input → DB columns. `updated_at` isn't on restaurants, so it isn't written. */
@@ -519,14 +606,45 @@ function toRow(input: VendorInput) {
   };
 }
 
+/** The 0034 half of the write, kept separate for the same reason the read is. */
+function toPaymentRuleRow(input: VendorInput) {
+  return {
+    accept_cod: input.acceptCod,
+    accept_online: input.acceptOnline,
+    cod_max_order: Math.max(0, Math.trunc(input.codMaxOrder)),
+    other_charges_per_order: Math.max(
+      0,
+      Math.trunc(input.otherChargesPerOrder)
+    ),
+    settlement_cycle: input.settlementCycle,
+  };
+}
+
 export async function updateVendor(id: string, input: VendorInput): Promise<void> {
   // Writes the payout / KYC columns, which 0022 revokes from `authenticated`
   // (see getVendorDetail). Service-role; the calling action re-gates on admin.
   const supabase = createAdminClient();
-  const { error } = await supabase
-    .from("restaurants")
-    .update(toRow(input))
-    .eq("id", id);
+
+  const write = (withRules: boolean) =>
+    supabase
+      .from("restaurants")
+      .update(
+        withRules ? { ...toRow(input), ...toPaymentRuleRow(input) } : toRow(input)
+      )
+      .eq("id", id);
+
+  const asked = !columnKnownMissing(PAYMENT_RULE_COLUMNS);
+  const { error } = await write(asked);
+
+  if (asked && error && isMissingColumn(error)) {
+    // Pre-0034. Save the rest of the form rather than losing an operator's
+    // edit to a set of toggles this database cannot store anyway.
+    rememberColumn(PAYMENT_RULE_COLUMNS, false);
+    const { error: retry } = await write(false);
+    if (retry) throw retry;
+    return;
+  }
+
   if (error) throw error;
 }
 

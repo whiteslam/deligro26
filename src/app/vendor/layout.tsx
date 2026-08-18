@@ -1,6 +1,5 @@
 import { VendorShell } from "@/components/vendor/vendor-shell";
 import { requireVendorAccess } from "@/lib/auth/vendor-access";
-import { requireOperatorMfa } from "@/lib/auth/mfa";
 import {
   listOwnedRestaurants,
   resolveVendorRestaurant,
@@ -28,8 +27,6 @@ export default async function RestaurantLayout({
 }) {
   // Vendor accounts OR any shop owner (a customer who also runs a shop).
   const profile = await requireVendorAccess();
-  // Optional for vendors: only challenged if they opted in from settings.
-  await requireOperatorMfa("/vendor", "restaurant");
 
   let restaurantName = "";
   let isOpen = false;

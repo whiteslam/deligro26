@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { AdminHero } from "@/components/admin/admin-ui";
 import { ConsoleOnly } from "@/components/admin/console-only";
-import { istDateKey, startOfIstWeek, addIstDays } from "@/lib/utils/ist-time";
+import {
+  CYCLE_LABEL,
+  DEFAULT_SETTLEMENT_CYCLE,
+  lastCompletePeriod,
+} from "@/lib/settlements/cycle";
 import {
   listSettlementVendors,
   previewSettlement,
@@ -36,13 +40,18 @@ export default async function NewSettlementPage({
 
   const sp = await searchParams;
   const restaurantId = one(sp.restaurantId) ?? "";
-  const weekStart = startOfIstWeek(new Date());
-  const defaultFrom = istDateKey(weekStart);
-  const defaultTo = istDateKey(addIstDays(new Date(), 0));
-  const fromDate = one(sp.from) ?? defaultFrom;
-  const toDate = one(sp.to) ?? defaultTo;
-
   const vendors = await listSettlementVendors().catch(() => []);
+
+  // The dates default to the vendor's own cycle — last full week, or last full
+  // calendar month — rather than to "this week so far". Typing a range by hand
+  // is where periods overlap (paying twice) or leave a gap (never paying), and
+  // the cycle is the operator's own statement of which range is correct. Either
+  // date can still be overridden.
+  const vendor = vendors.find((v) => v.id === restaurantId);
+  const cycle = vendor?.settlementCycle ?? DEFAULT_SETTLEMENT_CYCLE;
+  const suggested = lastCompletePeriod(cycle);
+  const fromDate = one(sp.from) ?? suggested.from;
+  const toDate = one(sp.to) ?? suggested.to;
 
   let preview = null;
   let previewError: string | null = null;
@@ -76,6 +85,11 @@ export default async function NewSettlementPage({
           restaurantId={restaurantId}
           fromDate={fromDate}
           toDate={toDate}
+          cycleNote={
+            vendor
+              ? `${vendor.name} is paid: ${CYCLE_LABEL[cycle].toLowerCase()}. Dates below are the ${suggested.label.toLowerCase()}.`
+              : null
+          }
         />
 
         {previewError ? (

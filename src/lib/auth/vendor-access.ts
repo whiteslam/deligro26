@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { requireRole, requireUser, type Profile } from "@/lib/auth";
+import { PORTALS } from "@/lib/auth/portals";
 
 /**
  * Vendor access is ownership-based, not role-based. A person can be a customer
@@ -39,5 +40,5 @@ export async function requireVendorAccess(): Promise<Profile> {
 
   const profile = await requireUser();
   if (await hasVendorAccess(profile)) return profile;
-  redirect("/login?denied=1");
+  redirect(`${PORTALS.vendor.login}?denied=1`);
 }

@@ -2,18 +2,33 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { ImagePlus, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, fieldCls, labelCls } from "@/components/ui/field";
+import {
+  FoodImagePicker,
+  type PickedImage,
+} from "@/components/admin/food-image-picker";
 import { DISH_CATEGORIES } from "@/lib/menu-categories";
 import type { AdminMenuItem, MenuItemInput } from "@/lib/data-access/admin-menu";
 import { ExcelImport } from "./excel-import";
+import {
+  searchFoodImagesAction,
+  suggestFoodImagesAction,
+} from "@/app/admin/food-images/actions";
 import {
   createMenuItemAction,
   updateMenuItemAction,
   deleteMenuItemAction,
   setMenuAvailabilityAction,
+  setMenuItemImageAction,
 } from "./manage-actions";
+
+/** The admin-gated door onto the shared photo library. */
+const LIBRARY = {
+  suggest: suggestFoodImagesAction,
+  search: searchFoodImagesAction,
+};
 
 interface FormState {
   name: string;
@@ -23,6 +38,16 @@ interface FormState {
   veg: boolean;
   available: boolean;
   description: string;
+  /**
+   * The item's existing picture, carried through the form untouched.
+   *
+   * It has to be here because the update writes every column: sending a fixed
+   * `imageUrl: null` — which this form used to do — cleared the photo of any
+   * item whose price or description was edited. That was quiet before, when
+   * few items had photos; with pictures now attached automatically it would
+   * blank them on the first edit.
+   */
+  imageUrl: string | null;
 }
 
 const EMPTY: FormState = {
@@ -33,6 +58,7 @@ const EMPTY: FormState = {
   veg: true,
   available: true,
   description: "",
+  imageUrl: null,
 };
 
 function toInput(f: FormState): MenuItemInput {
@@ -44,7 +70,7 @@ function toInput(f: FormState): MenuItemInput {
     discountPrice: f.discountPrice.trim() ? Number(f.discountPrice) : null,
     veg: f.veg,
     available: f.available,
-    imageUrl: null,
+    imageUrl: f.imageUrl,
   };
 }
 
@@ -63,6 +89,24 @@ export function MenuManager({
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [error, setError] = useState<string | null>(null);
+  /** Which row has its photo picker open. One at a time. */
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
+
+  const pickImage = (item: AdminMenuItem, picked: PickedImage | null) =>
+    start(async () => {
+      const res = await setMenuItemImageAction(
+        restaurantId,
+        item.id,
+        picked?.imageUrl ?? null,
+        picked?.libraryId ?? null
+      );
+      if (!res.ok && res.error) {
+        setError(res.error);
+        return;
+      }
+      setPickerFor(null);
+      router.refresh();
+    });
 
   const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -85,6 +129,7 @@ export function MenuManager({
       veg: item.veg,
       available: item.available,
       description: item.description ?? "",
+      imageUrl: item.imageUrl,
     });
   };
 
@@ -257,8 +302,30 @@ export function MenuManager({
           {items.map((item) => (
             <li
               key={item.id}
-              className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3"
+              className="space-y-2 rounded-xl border border-line bg-surface p-3"
             >
+            <div className="flex items-center gap-3">
+              {/* The picture, and the way to change it. Tapping it opens the
+                  two options — upload from this device, or choose from shared
+                  storage — which is the only thing to do when an automatic
+                  match got it wrong. */}
+              <button
+                type="button"
+                onClick={() => setPickerFor(pickerFor === item.id ? null : item.id)}
+                aria-label={`Change the picture for ${item.name}`}
+                className="press relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-line bg-surface-2"
+              >
+                {item.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={item.imageUrl}
+                    alt=""
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <ImagePlus className="size-4 text-muted" />
+                )}
+              </button>
               <span
                 className={
                   "size-2.5 shrink-0 rounded-full " +
@@ -272,6 +339,7 @@ export function MenuManager({
                   ₹{item.price}
                   {item.discountPrice != null ? ` · ₹${item.discountPrice} off-price` : ""}
                   {item.category ? ` · ${item.category}` : ""}
+                  {item.imageLibraryId ? " · photo from storage" : ""}
                 </p>
               </div>
               <button
@@ -302,6 +370,21 @@ export function MenuManager({
               >
                 <Trash2 className="size-4" />
               </button>
+            </div>
+
+            {pickerFor === item.id ? (
+              <FoodImagePicker
+                dishName={item.name}
+                current={
+                  item.imageUrl
+                    ? { imageUrl: item.imageUrl, libraryId: item.imageLibraryId }
+                    : null
+                }
+                source={LIBRARY}
+                onPick={(picked) => pickImage(item, picked)}
+                onClose={() => setPickerFor(null)}
+              />
+            ) : null}
             </li>
           ))}
         </ul>

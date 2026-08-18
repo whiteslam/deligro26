@@ -10,11 +10,14 @@ export function RoleTopBar({
   accent,
   nav,
   actions,
+  signOutTo = "/login",
 }: {
   role: string;
   accent?: string; // small colored dot to distinguish portals
   nav?: React.ReactNode;
   actions?: React.ReactNode;
+  /** The portal's own sign-in page — where "Sign out" returns to. */
+  signOutTo?: string;
 }) {
   return (
     <header className="glass sticky top-0 z-30 border-x-0 border-t-0">
@@ -34,7 +37,10 @@ export function RoleTopBar({
           {actions}
           <ThemeToggle />
           {isSupabaseConfigured ? (
-            <form action="/auth/signout" method="post">
+            <form
+              action={`/auth/signout?next=${encodeURIComponent(signOutTo)}`}
+              method="post"
+            >
               <button
                 type="submit"
                 className="press inline-flex items-center gap-1 rounded-full border border-line bg-surface px-3 py-2 text-xs font-semibold text-muted"

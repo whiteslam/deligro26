@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ShieldAlert, ShieldCheck } from "lucide-react";
 import {
   getAdminDashboard,
   getAdminNavCounts,
@@ -28,7 +27,6 @@ import { ConsoleOnly } from "@/components/admin/console-only";
 import { GmvOrdersChart } from "@/components/admin/admin-charts";
 import { LiveBoard } from "@/components/admin/live-board";
 import { ApprovalQueue } from "@/components/admin/approval-queue";
-import { getOperatorMfaGate } from "@/lib/auth/mfa";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { formatINR, formatWaited } from "@/lib/utils/format";
 
@@ -89,13 +87,10 @@ export default async function AdminOverviewPage({
   const requested = Number(daysParam);
   const days = RANGES.some((r) => r.value === requested) ? requested : 7;
 
-  const [dash, pending, mfa, series, mix, board, counts, settlements] =
+  const [dash, pending, series, mix, board, counts, settlements] =
     await Promise.all([
       getAdminDashboard(),
       listPendingRestaurants(),
-      isSupabaseConfigured
-        ? getOperatorMfaGate()
-        : Promise.resolve({ ok: true as const, currentLevel: null }),
       isSupabaseConfigured
         ? getAdminSeries(days)
         : Promise.resolve<AdminSeries>(EMPTY_SERIES),
@@ -113,7 +108,6 @@ export default async function AdminOverviewPage({
         : Promise.resolve({ draftCount: 0 }),
     ]);
 
-  const mfaActive = mfa.ok && mfa.currentLevel === "aal2";
   const now = new Intl.DateTimeFormat("en-IN", {
     weekday: "short",
     day: "numeric",
@@ -137,7 +131,7 @@ export default async function AdminOverviewPage({
 
   const kpis: KpiItem[] = [
     {
-      label: "GMV today",
+      label: "Total sales today",
       value: formatINR(dash.today.gmv),
       delta: { label: deltaLabel(dash.trends.gmv), direction: dash.trends.gmv.direction, note: "vs last week" },
       spark: spark.map((d) => d.gmv),
@@ -153,23 +147,24 @@ export default async function AdminOverviewPage({
       spark: spark.map((d) => d.orders),
     },
     {
-      label: "Avg basket",
+      label: "Average order value",
       value: formatINR(basketToday),
       unit: "per order today",
-      // Deliberately no delta: a week-over-week average basket is not derivable
-      // from the GMV and order trends without re-querying, and inferring one
-      // from the other two would be arithmetic that looks like a measurement.
+      // Deliberately no delta: a week-over-week average order value is not
+      // derivable from the sales and order trends without re-querying, and
+      // inferring one from the other two would be arithmetic that looks like a
+      // measurement.
       spark: spark.map((d) => (d.orders > 0 ? Math.round(d.gmv / d.orders) : 0)),
     },
     {
-      label: "Riders on delivery",
+      label: "Riders currently delivering",
       value: nf.format(dash.today.activeRiders),
-      unit: `of ${nf.format(dash.totals.drivers)} registered`,
+      unit: `out of ${nf.format(dash.totals.drivers)} riders`,
     },
     {
-      label: "In flight",
+      label: "Orders being delivered now",
       value: nf.format(board.inFlight || counts.liveOrders),
-      unit: board.atRisk > 0 ? `${board.atRisk} past promise` : "all on time",
+      unit: board.atRisk > 0 ? `${board.atRisk} running late` : "all on time",
     },
   ];
 
@@ -179,29 +174,29 @@ export default async function AdminOverviewPage({
   const decisions: Decision[] = [
     {
       href: "/admin/vendors",
-      title: "Vendor approvals",
-      detail: "Shops waiting to go live",
+      title: "New shops to approve",
+      detail: "Waiting for you to let them go live",
       count: pending.length,
       color: "var(--accent)",
     },
     {
       href: "/admin/refunds",
-      title: "Refund requests",
-      detail: "Money waiting on your decision",
+      title: "Refunds to decide",
+      detail: "Customers waiting on their money",
       count: counts.pendingRefunds,
       color: "var(--deal)",
     },
     {
       href: "/admin/settlements",
-      title: "Settlement drafts",
-      detail: "Built, not yet paid out",
+      title: "Shop payments ready",
+      detail: "Worked out, not sent yet",
       count: settlements.draftCount,
       color: "var(--pop)",
     },
     {
       href: "/admin/orders",
-      title: "Unassigned orders",
-      detail: "No rider after 8 minutes",
+      title: "Orders with no rider",
+      detail: "Nobody assigned after 8 minutes",
       count: board.unassigned,
       color: "var(--blue)",
     },
@@ -238,21 +233,10 @@ export default async function AdminOverviewPage({
       <AdminHero
         title="Dashboard"
         tag="Live"
-        subtitle={`Platform pulse · ${now} IST`}
+        subtitle={`How things are going right now · ${now} IST`}
         action={
-          <div className="flex items-center gap-2">
-            <div className="hidden @3xl:block">
-              <RangeTabs options={RANGES} active={days} hrefFor={rangeHref} />
-            </div>
-            {mfaActive ? (
-              <span className="pill pill-green shrink-0">
-                <ShieldCheck className="size-3.5" /> MFA
-              </span>
-            ) : (
-              <Link href="/mfa/setup?next=/admin" className="pill pill-deal shrink-0">
-                <ShieldAlert className="size-3.5" /> MFA
-              </Link>
-            )}
+          <div className="hidden @3xl:block">
+            <RangeTabs options={RANGES} active={days} hrefFor={rangeHref} />
           </div>
         }
       />
@@ -264,12 +248,12 @@ export default async function AdminOverviewPage({
       <div className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 grow-[1.55] basis-[420px]">
           <Panel
-            title="Live order board"
-            subtitle="Anything past its promise time is flagged for you"
+            title="Orders happening now"
+            subtitle="Anything later than promised is marked for you"
             action={
               <div className="flex items-center gap-2.5">
                 {board.atRisk > 0 ? (
-                  <span className="pill pill-deal">{board.atRisk} at risk</span>
+                  <span className="pill pill-deal">{board.atRisk} running late</span>
                 ) : null}
                 <Link
                   href="/admin/orders"
@@ -295,7 +279,7 @@ export default async function AdminOverviewPage({
 
         <div className="flex min-w-0 grow basis-[300px] flex-col gap-4">
           <Panel
-            title="Needs a decision"
+            title="Needs your attention"
             action={
               decisionTotal > 0 ? (
                 <span className="text-data rounded-full bg-[var(--c-divider)] px-2 py-0.5 text-[11px] font-semibold text-ink">
@@ -312,13 +296,13 @@ export default async function AdminOverviewPage({
               </div>
             ) : (
               <p className="rounded-lg bg-surface-2 px-3.5 py-6 text-center text-[13px] text-muted">
-                Nothing waiting on you. Every queue is clear.
+                Nothing is waiting on you right now.
               </p>
             )}
           </Panel>
 
           <Panel
-            title="Where orders ended up"
+            title="What happened to orders"
             subtitle={`${rangeLabel} · ${nf.format(mixTotal)} orders`}
           >
             <ShareBar segments={segments} />
@@ -330,8 +314,8 @@ export default async function AdminOverviewPage({
         <div className="flex min-w-0 grow-[1.55] basis-[420px] flex-col">
           <ChartCard
             className="flex-1"
-            title="GMV and orders"
-            subtitle={`${rangeLabel} · bars are orders, line is GMV`}
+            title="Sales and orders"
+            subtitle={`${rangeLabel} · bars are orders, line is sales`}
             height={196}
             action={
               <div className="flex gap-5 text-right">
@@ -340,7 +324,7 @@ export default async function AdminOverviewPage({
                     {formatINR(series.totals.gmv)}
                   </p>
                   <p className="mt-1 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted">
-                    GMV
+                    Sales
                   </p>
                 </div>
                 <div>
@@ -370,11 +354,11 @@ export default async function AdminOverviewPage({
           <Panel
             id="pending"
             className="flex-1"
-            title="Vendors waiting to go live"
+            title="Shops waiting to go live"
             subtitle={
               oldestWait
-                ? `Oldest first · longest wait ${oldestWait}`
-                : "Nothing in the queue"
+                ? `Longest wait first · ${oldestWait}`
+                : "None waiting"
             }
             action={
               pending.length > APPROVALS_SHOWN ? (

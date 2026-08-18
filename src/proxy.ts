@@ -2,6 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { updateSession } from "@/lib/supabase/middleware";
 import { GUEST_COOKIE } from "@/lib/auth/guest";
+import {
+  CUSTOMER_LOGIN,
+  PORTAL_LIST,
+  PORTAL_LOGIN_PATHS,
+} from "@/lib/auth/portals";
 
 // Next 16 "proxy" convention (formerly "middleware"). Runs before routes render.
 //
@@ -12,29 +17,24 @@ import { GUEST_COOKIE } from "@/lib/auth/guest";
 //        guest  → browse-only feed; gated customer routes bounce to /login
 //        user   → full access
 //
-// One global /login handles everyone: phone OTP for customers, email + password
-// (+ MFA) for operators, and a "browse as guest" option on the bare entry.
+// Each surface has its own front door: /login is the customer app's (phone OTP
+// or guest), and every portal bounces to its own (/admin → /admin/login, …), so
+// a signed-out visitor is always sent to the door for the thing they asked for.
 //
 // Fine-grained role enforcement (is this user actually an admin/vendor/driver?)
 // still happens server-side in each portal's layout via requireRole(). Proxy
 // stays coarse and DB-free so it's cheap.
 
-/** Entry / auth page — always reachable without a session. */
-const PUBLIC_PATHS = ["/login"];
+/** Auth pages — always reachable without a session. */
+const PUBLIC_PATHS = [CUSTOMER_LOGIN, "/portals", ...PORTAL_LOGIN_PATHS];
 
 /** Entry page a signed-in user should be bounced away from (already onboarded). */
-const ENTRY_PATHS = ["/login"];
-
-/** MFA challenge / enroll — need a session, but must stay reachable at aal1. */
-const MFA_PATHS = ["/mfa"];
-
-/** Operator portals — require a logged-in user (role is checked server-side). */
-const PROTECTED = ["/admin", "/vendor", "/driver"];
+const ENTRY_PATHS = [CUSTOMER_LOGIN];
 
 /** Customer routes that need a real account (user data or a write action). */
 const GATED_CUSTOMER = ["/checkout", "/orders", "/profile"];
 
-function matches(pathname: string, prefixes: string[]): boolean {
+function matches(pathname: string, prefixes: readonly string[]): boolean {
   return prefixes.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
@@ -51,49 +51,45 @@ export async function proxy(request: NextRequest) {
 
   const guest = request.cookies.get(GUEST_COOKIE)?.value === "1";
 
-  // A signed-in visitor never needs the entry/onboarding pages.
-  if (user && matches(path, ENTRY_PATHS)) {
-    return NextResponse.redirect(new URL("/", request.url));
+  // Public auth pages first — including the portal doors, which sit *under* a
+  // portal prefix and must not be caught by the portal gate below. The portal
+  // login page itself decides what to do with an already-signed-in visitor.
+  if (matches(path, PUBLIC_PATHS)) {
+    // A signed-in visitor never needs the customer entry page.
+    if (user && matches(path, ENTRY_PATHS)) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    return response;
   }
 
   // Once signed in, any stale guest flag is meaningless — clear it.
   if (user && guest) response.cookies.delete(GUEST_COOKIE);
 
-  // Public entry pages: always allowed.
-  if (matches(path, PUBLIC_PATHS)) return response;
-
-  // MFA pages: signed-in only (aal1 sessions must not be bounced to /).
-  if (matches(path, MFA_PATHS)) {
-    if (!user) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("next", path);
-      return NextResponse.redirect(url);
-    }
-    return response;
-  }
-
-  // Operator portals: must be a logged-in user (guest is not enough).
-  if (matches(path, PROTECTED) && !user) {
+  // Operator portals: must be a logged-in user (guest is not enough), and the
+  // bounce goes to that portal's own sign-in page, not the customer one.
+  const portal = PORTAL_LIST.find(
+    (p) => path === p.home || path.startsWith(`${p.home}/`)
+  );
+  if (portal && !user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = portal.login;
     url.searchParams.set("next", path);
     return NextResponse.redirect(url);
   }
 
-  // Gated customer routes: a guest is NOT enough — must be a real user. Same
-  // /login as operators (OTP is one tap in); `next` set means no guest option.
+  // Gated customer routes: a guest is NOT enough — must be a real user.
+  // `next` set means the customer login hides its guest option.
   if (matches(path, GATED_CUSTOMER) && !user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = CUSTOMER_LOGIN;
     url.searchParams.set("next", path);
     return NextResponse.redirect(url);
   }
 
-  // Everything else in the app shell (main feed, search, restaurants, portals
-  // index) needs at least an explicit guest. Pure anon → the login/entry screen.
+  // Everything else in the app shell (main feed, search, restaurants) needs at
+  // least an explicit guest. Pure anon → the customer entry screen.
   if (!user && !guest) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL(CUSTOMER_LOGIN, request.url));
   }
 
   return response;

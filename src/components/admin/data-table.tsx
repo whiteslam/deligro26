@@ -46,6 +46,19 @@ export interface TableSort {
   dir: "asc" | "desc";
 }
 
+/**
+ * A totals line, keyed by column so each figure sits under the column it totals.
+ *
+ * Keyed rather than positional on purpose: a summary sentence in a footer bar
+ * makes a reader add up a column by eye to check it, and one written as a
+ * free-form string drifts the moment a column moves.
+ */
+export interface TableTotals {
+  /** Shown in the first column. Defaults to "Total". */
+  label?: string;
+  cells: Record<string, React.ReactNode>;
+}
+
 export function DataTable<T>({
   columns,
   rows,
@@ -56,6 +69,8 @@ export function DataTable<T>({
   empty,
   caption,
   footer,
+  totals,
+  dense,
   minWidth = 840,
   rowTone,
 }: {
@@ -71,6 +86,10 @@ export function DataTable<T>({
   caption?: string;
   /** Sunken bar inside the card's bottom edge — counts and pagination. */
   footer?: React.ReactNode;
+  /** A column-aligned totals line above the footer. */
+  totals?: TableTotals;
+  /** Tighter rows, for a list whose cells are two short lines rather than one. */
+  dense?: boolean;
   /**
    * The width below which the table scrolls sideways instead of squashing.
    * Real minimums, not `minmax(0,1fr)`: columns that can collapse to zero next
@@ -93,7 +112,22 @@ export function DataTable<T>({
     <>
       {/* ---------- wide: table ---------- */}
       <div className="hidden overflow-hidden rounded-xl border border-line bg-surface @3xl:block">
-        <div className="overflow-x-auto">
+        {/* The inner scroller carries the matching radius as well as the outer
+            box. `overflow-x-auto` makes this element its own scroll container,
+            and a scroll container paints its own square border box — which the
+            rounded ancestor's clip does not round off. The result was the
+            table's header tint and row rules squaring off the top corners, most
+            visibly on Orders, Refunds and Vendors where the header is tinted.
+            11px = the outer 12px radius minus the 1px border, so the two arcs
+            sit concentric instead of one cutting across the other. */}
+        <div
+          className={cn(
+            "overflow-x-auto rounded-t-[11px]",
+            // With no footer the scroller reaches the bottom of the box too, so
+            // it needs that pair of corners as well.
+            !footer && "rounded-b-[11px]"
+          )}
+        >
           <table
             className="w-full border-collapse text-left text-sm"
             style={{ minWidth }}
@@ -106,7 +140,8 @@ export function DataTable<T>({
                     key={col.key}
                     scope="col"
                     className={cn(
-                      "whitespace-nowrap px-4 py-2.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted",
+                      "whitespace-nowrap text-[10.5px] font-semibold uppercase tracking-[0.06em] text-muted",
+                      dense ? "px-3 py-2" : "px-4 py-2.5",
                       col.align === "right" && "text-right",
                       col.width
                     )}
@@ -144,7 +179,8 @@ export function DataTable<T>({
                       <td
                         key={col.key}
                         className={cn(
-                          "px-4 py-2.5 align-middle",
+                          "align-middle",
+                          dense ? "px-3 py-1.5" : "px-4 py-2.5",
                           col.align === "right" && "text-right"
                         )}
                       >
@@ -165,6 +201,29 @@ export function DataTable<T>({
                 );
               })}
             </tbody>
+            {totals ? (
+              <tfoot>
+                <tr className="border-t-2 border-[color:var(--c-divider)] bg-surface-2">
+                  {columns.map((col, i) => (
+                    <td
+                      key={col.key}
+                      className={cn(
+                        "align-middle text-[12.5px] font-semibold tabular-nums text-ink",
+                        dense ? "px-3 py-2" : "px-4 py-2.5",
+                        col.align === "right" && "text-right"
+                      )}
+                    >
+                      {totals.cells[col.key] ??
+                        (i === 0 ? (
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
+                            {totals.label ?? "Total"}
+                          </span>
+                        ) : null)}
+                    </td>
+                  ))}
+                </tr>
+              </tfoot>
+            ) : null}
           </table>
         </div>
         {footer ? (
@@ -235,6 +294,34 @@ export function DataTable<T>({
             </li>
           );
         })}
+
+        {/* The same totals, as a card. Column alignment has no meaning here, so
+            it becomes a label/value list of only the columns that carry one. */}
+        {totals ? (
+          <li className="rounded-2xl border border-line bg-surface-2 p-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
+              {totals.label ?? "Total"}
+            </p>
+            <dl className="mt-2 space-y-1">
+              {columns
+                .filter((c) => totals.cells[c.key])
+                .map((col) => (
+                  <div
+                    key={col.key}
+                    className="flex items-baseline justify-between gap-3"
+                  >
+                    <dt className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                      {col.header || "—"}
+                    </dt>
+                    <dd className="min-w-0 truncate text-right text-[13px] font-semibold tabular-nums text-ink">
+                      {totals.cells[col.key]}
+                    </dd>
+                  </div>
+                ))}
+            </dl>
+          </li>
+        ) : null}
+
         {footer ? <li className="pt-1">{footer}</li> : null}
       </ul>
     </>

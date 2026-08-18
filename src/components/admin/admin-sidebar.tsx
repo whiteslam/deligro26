@@ -115,7 +115,7 @@ export function AdminSidebar({
           </div>
 
           {isSupabaseConfigured ? (
-            <form action="/auth/signout" method="post">
+            <form action="/auth/signout?next=/admin/login" method="post">
               <button
                 type="submit"
                 className="press flex w-full items-center gap-2 rounded-[7px] px-2 py-1.5 text-xs font-semibold text-[var(--sb-meta)] transition-colors hover:bg-[var(--sb-hover)] hover:text-white"

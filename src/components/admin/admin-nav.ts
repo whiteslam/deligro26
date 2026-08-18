@@ -1,5 +1,8 @@
 import {
   Banknote,
+  FileSpreadsheet,
+  HandCoins,
+  ImageIcon,
   LayoutDashboard,
   ListOrdered,
   Megaphone,
@@ -93,6 +96,25 @@ export const ADMIN_NAV: AdminNavItem[] = [
     match: (p) => p.startsWith("/admin/settlements"),
   },
   {
+    // A sub-route of Settlements listed directly on the rail, like Featured
+    // slots under Vendors: paying a single order early is a daily job, and
+    // activeNavItem's longest-href rule keeps Settlements highlighted elsewhere.
+    href: "/admin/settlements/orders",
+    label: "Order payouts",
+    icon: HandCoins,
+    group: "Operations",
+    tone: "pop",
+    match: (p) => p.startsWith("/admin/settlements/orders"),
+  },
+  {
+    href: "/admin/reports",
+    label: "Reports",
+    icon: FileSpreadsheet,
+    group: "Operations",
+    tone: "violet",
+    match: (p) => p.startsWith("/admin/reports"),
+  },
+  {
     href: "/admin/vendors",
     label: "Vendors",
     icon: Store,
@@ -112,6 +134,14 @@ export const ADMIN_NAV: AdminNavItem[] = [
     group: "Catalogue",
     tone: "deal",
     match: (p) => p.startsWith("/admin/vendors/slots"),
+  },
+  {
+    href: "/admin/food-images",
+    label: "Food photos",
+    icon: ImageIcon,
+    group: "Catalogue",
+    tone: "green",
+    match: (p) => p.startsWith("/admin/food-images"),
   },
   {
     href: "/admin/banners",
@@ -153,11 +183,10 @@ export const ADMIN_NAV: AdminNavItem[] = [
     group: "System",
     primary: true,
     tone: "violet",
-    // Deliberately broad: it also covers /admin/settings/security, which has no
-    // rail entry of its own. Where a sub-page *does* have one, activeNavItem's
-    // longest-href rule hands the highlight to that entry instead — which is
-    // why consumers must resolve the active item through it, not by calling
-    // match() per item.
+    // Deliberately broad: it also covers sub-pages with no rail entry of their
+    // own. Where a sub-page *does* have one, activeNavItem's longest-href rule
+    // hands the highlight to that entry instead — which is why consumers must
+    // resolve the active item through it, not by calling match() per item.
     match: (p) => p.startsWith("/admin/settings"),
   },
 ];

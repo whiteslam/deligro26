@@ -4,6 +4,7 @@ import { getSettings, settingsBackendReady } from "@/lib/settings";
 import { isRazorpayConfigured } from "@/lib/payments/razorpay";
 import {
   getCommissionCoverage,
+  getCommissionGstPct,
   getVendorCommissionDefault,
 } from "@/lib/data-access/admin-commission";
 import { SettingsForm } from "../settings-form";
@@ -17,13 +18,19 @@ import { SettingsForm } from "../settings-form";
 export const dynamic = "force-dynamic";
 
 export default async function PlatformSettingsPage() {
-  const [settings, backendReady, vendorCommissionPct, commissionCoverage] =
-    await Promise.all([
-      getSettings(),
-      settingsBackendReady(),
-      getVendorCommissionDefault(),
-      getCommissionCoverage(),
-    ]);
+  const [
+    settings,
+    backendReady,
+    vendorCommissionPct,
+    commissionGstPct,
+    commissionCoverage,
+  ] = await Promise.all([
+    getSettings(),
+    settingsBackendReady(),
+    getVendorCommissionDefault(),
+    getCommissionGstPct(),
+    getCommissionCoverage(),
+  ]);
 
   return (
     <>
@@ -55,6 +62,7 @@ export default async function PlatformSettingsPage() {
           settings={settings}
           razorpayConfigured={isRazorpayConfigured}
           vendorCommissionPct={vendorCommissionPct}
+          commissionGstPct={commissionGstPct}
           commissionCoverage={commissionCoverage}
         />
       </ConsoleOnly>

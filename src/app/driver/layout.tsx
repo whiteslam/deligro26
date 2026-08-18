@@ -9,7 +9,11 @@ export default async function DriverLayout({
   await requireRole("driver"); // delivery partners only
   return (
     <div className="dashboard-shell">
-      <RoleTopBar role="Driver partner" accent="var(--blue)" />
+      <RoleTopBar
+        role="Driver partner"
+        accent="var(--blue)"
+        signOutTo="/driver/login"
+      />
       <main className="dashboard-main max-w-[640px]">{children}</main>
     </div>
   );
