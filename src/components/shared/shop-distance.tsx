@@ -4,11 +4,16 @@ import { useLocation } from "@/stores/location-store";
 import { PINNED_LOCATION } from "@/lib/location/pinned";
 import { distanceToShop, formatDistance } from "@/lib/geo/distance";
 
+/**
+ * Only the pin. `distanceKm` used to be declared here too, described as the
+ * fallback "for shops the vendor hasn't pinned yet" — but nothing in this file
+ * ever read it, and the value behind it was manufactured (`?? 2` for every
+ * unseeded shop). Requiring a pin is the honest contract: measure, or say
+ * nothing.
+ */
 interface Shop {
   lat?: number | null;
   lng?: number | null;
-  /** Seeded number, used only for shops the vendor hasn't pinned yet. */
-  distanceKm?: number;
 }
 
 /**
@@ -26,15 +31,28 @@ export function useShopDistance(shop: Shop): string | null {
   return km === null ? null : formatDistance(km);
 }
 
-/** Inline "• 1.2 km" for a card's meta row. Renders nothing when unpinned. */
+/**
+ * Inline "• 1.2 km" for a card's meta row. Renders nothing when unpinned.
+ *
+ * Marked "~" when the origin it is measured from is a restored fix past its
+ * TTL. The cache used to carry no timestamp at all, so a distance computed from
+ * a fix resolved in another city weeks ago was presented exactly like one
+ * measured a second ago — and it also drives the sort order of the feed. The
+ * tilde is the smallest honest signal that fits in a meta row; the header
+ * carries the fuller version.
+ */
 export function ShopDistance({ shop }: { shop: Shop }) {
   const distance = useShopDistance(shop);
+  const stale = useLocation((s) => s.status === "stale");
   if (!distance) return null;
 
   return (
     <>
       <span className="text-line">•</span>
-      <span>{distance}</span>
+      <span title={stale ? "Measured from your last known location" : undefined}>
+        {stale ? "~" : ""}
+        {distance}
+      </span>
     </>
   );
 }

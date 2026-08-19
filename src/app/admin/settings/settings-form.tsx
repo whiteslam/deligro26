@@ -297,21 +297,24 @@ export function SettingsForm({
               defaultChecked={settings.acceptingOrders}
             />
           </Row>
-          <Row label="Grocery" hint="Show the grocery vertical." htmlFor="featureGrocery">
+          {/* These two now gate the Stores tab's category tiles and their heroes
+              (lib/store-categories.ts). Until that consumer existed, switching
+              one off changed nothing at all while this form confirmed the save.
+
+              The "Pharmacy" switch that sat between them has been removed. There
+              is no pharmacy category, hero or vertical anywhere in the product,
+              so it could not be wired to anything — and a switch over a feature
+              that does not exist is the same dead control in a new place. The
+              column stays in the database; nothing presents it as operational.
+              Add the switch back with the vertical, not before it. */}
+          <Row label="Grocery" hint="Show the grocery category and its WhatsApp ordering hero." htmlFor="featureGrocery">
             <Switch
               id="featureGrocery"
               name="featureGrocery"
               defaultChecked={settings.featureGrocery}
             />
           </Row>
-          <Row label="Pharmacy" hint="Show the pharmacy vertical." htmlFor="featurePharmacy">
-            <Switch
-              id="featurePharmacy"
-              name="featurePharmacy"
-              defaultChecked={settings.featurePharmacy}
-            />
-          </Row>
-          <Row label="Pick & Drop" hint="Show the courier vertical." htmlFor="featurePickDrop">
+          <Row label="Pick & Drop" hint="Show the courier category and its hero." htmlFor="featurePickDrop">
             <Switch
               id="featurePickDrop"
               name="featurePickDrop"

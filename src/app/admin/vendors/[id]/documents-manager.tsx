@@ -94,7 +94,7 @@ export function DocumentsManager({
           the list below and its download links stay. */}
       <ConsoleOnly
         tool="Uploading and removing documents"
-        why="You can still open anything already filed."
+        why="Anything already filed is listed below and still opens here, so you can check a vendor's papers from anywhere."
       >
         <div className="card space-y-3 p-4">
           <p className={labelCls}>Upload document</p>

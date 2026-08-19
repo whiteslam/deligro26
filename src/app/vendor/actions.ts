@@ -7,6 +7,7 @@ import { hasVendorAccess } from "@/lib/auth/vendor-access";
 import {
   listOwnedRestaurants,
   setRestaurantOpen,
+  setVendorBusy,
   updateVendorRestaurant,
   VENDOR_RESTAURANT_COOKIE,
   type VendorRestaurantUpdateInput,
@@ -53,6 +54,21 @@ export async function updateVendorRestaurantAction(
   if (!ok) throw new Error("not_found");
   revalidatePath("/vendor", "layout");
   revalidatePath("/vendor/profile");
+  return { ok: true as const };
+}
+
+/**
+ * "Kitchen is slammed — quote longer for the next hour."
+ *
+ * Revalidates the customer tree as well as the vendor's: the whole point is that
+ * shoppers see the longer band before they order, so the cards have to rebuild.
+ */
+export async function setVendorBusyAction(minutes: number, forMinutes = 60) {
+  await requireRestaurantRole();
+  const ok = await setVendorBusy({ minutes, forMinutes });
+  if (!ok) throw new Error("not_found");
+  revalidatePath("/vendor", "layout");
+  revalidatePath("/", "layout");
   return { ok: true as const };
 }
 

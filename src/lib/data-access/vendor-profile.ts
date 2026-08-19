@@ -17,6 +17,8 @@ export interface VendorRestaurantDetail extends OwnedRestaurant {
   accentTint: string | null;
   etaMin: number | null;
   etaMax: number | null;
+  /** `restaurants.prep_minutes` (0036). Null inherits the platform default. */
+  prepMinutes: number | null;
   costForTwo: number | null;
   priceTier: number;
   promoted: boolean;
@@ -119,14 +121,26 @@ export async function getVendorProfileSummary(): Promise<VendorProfileSummary | 
   };
 
   if (active) {
-    const [{ data: row }, reviewsCount] = await Promise.all([
-      supabase
+    const BASE_COLUMNS =
+      "id, slug, name, tagline, is_open, approved, cuisines, rating, rating_count, offer, image_url, accent_tint, eta_min, eta_max, cost_for_two, price_tier, promoted, created_at";
+    // `prep_minutes` arrives with 0036. Asked for separately so a database
+    // without it loses the field, not the whole profile screen.
+    const readRestaurant = async () => {
+      const withPace = await supabase
         .from("restaurants")
-        .select(
-          "id, slug, name, tagline, is_open, approved, cuisines, rating, rating_count, offer, image_url, accent_tint, eta_min, eta_max, cost_for_two, price_tier, promoted, created_at"
-        )
+        .select(`${BASE_COLUMNS}, prep_minutes`)
         .eq("id", active.id)
-        .maybeSingle(),
+        .maybeSingle();
+      if (!withPace.error) return withPace;
+      return supabase
+        .from("restaurants")
+        .select(BASE_COLUMNS)
+        .eq("id", active.id)
+        .maybeSingle();
+    };
+
+    const [{ data: row }, reviewsCount] = await Promise.all([
+      readRestaurant(),
       supabase
         .from("reviews")
         .select("id", { count: "exact", head: true })
@@ -149,6 +163,8 @@ export async function getVendorProfileSummary(): Promise<VendorProfileSummary | 
         accentTint: row.accent_tint,
         etaMin: row.eta_min,
         etaMax: row.eta_max,
+        prepMinutes:
+          (row as { prep_minutes?: number | null }).prep_minutes ?? null,
         costForTwo: row.cost_for_two,
         priceTier: row.price_tier,
         promoted: row.promoted,

@@ -23,6 +23,16 @@ export interface OrdersPageData {
   past: UiOrder[];
   /** True when showing mock orders (no backend). */
   isDemo: boolean;
+  /**
+   * False when the read failed.
+   *
+   * This used to be indistinguishable from "you have never ordered", because a
+   * caught exception returned the same `{ active: null, past: [] }` as an empty
+   * account. That is the sharpest version of this failure in the product: a
+   * customer whose food is on its way, told they have no orders. The list screen
+   * now says the read failed instead of asserting the absence.
+   */
+  ok: boolean;
 }
 
 function demoOrders(): OrdersPageData {
@@ -30,6 +40,7 @@ function demoOrders(): OrdersPageData {
     active: ACTIVE_ORDER,
     past: PAST_ORDERS,
     isDemo: true,
+    ok: true,
   };
 }
 
@@ -43,13 +54,14 @@ export async function getOrdersPageData(): Promise<OrdersPageData> {
 
   const profile = await getProfile();
   if (!profile) {
-    return { active: null, past: [], isDemo: false };
+    // A genuine, known "no orders": nobody is signed in.
+    return { active: null, past: [], isDemo: false, ok: true };
   }
 
   try {
     const rows = await listVisibleOrders();
     if (!rows.length) {
-      return { active: null, past: [], isDemo: false };
+      return { active: null, past: [], isDemo: false, ok: true };
     }
 
     const activeRow = rows.find((r) => isActiveDbStatus(r.status)) ?? null;
@@ -63,9 +75,25 @@ export async function getOrdersPageData(): Promise<OrdersPageData> {
       })
       .map(mapDbOrderRow);
 
-    return { active, past, isDemo: false };
-  } catch {
-    return { active: null, past: [], isDemo: false };
+    return { active, past, isDemo: false, ok: true };
+  } catch (err) {
+    console.error("[orders-ui] getOrdersPageData failed", err);
+    return { active: null, past: [], isDemo: false, ok: false };
+  }
+}
+
+/**
+ * A failed read of one order.
+ *
+ * Thrown rather than returned as null, because the tracking page maps null to
+ * `notFound()` — so a backend fault used to 404 a real, in-flight order. "This
+ * order does not exist" and "we could not reach the database" are different
+ * sentences and the customer deserves the right one.
+ */
+export class OrderReadFailed extends Error {
+  constructor(readonly cause?: unknown) {
+    super("order_read_failed");
+    this.name = "OrderReadFailed";
   }
 }
 
@@ -74,11 +102,12 @@ export async function getOrderForTracking(id: string): Promise<UiOrder | null> {
   if (isSupabaseConfigured) {
     try {
       const row = await getOrderById(id);
-      if (row) return mapDbOrderRow(row);
-    } catch {
-      return null;
+      // A null row genuinely is "no such order you may see" — RLS said so.
+      return row ? mapDbOrderRow(row) : null;
+    } catch (err) {
+      console.error("[orders-ui] getOrderForTracking failed", err);
+      throw new OrderReadFailed(err);
     }
-    return null;
   }
 
   const mock = [ACTIVE_ORDER, ...PAST_ORDERS].find((o) => o.id === id);

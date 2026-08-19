@@ -9,7 +9,8 @@ import { useUI } from "@/stores/ui-store";
 import { QtyStepper } from "@/components/shared/qty-stepper";
 import { VegMark } from "@/components/shared/veg-mark";
 import { formatINR } from "@/lib/utils/format";
-import { computeCharges } from "@/lib/pricing";
+import { computeChargesWith } from "@/lib/pricing";
+import { useChargesConfig } from "@/components/providers/charges-config-provider";
 import { cn } from "@/lib/utils/cn";
 
 const HIDDEN_ON = ["/checkout"];
@@ -24,8 +25,13 @@ export function GlassCart() {
   const clear = useCart((s) => s.clear);
   const count = lines.reduce((n, l) => n + l.qty, 0);
   const subtotal = lines.reduce((sum, l) => sum + l.price * l.qty, 0);
-  // Shared with checkout and with the server that bills — see lib/pricing.
-  const { deliveryFee, taxes, total } = computeCharges(subtotal);
+  // The live platform settings — the same fee, tax rate and free-delivery
+  // threshold checkout quotes and `createOrder` bills. This used to call
+  // `computeCharges()`, which is the pricing.ts *defaults*: an admin who moved
+  // the fee off ₹29, or set a threshold, got a basket total that disagreed with
+  // the one the customer was charged a tap later.
+  const charges = computeChargesWith(useChargesConfig(), subtotal);
+  const { deliveryFee, taxes, total } = charges;
 
   const cartOpen = useUI((s) => s.cartOpen);
   const openCart = useUI((s) => s.openCart);
@@ -142,7 +148,14 @@ export function GlassCart() {
 
               <div className="mt-1 space-y-2 border-t border-dashed border-line py-4 text-[15px]">
                 <Row label="Subtotal" value={formatINR(subtotal)} muted />
-                <Row label="Delivery" value={formatINR(deliveryFee)} muted />
+                {/* "Free", not "₹0" — a basket that has cleared the admin's
+                    free-delivery threshold is the one case this row exists to
+                    tell the customer about. */}
+                <Row
+                  label="Delivery"
+                  value={deliveryFee === 0 ? "Free" : formatINR(deliveryFee)}
+                  muted
+                />
                 <Row label="Taxes" value={formatINR(taxes)} muted />
                 <Row label="Total" value={formatINR(total)} bold />
               </div>

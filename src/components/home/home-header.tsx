@@ -48,6 +48,12 @@ export function HomeHeader({
 
   const detecting = status === "loading";
   const detected = status === "granted" && !!label;
+  // A fix restored from cache, past its TTL. Still shown — the last known area
+  // is usually right, and a blank header helps nobody — but not presented as
+  // where the customer is now. Before the cache carried a timestamp this state
+  // did not exist: a fix from another city weeks ago was restored as "granted"
+  // and named in the header with nothing to say how old it was.
+  const stale = status === "stale" && !!label;
 
   // The store always holds a location — it starts at Bemetara, the city we
   // deliver in, and a detected fix or a saved address replaces it. So the
@@ -65,7 +71,11 @@ export function HomeHeader({
 
   const shown = place ?? saved ?? fallback;
   const primary = shown?.label ?? "Set your location";
-  const secondary = shown?.sublabel ?? "Tap to detect";
+  // The subtitle is where the age goes: it is the line nobody depends on for
+  // the place name, and "Last known area" is the whole disclosure a customer
+  // needs before they read a distance off a card.
+  const secondary =
+    stale && !saved ? "Last known area · tap to update" : (shown?.sublabel ?? "Tap to detect");
 
   return (
     <div className="app-header sticky top-0 z-20 px-4 pb-3 pt-2.5">

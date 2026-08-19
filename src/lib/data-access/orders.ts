@@ -2,6 +2,8 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { computeChargesWith } from "@/lib/pricing";
 import { getSettings } from "@/lib/settings";
+import { formatINR } from "@/lib/utils/format";
+import { checkServiceArea, outOfRangeMessage } from "@/lib/geo/service-area";
 import { evaluateCoupon } from "@/lib/data-access/coupons";
 import { onlinePaymentsEnabled } from "@/lib/payments/availability";
 import { getVendorPaymentRules } from "@/lib/payments/vendor-rules";
@@ -149,7 +151,13 @@ export interface CreateOrderLine {
 export interface CreateOrderInput {
   restaurantSlug: string;
   lines: CreateOrderLine[];
-  address: { label: string; line: string };
+  /**
+   * `lat`/`lng` are the delivery pin. Optional because an address saved before
+   * the map picker existed has none — and because they are the customer's to
+   * send, so they are checked, never trusted (see the service-area gate in
+   * `createOrder`).
+   */
+  address: { label: string; line: string; lat?: number | null; lng?: number | null };
   /** Courier tip, in whole rupees. Clamped server-side to what the UI offers. */
   tip?: number;
   /**
@@ -214,6 +222,32 @@ export class PaymentRefused extends Error {
   }
 }
 
+/** Platform-level reasons an order is refused before anything is written. */
+export type OrderRefusalCode =
+  | "orders_paused"
+  | "below_minimum"
+  | "outside_delivery_area";
+
+/**
+ * The platform, not the shop, is refusing this order.
+ *
+ * Carries its own sentence for the same reason `PaymentRefused` does: the
+ * numbers in it — the maintenance message the admin wrote, the configured
+ * minimum, the shop's radius — are only known to the code that refused. The API
+ * layer would have to guess them to write the message itself.
+ */
+export class OrderRefused extends Error {
+  readonly customerMessage: string;
+  constructor(
+    public readonly reason: OrderRefusalCode,
+    customerMessage: string
+  ) {
+    super(reason);
+    this.name = "OrderRefused";
+    this.customerMessage = customerMessage;
+  }
+}
+
 /** Place an order — prices validated server-side from menu_items, never trusted from client. */
 export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const supabase = await createClient();
@@ -222,9 +256,26 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("unauthorized");
 
+  // The platform-level gates, re-decided here.
+  //
+  // The checkout screen has its own copies of these — `checkoutBlocked` — and
+  // they are advisory, exactly like every other rule on that screen. Three
+  // things get past them: a tab that was already open when ops flipped the
+  // pause, a stale basket placed later, and any direct POST to /api/orders.
+  // Every other checkout rule in this file is already re-decided server-side;
+  // these two were the omissions.
+  const settings = await getSettings();
+  if (!settings.acceptingOrders) {
+    throw new OrderRefused(
+      "orders_paused",
+      settings.maintenanceMessage.trim() ||
+        "We're not accepting orders right now. Please try again shortly."
+    );
+  }
+
   const { data: restaurant, error: restaurantError } = await supabase
     .from("restaurants")
-    .select("id, slug, name, is_open")
+    .select("id, slug, name, is_open, lat, lng")
     .eq("slug", input.restaurantSlug)
     .eq("approved", true)
     .maybeSingle();
@@ -234,6 +285,19 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   if (!restaurant.is_open) throw new Error("restaurant_closed");
 
   if (!input.lines.length) throw new Error("empty_cart");
+
+  // Delivery area. Measured from the address the customer is actually sending,
+  // not the one they previewed with. Returns `unknown` — and so does not refuse
+  // — when the shop or the address has no pin; see `checkServiceArea` for why
+  // that limitation is deliberate and what closes it.
+  const area = checkServiceArea({
+    shop: restaurant,
+    destination: input.address,
+    radiusKm: settings.deliveryRadiusKm,
+  });
+  if (area.status === "out_of_range") {
+    throw new OrderRefused("outside_delivery_area", outOfRangeMessage(area));
+  }
 
   const externalIds = [...new Set(input.lines.map((l) => l.itemId))];
   const { data: menuItems, error: menuError } = await supabase
@@ -253,10 +317,22 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     return sum + item.price * line.qty;
   }, 0);
 
+  // The minimum order, against the subtotal the SERVER just derived from its
+  // own prices — not the one the browser previewed with. Without this the
+  // policy was advisory: a ₹40 basket placed from a stale tab or a script was
+  // accepted and dispatched at a loss.
+  if (settings.minOrder > 0 && itemSubtotal < settings.minOrder) {
+    throw new OrderRefused(
+      "below_minimum",
+      `Orders start at ${formatINR(settings.minOrder)} — add ${formatINR(
+        settings.minOrder - itemSubtotal
+      )} more to place this one.`
+    );
+  }
+
   // Charges are derived here from the live platform settings and the DB's own
   // prices — the client sends items and a tip, never an amount. This is the
   // authoritative bill: whatever fee/tax/threshold the admin set applies here.
-  const settings = await getSettings();
   const charges = computeChargesWith(
     {
       deliveryFee: settings.deliveryFee,

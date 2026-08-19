@@ -52,7 +52,11 @@ export default async function NewVendorPage({
       {/* Console-only: eight steps of forms with autosaving drafts. Gating the
           draft list too is deliberate — offering "resume" on a phone would lead
           straight back into the wizard it can't run. */}
-      <ConsoleOnly variant="page" tool="Vendor onboarding">
+      <ConsoleOnly
+        variant="page"
+        tool="Vendor onboarding"
+        why="Eight steps of forms, papers and photos want a keyboard. Approving a shop that has already signed up works fine on a phone."
+      >
         {!draftId && drafts.length > 0 ? (
           <section className="rounded-xl border border-line bg-surface px-4 py-3.5">
             <h2 className="text-label mb-2">Resume a draft</h2>

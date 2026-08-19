@@ -44,7 +44,7 @@ export default async function EditVendorPage({
           action on /admin/vendors, so nothing time-critical is behind this. */}
       <ConsoleOnly
         tool="Editing vendor details"
-        why="Password resets above still work here."
+        why="Resetting this owner's password, above, still works on a phone — and suspending the shop is a row action on the vendor list."
       >
         <VendorForm
           vendor={vendor}

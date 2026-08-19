@@ -72,8 +72,17 @@ export interface OrderEtaInput {
   /** The restaurant's advertised band, door to door. */
   etaMin?: number | null;
   etaMax?: number | null;
-  /** `platform_settings.default_prep_minutes`. */
+  /** `platform_settings.default_prep_minutes` — the platform-wide fallback. */
   defaultPrepMinutes?: number | null;
+  /**
+   * `restaurants.prep_minutes` (0036) — this kitchen's own leg, when it has set
+   * one. Null inherits `defaultPrepMinutes`.
+   *
+   * Before this existed the admin default was the kitchen leg for every shop on
+   * the platform, so a tandoor and a juice counter were modelled as cooking at
+   * identical speed and every estimate split the band the same way.
+   */
+  restaurantPrepMinutes?: number | null;
   /** Injected for testing and for re-deriving the countdown between polls. */
   now?: number;
 }
@@ -137,8 +146,12 @@ function clamp(value: number, min: number, max: number): number {
 export function computeOrderEta(input: OrderEtaInput): OrderEta {
   const now = input.now ?? Date.now();
 
+  // This kitchen's own pace when it has declared one, the admin's platform-wide
+  // number when it hasn't. Same clamp either way: both are free-text fields, and
+  // a stray 0 must not turn every estimate into nonsense.
   const prepMinutes = clamp(
-    positiveMinutes(input.defaultPrepMinutes) ??
+    positiveMinutes(input.restaurantPrepMinutes) ??
+      positiveMinutes(input.defaultPrepMinutes) ??
       DEFAULT_SETTINGS.defaultPrepMinutes,
     MIN_PREP_MINUTES,
     MAX_PREP_MINUTES

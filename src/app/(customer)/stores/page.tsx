@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Store } from "lucide-react";
+import { Store, TriangleAlert } from "lucide-react";
 import { HomeHeader } from "@/components/home/home-header";
 import { RestaurantCard } from "@/components/shared/restaurant-card";
 import { PhotoTile } from "@/components/shared/photo-tile";
@@ -7,20 +7,31 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { StoreCategoryStrip } from "@/components/stores/store-category-strip";
 import { PickDropHero } from "@/components/stores/pick-drop-hero";
 import { GroceryListHero } from "@/components/stores/grocery-list-hero";
-import { listRestaurants } from "@/lib/catalog";
+import { listRestaurantsResult } from "@/lib/catalog";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { listAddresses } from "@/lib/data-access/addresses";
-import { ADDRESSES, STORE_CATEGORIES } from "@/lib/data";
+import { getSettings } from "@/lib/settings";
+import { enabledStoreCategories } from "@/lib/store-categories";
+import { ADDRESSES } from "@/lib/data";
 
 export default async function StoresPage({
   searchParams,
 }: {
   searchParams: Promise<{ category?: string }>;
 }) {
-  const [{ category }, restaurants] = await Promise.all([
+  const [{ category }, catalog, settings] = await Promise.all([
     searchParams,
-    listRestaurants(),
+    listRestaurantsResult(),
+    getSettings(),
   ]);
+  const { restaurants } = catalog;
+
+  // Which storefront types the admin has switched on. The Settings toggles used
+  // to be stored, validated, displayed — and read by nothing: switching
+  // Groceries off to handle a supplier outage left the category, the hero and
+  // the WhatsApp CTA fully live to customers, while the Settings page confirmed
+  // the save.
+  const categories = enabledStoreCategories(settings);
 
   let savedAddress: { label: string; line: string } | null = null;
   if (isSupabaseConfigured) {
@@ -33,8 +44,11 @@ export default async function StoresPage({
   }
 
   // An unknown ?category= reads as "no filter" rather than "nothing matches" —
-  // a stale link shouldn't land the user on an empty tab.
-  const active = STORE_CATEGORIES.find((c) => c.id === category) ?? null;
+  // a stale link shouldn't land the user on an empty tab. A switched-off
+  // category is unknown by the same rule, so a bookmarked /stores?category=
+  // groceries link stops working the moment an admin turns it off, rather than
+  // reaching a hero the platform is no longer serving.
+  const active = categories.find((c) => c.id === category) ?? null;
   const inCategory = active
     ? restaurants.filter((r) =>
         r.cuisines.some((c) =>
@@ -55,11 +69,27 @@ export default async function StoresPage({
       <div className="space-y-7 pt-3">
         <section className="space-y-3">
           <h2 className="px-4 text-heading">Categories</h2>
-          <StoreCategoryStrip active={active?.id} />
+          <StoreCategoryStrip active={active?.id} categories={categories} />
         </section>
 
+        {!catalog.ok ? (
+          <div className="mx-4 flex items-start gap-2.5 rounded-2xl border border-deal/30 bg-deal-soft px-3 py-2.5 text-sm font-medium text-deal">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+            <span>
+              We couldn&apos;t load stores just now. This is a problem on our
+              side — try again in a moment.
+            </span>
+          </div>
+        ) : null}
+
         {active?.id === "groceries" ? (
-          <GroceryListHero savedAddress={savedAddress} />
+          // The number is the admin's, not a constant: a change of business
+          // number or an ops handover used to leave grocery orders arriving at
+          // a WhatsApp nobody was watching, with no way to redirect them.
+          <GroceryListHero
+            savedAddress={savedAddress}
+            whatsappNumber={settings.supportWhatsapp}
+          />
         ) : null}
 
         {active?.id === "pick-drop" ? (

@@ -26,6 +26,12 @@ export default async function OrderTrackingPage({
   // order this caller may not see, which is the same answer it gives for one
   // that doesn't exist — but the order read below is what actually decides
   // whether this page is a 404.
+  // `getOrderForTracking` now throws `OrderReadFailed` rather than returning
+  // null when the read itself fails. That distinction is the whole point: null
+  // means RLS says there is no such order for you, which IS a 404, while a
+  // backend fault used to 404 a real order the customer was waiting on. Letting
+  // it throw hands the case to the route's error boundary — an "something went
+  // wrong, retry" screen — instead of asserting the order does not exist.
   const [order, initialEta] = await Promise.all([
     getOrderForTracking(id),
     isSupabaseConfigured

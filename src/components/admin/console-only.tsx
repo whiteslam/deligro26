@@ -1,7 +1,9 @@
 "use client";
 
-import { Monitor } from "lucide-react";
+import { useState } from "react";
+import { Check, Monitor, Send } from "lucide-react";
 import { EmptyState } from "@/components/admin/admin-ui";
+import { Button } from "@/components/ui/button";
 import { useAdminShellMode } from "@/hooks/use-admin-shell-mode";
 import { useIsDesktop } from "@/hooks/use-is-desktop";
 
@@ -42,9 +44,20 @@ export function ConsoleOnly({
   notice = true,
   children,
 }: {
-  /** The thing that isn't here, named as the operator would name it. */
+  /**
+   * The thing that isn't here, named as the operator would name it. It becomes
+   * the subject of a sentence — "{tool} runs in the web console only" — so write
+   * it to read as one: "Building a settlement", "The menu editor". Not a bare
+   * verb, not a sentence of its own.
+   */
   tool: string;
-  /** Optional extra clause of reason, when "it needs the width" isn't the whole story. */
+  /**
+   * The half of the message worth reading: what *does* still work on this
+   * screen, or why the job wants a desk. One short sentence, ending in a full
+   * stop. Skip it on a fully gated page and the notice falls back to a general
+   * reassurance, which is the right thing there and wrong anywhere else — two
+   * gates on one screen must not say the same sentence twice.
+   */
   why?: string;
   /** `inline` replaces a control mid-page; `page` replaces a whole screen body. */
   variant?: "inline" | "page";
@@ -78,23 +91,41 @@ export function ConsoleOnlyNotice({
   why?: string;
   variant?: "inline" | "page";
 }) {
-  // Honest about what *this* device can do. On a real phone the console is not
-  // one tap away — it is not reachable at all, because AdminShell forces the
-  // phone frame below 480px and `setMode("web")` would change nothing on
-  // screen. That is also why neither variant offers a switch button: on a
-  // desktop preview the Layout pill is already on screen, bottom-right.
+  // Two different readers, two different fixes, so two different messages.
+  //
+  // On a desktop the operator is *previewing* the phone frame and the console
+  // is one click away, so the note points at the Layout switcher. On a real
+  // handset it is not one click away — it is not reachable at all, because
+  // AdminShell forces the phone frame below 480px and `setMode("web")` would
+  // change nothing on screen. Telling that reader to "switch layout" would send
+  // them hunting for a control that isn't there.
   const isDesktop = useIsDesktop();
 
+  // Deliberately not "needs the width". Width is the reason for the vendor
+  // table; it is not the reason for the platform fee form or for typing a UTR
+  // against a bank transfer. The base sentence states the rule, and `why`
+  // carries the reason that is actually true for this screen.
   const title = isDesktop ? "Switch to Web to use this" : "Open this on a computer";
-  const description = isDesktop
-    ? `${tool} needs the console layout — use the Layout switcher, bottom-right.`
-    : `${tool} needs the width of the web console. Everything else here works on a phone.`;
-  const body = why ? `${description} ${why}` : description;
+  const lead = isDesktop
+    ? `${tool} runs in the console layout — the Layout switcher is bottom-right, and this screen is already wide enough for it.`
+    : `${tool} runs in the web console only, so it isn't available on a phone.`;
+  // The fallback is for fully gated pages, where "the rest of this screen" does
+  // not exist and the reassurance has to be about the admin as a whole.
+  const body = `${lead} ${why ?? "Everything else in the admin works fine here."}`;
 
   if (variant === "page") {
     return (
       <div role="note">
-        <EmptyState icon={Monitor} title={title} description={body} />
+        <EmptyState
+          icon={Monitor}
+          title={title}
+          description={body}
+          // Only on a real handset, and only when the whole screen is gated.
+          // A desktop preview needs no link — the console is one click away —
+          // and an inline notice sits beside working controls, where a button
+          // saying "go elsewhere" competes with the work still on the page.
+          action={isDesktop ? undefined : <SendToComputer />}
+        />
       </div>
     );
   }
@@ -111,5 +142,62 @@ export function ConsoleOnlyNotice({
         <span className="font-semibold text-ink">{title}.</span> {body}
       </p>
     </div>
+  );
+}
+
+/**
+ * Hands the operator the one thing the notice above is missing: the address of
+ * the page they are standing on, in a form they can open at a desk.
+ *
+ * "Open this on a computer" is only half an instruction — the other half is a
+ * deep link into `/admin/vendors/new?draft=…` that nobody is going to retype
+ * from a phone screen. The share sheet is the phone-native answer and lands in
+ * WhatsApp, which is where an operator here will actually send it to themselves;
+ * clipboard is the fallback where the sheet doesn't exist.
+ *
+ * The URL is read at click time, not at render: this component is mounted on
+ * server-rendered pages, where `window` doesn't exist on the first pass.
+ */
+function SendToComputer() {
+  const [sent, setSent] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function send() {
+    const url = window.location.href;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Deligro admin", url });
+        return; // no confirmation needed — the sheet was the confirmation
+      } catch {
+        return; // dismissed, not failed
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setSent(true);
+      setFailed(false);
+    } catch {
+      // Blocked clipboard, insecure context, an old webview. Say so rather than
+      // leaving a button that looks like it worked.
+      setFailed(true);
+    }
+  }
+
+  if (failed) {
+    return (
+      <p className="text-xs text-muted">
+        Copy the address from your browser&apos;s address bar and open it on a
+        computer.
+      </p>
+    );
+  }
+
+  return (
+    <Button type="button" variant="secondary" size="sm" onClick={send}>
+      {sent ? <Check className="size-4" /> : <Send className="size-4" />}
+      {sent ? "Link copied" : "Send myself this link"}
+    </Button>
   );
 }

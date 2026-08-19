@@ -10,6 +10,7 @@ import {
   type SettlementOrderBreakdown,
   type SettlementPaymentMethod,
   type SettlementPaymentStatus,
+  type VendorSettlementEstimate,
 } from "@/lib/settlements/math";
 import {
   DEFAULT_SETTLEMENT_CYCLE,
@@ -536,6 +537,67 @@ export async function previewSettlement(input: {
     ...totals,
     lines,
     payout: payoutFrom(rest, terms),
+  };
+}
+
+/**
+ * What one vendor is actually owed for a window — the same arithmetic a real
+ * statement uses, for the vendor's own Earnings screen.
+ *
+ * Caller MUST be admin OR the owning vendor. `createAdminClient()` bypasses RLS
+ * (AGENTS.md §5); the vendor path is authorised by `hasVendorAccess` +
+ * `resolveVendorRestaurant` in `/vendor/earnings` and `/api/vendor/earnings`,
+ * which resolve the restaurant id from the signed-in account rather than
+ * accepting one. It has to be the service-role client either way: migrations
+ * 0032/0035 revoke `commission_pct` and `commission_gst_pct` from
+ * `authenticated`, so a vendor's own cookie-bound client cannot read the rate
+ * it is charged.
+ *
+ * It shares `loadRestaurant`/`termsFor`/`lineFor` with `previewSettlement`
+ * deliberately: the vendor's forecast and the statement they are later paid
+ * against are then the same computation over the same rows, and cannot drift.
+ *
+ * The returned shape lives in `settlements/math.ts`, not here: the vendor's
+ * Earnings panel is a client component and must not import, even type-only,
+ * from a `server-only` data-access module.
+ */
+export async function settlementEstimateFor(input: {
+  restaurantId: string;
+  from: Date;
+  /** Exclusive. */
+  to: Date;
+}): Promise<VendorSettlementEstimate | null> {
+  if (!UUID_RE.test(input.restaurantId)) return null;
+
+  const rest = await loadRestaurant({ column: "id", value: input.restaurantId });
+  if (!rest) return null;
+  const terms = await termsFor(rest);
+
+  const supabase = createAdminClient();
+  const orders = (await selectOptional(ORDER_PAY_COLUMNS, (withPay) =>
+    supabase
+      .from("orders")
+      .select(withPay ? ORDER_SELECT : ORDER_BASE_SELECT)
+      .eq("restaurant_id", input.restaurantId)
+      .eq("status", "delivered")
+      .gte("created_at", input.from.toISOString())
+      .lt("created_at", input.to.toISOString())
+  )) as unknown as OrderRow[];
+
+  const settled = await alreadySettledOrderIds(input.restaurantId);
+  const eligible = orders.filter((o) => !settled.has(o.id));
+  const refunds = await loadApprovedRefunds(eligible.map((o) => o.id));
+  const lines = eligible.map((o) => lineFor(o, terms, refunds));
+  const totals = sumSettlementTotals(lines);
+
+  return {
+    commissionPct: terms.commissionPct,
+    commissionGstPct: terms.commissionGstPct,
+    otherChargesPerOrder: terms.otherChargesPerOrder,
+    orderCount: eligible.length,
+    grossRevenue: eligible.reduce((sum, o) => sum + (Number(o.total) || 0), 0),
+    ...totals,
+    settledCount: orders.length - eligible.length,
   };
 }
 

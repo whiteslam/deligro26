@@ -6,7 +6,9 @@ import { ItemSheet } from "@/components/restaurant/item-sheet";
 import { CartSwitchDialog } from "@/components/shared/cart-switch-dialog";
 import { SplashScreen } from "@/components/shared/splash-screen";
 import { OneSignalInit } from "@/components/notifications/onesignal-init";
+import { ChargesConfigProvider } from "@/components/providers/charges-config-provider";
 import { getProfile } from "@/lib/auth";
+import { getSettings } from "@/lib/settings";
 
 // The customer app is per-request: it reads the auth cookie (getProfile, below)
 // and live catalog/order data. Render dynamically so cookie/Supabase access
@@ -27,21 +29,35 @@ export default async function CustomerLayout({
   // operates — the owner's phone is an admin, so signing in to shop landed on
   // the admin console. The customer app is for everyone; the portals are the
   // things that are gated, each behind its own door.
-  const profile = await getProfile();
+  //
+  // Settings come down with it because the basket sheet and every discovery
+  // card quote a delivery fee, and those quotes have to be the numbers checkout
+  // and `createOrder` bill from. Read here, once, rather than per surface:
+  // `getSettings()` is request-cached, and this is the one node that is an
+  // ancestor of both the page tree and the cart sheet.
+  const [profile, settings] = await Promise.all([getProfile(), getSettings()]);
 
   return (
-    <div className="device">
-      <div className="app-shell">
-        <div className="app-scroll no-scrollbar pb-[80px]">{children}</div>
-        <StatusBar />
-        <ItemSheet />
-        <CartSwitchDialog />
-        <GlassCart />
-        <CartHydrator />
-        <TabBar />
-        <SplashScreen />
-        {profile ? <OneSignalInit /> : null}
+    <ChargesConfigProvider
+      config={{
+        deliveryFee: settings.deliveryFee,
+        taxRate: settings.taxRate,
+        freeDeliveryThreshold: settings.freeDeliveryThreshold,
+      }}
+    >
+      <div className="device">
+        <div className="app-shell">
+          <div className="app-scroll no-scrollbar pb-[80px]">{children}</div>
+          <StatusBar />
+          <ItemSheet />
+          <CartSwitchDialog />
+          <GlassCart />
+          <CartHydrator />
+          <TabBar />
+          <SplashScreen />
+          {profile ? <OneSignalInit /> : null}
+        </div>
       </div>
-    </div>
+    </ChargesConfigProvider>
   );
 }

@@ -22,10 +22,20 @@ function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n));
 }
 
-/** Smooth step for natural-looking movement on the map. */
-function ease(t: number): number {
-  return t * t * (3 - 2 * t);
-}
+/**
+ * How far along the route an ESTIMATED pin is ever allowed to travel.
+ *
+ * The estimate used to run the full 0→1 ramp, so a courier who had broken down,
+ * gone to the wrong door or stopped for another order was still drawn arriving
+ * at the customer's address, exactly on schedule, off nothing but a clock. The
+ * caption calls the pin an estimate; it does not stop the estimate asserting an
+ * arrival that never happened.
+ *
+ * Short of 1, arrival can only come from a real signal — a GPS fix, or the
+ * delivery being marked complete. The pin says "somewhere along the way", which
+ * is the most an interpolation actually knows.
+ */
+const MAX_ESTIMATED_PROGRESS = 0.85;
 
 export interface TrackPoint {
   lat: number;
@@ -46,8 +56,20 @@ export interface RiderPositionInput {
 
 /**
  * Returns where the rider pin should sit right now.
- * Uses stored GPS when fresh; otherwise interpolates along the route so the
- * customer map feels live even between driver pings.
+ *
+ * Uses stored GPS when fresh. Past that window it falls back to a point along
+ * the straight line between shop and door, derived from elapsed time — an
+ * estimate, labelled as one by `riderPositionSourceFor` and captioned as one on
+ * the tracking screen.
+ *
+ * Two things it deliberately does NOT do, both removed because they made the
+ * estimate assert more than it knows:
+ *
+ *  - It does not jitter. Before pickup the pin used to wobble ±0.00008° on a
+ *    sine wave, for no reason but to "feel alive" — motion invented to suggest a
+ *    courier was moving when we had no idea whether they were.
+ *  - It does not arrive. The ramp stops at `MAX_ESTIMATED_PROGRESS`, so the
+ *    clock alone can never walk the pin onto the customer's doorstep.
  */
 export function computeRiderPosition(input: RiderPositionInput): TrackPoint | null {
   const now = input.now ?? Date.now();
@@ -77,13 +99,10 @@ export function computeRiderPosition(input: RiderPositionInput): TrackPoint | nu
   const etaMs = Math.max(input.etaMinutes, 8) * 60_000;
 
   if (!onTheWay) {
-    // Heading to restaurant for pickup — small jitter so the pin feels alive.
-    const t = (now % 12_000) / 12_000;
-    const jitter = 0.00008 * Math.sin(t * Math.PI * 2);
-    return {
-      lat: start.lat + jitter,
-      lng: start.lng + jitter * 0.7,
-    };
+    // Heading to the restaurant for pickup. The food is still at the shop and
+    // that is the only location this branch can defend, so the pin sits on it
+    // and stays put.
+    return start;
   }
 
   const since = input.pickedUpAt ?? input.assignedAt;
@@ -92,8 +111,7 @@ export function computeRiderPosition(input: RiderPositionInput): TrackPoint | nu
   }
 
   const elapsed = now - new Date(since).getTime();
-  const raw = clamp01(elapsed / etaMs);
-  const progress = ease(raw);
+  const progress = clamp01(elapsed / etaMs) * MAX_ESTIMATED_PROGRESS;
 
   return {
     lat: lerp(start.lat, end.lat, progress),

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { SearchView } from "@/components/search/search-view";
 import { listRestaurants } from "@/lib/catalog";
+import { dailyRotationSeed } from "@/lib/search/rotation";
 
 export default async function SearchPage({
   searchParams,
@@ -18,6 +19,7 @@ export default async function SearchPage({
         initialCategory={category}
         initialQuery={q}
         restaurants={restaurants}
+        rotationSeed={dailyRotationSeed()}
       />
     </Suspense>
   );

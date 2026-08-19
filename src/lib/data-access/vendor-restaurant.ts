@@ -106,6 +106,85 @@ export interface VendorRestaurantUpdateInput {
   etaMax?: number | null;
   costForTwo?: number | null;
   priceTier?: number;
+  /**
+   * `restaurants.prep_minutes` (0036) — how long this kitchen takes, as opposed
+   * to how long the platform assumes every kitchen takes. Null clears it back to
+   * inheriting `platform_settings.default_prep_minutes`.
+   */
+  prepMinutes?: number | null;
+}
+
+export interface VendorPace {
+  /** Minutes currently added to what customers are quoted. 0 = not busy. */
+  extraMinutes: number;
+  /** ISO, when it lapses. Null when not busy. */
+  until: string | null;
+  /** False on a database that predates 0036 — the control hides itself. */
+  supported: boolean;
+}
+
+/**
+ * The shop's live busy bump, for the vendor's own board.
+ *
+ * Soft on a missing column rather than throwing: a database without 0036 loses
+ * this one control, not the kitchen board it sits on.
+ */
+export async function getVendorPace(restaurantId: string): Promise<VendorPace> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("restaurants")
+    .select("busy_until, busy_extra_minutes")
+    .eq("id", restaurantId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { extraMinutes: 0, until: null, supported: !error };
+  }
+
+  const until = data.busy_until as string | null;
+  const live = until !== null && Date.parse(until) > Date.now();
+  return {
+    extraMinutes: live ? Number(data.busy_extra_minutes ?? 0) : 0,
+    until: live ? until : null,
+    supported: true,
+  };
+}
+
+/**
+ * "We're slammed — add 15 minutes for the next hour."
+ *
+ * A deadline rather than a flag, so it cannot be left on: the worst case is that
+ * it lapses while the kitchen is still busy and the vendor taps it again, which
+ * is strictly better than a shop advertising a permanent penalty because someone
+ * forgot to clear it. `minutes: 0` clears it now.
+ *
+ * Bounds mirror the 0036 CHECK constraints — the column is the floor under this,
+ * not a substitute for it.
+ */
+export async function setVendorBusy(input: {
+  minutes: number;
+  forMinutes?: number;
+}): Promise<boolean> {
+  const restaurant = await resolveVendorRestaurant();
+  if (!restaurant) return false;
+
+  const extra = Math.min(120, Math.max(0, Math.round(input.minutes)));
+  const window = Math.min(360, Math.max(1, Math.round(input.forMinutes ?? 60)));
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("restaurants")
+    .update({
+      busy_extra_minutes: extra,
+      busy_until:
+        extra > 0
+          ? new Date(Date.now() + window * 60_000).toISOString()
+          : null,
+    })
+    .eq("id", restaurant.id);
+
+  if (error) throw error;
+  return true;
 }
 
 /** Update storefront fields for the active restaurant. */
@@ -131,6 +210,14 @@ export async function updateVendorRestaurant(
     patch.accent_tint = input.accentTint?.trim() || null;
   if (input.etaMin !== undefined) patch.eta_min = input.etaMin;
   if (input.etaMax !== undefined) patch.eta_max = input.etaMax;
+  if (input.prepMinutes !== undefined) {
+    // Null is meaningful — "inherit the platform default" — so this is an
+    // explicit null check, not a falsy one that would swallow it.
+    patch.prep_minutes =
+      input.prepMinutes === null
+        ? null
+        : Math.min(180, Math.max(1, Math.round(input.prepMinutes)));
+  }
   if (input.costForTwo !== undefined) patch.cost_for_two = input.costForTwo;
   if (input.priceTier !== undefined) {
     const tier = Math.min(3, Math.max(1, Math.round(input.priceTier)));

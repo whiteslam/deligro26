@@ -1,10 +1,11 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createPublicClient } from "@/lib/supabase/server";
 import { getMenuPopularity, type Popularity } from "@/lib/data-access/menu-popularity";
 import {
   applyVendorOrder,
   getVendorPositions,
 } from "@/lib/data-access/vendor-positions";
+import { kitchenPace } from "@/lib/orders/kitchen-pace";
 import type { Cuisine, MenuItem, PriceTier, Restaurant } from "@/types";
 
 interface DbMenuItem {
@@ -43,6 +44,10 @@ interface DbRestaurantRow {
   address?: string | null;
   offer: string | null;
   promoted: boolean;
+  // Optional: absent entirely on a database that predates migration 0036.
+  prep_minutes?: number | null;
+  busy_until?: string | null;
+  busy_extra_minutes?: number | null;
   menu_items: DbMenuItem[];
 }
 
@@ -53,12 +58,13 @@ interface DbRestaurantRow {
  * run 0009 yet simply serves shops without a pin, and they fall back to the
  * seeded `distance_km`. Delete this branch once every environment is migrated.
  */
-function restaurantSelect(withLocation: boolean): string {
+function restaurantSelect(withLocation: boolean, withPace: boolean): string {
   return `
     id, slug, name, tagline, is_open,
     image_url, accent_tint, cuisines, rating, rating_count,
     eta_min, eta_max, price_tier, cost_for_two, distance_km,
     ${withLocation ? "lat, lng, address," : ""}
+    ${withPace ? "prep_minutes, busy_until, busy_extra_minutes," : ""}
     offer, promoted,
     menu_items (
       id, external_id, name, description, price, veg, available,
@@ -69,6 +75,8 @@ function restaurantSelect(withLocation: boolean): string {
 
 /** null = not asked yet. Latches after the first query, so we probe once. */
 let hasShopLocation: boolean | null = null;
+/** Same, for the 0036 pace columns. Separate because the migrations are. */
+let hasKitchenPace: boolean | null = null;
 
 /** PostgREST's "column does not exist". */
 const UNDEFINED_COLUMN = "42703";
@@ -85,17 +93,29 @@ interface QueryResult<T> {
 async function selectRestaurants<T>(
   run: (select: string) => PromiseLike<QueryResult<T>>
 ): Promise<T | null> {
-  if (hasShopLocation !== false) {
-    const { data, error } = await run(restaurantSelect(true));
+  // Dropped newest-migration-first: `isMissingColumn` doesn't say WHICH column
+  // is absent, so a database with 0009 but not 0036 must not lose its shop pins
+  // to a failed probe for the pace columns.
+  const groups: Array<[() => boolean, (v: boolean) => void]> = [
+    [() => hasKitchenPace !== false, (v) => (hasKitchenPace = v)],
+    [() => hasShopLocation !== false, (v) => (hasShopLocation = v)],
+  ];
+
+  for (const [optimistic, latch] of groups) {
+    if (!optimistic()) continue;
+    const { data, error } = await run(
+      restaurantSelect(hasShopLocation !== false, hasKitchenPace !== false)
+    );
     if (!error) {
-      hasShopLocation = true;
+      if (hasShopLocation !== false) hasShopLocation = true;
+      if (hasKitchenPace !== false) hasKitchenPace = true;
       return data;
     }
     if (error.code !== UNDEFINED_COLUMN) throw error;
-    hasShopLocation = false;
+    latch(false);
   }
 
-  const { data, error } = await run(restaurantSelect(false));
+  const { data, error } = await run(restaurantSelect(false, false));
   if (error) throw error;
   return data;
 }
@@ -136,6 +156,13 @@ function mapRestaurant(row: DbRestaurantRow, popularity?: Popularity): Restauran
     ...Array.from(new Set(menu.map((m) => m.category).filter((c) => c !== "Popular"))),
   ];
 
+  const pace = kitchenPace({
+    etaMin: row.eta_min,
+    etaMax: row.eta_max,
+    busyUntil: row.busy_until,
+    busyExtraMinutes: row.busy_extra_minutes,
+  });
+
   return {
     popularBasis: popularity?.basis ?? "picks",
     slug: row.slug,
@@ -144,11 +171,26 @@ function mapRestaurant(row: DbRestaurantRow, popularity?: Popularity): Restauran
     cuisines: row.cuisines as Cuisine[],
     rating: Number(row.rating),
     ratingCount: row.rating_count,
-    etaMin: row.eta_min ?? 25,
-    etaMax: row.eta_max ?? 35,
+    // The band the shop is quoting RIGHT NOW, bump included — not the one the
+    // vendor typed when they set the store up. Applied here, once, so every
+    // surface that renders a Restaurant (cards, search, the shop page) tells the
+    // same story without each having to remember to.
+    etaMin: pace.etaMin,
+    etaMax: pace.etaMax,
+    busy: pace.busy,
+    busyExtraMinutes: pace.addedMinutes,
+    prepMinutes: row.prep_minutes ?? null,
     priceTier: row.price_tier as PriceTier,
     costForTwo: row.cost_for_two ?? 400,
-    distanceKm: Number(row.distance_km ?? 2),
+    // Null, not 2. A shop with no seeded distance has no distance, and `?? 2`
+    // manufactured one — the same 2 km for every such shop, for every customer,
+    // however far away they were. Nothing renders it today (`ShopDistance`
+    // measures from lat/lng and shows nothing without a pin), but it sat on the
+    // type as the documented fallback, waiting for the next caller to believe it.
+    distanceKm:
+      row.distance_km === null || row.distance_km === undefined
+        ? null
+        : Number(row.distance_km),
     lat: row.lat ?? null,
     lng: row.lng ?? null,
     address: row.address ?? null,
@@ -180,6 +222,34 @@ export async function listRestaurantsFromDb(): Promise<Restaurant[]> {
   // resilient — an un-migrated database just keeps the default order.
   const { bySlug } = await getVendorPositions();
   return applyVendorOrder(list, bySlug, (r) => r.slug);
+}
+
+/**
+ * Just the slugs of approved restaurants, for `sitemap.xml`.
+ *
+ * Deliberately not `listRestaurantsFromDb().map(r => r.slug)`. That path builds
+ * every menu, resolves kitchen pace and applies admin pin order — none of which
+ * a list of URLs needs — and, more importantly, it runs on the cookie-reading
+ * client, which forces the sitemap out of static generation and made the read
+ * throw during `next build`.
+ *
+ * Same `approved = true` filter and the same anon-visible grants as the
+ * storefront, so this cannot advertise a page the app will not render. Throws
+ * rather than returning `[]` on failure: an empty sitemap and a failed query are
+ * very different claims, and the caller decides what to publish.
+ */
+export async function listPublicRestaurantSlugs(): Promise<
+  { slug: string }[]
+> {
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("restaurants")
+    .select("slug")
+    .eq("approved", true)
+    .order("name");
+
+  if (error) throw error;
+  return (data ?? []) as { slug: string }[];
 }
 
 /**

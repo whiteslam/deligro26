@@ -1,5 +1,7 @@
 import { HomeView } from "@/components/home/home-view";
-import { listRestaurants } from "@/lib/catalog";
+import { dailyRotationSeed } from "@/lib/search/rotation";
+import { listRestaurantsResult } from "@/lib/catalog";
+import { getHomeCategories } from "@/lib/categories";
 import { listActiveBanners } from "@/lib/banners";
 import { getOrdersPageData } from "@/lib/orders-ui";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -7,11 +9,13 @@ import { listAddresses } from "@/lib/data-access/addresses";
 import { ADDRESSES } from "@/lib/data";
 
 export default async function HomePage() {
-  const [restaurants, orders, banners] = await Promise.all([
-    listRestaurants(),
+  const [catalog, orders, banners, categories] = await Promise.all([
+    listRestaurantsResult(),
     getOrdersPageData(),
     // The home carousel: whatever campaigns the Admin Panel has running here.
     listActiveBanners("home_hero"),
+    // Cuisine strip. Curated pictures, with any an operator has replaced.
+    getHomeCategories(),
   ]);
 
   let savedAddress: { label: string; line: string } | null = null;
@@ -24,6 +28,7 @@ export default async function HomePage() {
     savedAddress = def ? { label: def.label, line: def.line } : null;
   }
 
+  const { restaurants } = catalog;
   const popular = [...restaurants]
     .sort((a, b) => b.rating - a.rating)
     .slice(0, 6);
@@ -37,6 +42,11 @@ export default async function HomePage() {
       banners={banners}
       popular={popular}
       nearby={nearby}
+      categories={categories}
+      // A failed catalog read must not render as "no shops near you" — the
+      // storefront says it couldn't load instead of describing the city.
+      catalogFailed={!catalog.ok}
+      rotationSeed={dailyRotationSeed()}
     />
   );
 }

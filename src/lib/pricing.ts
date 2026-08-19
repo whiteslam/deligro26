@@ -7,12 +7,20 @@
  * nothing while the customer was quietly shown three different delivery fees for
  * the same order. Anything that needs a fee or a tax imports it from here.
  *
+ * The constants below are *defaults*, not the live numbers: once an admin saves
+ * the Settings tab, `platform_settings` is the source and these are only what a
+ * demo install or an un-migrated database falls back to (see
+ * `settings-defaults.ts`). So anything that quotes a price to a customer takes a
+ * config — `computeChargesWith`, `riderPayout` — and gets it from the settings
+ * row. `computeCharges()` is the defaults, and is for callers that genuinely
+ * have no settings in scope; a customer-facing surface is not one of those.
+ *
  * Safe on the client (no secrets), but the server is still the authority: the
- * amount billed is recomputed from these constants in `createOrder`, never taken
- * from what the browser sends.
+ * amount billed is recomputed here in `createOrder` from the settings it reads
+ * itself, never taken from what the browser sends.
  */
 
-/** Flat delivery fee, in whole rupees. */
+/** Flat delivery fee, in whole rupees, before an admin sets one. */
 export const DELIVERY_FEE = 29;
 
 /** Applied to the item subtotal only — fees are not taxed. */
@@ -86,14 +94,36 @@ export function clampTip(tip: number): number {
 
 /* ---------- Rider payout ---------- */
 
-/** Share of the food bill that goes to the rider. */
+/** Share of the food bill that goes to the rider, before an admin sets one. */
 export const RIDER_COMMISSION = 0.08;
 
 /** No trip pays less than this, however small the order. */
 export const RIDER_MIN_PAYOUT = 30;
 
+/** The payout knobs — a slice of PlatformSettings, mirroring ChargesConfig. */
+export interface RiderPayoutConfig {
+  /** Fraction of the food subtotal, e.g. 0.08. */
+  commission: number;
+  /** Floor for the commission part, in whole rupees. */
+  minPayout: number;
+}
+
+/** The module defaults as a config, for callers with no settings row. */
+export const DEFAULT_RIDER_PAYOUT_CONFIG: RiderPayoutConfig = {
+  commission: RIDER_COMMISSION,
+  minPayout: RIDER_MIN_PAYOUT,
+};
+
 /**
  * What the rider earns for a delivery.
+ *
+ * The config is required rather than defaulted, unlike `computeCharges` above.
+ * `platform_settings.rider_commission` / `rider_min_payout` have been editable
+ * in the Admin Settings form since migration 0015 and were read by nothing that
+ * pays anyone: an operations lead could raise the rate to solve a driver-supply
+ * problem, be told it saved, and have every offer card and earnings total keep
+ * quoting the old one. A parameter with no default is the only version of this
+ * function that cannot drift back into that.
  *
  * Deliberately computed on the FOOD subtotal, not the order total: the total
  * includes the delivery fee, the customer's GST and their tip, and paying a
@@ -103,16 +133,19 @@ export const RIDER_MIN_PAYOUT = 30;
  * The tip is then added in full, which is what checkout promises the customer
  * ("the courier will get 100% of your tip").
  */
-export function riderPayout({
-  itemSubtotal,
-  tip = 0,
-}: {
-  itemSubtotal: number;
-  tip?: number;
-}): number {
+export function riderPayout(
+  config: RiderPayoutConfig,
+  {
+    itemSubtotal,
+    tip = 0,
+  }: {
+    itemSubtotal: number;
+    tip?: number;
+  }
+): number {
   const commission = Math.max(
-    RIDER_MIN_PAYOUT,
-    Math.round(itemSubtotal * RIDER_COMMISSION)
+    config.minPayout,
+    Math.round(itemSubtotal * config.commission)
   );
   return commission + clampTip(tip);
 }

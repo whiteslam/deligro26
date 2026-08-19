@@ -27,6 +27,7 @@ import { useSavedAddresses } from "@/hooks/use-saved-addresses";
 import { cn } from "@/lib/utils/cn";
 import { formatINR } from "@/lib/utils/format";
 import { computeChargesWith, TIP_OPTIONS } from "@/lib/pricing";
+import { outOfRangeMessage, type ServiceArea } from "@/lib/geo/service-area";
 import {
   openRazorpayCheckout,
   RazorpayDismissedError,
@@ -233,7 +234,63 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
     mapCoords &&
     (selectedAddress.lat !== mapCoords.lat || selectedAddress.lng !== mapCoords.lng);
 
-  const showDistanceWarning = Boolean(selectedAddress) && !mapCoords;
+  // Is this pin inside the shop's delivery area?
+  //
+  // This replaces `Boolean(selectedAddress) && !mapCoords`, which was labelled
+  // "you're a bit far away" and measured nothing of the kind: it fired when the
+  // address had NO coordinates, and stayed silent for an address 40 km away
+  // that had them — telling the wrong customers they were far away and the
+  // genuinely-distant ones nothing at all.
+  //
+  // Advisory. `/api/orders` re-runs the same `checkServiceArea` against the
+  // address actually submitted and refuses the order there.
+  // Stored against the pin it was measured for, and read back only when the two
+  // still match. That is what makes moving the pin drop the previous answer
+  // without an effect having to clear it — a stale "out of range" left on screen
+  // for a pin the customer has already corrected is the one failure mode here.
+  const areaKey = mapCoords ? `${mapCoords.lat},${mapCoords.lng}` : null;
+  const [measured, setMeasured] = useState<{
+    key: string;
+    area: ServiceArea;
+  } | null>(null);
+  const serviceArea =
+    measured && measured.key === areaKey ? measured.area : null;
+
+  useEffect(() => {
+    if (!restaurantSlug || !isSupabaseConfigured || !areaKey || !mapCoords) {
+      return;
+    }
+    let live = true;
+    const query = new URLSearchParams({
+      lat: String(mapCoords.lat),
+      lng: String(mapCoords.lng),
+    });
+    fetch(
+      `/api/restaurants/${encodeURIComponent(restaurantSlug)}/serviceability?${query}`
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { area?: ServiceArea } | null) => {
+        if (live && d?.area) setMeasured({ key: areaKey, area: d.area });
+      })
+      .catch(() => {
+        // Can't check ≠ out of range. Leave it unmeasured and say nothing; the
+        // order API is the gate that decides.
+      });
+    return () => {
+      live = false;
+    };
+  }, [restaurantSlug, areaKey, mapCoords]);
+
+  const outOfArea = serviceArea?.status === "out_of_range";
+  // An address with no pin is not "far away" — it is unmeasurable, and the fix
+  // is one the customer can act on, so that is what the notice asks for.
+  const addressUnpinned = Boolean(selectedAddress) && !mapCoords;
+
+  // Everything that stops this basket being placed, in one value. Out-of-area
+  // joins the pre-existing gates for the same stated reason: learning it from
+  // "Could not place the order" after filling in an address is a worse way to
+  // find out. `unknown` never blocks — see `checkServiceArea`.
+  const orderBlocked = checkoutBlocked || outOfArea;
 
   async function savePinToAddress() {
     if (!selectedAddress || !mapCoords) return;
@@ -340,6 +397,10 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
     }
     if (availability.notice && !availability.cod && !availability.online) {
       setError(availability.notice);
+      return;
+    }
+    if (outOfArea && serviceArea) {
+      setError(outOfRangeMessage(serviceArea));
       return;
     }
     if (!selectedAddress) {
@@ -474,11 +535,18 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
       }
     }
 
-    window.setTimeout(() => {
-      setStatus("placed");
-      clear();
-      router.push(`/orders/${ACTIVE_ORDER.id}?placed=1`);
-    }, 1400);
+    // Demo mode only — `isSupabaseConfigured` is false, which cannot happen in a
+    // production build (supabase/config.ts throws at boot). Nothing is placed,
+    // charged or recorded; this walks to the mock tracking screen so the flow can
+    // be shown end to end.
+    //
+    // The 1400ms `setTimeout` that used to wrap this is gone. It existed to
+    // simulate a network round trip — a fake "Placing your order…" spinner over
+    // a call that never happened, which is the one part of a demo that should
+    // not be pretending.
+    setStatus("placed");
+    clear();
+    router.push(`/orders/${ACTIVE_ORDER.id}?placed=1&demo=1`);
   };
 
   if (lines.length === 0 && status !== "placed") {
@@ -557,10 +625,18 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
                 <ChevronRight className="size-5 shrink-0 text-muted" />
               </button>
 
-              {showDistanceWarning ? (
+              {outOfArea && serviceArea ? (
                 <div className="flex items-start gap-2.5 border-b border-line bg-deal-soft px-4 py-3 text-sm font-medium text-deal">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                  <span>Check your address, you&apos;re a bit far away</span>
+                  <span>{outOfRangeMessage(serviceArea)}</span>
+                </div>
+              ) : addressUnpinned ? (
+                <div className="flex items-start gap-2.5 border-b border-line bg-surface-2 px-4 py-3 text-sm font-medium text-muted">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <span>
+                    This address has no map pin, so we can&apos;t check it&apos;s
+                    in the delivery area. Drop a pin below.
+                  </span>
                 </div>
               ) : null}
 
@@ -839,7 +915,7 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
         ) : null}
         <button
           onClick={placeOrder}
-          disabled={status !== "ready" || checkoutBlocked}
+          disabled={status !== "ready" || orderBlocked}
           className="press flex h-12 w-full items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:opacity-70"
         >
           {status === "processing" ? (

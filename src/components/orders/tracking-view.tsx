@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Phone,
   Check,
-  MessageCircle,
   CircleHelp,
   Star,
   ShieldCheck,
@@ -14,6 +13,7 @@ import {
   Loader2,
   Navigation,
   Clock,
+  WifiOff,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { TrackingMap } from "@/components/orders/tracking-map";
@@ -249,6 +249,36 @@ export function TrackingView({
       <div className="bolt-sheet relative -mt-6 space-y-4 px-4 pt-2">
         <div className="bolt-sheet-handle" />
 
+        {/* The screen has stopped hearing from the server. Everything below is
+            still the best we know, so it stays — but it is no longer live, and
+            a tracking screen that looks live while frozen is worse than one
+            that is visibly broken. The courier pin stops advancing at the same
+            moment (see use-live-tracking). */}
+        {live.health.stale ? (
+          <p className="flex items-start gap-2 rounded-2xl border border-deal/30 bg-deal-soft px-3 py-2.5 text-xs font-medium leading-relaxed text-deal">
+            <WifiOff className="mt-0.5 size-3.5 shrink-0" />
+            <span>
+              {live.health.unauthorized ? (
+                <>
+                  You&apos;ve been signed out, so this has stopped updating.{" "}
+                  <Link href="/login" className="underline">
+                    Sign in
+                  </Link>{" "}
+                  to see live progress.
+                </>
+              ) : (
+                <>
+                  Not updating right now — showing the last status we received
+                  {live.health.ageMs !== null
+                    ? `, about ${Math.max(1, Math.round(live.health.ageMs / 60000))} min ago`
+                    : ""}
+                  . We&apos;ll reconnect automatically.
+                </>
+              )}
+            </span>
+          </p>
+        ) : null}
+
         <div className="text-center">
           <p className="text-sm text-muted">
             {delivered
@@ -405,14 +435,13 @@ export function TrackingView({
                 <p className="text-xs text-muted">Your courier</p>
               )}
             </div>
-            <button
-              type="button"
-              aria-label="Message rider"
-              disabled
-              className="press grid size-11 place-items-center rounded-full border border-line bg-surface text-ink opacity-50"
-            >
-              <MessageCircle className="size-5" />
-            </button>
+            {/* A "Message rider" button used to sit here: permanently disabled,
+                50% opacity, no explanation, right next to a Call button that
+                works. There is no chat backend and none is planned, so it was
+                not a control waiting on data — it was a control waiting on a
+                feature. Removed rather than left greyed out; calling is how you
+                reach your rider, and the button that does it is now the only
+                one offered. */}
             {riderTel ? (
               <a
                 href={`tel:${riderTel}`}

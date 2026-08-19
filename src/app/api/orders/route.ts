@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import {
   createOrder,
   listVisibleOrders,
+  OrderRefused,
   PaymentRefused,
   type CreateOrderInput,
 } from "@/lib/data-access/orders";
@@ -123,6 +124,16 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: err.reason, message: err.customerMessage },
         { status: 400 }
+      );
+    }
+    // Same shape, same reason: the maintenance message, the configured minimum
+    // and the shop's radius are only known to the code that refused. A pause is
+    // 503 (try later, nothing about the request was wrong); a basket under the
+    // minimum or an address out of area is 400 (the request itself can't stand).
+    if (err instanceof OrderRefused) {
+      return NextResponse.json(
+        { error: err.reason, message: err.customerMessage },
+        { status: err.reason === "orders_paused" ? 503 : 400 }
       );
     }
     const message = err instanceof Error ? err.message : "server_error";

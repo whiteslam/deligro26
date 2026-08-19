@@ -18,11 +18,12 @@ import {
   LocateOff,
   ShieldCheck,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { StatCard, SectionTitle, Pill } from "@/components/roles/role-ui";
 import { EmptyState } from "@/components/shared/empty-state";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { formatINR } from "@/lib/utils/format";
+import { callablePhone, mapsDirectionsUrl } from "@/lib/utils/phone";
 import type { DriverBoardData } from "@/lib/data-access/driver-orders";
 import { acceptDeliveryAction, advanceDeliveryAction } from "@/app/driver/actions";
 
@@ -221,17 +222,18 @@ export function DriverBoard({
   live: boolean;
 }) {
   const router = useRouter();
-  const [online, setOnline] = useState(true);
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const { available, active, today } = initial;
+  const customerTel = callablePhone(active?.customerPhone);
   const [otp, setOtp] = useState("");
   const [otpError, setOtpError] = useState<string | null>(null);
   const [acceptError, setAcceptError] = useState<string | null>(null);
 
-  // Tied to the delivery, not to the online toggle: a rider carrying someone's
-  // dinner is on duty whether or not a switch on this screen says so.
+  // Tied to the delivery: a rider carrying someone's dinner is sharing their
+  // position for as long as they are carrying it. (This used to be phrased
+  // against the online/offline toggle, which has since gone — see below.)
   const reporting = useLocationReporting(live && active ? active.job.id : null);
 
   function accept(orderId: string) {
@@ -268,6 +270,8 @@ export function DriverBoard({
           setOtpError(
             result.error === "bad_otp"
               ? "Wrong code — ask the customer again."
+              : result.error === "bad_pickup_otp"
+                ? "Wrong code — ask the restaurant to read it again."
               : result.error === "rate_limited"
                 ? "Too many attempts — wait a minute and try again."
                 : "Couldn't update. Try again."
@@ -284,43 +288,35 @@ export function DriverBoard({
 
   return (
     <div className="space-y-6">
-      {live && online ? <AutoRefresh interval={4000} /> : null}
-      {/* Online toggle */}
+      {live ? <AutoRefresh interval={4000} /> : null}
+
+      {/* This was an online/offline switch. It was `useState(true)` — never
+          persisted, never sent anywhere, reset to online on every mount — and
+          its only effects were hiding this page's own job list and pausing this
+          page's own polling. A rider who ended a shift with it and closed the
+          app was never off duty as far as the platform was concerned, and
+          reopening the app put them back to "online" regardless.
+
+          It is gone rather than wired up because there is nothing behind it to
+          wire to: no driver-availability column, no dispatch, no assignment, no
+          shift state. The pool is every ready order not yet claimed, shown to
+          whoever opens the board. That is what this card now says, because a
+          rider deciding whether to stop for lunch should know that logging off
+          is not a thing this system can currently do. */}
       <div className="card flex items-center gap-3 p-4">
-        <span
-          className={`grid size-11 place-items-center rounded-full ${
-            online ? "bg-green-soft text-green" : "bg-surface-2 text-muted"
-          }`}
-        >
+        <span className="grid size-11 place-items-center rounded-full bg-surface-2 text-muted">
           <Bike className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-bold leading-tight">
-            {online ? "You're online" : "You're offline"}
+            {live ? "Open to all riders" : "Demo data"}
           </p>
           <p className="text-xs text-muted">
             {live
-              ? online
-                ? "Receiving live delivery requests"
-                : "Go online to earn"
-              : "Demo data — connect Supabase for live requests"}
+              ? "Every order below is offered to every rider — first to accept takes it. There's no shift or duty status yet."
+              : "Connect Supabase for live requests"}
           </p>
         </div>
-        <button
-          onClick={() => setOnline((v) => !v)}
-          role="switch"
-          aria-checked={online}
-          aria-label="Toggle online status"
-          className={`press relative h-7 w-12 shrink-0 rounded-full transition-colors ${
-            online ? "bg-green" : "bg-line"
-          }`}
-        >
-          <span
-            className={`absolute top-1 size-5 rounded-full bg-white shadow-sm transition-all ${
-              online ? "left-6" : "left-1"
-            }`}
-          />
-        </button>
       </div>
 
       {/* Today. "Online 5.5 h" and "Rating 4.8 ★" used to sit here as constants —
@@ -436,13 +432,65 @@ export function DriverBoard({
                 </span>
               </div>
 
+              {/* Both of these were full-width outline buttons with no onClick,
+                  no href and no disabled state — so they looked and pressed
+                  like working controls and did nothing, to a courier standing
+                  at an address they don't know. They now open the phone's maps
+                  app and dialler, and degrade to a visibly-disabled control
+                  when the pin or the number isn't recorded (the pattern the
+                  customer's own call button already used). */}
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1">
-                  <Navigation className="size-4" /> Navigate
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1">
-                  <Phone className="size-4" /> Call
-                </Button>
+                {active.navigateTo ? (
+                  <a
+                    href={mapsDirectionsUrl(active.navigateTo)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={buttonClasses({
+                      variant: "outline",
+                      size: "sm",
+                      className: "flex-1",
+                    })}
+                  >
+                    <Navigation className="size-4" /> Navigate
+                  </a>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    disabled
+                    title={
+                      active.leg === "TO_PICKUP"
+                        ? "This shop hasn't been pinned on the map"
+                        : "This address has no map pin"
+                    }
+                  >
+                    <Navigation className="size-4" /> No pin
+                  </Button>
+                )}
+
+                {customerTel ? (
+                  <a
+                    href={`tel:${customerTel}`}
+                    className={buttonClasses({
+                      variant: "outline",
+                      size: "sm",
+                      className: "flex-1",
+                    })}
+                  >
+                    <Phone className="size-4" /> Call customer
+                  </a>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    disabled
+                    title="No phone number recorded for this customer"
+                  >
+                    <Phone className="size-4" /> No number
+                  </Button>
+                )}
               </div>
 
               {active.leg === "TO_CUSTOMER" ? (
@@ -473,26 +521,45 @@ export function DriverBoard({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {/* The other half of the handover. The customer reads their code
-                      to the rider at the door; the rider reads this one to the
-                      counter, so the kitchen knows it is releasing the food to the
-                      courier the order was actually assigned to. */}
-                  {active.pickupOtp ? (
-                    <div className="rounded-xl border border-line bg-surface-2 px-4 py-3 text-center">
-                      <p className="text-label flex items-center justify-center gap-1.5">
-                        <KeyRound className="size-3.5" /> Read this to the restaurant
-                      </p>
-                      <p className="text-data mt-1.5 text-3xl font-bold tracking-[0.35em]">
-                        {active.pickupOtp}
-                      </p>
+                  {/* The other half of the handover, and it now works the same
+                      way round as the delivery leg: the counter holds the code
+                      and the rider enters it. The rider used to be SHOWN this
+                      code to read out, while the server wrote `picked_up`
+                      without checking anything — so a pickup could be marked
+                      from anywhere. Typing what the kitchen tells you is what
+                      makes the code evidence of having been there. */}
+                  {active.pickupCodeRequired ? (
+                    <div className="space-y-2">
+                      <label className="text-label flex items-center gap-1.5">
+                        <KeyRound className="size-3.5" />
+                        Ask the restaurant for the pickup code
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={4}
+                        value={otp}
+                        onChange={(e) =>
+                          setOtp(e.target.value.replace(/\D/g, ""))
+                        }
+                        className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-center text-2xl tracking-[0.4em] outline-none focus:border-accent"
+                        placeholder="••••"
+                      />
                     </div>
                   ) : null}
                   {otpError ? <p className="text-sm text-accent">{otpError}</p> : null}
                   <Button
                     className="w-full"
                     size="lg"
-                    disabled={pending}
-                    onClick={() => advance(active.job.id)}
+                    disabled={
+                      pending || (active.pickupCodeRequired && otp.length !== 4)
+                    }
+                    onClick={() =>
+                      advance(
+                        active.job.id,
+                        active.pickupCodeRequired ? otp : undefined
+                      )
+                    }
                   >
                     {pending && busyId === active.job.id ? (
                       <><Loader2 className="size-5 animate-spin" /> Updating…</>
@@ -518,13 +585,7 @@ export function DriverBoard({
           Available orders
         </SectionTitle>
 
-        {!online ? (
-          <EmptyState
-            icon={<Bike className="size-7" />}
-            title="You're offline"
-            description="Go online to start receiving delivery requests near you."
-          />
-        ) : active ? (
+        {active ? (
           <p className="card p-4 text-sm text-muted">
             Finish your active delivery to see new requests.
           </p>

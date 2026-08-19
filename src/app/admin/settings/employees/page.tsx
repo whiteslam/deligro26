@@ -131,7 +131,7 @@ export default async function AdminEmployeesPage() {
           not. */}
       <ConsoleOnly
         tool="Creating an employee"
-        why="The temporary password is shown only once."
+        why="A new login's temporary password is shown once and never again, so it wants a screen you can copy from. Reading the team list works fine here."
       />
 
       {employees.length === 0 ? (

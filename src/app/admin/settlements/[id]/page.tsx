@@ -156,7 +156,7 @@ export default async function SettlementDetailPage({
       {settlement.status === "draft" ? (
         <ConsoleOnly
           tool="Settling a payout"
-          why="Recording a UTR or voiding a batch is money movement."
+          why="Recording a UTR or voiding a batch moves real money, and a phone keyboard is the wrong place to get a reference number right. The statement below reads fine here."
         >
           <SettlementActions
             id={settlement.id}

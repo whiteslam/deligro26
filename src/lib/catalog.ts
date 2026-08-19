@@ -14,15 +14,40 @@ import type { Restaurant } from "@/types";
  * Server facade: live Supabase catalog when configured and seeded,
  * otherwise Phase 1 mock data (demo mode).
  */
-export async function listRestaurants(): Promise<Restaurant[]> {
-  if (!isSupabaseConfigured) return RESTAURANTS;
+
+/**
+ * A catalog read that says whether it worked.
+ *
+ * `listRestaurants()` used to swallow every exception and return `[]`, which the
+ * storefront renders as "we haven't onboarded a store near you" — a confident
+ * statement about the customer's city, made on the strength of a failed query.
+ * The two states look identical to a caller and are nothing alike, so they are
+ * now distinguishable and the UI says which one it is looking at.
+ */
+export interface CatalogResult {
+  restaurants: Restaurant[];
+  /** False when the read failed. `restaurants` is then empty but meaningless. */
+  ok: boolean;
+}
+
+export async function listRestaurantsResult(): Promise<CatalogResult> {
+  if (!isSupabaseConfigured) return { restaurants: RESTAURANTS, ok: true };
 
   try {
-    const live = await listRestaurantsFromDb();
-    return live;
-  } catch {
-    return [];
+    return { restaurants: await listRestaurantsFromDb(), ok: true };
+  } catch (err) {
+    console.error("[catalog] listRestaurants failed", err);
+    return { restaurants: [], ok: false };
   }
+}
+
+/**
+ * The list alone, for callers with nothing useful to say about a failure —
+ * `listRestaurantSlugs` below, and route params. Anything that renders an empty
+ * state to a customer should use `listRestaurantsResult` instead.
+ */
+export async function listRestaurants(): Promise<Restaurant[]> {
+  return (await listRestaurantsResult()).restaurants;
 }
 
 export async function getRestaurant(slug: string): Promise<Restaurant | undefined> {

@@ -70,7 +70,7 @@ export default function AdminSettingsPage() {
         <h2 className="text-label mb-2">Configuration</h2>
         <ConsoleOnlyNotice
           tool="Platform configuration"
-          why="Fees, tax, support, availability and the rider payout formula."
+          why="Fees, tax, support hours, availability and the rider payout formula all live behind it, and each one reaches every order."
         />
       </section>
 

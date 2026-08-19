@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Clock, Bike } from "lucide-react";
 // BadgePercent — used by the temporarily hidden offer banner below
@@ -7,7 +9,7 @@ import { PhotoTile } from "@/components/shared/photo-tile";
 // import { RatingPill } from "@/components/shared/rating";
 import { ShopDistance } from "@/components/shared/shop-distance";
 import { formatEta, formatINR } from "@/lib/utils/format";
-import { DELIVERY_FEE } from "@/lib/pricing";
+import { useChargesConfig } from "@/components/providers/charges-config-provider";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -15,6 +17,11 @@ import { cn } from "@/lib/utils/cn";
  * - "list"     → full-width row in a vertical feed
  * - "carousel" → fixed-width tile inside a horizontal scroller
  * Sold-out / closed venues are dimmed, not hidden.
+ *
+ * A client component for the delivery fee alone: the card advertises a price,
+ * so it has to read the live one from the customer layout's settings context
+ * rather than a build-time constant. (Its meta row already rendered a client
+ * child — ShopDistance — so this costs no extra boundary.)
  */
 export function RestaurantCard({
   restaurant,
@@ -25,6 +32,7 @@ export function RestaurantCard({
 }) {
   const r = restaurant;
   const carousel = variant === "carousel";
+  const { deliveryFee } = useChargesConfig();
 
   return (
     <Link
@@ -54,9 +62,13 @@ export function RestaurantCard({
             directions: it never showed whether a place WAS a favourite, and
             tapping it never made one. The working control is on the restaurant
             page (RestaurantActions). */}
+        {/* "Opens soon" implied a schedule. There isn't one — `is_open` is a
+            switch a vendor flips, and nothing in the platform knows when (or
+            whether) it will flip back. "Closed" says the part we can stand
+            behind. */}
         {!r.open ? (
           <span className="absolute bottom-2.5 right-2.5 rounded-full bg-ink px-2.5 py-1 text-xs font-semibold text-white">
-            Opens soon
+            Closed
           </span>
         ) : null}
         {/* Temporarily hidden — rating star not needed right now
@@ -81,16 +93,26 @@ export function RestaurantCard({
         <div className="mt-1.5 flex items-center gap-2 text-[12px] font-medium text-muted">
           <span className="inline-flex items-center gap-1">
             <Bike className="size-4" />
-            {/* The fee we actually bill. This used to read `priceTier * 20`,
-                which advertised "Free" or "₹40" on a shop that then charged ₹29
-                at checkout — priceTier is the ₹/₹₹/₹₹₹ cost-for-two indicator,
-                never a delivery fee. */}
-            {formatINR(DELIVERY_FEE)}
+            {/* The fee we actually bill, from the live platform settings.
+                Two earlier versions of this line advertised a number checkout
+                then disagreed with: `priceTier * 20` (priceTier is the ₹/₹₹/₹₹₹
+                cost-for-two indicator, never a fee), and then the pricing.ts
+                default — right until the first time an admin changed it. */}
+            {deliveryFee === 0 ? "Free" : formatINR(deliveryFee)}
           </span>
           <span className="text-line">•</span>
-          <span className="inline-flex items-center gap-1">
+          {/* Already includes any live busy bump (see mapRestaurant). Labelled
+              when it does: a band that silently grew reads as a slow shop, where
+              "Busy" reads as a kitchen being straight with you. */}
+          <span
+            className={cn(
+              "inline-flex items-center gap-1",
+              r.busy && "font-semibold text-deal"
+            )}
+          >
             <Clock className="size-4" />
             {formatEta(r.etaMin, r.etaMax)}
+            {r.busy ? " · Busy" : ""}
           </span>
           <ShopDistance shop={r} />
         </div>

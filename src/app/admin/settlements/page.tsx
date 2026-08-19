@@ -520,7 +520,7 @@ export default async function AdminSettlementsPage({
           here — once, rather than at each of its call sites. */}
       <ConsoleOnly
         tool="Building a settlement"
-        why="Reading and tracking existing payouts works fine here."
+        why="Reading a statement and tracking a payout already raised both work on a phone — only composing a new batch needs the desk."
       />
 
       {/* The figures come first: what is owed in total, before the list of who

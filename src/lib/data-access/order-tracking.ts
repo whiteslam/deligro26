@@ -78,6 +78,8 @@ interface RestaurantRef {
   eta_max?: number | null;
   lat?: number | null;
   lng?: number | null;
+  /** 0036 — this kitchen's own prep leg. Absent before the migration. */
+  prep_minutes?: number | null;
 }
 
 interface TrackedOrderRow {
@@ -109,11 +111,14 @@ interface QueryResult<T> {
   error: { code?: string } | null;
 }
 
-function orderColumns(withLifecycle: boolean): string {
+/** `restaurants.prep_minutes` arrives with 0036, independently of 0026. */
+const PREP_MINUTES_COLUMN = "restaurants.prep_minutes";
+
+function orderColumns(withLifecycle: boolean, withPrep: boolean): string {
   return [
     "id, status, created_at, address, restaurant_id",
     withLifecycle ? ", accepted_at, ready_at" : "",
-    ", restaurants ( eta_min, eta_max, lat, lng )",
+    `, restaurants ( eta_min, eta_max, lat, lng${withPrep ? ", prep_minutes" : ""} )`,
   ].join("");
 }
 
@@ -155,6 +160,47 @@ async function selectProbed<T>(
   if (present) rememberColumn(key, true);
 
   return { data: data ?? null, present };
+}
+
+/**
+ * The order row, tolerating a database missing 0026, 0036, or both.
+ *
+ * Two independent optional groups, so one `selectProbed` key cannot cover it:
+ * an environment can have the lifecycle timestamps and not the per-kitchen prep
+ * leg, or the reverse. The newer group is dropped first — losing a prep override
+ * costs one input to an estimate, whereas losing `accepted_at` costs the whole
+ * "in kitchen" stage.
+ */
+async function selectOrderRow(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orderId: string
+): Promise<Record<string, unknown> | null> {
+  const run = (columns: string) =>
+    supabase
+      .from("orders")
+      .select(columns)
+      .eq("id", orderId)
+      .maybeSingle()
+      .overrideTypes<Record<string, unknown>>();
+
+  if (!columnKnownMissing(PREP_MINUTES_COLUMN)) {
+    const withLifecycle = !columnKnownMissing(LIFECYCLE_COLUMNS);
+    const { data, error } = await run(orderColumns(withLifecycle, true));
+    if (!error) {
+      rememberColumn(PREP_MINUTES_COLUMN, true);
+      if (withLifecycle) rememberColumn(LIFECYCLE_COLUMNS, true);
+      return data ?? null;
+    }
+    if (!isMissingColumn(error)) throw error;
+    rememberColumn(PREP_MINUTES_COLUMN, false);
+  }
+
+  const { data } = await selectProbed<Record<string, unknown>>(
+    LIFECYCLE_COLUMNS,
+    (withLifecycle) => orderColumns(withLifecycle, false),
+    run
+  );
+  return data;
 }
 
 function parseDestination(address: unknown): TrackPoint {
@@ -215,17 +261,7 @@ export async function getOrderTrackingSnapshot(
   // Anon key, so RLS decides: a row comes back only for the customer who placed
   // this order, the restaurant cooking it, the driver carrying it, or an admin.
   // Getting past the null check below IS the authorization for everything after.
-  const { data: orderRow } = await selectProbed<Record<string, unknown>>(
-    LIFECYCLE_COLUMNS,
-    orderColumns,
-    (columns) =>
-      supabase
-        .from("orders")
-        .select(columns)
-        .eq("id", orderId)
-        .maybeSingle()
-        .overrideTypes<Record<string, unknown>>()
-  );
+  const orderRow = await selectOrderRow(supabase, orderId);
 
   if (!orderRow) return null;
   const order = orderRow as unknown as TrackedOrderRow;
@@ -308,6 +344,7 @@ export async function getOrderTrackingSnapshot(
     acceptedAt: order.accepted_at ?? null,
     readyAt: order.ready_at ?? null,
     pickedUpAt: delivery?.picked_up_at ?? null,
+    restaurantPrepMinutes: restaurant?.prep_minutes ?? null,
     etaMin: restaurant?.eta_min ?? null,
     etaMax: restaurant?.eta_max ?? null,
     defaultPrepMinutes: settings.defaultPrepMinutes,
@@ -380,17 +417,7 @@ export async function getOrderEta(orderId: string): Promise<OrderEta | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: orderRow } = await selectProbed<Record<string, unknown>>(
-    LIFECYCLE_COLUMNS,
-    orderColumns,
-    (columns) =>
-      supabase
-        .from("orders")
-        .select(columns)
-        .eq("id", orderId)
-        .maybeSingle()
-        .overrideTypes<Record<string, unknown>>()
-  );
+  const orderRow = await selectOrderRow(supabase, orderId);
 
   if (!orderRow) return null;
   const order = orderRow as unknown as TrackedOrderRow;
@@ -403,6 +430,7 @@ export async function getOrderEta(orderId: string): Promise<OrderEta | null> {
     createdAt: order.created_at,
     acceptedAt: order.accepted_at ?? null,
     readyAt: order.ready_at ?? null,
+    restaurantPrepMinutes: restaurant?.prep_minutes ?? null,
     etaMin: restaurant?.eta_min ?? null,
     etaMax: restaurant?.eta_max ?? null,
     defaultPrepMinutes: settings.defaultPrepMinutes,

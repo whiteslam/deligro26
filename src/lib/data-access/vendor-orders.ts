@@ -62,6 +62,17 @@ interface VendorOrderRow {
    */
   accepted_at?: string | null;
   ready_at?: string | null;
+  /**
+   * Migration 0006. The handover code the kitchen reads to the rider at
+   * collection — the counter's half of the pair whose other half is the
+   * customer's delivery code.
+   *
+   * It has existed since 0006 with no UI anywhere. It was briefly shown to the
+   * RIDER instead, which is backwards: a code the person being checked already
+   * holds proves nothing, and the pickup transition did not verify it in any
+   * case. Shown here, on the packed order, it is what the rider has to be told.
+   */
+  pickup_otp?: string | null;
 }
 
 /** Payment columns arrive together in migration 0025 — see schema-probe. */
@@ -83,7 +94,7 @@ interface SelectFlags {
 
 function select(flags: SelectFlags): string {
   return [
-    "id, status, total, created_at, address",
+    "id, status, total, created_at, address, pickup_otp",
     flags.payment ? ", payment_method, payment_status" : "",
     flags.lifecycle ? ", accepted_at, ready_at" : "",
     ", order_items(name, qty, price, menu_items(description, image_url))",
@@ -247,6 +258,7 @@ function mapKitchenOrder(row: VendorOrderRow): KitchenOrder {
     paymentStatus: row.payment_status ?? undefined,
     acceptedAt: row.accepted_at,
     readyAt: row.ready_at,
+    pickupOtp: row.pickup_otp?.trim() || null,
   };
 }
 

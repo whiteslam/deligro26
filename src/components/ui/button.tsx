@@ -26,6 +26,28 @@ const sizes: Record<Size, string> = {
   lg: "h-14 px-6 text-[17px] font-bold",
 };
 
+/**
+ * The button's look, without the button.
+ *
+ * For the cases where the control has to be an anchor because it navigates —
+ * `tel:` and a maps deep link, on the driver's active-delivery card. A `<button>`
+ * with an onClick that sets `location.href` would look identical and behave
+ * worse: no long-press, no "open in new tab", nothing for a screen reader to
+ * announce as a link.
+ */
+export function buttonClasses(opts?: {
+  variant?: Variant;
+  size?: Size;
+  className?: string;
+}): string {
+  return cn(
+    base,
+    variants[opts?.variant ?? "primary"],
+    sizes[opts?.size ?? "md"],
+    opts?.className
+  );
+}
+
 export function Button({
   variant = "primary",
   size = "md",
@@ -36,9 +58,6 @@ export function Button({
   size?: Size;
 }) {
   return (
-    <button
-      className={cn(base, variants[variant], sizes[size], className)}
-      {...props}
-    />
+    <button className={buttonClasses({ variant, size, className })} {...props} />
   );
 }

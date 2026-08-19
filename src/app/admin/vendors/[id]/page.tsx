@@ -154,7 +154,11 @@ export default async function VendorDetailPage({
       {/* Menu authoring is console work: inline CRUD across every dish plus an
           xlsx template → upload → validate → bulk-insert import. */}
       {active === "menu" ? (
-        <ConsoleOnly variant="page" tool="The menu editor">
+        <ConsoleOnly
+          variant="page"
+          tool="The menu editor"
+          why="Every other tab on this shop — overview, business, payment, documents, activity — reads fine here."
+        >
           <MenuManager restaurantId={id} items={menuItems} categories={menuCategories} />
         </ConsoleOnly>
       ) : null}

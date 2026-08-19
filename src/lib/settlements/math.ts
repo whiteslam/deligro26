@@ -233,6 +233,29 @@ export function sumSettlementTotals(lines: SummableLine[]): SettlementTotals {
 }
 
 /**
+ * A vendor's forecast payout for a period, as the Earnings screen renders it.
+ *
+ * Declared here rather than beside `settlementEstimateFor` because that module
+ * is `server-only` and this is the shape a client component receives — putting
+ * it in the arithmetic module keeps the vendor's panel from importing (even
+ * type-only) out of the service-role data layer.
+ *
+ * `grossRevenue` rides along on purpose: it is the sum of `orders.total` that
+ * the Earnings screen used to present as "your settlement estimate", and showing
+ * it next to the real net is how a vendor who forecast off it sees the gap.
+ */
+export interface VendorSettlementEstimate extends SettlementTotals {
+  commissionPct: number;
+  commissionGstPct: number;
+  otherChargesPerOrder: number;
+  orderCount: number;
+  /** Not a payout. What the customers paid, in full. */
+  grossRevenue: number;
+  /** Delivered in the window but already paid out, so excluded above. */
+  settledCount: number;
+}
+
+/**
  * Does this settlement add up? Returns the mismatch in rupees, or 0.
  *
  * Called before a draft is written and again when a statement is rendered. It

@@ -90,7 +90,7 @@ export default async function VendorSlotsPage() {
           — and keeps refreshing, so the screen is still worth opening. */}
       <ConsoleOnly
         tool="Editing featured slots"
-        why="The order above stays live here."
+        why="The running order, above, stays live on a phone — so you can always see who is pinned where, just not move them."
       >
         {/* Board left, feed preview right — the preview is a narrow fixed column
             because it is a phone-width sketch, and it stacks under the board below

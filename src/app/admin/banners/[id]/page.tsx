@@ -26,7 +26,11 @@ export default async function EditBannerPage({
       {/* Console-only, same as /admin/banners/new — this is the same 400-line
           creative form. The row actions on /admin/banners cover the phone case:
           pausing or ending a live campaign. */}
-      <ConsoleOnly variant="page" tool="Editing a campaign">
+      <ConsoleOnly
+        variant="page"
+        tool="Editing a campaign"
+        why="If this one is live and you need it stopped now, the campaigns list has pause and end as row actions — both work on a phone."
+      >
         <BannerForm banner={banner} />
       </ConsoleOnly>
     </div>

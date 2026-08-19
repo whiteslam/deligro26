@@ -416,7 +416,43 @@ grant select, insert on public.review_moderation_log to authenticated;
 grant select, insert on public.review_moderation_log to service_role;
 
 -- ============================================================
--- 7 — Reviews: read policies now respect moderation
+-- 7 — Operator-tunable review policy
+-- ------------------------------------------------------------
+-- These two columns come BEFORE the window functions in section 8, not after.
+-- `review_window_open` / `review_edit_open` are `language sql`, and Postgres
+-- validates a SQL function's body at CREATE time (check_function_bodies is on
+-- by default), unlike plpgsql. Defining them first fails with
+-- `42703: column "review_window_days" does not exist`.
+-- ============================================================
+alter table public.platform_settings
+  add column if not exists review_window_days integer not null default 14,
+  add column if not exists review_edit_window_hours integer not null default 48;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.platform_settings'::regclass
+       and conname  = 'platform_settings_review_window_days_range'
+  ) then
+    alter table public.platform_settings
+      add constraint platform_settings_review_window_days_range
+      check (review_window_days between 1 and 365);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.platform_settings'::regclass
+       and conname  = 'platform_settings_review_edit_window_range'
+  ) then
+    alter table public.platform_settings
+      add constraint platform_settings_review_edit_window_range
+      check (review_edit_window_hours between 0 and 720);
+  end if;
+end $$;
+
+-- ============================================================
+-- 8 — Reviews: read policies now respect moderation
 -- ------------------------------------------------------------
 -- 0006's `for select using (true)` predates there being anything to hide. With a
 -- status column it would publish hidden reviews, so it is replaced by four
@@ -563,36 +599,6 @@ grant update (
 ) on public.reviews to authenticated;
 grant delete on public.reviews to authenticated;
 grant select, insert, update, delete on public.reviews to service_role;
-
--- ============================================================
--- 8 — Operator-tunable review policy
--- ============================================================
-alter table public.platform_settings
-  add column if not exists review_window_days integer not null default 14,
-  add column if not exists review_edit_window_hours integer not null default 48;
-
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint
-     where conrelid = 'public.platform_settings'::regclass
-       and conname  = 'platform_settings_review_window_days_range'
-  ) then
-    alter table public.platform_settings
-      add constraint platform_settings_review_window_days_range
-      check (review_window_days between 1 and 365);
-  end if;
-
-  if not exists (
-    select 1 from pg_constraint
-     where conrelid = 'public.platform_settings'::regclass
-       and conname  = 'platform_settings_review_edit_window_range'
-  ) then
-    alter table public.platform_settings
-      add constraint platform_settings_review_edit_window_range
-      check (review_edit_window_hours between 0 and 720);
-  end if;
-end $$;
 
 -- ============================================================
 -- 9 — Backfill the aggregate

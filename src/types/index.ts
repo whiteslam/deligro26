@@ -34,17 +34,34 @@ export interface Restaurant {
   cuisines: Cuisine[];
   rating: number;
   ratingCount: number;
+  /**
+   * The band the shop is quoting right now, door to door — the vendor's
+   * advertised numbers plus any live busy bump (migration 0036), resolved once
+   * in `mapRestaurant`. Surfaces render it verbatim; none of them apply the
+   * bump themselves, so none of them can forget to.
+   */
   etaMin: number;
   etaMax: number;
+  /** True while a busy bump is in force, so the band can be labelled not hidden. */
+  busy?: boolean;
+  /** Minutes the bump is adding. 0 when not busy. */
+  busyExtraMinutes?: number;
+  /** `restaurants.prep_minutes` — this kitchen's own leg. Null inherits the platform default. */
+  prepMinutes?: number | null;
   priceTier: PriceTier;
   costForTwo: number;
   /**
-   * Seeded, customer-independent distance. Only a fallback now: when the shop
-   * has been pinned (lat/lng below) the UI measures the real distance from the
-   * customer instead. Kept so shops that haven't pinned yet still show
-   * something.
+   * Seeded, customer-independent distance — from the shop's own row, not
+   * measured from anybody.
+   *
+   * Null when the row has none, which is the honest answer and is why this is
+   * nullable: it used to default to 2, so every unseeded shop claimed to be
+   * exactly 2 km from every customer. Nothing renders it — `ShopDistance`
+   * measures from `lat`/`lng` and shows nothing without a pin — so treat this as
+   * legacy seed data rather than a fallback to reach for. If you need a distance,
+   * use `distanceToShop`, and render nothing when it returns null.
    */
-  distanceKm: number;
+  distanceKm: number | null;
   /** Where the shop actually is — null until the vendor pins it on the map. */
   lat?: number | null;
   lng?: number | null;
@@ -68,15 +85,34 @@ export interface Restaurant {
 export interface Category {
   id: string;
   label: string;
+  /** Fallback for the tile — shown while the photo loads, or if it fails. */
   emoji: string;
+  /**
+   * The tile photograph. A curated default from `lib/taxonomy.ts`, or the
+   * operator's replacement from `category_images` (migration 0037) once one has
+   * been set — resolved by `lib/categories.ts`, never by the component.
+   */
+  image: string;
+  /** Gradient behind the photo, so the tile is never a grey hole. */
+  tint: string;
 }
 
 /**
  * A storefront type on the Stores tab (bakery, dairy, …) — not a food cuisine.
  * `tags` are the vendor cuisine tags that belong to the category, so a store
  * shows up under it as soon as it carries one of them.
+ *
+ * Deliberately no longer `extends Category`. It shared a shape by coincidence,
+ * and the coincidence ended when food categories gained photographs: a cuisine
+ * has an obvious picture (a plate of biryani), a category of SHOP does not —
+ * there is no honest single photo of "Pick & Drop". These tiles stay emoji, and
+ * saying so in the type stops the next change to one silently demanding
+ * something of the other.
  */
-export interface StoreCategory extends Category {
+export interface StoreCategory {
+  id: string;
+  label: string;
+  emoji: string;
   tags: string[];
 }
 

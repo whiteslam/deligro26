@@ -3,6 +3,7 @@ import { Phone, Mail, MessageCircle } from "lucide-react";
 import { ProfileSubpage } from "@/components/profile/profile-subpage";
 import { requireUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
+import { onlinePaymentsEnabled } from "@/lib/payments/availability";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,13 @@ function digits(s: string) {
   return s.replace(/[^\d]/g, "");
 }
 
+/**
+ * The answers that don't depend on configuration. "Payment methods" used to sit
+ * here too, as a constant reading "We currently support Cash on Delivery. Online
+ * payments are coming soon." — on a page that already loads live settings for
+ * its contact channels. The moment an admin enabled online payment, the official
+ * support answer told customers it didn't exist.
+ */
 const FAQ = [
   {
     q: "Where is my order?",
@@ -20,15 +28,28 @@ const FAQ = [
     q: "How do I cancel?",
     a: "You can cancel from the order tracking screen before the kitchen starts preparing your food.",
   },
-  {
-    q: "Payment methods",
-    a: "We currently support Cash on Delivery. Online payments are coming soon.",
-  },
 ];
 
 export default async function HelpPage() {
   await requireUser();
-  const s = await getSettings();
+  // Same gate the checkout and /api/orders use, not the raw toggle: what the
+  // customer can actually pay with depends on the admin switch AND the gateway
+  // keys, and answering from the switch alone would promise a method the order
+  // API would refuse.
+  const [s, onlinePayments] = await Promise.all([
+    getSettings(),
+    onlinePaymentsEnabled(),
+  ]);
+
+  const faq = [
+    ...FAQ,
+    {
+      q: "Payment methods",
+      a: onlinePayments
+        ? "You can pay cash on delivery, or online by card, UPI or netbanking at checkout. Some shops set a cash limit on larger orders — checkout will say so."
+        : "We currently accept Cash on Delivery. Online payment isn't available yet.",
+    },
+  ];
 
   const channels = [
     s.supportPhone && {
@@ -63,7 +84,7 @@ export default async function HelpPage() {
   return (
     <ProfileSubpage title="Help & support">
       <div className="space-y-3">
-        {FAQ.map((item) => (
+        {faq.map((item) => (
           <div key={item.q} className="card p-4">
             <h2 className="text-[15px] font-bold">{item.q}</h2>
             <p className="mt-1 text-sm leading-relaxed text-muted">{item.a}</p>

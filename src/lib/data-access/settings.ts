@@ -24,6 +24,22 @@ export class SettingsNotMigratedError extends Error {
   }
 }
 
+/**
+ * The table is there and we still could not read it — an RLS or grant
+ * regression, an unreachable database, a column the probes did not catch.
+ *
+ * Distinct from `SettingsNotMigratedError` because the two mean opposite
+ * things. "Not migrated" is a known state with a known answer: nothing is
+ * configured, so the defaults ARE the configuration. This one means we do not
+ * know what the admin configured, and the caller must not pretend otherwise.
+ */
+export class SettingsUnavailableError extends Error {
+  constructor(readonly cause?: unknown) {
+    super("settings_unavailable");
+    this.name = "SettingsUnavailableError";
+  }
+}
+
 function isMissingTable(
   error: { code?: string; message?: string } | null
 ): boolean {
@@ -189,18 +205,23 @@ export async function getSettingsFromDb(): Promise<PlatformSettings> {
 
   if (result.error) {
     // Checked BEFORE isMissingTable: PostgREST's missing-column message also
-    // contains "does not exist", so the table check would swallow it and hand
-    // back DEFAULT_SETTINGS — quietly billing default fees on a database whose
-    // admin had configured real ones. A missing column costs the one column.
-    //
-    // With the groups probed up front this should now be unreachable, so it is
-    // treated as the transient failure it must be rather than latched as a
-    // permanent absence.
-    if (isMissingColumn(result.error)) return DEFAULT_SETTINGS;
+    // contains "does not exist", so the table check would swallow it and report
+    // the wrong one of the two conditions. With the groups probed up front a
+    // missing column here should be unreachable, so it is a real fault.
+    if (isMissingColumn(result.error)) {
+      throw new SettingsUnavailableError(result.error);
+    }
     if (isMissingTable(result.error)) throw new SettingsNotMigratedError();
-    // A configured-but-failing read shouldn't crash the app it configures.
-    return DEFAULT_SETTINGS;
+    // Every other failure used to `return DEFAULT_SETTINGS`, which is not a
+    // fallback — it is an assertion, and a false one: "the fee is ₹29, the tax
+    // is 5%, there is no minimum, and the platform is open for business". On a
+    // database whose admin had paused ordering, that assertion un-paused it.
+    // Throw; `lib/settings.ts` decides how to fail, and it fails closed.
+    throw new SettingsUnavailableError(result.error);
   }
+  // Table present, no row: migration 0015 seeds one, so this is a database
+  // nobody has configured rather than one we cannot read. The defaults ARE the
+  // configuration in that state, which is why this is not a fault.
   if (!result.data) return DEFAULT_SETTINGS;
   return mapSettings(result.data as unknown as SettingsRow);
 }

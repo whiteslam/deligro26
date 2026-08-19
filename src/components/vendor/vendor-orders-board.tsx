@@ -11,6 +11,7 @@ import {
   ClipboardList,
   CreditCard,
   ExternalLink,
+  KeyRound,
   MapPin,
   Phone,
   Sparkles,
@@ -23,6 +24,9 @@ import { Button } from "@/components/ui/button";
 import { VendorSegmentedTabs } from "@/components/vendor/vendor-page-header";
 import { VendorOrderHistoryDialog } from "@/components/vendor/vendor-order-history-dialog";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
+import { KitchenAlert } from "@/components/vendor/kitchen-alert";
+import { KitchenBusyControl } from "@/components/vendor/kitchen-busy-control";
+import type { VendorPace } from "@/lib/data-access/vendor-restaurant";
 import {
   VendorEmptyState,
   VendorHero,
@@ -458,6 +462,24 @@ function ReadyList({
     <div className="space-y-3">
       {orders.map((o) => (
         <OrderCard key={o.id} order={o}>
+          {/* The counter's half of the handover. The rider cannot mark this
+              order collected without entering it, so reading it out is what
+              releases the food — and it is only read out to the courier who
+              actually turns up. It had never been shown anywhere: the column
+              has existed since migration 0006 with no UI, and the one attempt
+              at using it showed the code to the RIDER, who then did not have to
+              produce it for anyone. */}
+          {o.pickupOtp ? (
+            <div className="col-span-2 flex items-center justify-between gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2">
+              <span className="text-label flex items-center gap-1.5">
+                <KeyRound className="size-3.5" />
+                Read to the rider
+              </span>
+              <span className="text-data text-xl font-bold tracking-[0.3em]">
+                {o.pickupOtp}
+              </span>
+            </div>
+          ) : null}
           <Button
             variant="outline"
             size="sm"
@@ -663,6 +685,7 @@ export function VendorOrdersBoard({
   initialCancelled = [],
   live,
   restaurantName,
+  pace,
 }: {
   initialIncoming: KitchenOrder[];
   initialPreparing: KitchenOrder[];
@@ -671,6 +694,8 @@ export function VendorOrdersBoard({
   initialCancelled?: KitchenOrder[];
   live: boolean;
   restaurantName?: string;
+  /** Absent in demo mode, unsupported before migration 0036. */
+  pace?: VendorPace;
 }) {
   const [incoming, setIncoming] = useState(initialIncoming);
   const [preparing, setPreparing] = useState(initialPreparing);
@@ -813,7 +838,9 @@ export function VendorOrdersBoard({
 
   return (
     <>
-      {live ? <AutoRefresh interval={8000} /> : null}
+      {/* `whenHidden`: a kitchen tablet is usually on another tab or asleep,
+          which is precisely when an unnoticed order does the most damage. */}
+      {live ? <AutoRefresh interval={8000} whenHidden /> : null}
 
       <VendorHero
         live={live}
@@ -825,6 +852,20 @@ export function VendorOrdersBoard({
             : "Your restaurant order board."
         }
       />
+
+      {live ? (
+        <KitchenAlert
+          incomingIds={incoming.map((o) => o.id)}
+          restaurantName={restaurantName}
+        />
+      ) : null}
+
+      {live && pace?.supported ? (
+        <KitchenBusyControl
+          extraMinutes={pace.extraMinutes}
+          until={pace.until}
+        />
+      ) : null}
 
       {actionError ? (
         <div

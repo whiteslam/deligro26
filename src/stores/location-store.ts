@@ -16,7 +16,8 @@ import { PINNED_LOCATION } from "@/lib/location/pinned";
 export type LocationStatus =
   | "idle" // not asked yet
   | "loading" // waiting on the device
-  | "granted" // we have a fix
+  | "granted" // we have a current fix
+  | "stale" // restored from cache, older than CACHE_TTL_MS — usable, not current
   | "denied" // user/OS refused
   | "unsupported"; // no geolocation on this device
 
@@ -30,6 +31,13 @@ interface LocationState {
   label: string | null; // resolved area, e.g. "Bandra West"
   sublabel: string | null; // fuller line, e.g. "Mumbai, Maharashtra"
   coords: Coords | null;
+  /**
+   * How old `coords` is, in ms — null when they were just resolved, or when the
+   * age is unknowable (a cache entry written before timestamping existed).
+   * Surfaces that quote a distance use it to say so rather than presenting a
+   * weeks-old measurement as a live one.
+   */
+  coordsAgeMs: number | null;
   error: string | null;
   askOpen: boolean; // in-app permission explainer visibility
   blocked: boolean; // device/browser refused — only Settings can undo it
@@ -61,14 +69,46 @@ const GOOD_ACCURACY_M = 100; // sharp enough — stop waiting and use it
 const MAX_ACCURACY_M = 20_000; // coarser than this ≈ IP-level: don't trust the city
 const DETECT_TIMEOUT_MS = 12_000; // how long to let the fix sharpen before giving up
 
-function loadCache(): Partial<LocationState> | null {
+/**
+ * How long a restored fix is treated as current.
+ *
+ * The cache used to carry no timestamp at all, so no expiry was even
+ * expressible: a fix resolved in another city weeks ago was restored on open
+ * and adopted as `status: "granted"`, and every "1.2 km" on every card, the
+ * shop sort order, and the header were all measured from it with nothing to say
+ * how old it was. Twelve hours is roughly "since you last went out" — long
+ * enough that a normal day's use never re-prompts, short enough that a fix does
+ * not survive a journey.
+ */
+const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+
+interface CachedPlace {
+  label: string | null;
+  sublabel: string | null;
+  coords: Coords | null;
+  /** Absent on a cache written before this field existed — treated as expired. */
+  at?: number;
+}
+
+function loadCache(): CachedPlace | null {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    return JSON.parse(raw) as CachedPlace;
   } catch {
     return null;
   }
+}
+
+/** Age in ms, or null when the entry predates timestamping (i.e. unknowable). */
+function cacheAge(cached: CachedPlace | null): number | null {
+  if (!cached || typeof cached.at !== "number") return null;
+  return Date.now() - cached.at;
+}
+
+function cacheIsFresh(cached: CachedPlace | null): boolean {
+  const age = cacheAge(cached);
+  return age !== null && age < CACHE_TTL_MS;
 }
 
 function saveCache(data: {
@@ -77,7 +117,7 @@ function saveCache(data: {
   coords: Coords | null;
 }) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, at: Date.now() }));
   } catch {}
 }
 
@@ -117,6 +157,7 @@ export const useLocation = create<LocationState>((set, get) => ({
   label: PINNED_LOCATION.label,
   sublabel: PINNED_LOCATION.sublabel,
   coords: PINNED_LOCATION.coords,
+  coordsAgeMs: null,
   error: null,
   askOpen: false,
   blocked: false,
@@ -124,14 +165,22 @@ export const useLocation = create<LocationState>((set, get) => ({
   maybePrompt: async () => {
     if (typeof window === "undefined") return;
 
-    // Restore a previously resolved location so the header isn't empty.
+    // Restore a previously resolved location so the header isn't empty — but
+    // only claim it is current while it still is.
+    //
+    // A stale entry is still shown (an empty header helps nobody, and the last
+    // known area is usually right) and is NOT promoted to "granted": `stale`
+    // keeps distances rendering while letting the header say where the number
+    // came from, and the refresh below replaces it as soon as the device answers.
     const cached = loadCache();
+    const fresh = cacheIsFresh(cached);
     if (cached?.coords) {
       set({
-        status: "granted",
+        status: fresh ? "granted" : "stale",
         label: cached.label ?? null,
         sublabel: cached.sublabel ?? null,
         coords: cached.coords ?? null,
+        coordsAgeMs: cacheAge(cached),
       });
     }
 
@@ -178,7 +227,10 @@ export const useLocation = create<LocationState>((set, get) => ({
     // browsers), don't guess and pop a popup at someone who may already have
     // granted it: detect silently instead. A granted device resolves with no
     // UI at all; only a true first-timer sees the browser's own native prompt.
-    if (cached?.coords) return;
+    // A FRESH cache is answer enough — nothing to ask, nothing to re-detect.
+    // A stale one is not: it is why the header may be showing another city, so
+    // fall through and let the branches below refresh it.
+    if (cached?.coords && fresh) return;
 
     if (state === "prompt") {
       if (!alreadyAsked) set({ askOpen: true });
@@ -219,7 +271,13 @@ export const useLocation = create<LocationState>((set, get) => ({
         lng: pos.coords.longitude,
       };
       // Device said yes — drop the sheet and show what we have immediately.
-      set({ status: "granted", coords, askOpen: false, blocked: false });
+      set({
+        status: "granted",
+        coords,
+        coordsAgeMs: 0,
+        askOpen: false,
+        blocked: false,
+      });
 
       const place = await reverseGeocode(coords.lat, coords.lng);
       const next = {
@@ -228,7 +286,7 @@ export const useLocation = create<LocationState>((set, get) => ({
         coords,
       };
       saveCache(next);
-      set({ ...next, status: "granted" });
+      set({ ...next, status: "granted", coordsAgeMs: 0 });
     };
 
     // We watch instead of taking a single shot, because the first reading the
@@ -266,7 +324,10 @@ export const useLocation = create<LocationState>((set, get) => ({
         // place we don't trust; keep whatever we already show and invite the
         // user to set their area by hand.
         set({
-          status: get().coords ? "granted" : "idle",
+          // Keeps whatever we were showing at whatever standing it had: if that
+          // was a stale cached fix, a coarse reading is no reason to promote it
+          // to "current".
+          status: get().coords ? get().status : "idle",
           error:
             "We couldn't pinpoint you accurately. Pick your area for the right shops.",
         });
@@ -315,7 +376,15 @@ export const useLocation = create<LocationState>((set, get) => ({
     markAsked();
     const next = { label, sublabel, coords };
     saveCache(next);
-    set({ ...next, status: "granted", askOpen: false, blocked: false, error: null });
+    // Hand-picked, so it is current by definition — the customer just said so.
+    set({
+      ...next,
+      status: "granted",
+      coordsAgeMs: 0,
+      askOpen: false,
+      blocked: false,
+      error: null,
+    });
   },
 
   dismiss: () => {

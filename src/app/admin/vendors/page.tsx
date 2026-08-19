@@ -114,7 +114,7 @@ export default async function AdminVendorsPage({
 
       <ConsoleOnly
         tool="Vendor onboarding"
-        why="Approving, suspending and searching all work here."
+        why="Approving a signup, suspending a shop and searching the list all work on a phone — only adding a brand-new vendor needs the desk."
       />
 
       {/* ---------- the queue: the only part of this page with a clock on it ---------- */}

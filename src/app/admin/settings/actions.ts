@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { updateSettings } from "@/lib/data-access/settings";
+import { getSettingsSnapshot } from "@/lib/settings";
 import { DEFAULT_SETTINGS } from "@/lib/settings-defaults";
 import {
   CommissionNotMigratedError,
@@ -36,8 +37,12 @@ function bool(form: FormData, name: string): boolean {
   return form.get(name) === "on";
 }
 
-/** Read the settings form into the domain shape. Percentages → fractions. */
-function parse(form: FormData): PlatformSettings {
+/**
+ * Read the settings form into the domain shape. Percentages → fractions.
+ *
+ * `current` is what is stored right now, for fields the form no longer renders.
+ */
+function parse(form: FormData, current: PlatformSettings): PlatformSettings {
   const taxPct = num(form.get("taxRatePct"), 5);
   const commissionPct = num(form.get("riderCommissionPct"), 8);
   return {
@@ -56,7 +61,12 @@ function parse(form: FormData): PlatformSettings {
     acceptingOrders: bool(form, "acceptingOrders"),
     maintenanceMessage: str(form.get("maintenanceMessage")),
     featureGrocery: bool(form, "featureGrocery"),
-    featurePharmacy: bool(form, "featurePharmacy"),
+    // Carried through from what is stored, not read from the form: the pharmacy
+    // switch was removed because the vertical does not exist (see
+    // settings-form.tsx), and `bool()` on an absent checkbox returns false — so
+    // reading it would silently rewrite the column to false on every save.
+    // Untouched until something actually consumes it.
+    featurePharmacy: current.featurePharmacy,
     featurePickDrop: bool(form, "featurePickDrop"),
     featureOnlinePayment: bool(form, "featureOnlinePayment"),
 
@@ -108,8 +118,22 @@ export async function saveSettingsAction(
     num(form.get("commissionGstPct"), 0)
   );
 
+  // Read before write, for the fields this form no longer renders. If the
+  // settings row is currently unreadable this bails out rather than saving:
+  // `getSettings()` answers with fallback defaults during an outage (see
+  // lib/settings.ts), and writing those over a live configuration would turn a
+  // transient read failure into permanent data loss.
+  const snapshot = await getSettingsSnapshot();
+  if (snapshot.source === "unavailable") {
+    return {
+      ok: false,
+      error:
+        "Settings can't be read right now, so saving would overwrite your configuration with defaults. Reload and try again.",
+    };
+  }
+
   try {
-    await updateSettings(parse(form));
+    await updateSettings(parse(form, snapshot.settings));
   } catch {
     return { ok: false, error: "Couldn't save settings. Try again." };
   }

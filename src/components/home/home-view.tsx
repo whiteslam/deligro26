@@ -2,12 +2,17 @@
 
 import { useDeferredValue, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Search } from "lucide-react";
-import type { Banner, Order, Restaurant } from "@/types";
+import { ChevronRight, Search, TriangleAlert } from "lucide-react";
+import type { Banner, Category, Order, Restaurant } from "@/types";
 import { useLocation } from "@/stores/location-store";
 import { PINNED_LOCATION } from "@/lib/location/pinned";
 import { distanceToShop } from "@/lib/geo/distance";
-import { buildDishIndex, groupByShop, searchDishes } from "@/lib/search/dishes";
+import {
+  buildDishIndex,
+  groupByShop,
+  searchDishes,
+  type RankContext,
+} from "@/lib/search/dishes";
 import { HomeHeader, type SavedAddress } from "@/components/home/home-header";
 import { ActiveOrderStrip } from "@/components/home/active-order-strip";
 import { CategoryStrip } from "@/components/home/category-strip";
@@ -27,6 +32,9 @@ export function HomeView({
   banners,
   popular,
   nearby,
+  categories,
+  catalogFailed = false,
+  rotationSeed,
 }: {
   savedAddress: SavedAddress | null;
   restaurants: Restaurant[];
@@ -34,6 +42,16 @@ export function HomeView({
   banners: Banner[];
   popular: Restaurant[];
   nearby: Restaurant[];
+  /** Cuisine strip, pictures already resolved server-side. */
+  categories: Category[];
+  /** The catalog read failed — the lists below are empty but say nothing. */
+  catalogFailed?: boolean;
+  /**
+   * Today's date, from the server — see `lib/search/rotation.ts`. Passed in
+   * rather than read from the clock here so the server and client renders can
+   * never disagree about which day it is.
+   */
+  rotationSeed?: string;
 }) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
@@ -62,9 +80,17 @@ export function HomeView({
   // "who has X?" with the dish itself, and lists the kitchens underneath.
   const index = useMemo(() => buildDishIndex(restaurants), [restaurants]);
 
+  // The same origin the nearest-first shop list below already measures from, now
+  // also feeding dish ranking — until this was threaded through, the shop list
+  // was distance-aware and the food results were not.
+  const ctx = useMemo<RankContext>(
+    () => ({ origin, rotationSeed }),
+    [origin, rotationSeed]
+  );
+
   const dishes = useMemo(
-    () => (typed ? searchDishes(index, typed) : []),
-    [index, typed]
+    () => (typed ? searchDishes(index, typed, {}, "relevance", ctx) : []),
+    [index, typed, ctx]
   );
 
   const shops = useMemo(
@@ -147,7 +173,7 @@ export function HomeView({
 
           <section className="space-y-3">
             <h2 className="px-4 text-heading">Categories</h2>
-            <CategoryStrip />
+            <CategoryStrip categories={categories} />
           </section>
 
           <Section title="Popular right now" href="/search">
@@ -160,6 +186,19 @@ export function HomeView({
 
           {banners.length ? (
             <PromoBannerCarousel banners={banners} placement="home_hero" />
+          ) : null}
+
+          {/* Said before the empty lists below, not instead of them: a catalog
+              that failed to load renders identically to a city with no shops in
+              it, and only one of those is a statement we can stand behind. */}
+          {catalogFailed ? (
+            <div className="mx-4 flex items-start gap-2.5 rounded-2xl border border-deal/30 bg-deal-soft px-3 py-2.5 text-sm font-medium text-deal">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+              <span>
+                We couldn&apos;t load stores just now — this is a problem on our
+                side, not an empty neighbourhood. Pull to refresh in a moment.
+              </span>
+            </div>
           ) : null}
 
           <section className="space-y-3">

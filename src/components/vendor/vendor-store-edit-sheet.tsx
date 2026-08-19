@@ -31,6 +31,7 @@ type FormValues = {
   accentTint: string;
   etaMin: string;
   etaMax: string;
+  prepMinutes: string;
   costForTwo: string;
   priceTier: string;
 };
@@ -45,6 +46,7 @@ function toForm(r: VendorRestaurantDetail): FormValues {
     accentTint: r.accentTint ?? "",
     etaMin: r.etaMin != null ? String(r.etaMin) : "",
     etaMax: r.etaMax != null ? String(r.etaMax) : "",
+    prepMinutes: r.prepMinutes != null ? String(r.prepMinutes) : "",
     costForTwo: r.costForTwo != null ? String(r.costForTwo) : "",
     priceTier: String(r.priceTier || 2),
   };
@@ -142,6 +144,18 @@ export function VendorStoreEditSheet({
       setError("Invalid cost for two.");
       return;
     }
+    // Blank means "inherit the platform default", which is a real choice — so
+    // it stays null rather than being coerced to a number.
+    const prepMinutes = values.prepMinutes.trim()
+      ? Math.round(Number(values.prepMinutes))
+      : null;
+    if (
+      prepMinutes != null &&
+      (!Number.isFinite(prepMinutes) || prepMinutes < 1 || prepMinutes > 180)
+    ) {
+      setError("Kitchen time must be between 1 and 180 minutes.");
+      return;
+    }
 
     const cuisines = values.cuisines
       .split(",")
@@ -159,6 +173,7 @@ export function VendorStoreEditSheet({
           accentTint: values.accentTint || null,
           etaMin,
           etaMax,
+          prepMinutes,
           costForTwo,
           priceTier: Number(values.priceTier) || 2,
         });
@@ -312,6 +327,24 @@ export function VendorStoreEditSheet({
               />
             </label>
           </div>
+
+          <label className="block space-y-1.5">
+            <span className="text-label">Kitchen time (min)</span>
+            <input
+              type="number"
+              min={1}
+              max={180}
+              value={values.prepMinutes}
+              onChange={(e) => set("prepMinutes", e.target.value)}
+              className={INPUT}
+              placeholder="Platform default"
+            />
+            <span className="block text-xs text-muted">
+              How long your kitchen takes, before the ride. Splits the band above
+              into cooking and delivery so live tracking can tell them apart.
+              Leave blank to use the platform default.
+            </span>
+          </label>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-1.5">

@@ -79,7 +79,11 @@ export default async function NewSettlementPage({
       {/* Console-only: a vendor picker, an IST range and a four-column preview
           of every order in the run. Composing a money-movement batch is not
           triage — reading settlements on a phone is (see /admin/settlements). */}
-      <ConsoleOnly variant="page" tool="Building a settlement">
+      <ConsoleOnly
+        variant="page"
+        tool="Building a settlement"
+        why="Picking a vendor, a date range and every order in the run is desk work. Reading and tracking payouts already raised works on a phone."
+      >
         <NewSettlementForm
           vendors={vendors}
           restaurantId={restaurantId}

@@ -28,6 +28,7 @@ import type {
   EarningsRange,
   VendorEarningsSummary,
 } from "@/lib/data-access/vendor-earnings";
+import type { VendorSettlementEstimate } from "@/lib/settlements/math";
 import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
@@ -190,7 +191,10 @@ function Donut({
   );
 }
 
-function exportEarningsCsv(stats: VendorEarningsSummary) {
+function exportEarningsCsv(
+  stats: VendorEarningsSummary,
+  settlement: VendorSettlementEstimate | null
+) {
   const lines = [
     "section,label,a,b",
     `summary,range,${JSON.stringify(stats.rangeLabel)},`,
@@ -202,6 +206,26 @@ function exportEarningsCsv(stats: VendorEarningsSummary) {
     `summary,tax,${stats.taxAmount},`,
     `summary,cancelled_value,${stats.cancelledValue},`,
     `summary,delivered_revenue,${stats.deliveredRevenue},`,
+    // The payout, not just the revenue. An accountant reconciling a remittance
+    // against a file of gross figures will find a gap the size of the
+    // commission, its GST and the fees — which is what the old "use delivered
+    // revenue as your settlement estimate" note set them up to do.
+    ...(settlement
+      ? [
+          "settlement,label,amount,",
+          `settlement,orders,${settlement.orderCount},`,
+          `settlement,customer_paid,${settlement.grossRevenue},`,
+          `settlement,food_value,${settlement.foodGross},`,
+          `settlement,commission_pct,${settlement.commissionPct},`,
+          `settlement,commission,${-settlement.commission},`,
+          `settlement,commission_gst_pct,${settlement.commissionGstPct},`,
+          `settlement,commission_gst,${-settlement.commissionGst},`,
+          `settlement,other_charges,${-settlement.otherCharges},`,
+          `settlement,refunds_recovered,${-settlement.refundsRecovered},`,
+          `settlement,net_payable,${settlement.netPayable},`,
+          `settlement,already_settled_orders,${settlement.settledCount},`,
+        ]
+      : ["settlement,unavailable,,"]),
     "series,label,revenue,orders",
     ...stats.series.map(
       (p) => `series,${JSON.stringify(p.label)},${p.revenue},${p.orders}`
@@ -225,11 +249,15 @@ function exportEarningsCsv(stats: VendorEarningsSummary) {
 export function VendorEarningsCharts({
   restaurantName,
   initialStats,
+  initialSettlement = null,
 }: {
   restaurantName?: string;
   initialStats: VendorEarningsSummary;
+  /** Null when the payout engine could not be read — the panel says so. */
+  initialSettlement?: VendorSettlementEstimate | null;
 }) {
   const [stats, setStats] = useState(initialStats);
+  const [settlement, setSettlement] = useState(initialSettlement);
   const [range, setRange] = useState<EarningsRange>(initialStats.range);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -241,6 +269,7 @@ export function VendorEarningsCharts({
   if (adopted !== initialStats) {
     setAdopted(initialStats);
     setStats(initialStats);
+    setSettlement(initialSettlement);
     setRange(initialStats.range);
   }
 
@@ -252,8 +281,11 @@ export function VendorEarningsCharts({
       try {
         const res = await fetch(`/api/vendor/earnings?range=${next}`);
         if (!res.ok) throw new Error("failed");
-        const data = (await res.json()) as VendorEarningsSummary;
+        const data = (await res.json()) as VendorEarningsSummary & {
+          settlement?: VendorSettlementEstimate | null;
+        };
         setStats(data);
+        setSettlement(data.settlement ?? null);
       } catch {
         setError("Could not load that period. Try again.");
       }
@@ -346,7 +378,7 @@ export function VendorEarningsCharts({
           variant="outline"
           size="sm"
           className="shrink-0"
-          onClick={() => exportEarningsCsv(stats)}
+          onClick={() => exportEarningsCsv(stats, settlement)}
         >
           <Download className="size-4" /> Export CSV
         </Button>
@@ -722,28 +754,154 @@ export function VendorEarningsCharts({
             Managed by Deligro admin · not shown to partners yet
           </p>
         </VendorPanel>
-        <VendorPanel title="Settlement">
-          <p className="text-sm leading-relaxed text-muted">
-            Payouts land after delivered orders clear. Bank settlement is
-            configured by Deligro ops.
-          </p>
+        <VendorPanel title="Your payout (est.)">
+          {settlement ? (
+            <>
+              <p className="text-data text-xl font-bold text-green">
+                {formatINR(settlement.netPayable)}
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                {settlement.orderCount} unsettled
+                {settlement.settledCount > 0
+                  ? ` · ${settlement.settledCount} already paid`
+                  : ""}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm leading-relaxed text-muted">
+              Payout terms unavailable right now — see the note below.
+            </p>
+          )}
         </VendorPanel>
       </div>
 
+      {/* This panel used to read "Bank payouts are not configured in Deligro
+          yet" and tell the vendor to use delivered revenue as their settlement
+          estimate. Both halves were wrong. The payout engine exists and is what
+          Deligro actually pays from (per-order food value, commission, GST on
+          commission, other charges, refund recovery). And delivered revenue is
+          the sum of `orders.total` — it includes the delivery fee and the
+          customer's GST and deducts no commission, so a vendor reconciling
+          against it over-forecast their payout by roughly the commission plus
+          its GST plus the fees, and was right to dispute the remittance.
+
+          The same figures, from the same functions, now appear on both sides. */}
       <VendorPanel
-        title="Settlement note"
-        subtitle="Bank payouts are not configured in Deligro yet"
+        title="Settlement estimate"
+        subtitle={
+          settlement
+            ? `Delivered and not yet paid out, in ${stats.rangeLabel.toLowerCase()}`
+            : "Payout terms could not be read"
+        }
         action={<IndianRupee className="size-4 text-muted" />}
       >
-        <p className="text-sm text-muted">
-          Delivered revenue in this period is{" "}
-          <span className="text-data font-bold text-ink">
-            {formatINR(stats.deliveredRevenue)}
-          </span>
-          . Use this as your settlement estimate until payouts go live. Export
-          CSV for your accountant.
-        </p>
+        {settlement ? (
+          <div className="space-y-3">
+            <dl className="space-y-1.5 text-sm">
+              <SettlementRow
+                label="Customer paid"
+                value={settlement.grossRevenue}
+                muted
+                note={`${settlement.orderCount} delivered orders`}
+              />
+              <SettlementRow
+                label="Less delivery fees, taxes and tips"
+                value={-(settlement.grossRevenue - settlement.foodGross)}
+                muted
+                note="Not the shop's to keep"
+              />
+              <SettlementRow
+                label="Food value"
+                value={settlement.foodGross}
+                strong
+              />
+              <SettlementRow
+                label={`Platform commission (${settlement.commissionPct}%)`}
+                value={-settlement.commission}
+                muted
+              />
+              {settlement.commissionGst > 0 ? (
+                <SettlementRow
+                  label={`GST on commission (${settlement.commissionGstPct}%)`}
+                  value={-settlement.commissionGst}
+                  muted
+                />
+              ) : null}
+              {settlement.otherCharges > 0 ? (
+                <SettlementRow
+                  label="Other charges"
+                  value={-settlement.otherCharges}
+                  muted
+                  note={`${formatINR(settlement.otherChargesPerOrder)} per order`}
+                />
+              ) : null}
+              {settlement.refundsRecovered > 0 ? (
+                <SettlementRow
+                  label="Refunds recovered"
+                  value={-settlement.refundsRecovered}
+                  muted
+                />
+              ) : null}
+              <div className="border-t border-line pt-1.5">
+                <SettlementRow
+                  label="Estimated payout"
+                  value={settlement.netPayable}
+                  strong
+                />
+              </div>
+            </dl>
+            <p className="text-xs leading-relaxed text-muted">
+              An estimate because orders can still be refunded and the period
+              isn&apos;t closed — but it is computed by the same code that builds
+              your statement, so it will not drift from what you are paid.
+              Negative figures are cash-on-delivery orders where the shop already
+              holds the money and Deligro recovers its deductions.
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm leading-relaxed text-muted">
+            We couldn&apos;t read your payout terms just now, so this period&apos;s
+            estimate isn&apos;t shown. It is deliberately left blank rather than
+            filled with revenue, which is not what you are paid. Reload, or ask
+            Deligro ops if it persists.
+          </p>
+        )}
       </VendorPanel>
     </>
+  );
+}
+
+/** One line of the payout subtraction. Negatives render as deductions. */
+function SettlementRow({
+  label,
+  value,
+  note,
+  muted,
+  strong,
+}: {
+  label: string;
+  value: number;
+  note?: string;
+  muted?: boolean;
+  strong?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className={cn("min-w-0", muted && "text-muted")}>
+        {label}
+        {note ? (
+          <span className="block text-[11px] text-muted">{note}</span>
+        ) : null}
+      </dt>
+      <dd
+        className={cn(
+          "text-data shrink-0 tabular-nums",
+          strong ? "font-bold" : muted && "text-muted",
+          value < 0 && "text-muted"
+        )}
+      >
+        {value < 0 ? `− ${formatINR(Math.abs(value))}` : formatINR(value)}
+      </dd>
+    </div>
   );
 }

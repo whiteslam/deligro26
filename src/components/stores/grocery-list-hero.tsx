@@ -16,8 +16,23 @@ import {
  * Sits above the grocery stores on the Stores tab.
  */
 
-// Business WhatsApp number in international format, digits only (no +).
-const WHATSAPP_NUMBER = "918234888856";
+/**
+ * Fallback business WhatsApp, in international format, digits only (no +).
+ *
+ * Only reached when `platform_settings.support_whatsapp` is blank. It used to be
+ * the ONLY number: all three grocery entry points sent orders here, while the
+ * admin-editable setting — correctly used on the Help page — controlled nothing.
+ * A change of business number, an ops handover or a second city meant grocery
+ * orders kept arriving somewhere nobody was watching, with no way to redirect
+ * them short of a deploy.
+ */
+const FALLBACK_WHATSAPP_NUMBER = "918234888856";
+
+/** wa.me wants digits only. A stored "+91 82348 88856" has to be stripped. */
+function toWaNumber(configured: string | undefined): string {
+  const digits = (configured ?? "").replace(/\D/g, "");
+  return digits.length >= 10 ? digits : FALLBACK_WHATSAPP_NUMBER;
+}
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB, matching the avatar upload limit
 const OK_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -52,9 +67,13 @@ function WhatsAppIcon({ className }: { className?: string }) {
 
 export function GroceryListHero({
   savedAddress,
+  whatsappNumber,
 }: {
   savedAddress: SavedAddress;
+  /** `platform_settings.support_whatsapp`. Falls back when blank. */
+  whatsappNumber?: string;
 }) {
+  const waNumber = toWaNumber(whatsappNumber);
   const [note, setNote] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -78,7 +97,7 @@ export function GroceryListHero({
   }
 
   function openWhatsApp(text: string) {
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+    const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   }
 

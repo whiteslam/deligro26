@@ -6,7 +6,11 @@ import {
   listKitchenOrders,
   listVendorOrderHistory,
 } from "@/lib/data-access/vendor-orders";
-import { resolveVendorRestaurant } from "@/lib/data-access/vendor-restaurant";
+import {
+  getVendorPace,
+  resolveVendorRestaurant,
+  type VendorPace,
+} from "@/lib/data-access/vendor-restaurant";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { KitchenOrder } from "@/lib/roles-data";
 
@@ -66,6 +70,8 @@ export default async function VendorOrdersPage() {
   let ready: KitchenOrder[] = [];
   let recent: KitchenOrder[] = [];
   let cancelled: KitchenOrder[] = [];
+  // Soft: an un-migrated database simply doesn't offer the busy control.
+  let pace: VendorPace = { extraMinutes: 0, until: null, supported: false };
 
   try {
     const board = await listKitchenOrders(restaurant.id);
@@ -75,6 +81,7 @@ export default async function VendorOrdersPage() {
     const history = await listVendorOrderHistory(restaurant.id);
     recent = history.completed;
     cancelled = history.cancelled;
+    pace = await getVendorPace(restaurant.id).catch(() => pace);
   } catch {
     return (
       <div className="space-y-6">
@@ -95,6 +102,7 @@ export default async function VendorOrdersPage() {
       initialCancelled={cancelled}
       live
       restaurantName={restaurant.name}
+      pace={pace}
     />
   );
 }

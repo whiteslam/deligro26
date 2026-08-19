@@ -96,7 +96,7 @@ export default async function AdminBannersPage() {
           Authoring one — creative, placements, schedule — is not. */}
       <ConsoleOnly
         tool="Designing a campaign"
-        why="Pausing or ending a running one works here."
+        why="Pausing or ending a campaign that is already running — the urgent half — works on a phone, from the list below."
       />
 
       {!backendReady ? (

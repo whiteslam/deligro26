@@ -3,8 +3,18 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CartLine, MenuItem } from "@/types";
-import { DELIVERY_FEE, TAX_RATE } from "@/lib/pricing";
 
+/**
+ * The basket's contents — and nothing about what they cost beyond the line
+ * subtotal.
+ *
+ * This store used to carry `deliveryFee()`, `taxes()` and `total()` computed
+ * from the pricing.ts constants. Nothing read them, so they were a fee/tax
+ * definition that could silently drift from the one being billed — see the
+ * header of `lib/pricing.ts`. Charges are computed from the live platform
+ * settings at the point they are shown (`useChargesConfig` +
+ * `computeChargesWith`) and recomputed server-side in `createOrder`.
+ */
 
 interface CartState {
   restaurantSlug: string | null;
@@ -17,9 +27,6 @@ interface CartState {
   qtyOf: (itemId: string) => number;
   count: () => number;
   subtotal: () => number;
-  deliveryFee: () => number;
-  taxes: () => number;
-  total: () => number;
   reorder: (
     restaurant: { slug: string; name: string },
     lines: CartLine[]
@@ -93,12 +100,6 @@ export const useCart = create<CartState>()(
 
       subtotal: () =>
         get().lines.reduce((sum, l) => sum + l.price * l.qty, 0),
-
-      deliveryFee: () => (get().lines.length ? DELIVERY_FEE : 0),
-
-      taxes: () => Math.round(get().subtotal() * TAX_RATE),
-
-      total: () => get().subtotal() + get().deliveryFee() + get().taxes(),
 
       reorder: (restaurant, lines) =>
         set({

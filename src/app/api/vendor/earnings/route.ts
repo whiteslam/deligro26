@@ -4,7 +4,9 @@ import { hasVendorAccess } from "@/lib/auth/vendor-access";
 import {
   getVendorEarningsSummary,
   isEarningsRange,
+  resolveEarningsWindow,
 } from "@/lib/data-access/vendor-earnings";
+import { settlementEstimateFor } from "@/lib/data-access/admin-settlements";
 import { resolveVendorRestaurant } from "@/lib/data-access/vendor-restaurant";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -30,8 +32,19 @@ export async function GET(request: Request) {
   }
 
   try {
-    const summary = await getVendorEarningsSummary(restaurant.id, rangeParam);
-    return NextResponse.json(summary);
+    const window = resolveEarningsWindow(rangeParam);
+    const [summary, settlement] = await Promise.all([
+      getVendorEarningsSummary(restaurant.id, rangeParam),
+      // Same authorization as the page: vendor access, own restaurant, id
+      // resolved from the session rather than accepted from the caller. Soft
+      // failure — the panel says so rather than quoting revenue as a payout.
+      settlementEstimateFor({
+        restaurantId: restaurant.id,
+        from: window.start,
+        to: window.end,
+      }).catch(() => null),
+    ]);
+    return NextResponse.json({ ...summary, settlement });
   } catch {
     return NextResponse.json({ error: "load_failed" }, { status: 500 });
   }

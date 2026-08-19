@@ -1,14 +1,13 @@
-import type {
-  Address,
-  Banner,
-  Category,
-  Order,
-  Restaurant,
-  StoreCategory,
-} from "@/types";
+import type { Address, Banner, Order, Restaurant } from "@/types";
 
 /* ============================================================
    Static mock data — Phase 1 (UI/UX only, no backend).
+
+   Every export here is a DEMO FIXTURE. Each is reachable only behind
+   `!isSupabaseConfigured`, which throws at boot in a production build (see
+   supabase/config.ts) — so none of it can be served to a real customer. The two
+   exports that were genuinely live have moved to `lib/taxonomy.ts`; nothing in
+   this file should be imported without a demo-mode guard above it.
    Food photography "supplies the color". Images are served from
    Unsplash; the per-restaurant gradient tint stays underneath as the
    backdrop while each photo loads.
@@ -58,31 +57,15 @@ const DEFAULT_UNSPLASH = "photo-1504674900247-0877df9cc836";
 const px = (id: number, w = 800) =>
   `https://images.unsplash.com/${UNSPLASH_BY_LEGACY_ID[id] ?? DEFAULT_UNSPLASH}?w=${w}&q=80&auto=format&fit=crop`;
 
-export const CATEGORIES: Category[] = [
-  { id: "biryani", label: "Biryani", emoji: "🍚" },
-  { id: "pizza", label: "Pizza", emoji: "🍕" },
-  { id: "healthy", label: "Healthy", emoji: "🥗" },
-  { id: "burgers", label: "Burgers", emoji: "🍔" },
-  { id: "chinese", label: "Chinese", emoji: "🥡" },
-  { id: "desserts", label: "Desserts", emoji: "🍰" },
-  { id: "south", label: "South Indian", emoji: "🥞" },
-  { id: "rolls", label: "Rolls", emoji: "🌯" },
-];
-
-/**
- * The Stores tab taxonomy. A store lands in a category when one of its cuisine
- * tags matches — so onboarding a bakery means tagging it "Bakery", nothing more.
- * "Pick & Drop" is an errand service rather than a storefront, which is why it
- * has no food tags of its own.
+/*
+ * `CATEGORIES` and `STORE_CATEGORIES` used to be declared here. They have moved
+ * to `lib/taxonomy.ts`, because they were the only things in this file that are
+ * not mock data: everything below is a demo fixture behind
+ * `!isSupabaseConfigured`, while those two rendered for every customer on every
+ * visit regardless of backend. Keeping live taxonomy in a file headed "Static
+ * mock data" made the fixtures look load-bearing and the taxonomy look
+ * disposable, which is backwards.
  */
-export const STORE_CATEGORIES: StoreCategory[] = [
-  { id: "bakery", label: "Bakery", emoji: "🥐", tags: ["Bakery", "Desserts"] },
-  { id: "dairy", label: "Dairy", emoji: "🥛", tags: ["Dairy"] },
-  { id: "groceries", label: "Groceries", emoji: "🛒", tags: ["Groceries", "Kirana"] },
-  { id: "pick-drop", label: "Pick & Drop", emoji: "🛵", tags: ["Pick & Drop"] },
-  { id: "raw-meat", label: "Raw Meat", emoji: "🍗", tags: ["Raw Meat", "Meat", "Fish"] },
-  { id: "chowpaty", label: "Chowpaty", emoji: "🍧", tags: ["Chowpaty", "Street Food", "Chaat"] },
-];
 
 export const RESTAURANTS: Restaurant[] = [
   {

@@ -3,7 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { shortOrderId } from "@/lib/utils/order-map";
 import { notifyOnTheWay, notifyDelivered } from "@/lib/notifications/order-events";
 import type { DeliveryJob } from "@/lib/roles-data";
-import { riderPayout } from "@/lib/pricing";
+import { riderPayout, type RiderPayoutConfig } from "@/lib/pricing";
+import { getSettings } from "@/lib/settings";
 import { haversineKm } from "@/lib/geo/distance";
 import { PINNED_LOCATION } from "@/lib/location/pinned";
 import {
@@ -58,14 +59,43 @@ export interface DriverActive {
    */
   payment: DriverPayment;
   /**
-   * orders.pickup_otp — the code the rider reads to the kitchen at handover,
-   * the symmetric half of the delivery code the customer reads back at the
-   * door. The column has existed since 0006 and has never had any UI.
+   * Whether this leg is gated by the kitchen's handover code.
    *
-   * Null once the food is collected: a spent code is not worth carrying to the
-   * customer's doorstep. And nothing verifies it — see `advanceDelivery`.
+   * NOT the code itself, and that inversion is the fix. The rider used to be
+   * SHOWN `orders.pickup_otp` to read out at the counter, while
+   * `advanceDelivery` wrote `picked_up` without checking it — so a rider could
+   * mark an order collected without ever visiting the shop, starting the
+   * customer's road-leg ETA from a departure that never happened and pushing the
+   * order to `on_the_way` on the kitchen board.
+   *
+   * Now the CODE is shown to the vendor, on the packed order, and the rider
+   * types what the counter reads to them — the same shape as the delivery leg,
+   * where the customer holds the code and the rider enters it. Possession of the
+   * code is then evidence of having been there, which is the only thing that
+   * made it worth having.
+   *
+   * False on a database whose order has no code recorded, where the leg stays
+   * ungated rather than becoming impossible to complete.
    */
-  pickupOtp: string | null;
+  pickupCodeRequired: boolean;
+  /**
+   * Where THIS leg ends — the shop before pickup, the customer's pin after.
+   * Feeds the Navigate control, which was a button with no handler.
+   *
+   * Null when that end has never been pinned (or on a database predating
+   * migration 0009, which has no shop coordinates at all). The control renders
+   * disabled in that case rather than pretending to work.
+   */
+  navigateTo: { lat: number; lng: number } | null;
+  /**
+   * The customer's phone, for the Call control — which was likewise inert.
+   *
+   * On the ACTIVE delivery only, and read in its own query rather than added to
+   * `ORDER_SELECT`, for the same reason `pickupOtp` is: that column list also
+   * feeds the available pool, and every customer's number is not something to
+   * ship to every rider who opens the board.
+   */
+  customerPhone: string | null;
 }
 
 export interface DriverBoardData {
@@ -84,18 +114,27 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 }
 
 /**
- * What the rider is paid for this order. The commission is taken on the FOOD
- * subtotal (total minus the fee, the tax and the tip) — it used to be taken on
- * the gross, so riders were being paid a percentage of the customer's GST — and
- * the tip is then passed through in full.
+ * What the rider is paid for this order, at the rate the admin configured.
+ *
+ * The commission is taken on the FOOD subtotal (total minus the fee, the tax
+ * and the tip) — it used to be taken on the gross, so riders were being paid a
+ * percentage of the customer's GST — and the tip is then passed through in full.
+ *
+ * `rate` comes from `platform_settings`. It used to come from the pricing.ts
+ * constants, which meant `rider_commission` and `rider_min_payout` were editable
+ * in the admin form, validated, clamped, written to the database, and read by
+ * nothing: a rate change saved successfully and paid nobody differently.
  */
-function payoutFor(r: Pick<OrderRow, "total" | "delivery_fee" | "tax_amount" | "tip">): number {
+function payoutFor(
+  r: Pick<OrderRow, "total" | "delivery_fee" | "tax_amount" | "tip">,
+  rate: RiderPayoutConfig
+): number {
   const tip = r.tip ?? 0;
   const itemSubtotal = Math.max(
     0,
     (r.total ?? 0) - (r.delivery_fee ?? 0) - (r.tax_amount ?? 0) - tip
   );
-  return riderPayout({ itemSubtotal, tip });
+  return riderPayout(rate, { itemSubtotal, tip });
 }
 
 interface OrderRow {
@@ -129,7 +168,7 @@ function jobDistance(r: OrderRow): number | undefined {
   return Math.round(haversineKm(from, to) * 10) / 10;
 }
 
-function toJob(r: OrderRow): DeliveryJob {
+function toJob(r: OrderRow, rate: RiderPayoutConfig): DeliveryJob {
   const restaurant = one(r.restaurants)?.name ?? "Kitchen";
   const customer = one(r.profiles)?.full_name?.trim() || "Customer";
   const items = (r.order_items ?? []).reduce((n, i) => n + i.qty, 0);
@@ -141,7 +180,7 @@ function toJob(r: OrderRow): DeliveryJob {
     dropArea: r.address?.label ?? r.address?.line ?? "Delivery",
     // Was hardcoded to 2.5 for every job, on every screen, forever.
     distanceKm: jobDistance(r),
-    payout: payoutFor(r),
+    payout: payoutFor(r, rate),
     items,
     customer,
   };
@@ -251,6 +290,38 @@ async function activeOrderDetail(
   return shape(data, false);
 }
 
+/** A pin, or null when this end has never been placed on a map. */
+function pointOf(
+  lat: number | null | undefined,
+  lng: number | null | undefined
+): { lat: number; lng: number } | null {
+  if (typeof lat !== "number" || typeof lng !== "number") return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
+/**
+ * The customer's number for one claimed order.
+ *
+ * Its own query, scoped to the order the rider is actually carrying. Failure is
+ * soft: a rider whose Call button is disabled is worse off than one who can
+ * call, but not as badly off as one whose whole board fails to load.
+ */
+async function activeCustomerPhone(
+  supabase: AdminClient,
+  orderId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("profiles(phone)")
+    .eq("id", orderId)
+    .maybeSingle()
+    .overrideTypes<{ profiles: { phone: string | null } | { phone: string | null }[] | null }>();
+
+  if (error) return null;
+  return one(data?.profiles)?.phone?.trim() || null;
+}
+
 /** Cash-at-the-door, decided from what the database actually knows. */
 function paymentInstruction(detail: ActiveOrderDetail): CashInstruction {
   // We asked and got nothing. No opinion, and no guessing: collecting from
@@ -280,6 +351,16 @@ function paymentInstruction(detail: ActiveOrderDetail): CashInstruction {
 export async function getDriverBoard(driverId: string): Promise<DriverBoardData> {
   const supabase = createAdminClient();
 
+  // One read for the whole board, so every number on it — each offer card's
+  // payout and the day's earnings total — is quoted at the same configured
+  // rate. `getSettings()` is request-cached and falls back to the shared
+  // defaults on an un-migrated database.
+  const settings = await getSettings();
+  const rate: RiderPayoutConfig = {
+    commission: settings.riderCommission,
+    minPayout: settings.riderMinPayout,
+  };
+
   // Active delivery for this driver (assigned or picked up).
   type ActiveRow = { status: string; order: OrderRow | OrderRow[] | null };
   const activeRows = await selectJobs<ActiveRow[]>((columns) =>
@@ -299,11 +380,15 @@ export async function getDriverBoard(driverId: string): Promise<DriverBoardData>
     const order = one(activeRow.order);
     if (order) {
       const leg: Leg = activeRow.status === "picked_up" ? "TO_CUSTOMER" : "TO_PICKUP";
-      const detail = await activeOrderDetail(supabase, order.id);
+      const [detail, customerPhone] = await Promise.all([
+        activeOrderDetail(supabase, order.id),
+        activeCustomerPhone(supabase, order.id),
+      ]);
       const instruction = paymentInstruction(detail);
 
+      const shop = one(order.restaurants);
       active = {
-        job: toJob(order),
+        job: toJob(order, rate),
         leg,
         payment: {
           instruction,
@@ -311,7 +396,13 @@ export async function getDriverBoard(driverId: string): Promise<DriverBoardData>
           // includes the tip, which on a cash order the rider also collects.
           collectAmount: instruction === "collect" ? (order.total ?? 0) : 0,
         },
-        pickupOtp: leg === "TO_PICKUP" ? detail.pickupOtp : null,
+        pickupCodeRequired:
+          leg === "TO_PICKUP" && Boolean(detail.pickupOtp?.trim()),
+        navigateTo:
+          leg === "TO_PICKUP"
+            ? pointOf(shop?.lat, shop?.lng)
+            : pointOf(order.address?.lat, order.address?.lng),
+        customerPhone,
       };
     }
   }
@@ -334,7 +425,7 @@ export async function getDriverBoard(driverId: string): Promise<DriverBoardData>
 
   const available = (readyRows ?? [])
     .filter((r) => !takenIds.has(r.id))
-    .map(toJob);
+    .map((r) => toJob(r, rate));
 
   // Today's completed trips + earnings for this driver.
   const startOfDay = new Date();
@@ -359,7 +450,7 @@ export async function getDriverBoard(driverId: string): Promise<DriverBoardData>
   const done = doneRows ?? [];
   const earnings = done.reduce((sum, d) => {
     const order = one(d.order);
-    return sum + (order ? payoutFor(order) : 0);
+    return sum + (order ? payoutFor(order, rate) : 0);
   }, 0);
 
   return {
@@ -537,15 +628,30 @@ export async function advanceDelivery(
   if (!delivery) return { ok: false, error: "not_found" };
 
   if (delivery.status === "assigned") {
-    // Picked up → order is on the way.
+    // Picked up → order is on the way, gated by the kitchen's handover code.
     //
-    // Note what this transition does NOT check: orders.pickup_otp. The board now
-    // shows the rider that code so they can read it to the counter, but nothing
-    // here verifies it, because the half that would — the kitchen confirming the
-    // code it was given — has no UI on the vendor side yet. It is an aid to the
-    // handover, not a gate on it, and the rider can still mark a pickup without
-    // ever having stood at the shop. The delivery leg below is the one that is
-    // actually gated.
+    // This transition used to check nothing. The rider was shown
+    // `orders.pickup_otp` to read to the counter and could then mark the pickup
+    // from anywhere, so the customer's road-leg ETA started from a departure
+    // that may not have happened and the kitchen board moved to `on_the_way`
+    // for food still sitting on the pass. The code is now the vendor's — shown
+    // on their packed order — and the rider enters what they are told, which
+    // makes possessing it evidence of having stood at the shop.
+    //
+    // An order with no code recorded stays ungated: refusing would strand a
+    // rider holding real food, and a pre-0006 row genuinely has nothing to
+    // check against.
+    const { data: order } = await supabase
+      .from("orders")
+      .select("pickup_otp")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    const expected = (order?.pickup_otp ?? "").replace(/\D/g, "");
+    if (expected && (otp ?? "").replace(/\D/g, "") !== expected) {
+      return { ok: false, error: "bad_pickup_otp" };
+    }
+
     await supabase
       .from("deliveries")
       .update({

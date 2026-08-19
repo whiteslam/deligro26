@@ -3,6 +3,7 @@ import {
   FileSpreadsheet,
   HandCoins,
   ImageIcon,
+  Images,
   LayoutDashboard,
   ListOrdered,
   Megaphone,
@@ -166,6 +167,14 @@ export const ADMIN_NAV: AdminNavItem[] = [
     group: "People",
     tone: "blue",
     match: (p) => p.startsWith("/admin/settings/employees"),
+  },
+  {
+    href: "/admin/settings/categories",
+    label: "Category pictures",
+    icon: Images,
+    group: "Catalogue",
+    tone: "pop",
+    match: (p) => p.startsWith("/admin/settings/categories"),
   },
   {
     href: "/admin/settings/platform",

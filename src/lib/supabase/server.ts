@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./config";
 
@@ -26,5 +27,30 @@ export async function createClient() {
         }
       },
     },
+  });
+}
+
+/**
+ * An anon client that touches no cookies — for reads that are genuinely public
+ * and must not depend on who is asking.
+ *
+ * Two reasons this exists rather than reusing `createClient()` above.
+ *
+ * 1. **It can prerender.** `cookies()` opts a route out of static generation
+ *    entirely, so `sitemap.xml` could not be built ahead of time and threw
+ *    `DynamicServerError` during `next build` — the catalog read failed and the
+ *    sitemap silently shipped with no restaurants in it.
+ * 2. **It is the correct authority.** A sitemap should list what an anonymous
+ *    crawler can see, not what the requesting session can see. Binding it to a
+ *    session would mean the file's contents depended on who fetched it, which
+ *    for a sitemap is meaningless at best.
+ *
+ * Still the anon key, so RLS applies exactly as it does for a logged-out
+ * visitor. This is NOT `createAdminClient()` and grants nothing extra —
+ * a table anon cannot read stays unreadable here.
+ */
+export function createPublicClient() {
+  return createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 }
