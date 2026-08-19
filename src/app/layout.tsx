@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { InlineScript } from "@/components/shared/inline-script";
+import { IS_INDEXABLE, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const inter = Inter({
@@ -16,11 +17,44 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Deligro — Craving to doorstep",
+  // Without this, every relative image and canonical path below (and in each
+  // page's own generateMetadata) stays relative — and a crawler or a WhatsApp
+  // link preview needs absolute URLs, so it silently gets nothing.
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Deligro — food delivery in Bemetara",
+    // Pages set their own bare title; this frames it. Keeps every tab and search
+    // result identifiable without each page repeating the brand.
+    template: "%s · Deligro",
+  },
   description:
-    "Freshly made, delivered warm — usually in under 30 minutes. Deligro food delivery.",
+    "Order from restaurants across Bemetara. Freshly made, delivered warm — usually in under 30 minutes.",
   applicationName: "Deligro",
   appleWebApp: { capable: true, title: "Deligro", statusBarStyle: "default" },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    // iOS does not round transparent corners, it renders them black — this one
+    // is flattened onto white for that reason.
+    apple: [{ url: "/icons/apple-icon-180.png", sizes: "180x180" }],
+  },
+  openGraph: {
+    type: "website",
+    siteName: "Deligro",
+    locale: "en_IN",
+    title: "Deligro — food delivery in Bemetara",
+    description:
+      "Order from restaurants across Bemetara. Freshly made, delivered warm.",
+    images: [{ url: "/icons/icon-512.png", width: 512, height: 512 }],
+  },
+  twitter: { card: "summary", title: "Deligro", description: "Food delivery in Bemetara." },
+  // A staging or preview host that indexes itself competes with production for
+  // the same queries. Opt in per environment; see lib/site.ts.
+  robots: IS_INDEXABLE
+    ? { index: true, follow: true }
+    : { index: false, follow: false },
 };
 
 export const viewport: Viewport = {
@@ -30,7 +64,11 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // No `maximumScale`. Pinch-zoom is the only escape hatch a customer with weak
+  // near vision has, and this app's audience skews toward first-time smartphone
+  // users, shopkeepers reading the vendor board, and riders squinting at a phone
+  // in daylight. Locking the scale fails WCAG 1.4.4 (Resize Text) and is
+  // especially wrong here, where the type is small to begin with.
 };
 
 /* Light by default; set before paint to avoid a flash. Only an explicit saved

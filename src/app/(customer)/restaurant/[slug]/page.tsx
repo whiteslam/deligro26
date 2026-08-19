@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -22,10 +23,55 @@ import { RestaurantActions } from "@/components/restaurant/restaurant-actions";
 import { getProfile } from "@/lib/auth";
 import { isFavorite } from "@/lib/data-access/favorites";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { JsonLd } from "@/components/shared/json-ld";
+import { SITE_URL } from "@/lib/site";
 
 export async function generateStaticParams() {
   if (isSupabaseConfigured) return [];
   return RESTAURANTS.map((r) => ({ slug: r.slug }));
+}
+
+/**
+ * Every restaurant page used to inherit the root title, so all of them looked
+ * like the same duplicate page to a crawler — and a link shared into WhatsApp,
+ * which is how people actually pass these around here, previewed as nothing at
+ * all. Both are fixed by naming the shop and pointing at its own photo.
+ *
+ * Returns bare `{}` for a slug that does not resolve; the page itself calls
+ * `notFound()` a moment later and that is what decides the response.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const r = await getRestaurant(slug).catch(() => undefined);
+  if (!r) return {};
+
+  const cuisines = r.cuisines.join(", ");
+  const title = `${r.name} — order online in Bemetara`;
+  const description = `Order ${cuisines} from ${r.name}. Delivered in about ${r.etaMin}–${r.etaMax} minutes.`;
+
+  return {
+    // The layout's template appends "· Deligro".
+    title,
+    description,
+    alternates: { canonical: `/restaurant/${slug}` },
+    openGraph: {
+      type: "website",
+      title,
+      description,
+      url: `/restaurant/${slug}`,
+      images: r.image ? [{ url: r.image }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: r.image ? [r.image] : undefined,
+    },
+  };
 }
 
 export default async function RestaurantPage({
@@ -48,8 +94,40 @@ export default async function RestaurantPage({
   // Temporarily unused while the info card is hidden below.
   // const deliveryFee = formatINR(DELIVERY_FEE);
 
+  // `Restaurant` schema, so a search result can carry the rating, the cuisine
+  // and the fact that this shop delivers in Bemetara rather than just a blue
+  // link. `aggregateRating` is omitted when nobody has rated the shop — Google
+  // rejects the whole block for a rating with a zero review count, which would
+  // cost the rest of the markup too.
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Restaurant",
+    name: r.name,
+    description: r.tagline,
+    servesCuisine: r.cuisines,
+    url: `${SITE_URL}/restaurant/${r.slug}`,
+    ...(r.image ? { image: r.image } : {}),
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: "Bemetara",
+      addressRegion: "Chhattisgarh",
+      addressCountry: "IN",
+    },
+    areaServed: { "@type": "City", name: "Bemetara" },
+    ...(r.ratingCount > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: r.rating,
+            reviewCount: r.ratingCount,
+          },
+        }
+      : {}),
+  };
+
   return (
     <ImmersiveScreen>
+      <JsonLd data={jsonLd} />
       {/* Hero photo, edge to edge under the status bar, with overlaid name +
           circular controls. It's taller than the reserved strip it now sits
           beneath, so the visible artwork stays the size it was. */}
@@ -128,11 +206,21 @@ export default async function RestaurantPage({
             <span className="grid size-10 shrink-0 place-items-center rounded-full bg-ink/[0.06] text-muted">
               <Moon className="size-5" />
             </span>
+            {/* "Check back later during opening hours" used to sit here. There
+                are no opening hours: `restaurants.is_open` is a boolean the
+                vendor flips by hand (0001), with no opens_at/closes_at, no
+                day-of-week table and no scheduler anywhere. The copy asserted a
+                schedule the platform cannot honour, and pointed a customer at a
+                time that does not exist to come back at. What is actually true
+                is that the shop has stopped taking orders and will start again
+                when it says so. */}
             <span className="flex min-w-0 flex-col leading-tight">
-              <span className="text-sm font-bold text-ink">Closed right now</span>
+              <span className="text-sm font-bold text-ink">
+                Not taking orders right now
+              </span>
               <span className="mt-0.5 inline-flex items-center gap-1 text-[12px] text-muted">
                 <Clock className="size-3.5" />
-                Check back later during opening hours.
+                This shop reopens when they&apos;re ready — try again a bit later.
               </span>
             </span>
           </div>
