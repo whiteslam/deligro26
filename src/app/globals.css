@@ -516,7 +516,12 @@ button.card:active {
   background: var(--bg);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
-  font-size: 15px; /* Slightly denser than browser default 16px */
+  /* 16px, the browser default, deliberately. This was 15px "slightly denser",
+     which reads as a design choice on a developer's screen and as small type to
+     the people who actually use this — and inputs below 16px make iOS Safari
+     auto-zoom on focus, which is worst in the checkout form. Density is not
+     worth either cost here. */
+  font-size: 16px;
 
   /* Makes the shell — not the viewport — the containing block for
      `position: fixed` descendants. Without it a fixed overlay (sheet, modal,

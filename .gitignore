@@ -50,8 +50,11 @@ supabase/seed/legacy_customers.sql
 *.tsbuildinfo
 next-env.d.ts
 
-# Design reference archive (Bolt Food iOS teardown) — 279MB of screenshots,
-# kept locally only. GitHub rejects files over 100MB.
+# Design reference archives and screenshots — kept locally, never committed.
+# A zip in version control cannot be diffed or reviewed, and the WhatsApp export
+# names contain spaces and colons that break shell scripts and CI checkout on
+# Windows. Anything here that still informs current work belongs in
+# docs/design-refs/ under a descriptive name.
 /Bolt Food ios May 2025/
-/Bolt Food ios May 2025.zip
-/Admin panel UI redesign.zip
+/WhatsApp Unknown */
+*.zip

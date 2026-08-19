@@ -1,17 +1,30 @@
-# Deligro — Customer App
+# Deligro — food delivery for Bemetara
 
-**Phase 1 · Static UI/UX** (no backend yet — all data is mock, cart/theme run client-side).
+One Next.js app carrying five surfaces — customer, restaurant, driver, manager and
+admin — on a Supabase backend with authorization enforced by Row Level Security.
+Live: phone-OTP auth, Razorpay and cash payments, order dispatch and tracking,
+vendor payouts, and an admin console.
 
-The customer surface from the Deligro spec: warm-minimalism, bento home, glassmorphic
-persistent cart, time-aware dark mode, and live order tracking.
+The customer surface follows the original spec — warm minimalism, glassmorphic
+persistent cart, time-aware dark mode, order tracking on a map.
+
+> **Board updates are polled, not pushed.** Every "live" board re-runs its server
+> render on a timer (4s admin/manager/driver, 8s vendor kitchen, 3s customer
+> tracking). Supabase Realtime is not wired up — see `AUDIT_REPORT.md`, which
+> covers the cost and the migration that would replace it.
 
 ## Run
 
 ```bash
-npm install
-npm run dev     # http://localhost:3000 (or next free port)
-npm run build   # production build
+pnpm install
+pnpm dev        # http://localhost:3005
+pnpm build      # production build
+pnpm lint
 ```
+
+Without Supabase keys the app runs as a **static demo** against mock data, with
+enforcement off. Copy `.env.example` to `.env.local` and run the migrations in
+`supabase/migrations/` to switch it on — steps in [`SECURITY.md`](SECURITY.md).
 
 Open in a desktop browser and it renders inside a centered phone frame; on mobile it's
 full-screen. Toggle light/dark from the header or Profile → Appearance (it also
@@ -87,8 +100,17 @@ Without Supabase keys the app runs as a **static demo** (enforcement off). Add
 keys to `.env.local` and run the migration to switch it on — steps in
 [`SECURITY.md`](SECURITY.md).
 
-## Not in this phase
+## Not built yet
 
-Backend/Supabase, real auth (Hostinger OTP), live payments, real maps, and the AI
-assistant are later phases (C2–C4). The groundwork — feature folders, cart state,
-COD checkout flow — is in place for them to plug into.
+The items below were once listed here as "later phases". Supabase, OTP auth
+(Renflair SMS), Razorpay payments and Google Maps have all since shipped; what
+actually remains is:
+
+- **Supabase Realtime.** Boards poll. The CSP already permits `wss://*.supabase.co`,
+  so only the migration and the subscription are missing.
+- **Hindi.** The UI is English-only, which is the wrong default for this city.
+- **The AI ordering assistant.** Still a stub, still unscheduled.
+- **Offline handling** beyond the tracking screen's staleness indicator.
+
+`AUDIT_REPORT.md` (and the dashboard at `audit-report.html`) has the full list
+with fixes, prioritized.
