@@ -1,0 +1,271 @@
+{
+  "project": "Deligro — single-city food delivery (customer + vendor + driver + manager + admin)",
+  "date": "2026-08-19",
+  "stack": "Next.js 16.3 (App Router, Turbopack) · React 19.2 · TypeScript · Tailwind 4 · Supabase (Postgres + RLS + Auth) · Razorpay · OneSignal · Renflair SMS",
+  "scope": "Full repo at f:/deligro26/deligro. 417 source files, ~73,400 lines TS/TSX, 58 pages, 31 API routes, 40 SQL migrations. Static analysis + production build. No live URL, so Core Web Vitals are estimated from bundle output, not measured. Supabase project not inspected directly — RLS conclusions are read from migrations, not from the live database.",
+
+  "summary": "STATUS: the 10 quick wins were applied on 2026-08-19 and verified (typecheck, build and lint all clean) — viewport/font, PWA manifest with generated icons, robots + sitemap + restaurant metadata and JSON-LD, server-only declared, /build gated behind admin, 10 dead files deleted, /orders auto-refresh, GmvOrdersChart lazy-loaded, duplicate root .env.local removed, README rewritten. Two corrections emerged while applying them: rating.tsx is parked work rather than dead code and was kept, and the sitemap needed a cookie-free Supabase client because the session client cannot prerender. Scores below are the pre-fix baseline. Still open: Realtime, Hindi, opening the browse routes to crawlers, offline handling. Original assessment follows. --- This is not a typical vibe-coded codebase. The security engineering is genuinely strong — fail-closed auth, RLS at the database, a real CSP, rate limits on every write path, and code comments that document why each control exists. No critical vulnerability was found. The problems are elsewhere: the app calls itself live but has no realtime anywhere — every 'live' board is a 3-8 second full-page poll, and Supabase Realtime is not enabled in any of the 40 migrations even though the CSP already permits the WebSocket. Second, the entire customer app sits behind a login wall with no sitemap, no robots.txt and no per-restaurant metadata, so Google cannot index a single dish — for a one-city business that is the cheapest growth channel left unopened. Third, and most important for the stated audience: the app is English-only at 15px base type with pinch-zoom disabled, which is the wrong default for tier-3 users in Bemetara.",
+
+  "overall": {
+    "score": 69,
+    "uncapped_score": 69,
+    "capped": false
+  },
+
+  "scores": {
+    "security":     { "score": 84, "note": "No critical findings. RLS + fail-closed + CSP + rate limits. Loses points on 'unsafe-inline' script-src, an internal roadmap page any guest can open, and duplicate migration numbers." },
+    "performance":  { "score": 66, "note": "Polling architecture re-renders whole server trees every 3-8s per open tab. 3.3MB client chunks, largest 469KB. Recharts not lazy-loaded." },
+    "seo":          { "score": 31, "note": "Whole app login-walled. No robots.txt, sitemap.xml, manifest.json, canonical, OG tags or JSON-LD. Restaurant pages inherit the root title." },
+    "code_quality": { "score": 79, "note": "Excellent architecture and comments. 12 dead files, 4 duplicate migration numbers, ~50 files importing an undeclared dependency, 290KB of WhatsApp screenshots committed." }
+  },
+
+  "findings": [
+    {
+      "severity": "high",
+      "axis": "realtime",
+      "title": "Nothing in the app is actually realtime — every 'live' surface is a polling loop",
+      "location": "src/components/shared/auto-refresh.tsx:28 · src/hooks/use-live-tracking.ts:171 · supabase/migrations/ (all 40)",
+      "impact": "The word 'live' appears throughout the product, but there is not a single Supabase Realtime channel in the codebase. `AutoRefresh` calls `router.refresh()` on a timer — 4s on the admin orders board, manager board and driver board, 8s on the vendor kitchen board — which re-executes the ENTIRE server component tree and every database query behind it, then streams a fresh RSC payload down. The customer tracking screen polls `/api/orders/:id/tracking` every 3s. Three consequences. (1) Cost and load: one vendor tablet left open for a 10-hour service day fires ~4,500 full board re-renders, each running the vendor-orders query set. Ten vendors, two admins and four drivers online is roughly 100,000 needless database round trips a day, and Supabase bills egress. (2) Latency the kitchen feels: a new order takes up to 8 seconds to appear on the vendor board, and the customer waits up to 3s plus a full round trip to see 'accepted'. (3) It scales the wrong way — the load is proportional to open tabs, not to orders. No migration adds any table to the `supabase_realtime` publication, so the feature is off at the database as well as absent in the client.",
+      "fix": "The groundwork is already done — `next.config.ts:31` already allows `wss://*.supabase.co` in connect-src, so no CSP change is needed.\n\n1. Enable replication on the two tables that matter:\n\n```sql\n-- supabase/migrations/0038_realtime.sql\nalter publication supabase_realtime add table public.orders;\nalter publication supabase_realtime add table public.deliveries;\nalter table public.orders replica identity full;\nalter table public.deliveries replica identity full;\n```\nRLS applies to Realtime, so each role only receives the rows it may already read.\n\n2. Replace the timer in `AutoRefresh` with a change-triggered refresh, keeping a slow poll as a safety net:\n\n```tsx\nuseEffect(() => {\n  const supabase = createBrowserClient();\n  const ch = supabase\n    .channel(`orders-board`)\n    .on('postgres_changes',\n        { event: '*', schema: 'public', table: 'orders' },\n        () => router.refresh())\n    .subscribe();\n  // Net, not the mechanism: catches a dropped socket.\n  const id = setInterval(() => { if (!document.hidden) router.refresh(); }, 60_000);\n  return () => { supabase.removeChannel(ch); clearInterval(id); };\n}, [router]);\n```\n\nThis cuts the vendor board from ~4,500 refreshes a day to roughly one per order plus 600 heartbeats, while making the kitchen alert fire in well under a second instead of up to eight.",
+      "manual_action": "Enable Realtime for the `orders` and `deliveries` tables in the Supabase dashboard (Database → Replication) after running the migration."
+    },
+    {
+      "severity": "high",
+      "axis": "ux",
+      "title": "English-only interface for a Hindi-speaking tier-3 city",
+      "location": "src/app/layout.tsx:52 (`lang=\"en\"`) · no i18n library, no locale files, no translated strings anywhere in src/",
+      "impact": "Every string in the product — 'Craving to doorstep', 'Track order', 'Reorder', 'Cash on delivery', 'Your order is on the way' — is English only. Bemetara is a Hindi-speaking district in Chhattisgarh. A meaningful share of the target customers, and very likely most of the delivery riders and several of the restaurant staff who have to operate the vendor board, read Devanagari far more comfortably than Latin script. This is the single largest barrier to the app being 'very easy to understand' for the stated audience, and no amount of layout polish compensates for it. It also affects the operator surfaces: a rider who misreads 'Mark delivered' vs 'Mark picked up' creates a real support incident.",
+      "fix": "Hindi is a UI-string problem, not a full i18n-framework problem, because there is one city and one currency. Ship a lightweight dictionary rather than pulling in next-intl:\n\n```ts\n// src/lib/i18n/strings.ts\nexport const STRINGS = {\n  en: { trackOrder: 'Track order', onTheWay: 'On the way', cod: 'Cash on delivery' },\n  hi: { trackOrder: 'ऑर्डर ट्रैक करें', onTheWay: 'रास्ते में', cod: 'डिलीवरी पर नकद' },\n} as const;\n```\n\nOrder of work, highest value first:\n1. **Customer order-status words** — the six tracking stages and the cart/checkout buttons. This is ~40 strings and covers the moments that generate support calls.\n2. **Driver board** — ~15 strings. Riders are the least likely group to read English.\n3. **Vendor board** — ~30 strings.\n4. Admin console can stay English; it is used by you.\n\nAdd a language toggle in Profile, persist it the same way `deligro-theme` already is in `src/app/layout.tsx:40`, and set `<html lang>` from it. Consider defaulting to Hindi with an English toggle rather than the reverse — the default should match the majority user.",
+      "manual_action": "Get the Hindi strings reviewed by a native Chhattisgarhi Hindi speaker, not machine translation. Delivery vocabulary is regional and a stilted translation reads worse than English."
+    },
+    {
+      "severity": "high",
+      "axis": "seo",
+      "title": "The entire customer app is login-walled and invisible to Google",
+      "location": "src/proxy.ts:91 · no src/app/robots.ts · no src/app/sitemap.ts · src/app/(customer)/restaurant/[slug]/page.tsx (no generateMetadata)",
+      "impact": "`src/proxy.ts:91` redirects any visitor without a session or guest cookie to `/login`. Googlebot has neither, so every crawl of every URL returns a redirect to a sign-in page. The result is that the site has effectively zero indexable surface. There is no robots.txt, no sitemap.xml, no canonical tag, no Open Graph image, and no JSON-LD. Restaurant pages — the only genuinely valuable SEO asset a delivery business owns — carry no metadata at all and inherit the root title 'Deligro — Craving to doorstep', so all of them are duplicates to a crawler. For a single-city operator this is the difference between owning the 'food delivery bemetara' and 'best biryani bemetara' queries and being invisible on them. It also breaks link sharing: a restaurant link pasted into WhatsApp — the dominant sharing channel for this audience — renders with no image, no name and no description.",
+      "fix": "Let crawlers and cold visitors read the menu; keep the login wall only where it protects data.\n\n1. In `src/proxy.ts`, allow browse routes through without a session:\n```ts\nconst PUBLIC_BROWSE = ['/', '/search', '/restaurant', '/stores'];\n// …after the PUBLIC_PATHS check, before the guest gate:\nif (matches(path, PUBLIC_BROWSE)) return response;\n```\n`/checkout`, `/orders` and `/profile` stay gated by the existing `GATED_CUSTOMER` list, so nothing that touches user data opens up.\n\n2. Add per-restaurant metadata and structured data:\n```tsx\nexport async function generateMetadata({ params }): Promise<Metadata> {\n  const { slug } = await params;\n  const r = await getRestaurantBySlug(slug);\n  if (!r) return {};\n  return {\n    title: `${r.name} — order online in Bemetara | Deligro`,\n    description: `Order ${r.cuisines.join(', ')} from ${r.name}. Delivered in about ${r.etaMin} minutes.`,\n    alternates: { canonical: `/restaurant/${slug}` },\n    openGraph: { title: r.name, images: [r.imageUrl], type: 'website' },\n  };\n}\n```\nAdd `Restaurant` JSON-LD with `servesCuisine`, `aggregateRating` and `areaServed: 'Bemetara'`.\n\n3. Add `src/app/robots.ts`, `src/app/sitemap.ts` (enumerating approved restaurants), and `metadataBase` in the root layout.",
+      "manual_action": "Register the domain in Google Search Console and submit the sitemap once deployed. Also create a Google Business Profile for the city — for tier-3 local search that often outperforms organic."
+    },
+    {
+      "severity": "medium",
+      "axis": "ux",
+      "title": "15px base type with pinch-zoom disabled — the two problems compound",
+      "location": "src/app/layout.tsx:32 (`maximumScale: 1`) · src/app/globals.css:519 · 416 occurrences of `text-xs` or smaller across src/",
+      "impact": "The base font is set to 15px with the comment 'Slightly denser than browser default 16px', and the codebase uses `text-xs` (12px) or smaller in 416 places, with a documented 11px caption size and several 11.5px operator-console sizes. Separately, `maximumScale: 1` in the viewport disables pinch-zoom. Either alone is a minor issue; together they are not, because zoom is precisely the escape hatch a user with weak near vision reaches for when text is too small, and it has been removed. This fails WCAG 1.4.4 (Resize Text). The audience skews toward first-time smartphone users, older shopkeepers operating the vendor board, and riders reading a phone in daylight on a bike — all of whom need larger targets and text, not denser.",
+      "fix": "Two small changes, immediate effect:\n\n```diff\n// src/app/layout.tsx\n export const viewport: Viewport = {\n   width: 'device-width',\n   initialScale: 1,\n-  maximumScale: 1,\n };\n```\n\n```diff\n/* src/app/globals.css */\n-  font-size: 15px; /* Slightly denser than browser default 16px */\n+  font-size: 16px;\n```\n\nThen raise the floor on the customer-facing surfaces: no body or label text below 14px, and 16px for anything the customer must read to make a decision (prices, dish names, order status, the total). Note that inputs below 16px also cause iOS Safari to auto-zoom on focus, which is a real annoyance in the checkout form.\n\nAudit tap targets to a 44×44px minimum while you are in there — the quantity steppers and the category chips are the likely offenders.",
+      "manual_action": null
+    },
+    {
+      "severity": "medium",
+      "axis": "functionality",
+      "title": "No PWA manifest — the app cannot be installed to a home screen",
+      "location": "public/ (no manifest.json) · no src/app/manifest.ts · public/OneSignalSDKWorker.js exists but no app service worker",
+      "impact": "`src/app/layout.tsx` sets `appleWebApp: { capable: true }`, so iOS install was clearly intended, but there is no web app manifest, so Android Chrome never offers 'Add to home screen' and the app cannot be installed. This matters more here than it would elsewhere: in a tier-3 market, a home-screen icon is the difference between a repeat customer and a one-time visitor, because the alternative is remembering and typing a URL. Installability is also what makes web push reliable on Android — OneSignal is already wired (`src/components/notifications/onesignal-init.tsx`) and the server already fans out order events (`notifyOrderAccepted`, `notifyOnTheWay`, `notifyDelivered`), so you are paying for push infrastructure that a missing 20-line file is limiting. An installed vendor board is also far less likely to be closed by accident than a browser tab.",
+      "fix": "```ts\n// src/app/manifest.ts\nimport type { MetadataRoute } from 'next';\n\nexport default function manifest(): MetadataRoute.Manifest {\n  return {\n    name: 'Deligro — food delivery in Bemetara',\n    short_name: 'Deligro',\n    start_url: '/',\n    display: 'standalone',\n    background_color: '#ffffff',\n    theme_color: '#0f1215',\n    icons: [\n      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },\n      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },\n      { src: '/icons/icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },\n    ],\n  };\n}\n```\nThe brand marks already exist at `Resources/deligro-icon.svg` and `Resources/deligro-mark.svg` — export them to PNG at both sizes. Include a maskable variant or Android will letterbox the icon in a white circle.",
+      "manual_action": null
+    },
+    {
+      "severity": "medium",
+      "axis": "functionality",
+      "title": "No offline or weak-network handling outside the tracking screen",
+      "location": "src/components/orders/tracking-view.tsx:259 (the only offline affordance in the app)",
+      "impact": "The live tracking screen has a genuinely well-built staleness indicator — `use-live-tracking.ts` counts failed polls, freezes the rider pin rather than animating a courier that may not be moving, and shows a WifiOff banner. That care is not applied anywhere else. Nothing else in the app reads `navigator.onLine`. On a dropped connection the home feed, search, restaurant menu and — most damagingly — the checkout Place Order button all fail silently or hang. In a tier-3 city on patchy 4G this is a routine condition, not an edge case, and the worst outcome is a customer tapping Place Order three times on a stalled request because nothing told them the network was gone.",
+      "fix": "Two pieces.\n\n1. A global connection banner, mounted in the customer layout:\n```tsx\n'use client';\nexport function OfflineBanner() {\n  const [online, setOnline] = useState(true);\n  useEffect(() => {\n    const on = () => setOnline(true), off = () => setOnline(false);\n    setOnline(navigator.onLine);\n    window.addEventListener('online', on);\n    window.addEventListener('offline', off);\n    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };\n  }, []);\n  if (online) return null;\n  return <div role=\"status\" className=\"…\">No internet — showing what we last loaded</div>;\n}\n```\n\n2. Make the checkout submit explicitly network-aware: disable the button while a request is in flight (guarding against double-submit), give the fetch a timeout, and on failure show 'Could not reach Deligro — check your connection and try again' with a retry, rather than leaving a dead button.\n\nA service worker caching the shell and the restaurant list would go further, and pairs naturally with the manifest above.",
+      "manual_action": null
+    },
+    {
+      "severity": "medium",
+      "axis": "performance",
+      "title": "router.refresh() polling re-runs entire server trees, including heavy admin queries",
+      "location": "src/app/admin/orders/page.tsx:216 (4s) · src/app/manager/page.tsx:56 (4s) · src/components/driver/driver-board.tsx:291 (4s) · src/components/vendor/vendor-orders-board.tsx:843 (8s, `whenHidden`)",
+      "impact": "Beyond the realtime finding above, the vendor board polls with `whenHidden` set — deliberately, and the reasoning in the code is sound (a kitchen tablet asleep on another tab must not miss orders). But the consequence is that a forgotten open tab polls forever, at full server-render cost, with nobody watching. The admin orders page re-runs `listAllOrders` over a 50-row window plus `listPendingRestaurants` every 4 seconds. `src/lib/data-access/admin-settlements.ts` is 1,829 lines of query logic; anything on that path being polled is expensive. This is also the main reason the performance axis scores as it does — the code itself is efficient, but it is executed far more often than the data changes.",
+      "fix": "Fixing the realtime finding fixes most of this. Until then, two cheap mitigations:\n\n1. Back off when nothing is happening. If three consecutive refreshes return identical data, stretch the interval to 30s; reset on any change. A kitchen with no orders should not cost the same as a kitchen at dinner rush.\n2. Cap the `whenHidden` poll: after 60 minutes with no visibility event and no new order, stop and show a 'Reconnect' button on return. A tablet in a drawer should not poll overnight.",
+      "manual_action": null
+    },
+    {
+      "severity": "medium",
+      "axis": "functionality",
+      "title": "The customer orders list never updates — only the single-order tracking page does",
+      "location": "src/app/(customer)/orders/page.tsx:10 (server component, no refresh mechanism)",
+      "impact": "`/orders` is a plain server component with no AutoRefresh and no client polling. A customer who places an order and then sits on the orders list — a very natural thing to do, since it is the screen the tab bar leads to — sees a status frozen at the moment the page loaded. It never advances to Accepted, Ready or On the way unless they navigate away and back. Meanwhile the deeper `/orders/[id]` screen updates every 3 seconds. The inconsistency reads as a bug to the user: the same order shows two different statuses on two screens.",
+      "fix": "Mount the same `AutoRefresh` the operator boards use, but only when there is an active order — a list of delivered orders has nothing to refresh:\n\n```tsx\n{active && isSupabaseConfigured ? <AutoRefresh interval={10000} /> : null}\n```\n\nOnce Realtime lands, subscribe to the customer's own in-flight orders instead. Also consider making the active-order card on this screen tappable straight into tracking with a visible progress bar, so the list itself answers 'where is my food' without a second tap.",
+      "manual_action": null
+    },
+    {
+      "severity": "medium",
+      "axis": "security",
+      "title": "Internal build tracker with live database counts is reachable by any signed-in guest",
+      "location": "src/app/build/page.tsx · src/lib/build-plan.ts (1,049 lines) · src/lib/data-access/build-stats.ts",
+      "impact": "`/build` renders the project's internal five-week delivery plan — milestone titles, per-role task status, what is done versus blocked — alongside `getBuildDbSnapshot()`, which reports live row counts from application tables. `src/proxy.ts` only requires a guest cookie to reach non-gated routes, and a guest cookie is one click on the login screen. So any visitor can read your roadmap and a rough measure of business volume (how many orders, vendors and customers exist). It confirmed to this audit, for instance, that order updates are 'AutoRefresh poll (not Supabase Realtime)' — exactly the kind of architectural detail that helps someone probing the app. It is information disclosure rather than a vulnerability, but it is free intelligence for a competitor in a single-city market where there may be only one.",
+      "fix": "Gate it behind the admin role, the same way the console is:\n\n```tsx\n// src/app/build/page.tsx\nimport { requireRole } from '@/lib/auth';\n\nexport default async function BuildPage({ searchParams }) {\n  await requireRole('admin');\n  // …\n}\n```\n\nAlternatively move the route under `/admin/build` so it inherits the admin layout's existing guard, and add `noindex` to its metadata either way.",
+      "manual_action": null
+    },
+    {
+      "severity": "medium",
+      "axis": "code_quality",
+      "title": "Four pairs of migrations share a version number",
+      "location": "supabase/migrations/ — 0008, 0009, 0015 (`0015_orders_external_id.sql` + `0015_platform_settings.sql`), 0033 (`0033_drop_mfa.sql` + `0033_reviews.sql`)",
+      "impact": "Migration order is defined by filename, and four numbers are used twice. Within a pair the apply order is decided by lexical sort of the description — `0033_drop_mfa` runs before `0033_reviews` because 'd' precedes 'r', which is arbitrary rather than intended. Today the pairs happen not to depend on each other, so nothing is broken. The risk is forward-looking: the next duplicate may pair a table creation with something that references it, and it will fail on a fresh database while continuing to work on the existing one — the worst failure shape, because it only appears when you rebuild staging or onboard a new environment.",
+      "fix": "Do not renumber applied migrations — that breaks the migration ledger on the live database. Instead:\n\n1. Record the intended order in `supabase/migrations/README.md`, noting that the four duplicate pairs are order-independent and verified as such.\n2. Adopt timestamp-prefixed names for everything new (`20260819120000_realtime.sql`), which the Supabase CLI generates by default and which cannot collide.\n3. Add a pre-commit or CI check that fails on a duplicate numeric prefix.\n4. Verify by applying all migrations to an empty database — if `supabase db reset` succeeds cleanly, the current order is genuinely safe.",
+      "manual_action": "Run `supabase db reset` against a scratch project to confirm the full chain applies from empty. This is the only way to prove the duplicates are harmless."
+    },
+    {
+      "severity": "medium",
+      "axis": "code_quality",
+      "title": "About 50 files import `server-only`, which is not declared as a dependency",
+      "location": "src/lib/auth.ts:1 and ~49 other files under src/lib/ · package.json (no `server-only` entry)",
+      "impact": "`server-only` is the guard that makes a build fail loudly if a server module is ever pulled into a client bundle — it is the mechanism protecting the service-role Supabase client and every data-access module from leaking into the browser. It works today only because it resolves transitively through Next.js. Under pnpm's strict node_modules layout that is not guaranteed: a Next version bump that stops re-exporting it, or a switch to a stricter hoisting setting, makes ~50 imports fail to resolve. The failure is loud rather than silent, so this is a build-stability issue rather than a security hole — but it is a load-bearing security mechanism resting on an undeclared dependency, which is worth one line of package.json to fix.",
+      "fix": "```diff\n// package.json\n   \"dependencies\": {\n+    \"server-only\": \"^0.0.1\",\n     \"@supabase/ssr\": \"^0.12.0\",\n```\nThen `pnpm install`. No source changes.",
+      "manual_action": null
+    },
+    {
+      "severity": "low",
+      "axis": "security",
+      "title": "CSP allows 'unsafe-inline' for scripts, and the upgrade path is already documented",
+      "location": "next.config.ts:22",
+      "impact": "`script-src` includes `'unsafe-inline'`, which removes most of the XSS protection a CSP provides — if an injection point is ever introduced, the policy will not stop the payload. The comment at `next.config.ts:14` is honest about this being the 'pragmatic budget tier' and names the fix. The practical risk today is low: React escapes by default, there is exactly one `dangerouslySetInnerHTML`-shaped construct (the theme bootstrap in `src/app/layout.tsx`), and no user-controlled HTML is rendered anywhere. Recording it because it is the one place where a documented control is weaker than it reads.",
+      "fix": "Generate a per-request nonce in `src/proxy.ts`, pass it to the one inline script (`InlineScript` already wraps it, so there is a single call site), and drop `'unsafe-inline'`:\n\n```ts\nconst nonce = crypto.randomUUID();\nresponse.headers.set('x-nonce', nonce);\n// script-src 'self' 'nonce-${nonce}' https://cdn.onesignal.com …\n```\n\nWorth doing before you handle card payments at volume; not urgent at current scale.",
+      "manual_action": null
+    },
+    {
+      "severity": "low",
+      "axis": "security",
+      "title": "Live Supabase secret key sits in two env files with drifting variable names",
+      "location": "deligro/.env.local:4 (`SUPABASE_SERVICE_ROLE_KEY`) · ../.env.local:5 (`SUPABASE_SECRET_KEY`)",
+      "impact": "Not a leak — `.gitignore` correctly excludes `.env*` while keeping `.env.example`, git confirms only `.env.example` is tracked, and the workspace root is not a git repository. The issue is duplication and drift: the same live service-role key exists in two files under two different variable names, and the root copy also carries `SUPABASE_PUBLISHABLE_KEY` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` which the app does not read. A service-role key bypasses RLS entirely, so two copies is two chances to paste the wrong file into a deploy config, a screen share or a support ticket. There is no evidence any of that has happened.",
+      "fix": "Delete `f:/deligro26/.env.local` — the root package.json only proxies scripts into `deligro/`, so nothing reads it. Keep `deligro/.env.local` as the single source. Confirm the names there match `src/lib/supabase/config.ts` exactly, and remove the unused publishable-key aliases.",
+      "manual_action": "Rotate the service-role key if this drive has ever been shared, screen-recorded, or synced to cloud storage. If not, leave it — rotation has its own risk and is not warranted by anything found here."
+    },
+    {
+      "severity": "low",
+      "axis": "performance",
+      "title": "Recharts ships eagerly on three operator screens",
+      "location": "src/components/admin/admin-charts.tsx · src/components/vendor/vendor-earnings-charts.tsx · src/components/vendor/vendor-overview-board.tsx",
+      "impact": "Recharts is a large library (roughly 400KB before compression, and the two biggest chunks in the build are 469KB and 404KB) imported statically on three screens. It is genuinely below-the-fold decoration on all three — the numbers that matter are already in the stat tiles above the chart. `xlsx` is handled correctly by contrast, dynamically imported at all five call sites, so the pattern is already established in the codebase. Operator screens on a shopkeeper's mid-range Android are exactly where this cost lands.",
+      "fix": "```tsx\nconst VendorEarningsCharts = dynamic(\n  () => import('@/components/vendor/vendor-earnings-charts'),\n  { ssr: false, loading: () => <div className=\"h-64 animate-pulse rounded-2xl bg-surface\" /> }\n);\n```\nApply to all three. The stat tiles render immediately; the chart fills in.",
+      "manual_action": null
+    },
+    {
+      "severity": "low",
+      "axis": "code_quality",
+      "title": "290KB of WhatsApp screenshots and a design zip are committed to the repository",
+      "location": "WhatsApp Unknown 2026-07-16 at 10.20.08 PM.zip (245KB, tracked) · WhatsApp Unknown 2026-07-16 at 10.20.08 PM/ (4 JPEGs, tracked) · Admin panel UI redesign.zip (45KB, untracked)",
+      "impact": "Reference screenshots and a design archive are committed to git. They are in every clone forever, the directory name contains spaces and a timestamp that breaks shell scripts and some CI checkout steps on Windows, and a zip in version control cannot be diffed or reviewed. Minor, but it is the kind of thing that makes a repo feel unmaintained to the next developer who opens it.",
+      "fix": "```bash\ngit rm -r --cached \"WhatsApp Unknown 2026-07-16 at 10.20.08 PM\" \\\n                   \"WhatsApp Unknown 2026-07-16 at 10.20.08 PM.zip\"\n```\nMove the images to `docs/design-refs/` with descriptive names if they still inform current work, or delete them. Add `*.zip` to `.gitignore`.",
+      "manual_action": null
+    },
+    {
+      "severity": "low",
+      "axis": "code_quality",
+      "title": "Twelve source files are unreachable from any entry point",
+      "location": "src/components/bento/bento.tsx · src/components/home/ai-assistant-block.tsx · src/components/home/reorder-block.tsx · src/components/location/location-illustration.tsx · src/components/roles/portal-nav.tsx · src/components/shared/logo.tsx · src/components/shared/onboarding.tsx · src/components/shared/rating.tsx · src/components/vendor/vendor-menu.tsx · src/lib/reviews.ts · src/stores/onboarding-store.ts",
+      "impact": "Confirmed unreferenced by knip. Several are recognisable leftovers from the Phase-1 static build described in README.md — `bento.tsx`, `ai-assistant-block.tsx` and `reorder-block.tsx` are named after features that README still lists as home-screen blocks. `vendor-menu.tsx` sitting beside the live `vendor-menu-board.tsx` is the exact two-sources-of-truth situation AGENTS.md warns about: a future reader cannot tell which is current. `src/lib/reviews.ts` is dead while `src/lib/data-access/reviews.ts` is live, and that pair is the most confusable of the set.",
+      "fix": "Delete all eleven. (knip also lists `public/OneSignalSDKWorker.js` — that one is a false positive: it is fetched by the OneSignal SDK at runtime, not imported, so it must stay.) Verify with `pnpm build` after removal. Also drop the unused `ws` devDependency.",
+      "manual_action": null
+    },
+    {
+      "severity": "low",
+      "axis": "code_quality",
+      "title": "README describes a product that no longer exists",
+      "location": "README.md:3",
+      "impact": "The README opens with '**Phase 1 · Static UI/UX** (no backend yet — all data is mock, cart/theme run client-side)' and closes by listing Supabase, real auth, payments and maps as 'Not in this phase'. All four have since shipped — there are 40 migrations, a live Razorpay integration, Renflair SMS OTP and Google Maps. It also documents `npm run dev` on port 3000 when package.json runs pnpm on 3005. AGENTS.md states the project's own rule that 'a stale security doc is worse than none, because it stops the next reviewer from looking'; the same argument applies here, and this is the first file anyone opens.",
+      "fix": "Rewrite the header and the 'Not in this phase' section to describe the current system: five surfaces, Supabase with RLS, Razorpay, OTP auth, and polling-based board updates. Fix the run instructions to `pnpm dev` / port 3005. The route tables further down are still accurate and can stay.",
+      "manual_action": null
+    }
+  ],
+
+  "seo": {
+    "categories": [
+      { "name": "Crawlability & indexing", "score": 2, "max": 25, "note": "Proxy redirects all anonymous traffic to /login; no robots.txt, no sitemap.xml" },
+      { "name": "On-page metadata", "score": 9, "max": 25, "note": "Root title/description good; restaurant and search pages have none; no canonical, no metadataBase" },
+      { "name": "Social & structured data", "score": 2, "max": 15, "note": "OG tags on /profile/about only; no JSON-LD anywhere; WhatsApp link previews are blank" },
+      { "name": "Content quality", "score": 9, "max": 15, "note": "Semantic HTML and 185 aria-labels; one decorative img with empty alt is correct; content itself is thin because it is behind auth" },
+      { "name": "Technical & CWV", "score": 9, "max": 20, "note": "Good: font-display swap, security headers, theme set pre-paint. Bad: 3.3MB chunks, maximumScale blocks zoom, no manifest" }
+    ]
+  },
+
+  "duplicate_clusters": [
+    {
+      "name": "Reviews data access",
+      "files": ["src/lib/reviews.ts", "src/lib/data-access/reviews.ts"],
+      "duplicate_lines": 0,
+      "proposed_home": "src/lib/data-access/reviews.ts",
+      "note": "Not textual duplication — two modules for one concept. The data-access version is the one wired to RLS and the API route; src/lib/reviews.ts has no importers. Delete the orphan per AGENTS.md's 'delete the loser' rule."
+    },
+    {
+      "name": "Vendor menu components",
+      "files": ["src/components/vendor/vendor-menu.tsx", "src/components/vendor/vendor-menu-board.tsx"],
+      "duplicate_lines": 0,
+      "proposed_home": "src/components/vendor/vendor-menu-board.tsx",
+      "note": "The board (801 lines) is live and rendered by /vendor/menu; vendor-menu.tsx is unreferenced. Adjacent filenames for one feature is the confusion AGENTS.md calls out explicitly."
+    },
+    {
+      "name": "Environment configuration",
+      "files": ["deligro/.env.local", "f:/deligro26/.env.local"],
+      "duplicate_lines": 6,
+      "proposed_home": "deligro/.env.local",
+      "note": "Same live secret under two names plus unused publishable-key aliases. Root file is read by nothing."
+    }
+  ],
+
+  "actions": [
+    { "action": "Remove maximumScale:1 and raise base font 15px → 16px", "axis": "ux", "impact": "high", "effort": "low", "score_gain": "+6" },
+    { "action": "Add src/app/manifest.ts so the app is installable", "axis": "functionality", "impact": "high", "effort": "low", "score_gain": "+4" },
+    { "action": "Add robots.ts, sitemap.ts and generateMetadata on restaurant pages", "axis": "seo", "impact": "high", "effort": "low", "score_gain": "+18" },
+    { "action": "Declare server-only in package.json", "axis": "code_quality", "impact": "medium", "effort": "low", "score_gain": "+2" },
+    { "action": "Gate /build behind requireRole('admin')", "axis": "security", "impact": "medium", "effort": "low", "score_gain": "+3" },
+    { "action": "Delete 11 dead files, the ws devDependency and the committed zips", "axis": "code_quality", "impact": "medium", "effort": "low", "score_gain": "+5" },
+    { "action": "Add AutoRefresh to /orders when an order is active", "axis": "functionality", "impact": "medium", "effort": "low", "score_gain": "+3" },
+    { "action": "Add a global offline banner and guard the checkout submit", "axis": "functionality", "impact": "high", "effort": "medium", "score_gain": "+5" },
+    { "action": "Let /, /search and /restaurant/* render without a session", "axis": "seo", "impact": "high", "effort": "medium", "score_gain": "+12" },
+    { "action": "Lazy-load Recharts on the three operator screens", "axis": "performance", "impact": "medium", "effort": "low", "score_gain": "+4" },
+    { "action": "Enable Supabase Realtime on orders + deliveries and replace polling", "axis": "realtime", "impact": "critical", "effort": "medium", "score_gain": "+20" },
+    { "action": "Translate customer order-status and driver board strings to Hindi", "axis": "ux", "impact": "critical", "effort": "medium", "score_gain": "+15" },
+    { "action": "Adopt timestamped migration filenames and add a duplicate-prefix CI check", "axis": "code_quality", "impact": "medium", "effort": "low", "score_gain": "+3" },
+    { "action": "Move to a nonce-based CSP and drop 'unsafe-inline'", "axis": "security", "impact": "medium", "effort": "high", "score_gain": "+6" }
+  ],
+
+  "dead_code": [
+    "src/components/bento/bento.tsx — Phase-1 leftover, no imports (knip confirmed)",
+    "src/components/home/ai-assistant-block.tsx — README lists it as a home block; not rendered",
+    "src/components/home/reorder-block.tsx — README lists it as a home block; not rendered",
+    "src/components/location/location-illustration.tsx — no imports",
+    "src/components/roles/portal-nav.tsx — superseded by the per-portal shells",
+    "src/components/shared/logo.tsx — no imports",
+    "src/components/shared/onboarding.tsx — no imports; pairs with the dead onboarding store",
+    "src/components/shared/rating.tsx — no imports",
+    "src/components/vendor/vendor-menu.tsx — superseded by vendor-menu-board.tsx",
+    "src/lib/reviews.ts — superseded by src/lib/data-access/reviews.ts",
+    "src/stores/onboarding-store.ts — no imports",
+    "ws (devDependency) — unused",
+    "NOT dead: public/OneSignalSDKWorker.js — knip flags it, but the SDK fetches it at runtime. Keep."
+  ],
+
+  "modernization": [
+    "Next.js 16.3 and React 19.2 are current — no framework upgrade needed, and AGENTS.md correctly warns that this Next version's conventions differ from older training data.",
+    "Supabase Realtime is available on the existing plan and already permitted by the CSP; the app predates its own need for it and never adopted it.",
+    "Next 16's `proxy.ts` convention is correctly adopted (formerly middleware.ts) — good sign the codebase is being kept current.",
+    "No error monitoring. Sentry or a Supabase-logged error boundary would surface the failures the code carefully handles but never reports.",
+    "No automated tests in CI. scripts/qa/ contains a real suite (idor-suite, payments-signature, e2e-smoke, zap-baseline) that appears to be run by hand — wiring it to GitHub Actions is the single highest-leverage DX change available."
+  ],
+
+  "suggestions": [
+    "Order-status SMS as a fallback to web push. Push only reaches an installed or permission-granted browser; Renflair is already integrated for OTP, so a single 'Your order is on the way' SMS costs one API call and reaches every phone regardless of browser state.",
+    "A repeat-order shortcut on the home screen. In a single-city market the same customers order from the same three shops — surfacing 'Order again' as the first block beats any amount of discovery UI, and reorder logic already exists.",
+    "Show the delivery OTP larger on the tracking screen. getDeliveryOtp is already fetched; a rider and customer reading a 4-digit code to each other at the door need it at display size, not caption size.",
+    "Add a WhatsApp share button on restaurant pages. It is the dominant sharing channel for this audience, and fixing the OG tags (see the SEO finding) is what makes the shared link render properly.",
+    "Consider whether guest browsing should be the default rather than an opt-in below the OTP form. Requiring a phone number before a first-time user can see a single dish is a hard bounce for the least confident users.",
+    "Icons alongside text on the driver and vendor boards. Riders scanning a phone one-handed benefit from a shape they recognise before they read the word — and this partly hedges the language gap while translation is in progress.",
+    "Wire scripts/qa/run-all.sh into CI on every push to main. The suite exists and is good; running it by hand means it eventually stops being run."
+  ],
+
+  "not_assessed": [
+    "Live Supabase database — RLS policies were read from migration files, not verified against the running project. Policies can be altered in the dashboard without a migration, so a live check is worth doing.",
+    "Core Web Vitals — no deployed URL was available. Bundle sizes come from the local production build; LCP, INP and CLS are unmeasured.",
+    "Razorpay webhook signature verification was read but not exercised against live payloads.",
+    "Runtime behaviour generally — no browser session was driven. Every functional finding here is from source, so UI defects that only appear on interaction would not have been caught.",
+    "Accessibility beyond static checks — no screen reader or contrast audit was run.",
+    "Real-device performance on the low-end Android hardware this audience actually uses."
+  ]
+}

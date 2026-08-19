@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Audit &mdash; Deligro — second audit (runtime)</title>
+<style>
+:root {
+  --bg:#faf9f7; --card:#ffffff; --ink:#1f1d1a; --muted:#6b6660;
+  --line:#e5e1db; --track:#e8e4de; --accent:#4a5568;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#171614; --card:#211f1d; --ink:#f0ede8; --muted:#9c968e;
+          --line:#332f2b; --track:#332f2b; --accent:#9aa5b1; }
+}
+* { box-sizing:border-box; }
+body { margin:0; padding:32px 20px 80px; background:var(--bg); color:var(--ink);
+  font:15px/1.6 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif; }
+.wrap { max-width:1000px; margin:0 auto; }
+h1 { font-size:26px; margin:0 0 4px; letter-spacing:-0.02em; }
+h2 { font-size:17px; margin:0 0 6px; }
+h3 { font-size:15px; margin:0 0 16px; text-transform:uppercase;
+  letter-spacing:0.07em; color:var(--muted); font-weight:600; }
+h4 { font-size:13px; margin:14px 0 6px; color:var(--muted);
+  text-transform:uppercase; letter-spacing:0.05em; }
+.meta { color:var(--muted); font-size:13px; margin:0 0 26px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+  padding:22px; margin-bottom:18px; }
+.banner { display:flex; gap:22px; align-items:center; background:var(--card);
+  border:1px solid var(--line); border-left-width:5px; border-radius:12px;
+  padding:22px; margin-bottom:18px; }
+.banner-score { display:flex; flex-direction:column; align-items:center;
+  line-height:1; min-width:96px; }
+.banner-num { font-size:46px; font-weight:700; letter-spacing:-0.03em; }
+.banner-grade { font-size:15px; font-weight:600; margin-top:4px; }
+.banner-body p { margin:0; color:var(--muted); }
+.cap-note { margin-top:10px !important; font-size:13px;
+  border-left:3px solid #b3261e; padding-left:10px; }
+.gauges { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; }
+.gauge { text-align:center; }
+.gauge-num { font:700 28px ui-sans-serif,sans-serif; letter-spacing:-0.02em; }
+.gauge-grade { font:600 12px ui-sans-serif,sans-serif; fill:var(--muted); }
+.gauge-label { font-size:13px; color:var(--muted); margin-top:2px; }
+.sevbar { display:flex; height:10px; border-radius:5px; overflow:hidden;
+  background:var(--track); margin-bottom:12px; }
+.seg { min-width:4px; }
+.chips { display:flex; flex-wrap:wrap; gap:14px; font-size:13px; color:var(--muted); }
+.chip i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; }
+.finding { border:1px solid var(--line); border-radius:9px; margin-bottom:9px;
+  background:var(--card); overflow:hidden; }
+.finding summary { cursor:pointer; padding:13px 15px; display:flex;
+  align-items:center; gap:11px; list-style:none; }
+.finding summary::-webkit-details-marker { display:none; }
+.finding summary:hover { background:rgba(127,127,127,0.05); }
+.badge { color:#fff; font-size:10px; font-weight:700; letter-spacing:0.06em;
+  padding:3px 7px; border-radius:4px; flex-shrink:0; }
+.ftitle { font-weight:600; flex:1; }
+.faxis { font-size:12px; color:var(--muted); flex-shrink:0; }
+.fbody { padding:0 15px 16px; border-top:1px solid var(--line); }
+.fbody p { margin:12px 0 0; }
+.loc { display:inline-block; margin-top:12px; font-size:12.5px; }
+code { background:rgba(127,127,127,0.12); padding:2px 6px; border-radius:4px;
+  font:13px ui-monospace,SFMono-Regular,Menlo,monospace; }
+pre { background:rgba(127,127,127,0.09); padding:13px; border-radius:8px;
+  overflow-x:auto; margin:0; }
+pre code { background:none; padding:0; font-size:12.5px; line-height:1.55; }
+.manual { margin-top:14px; padding:11px 13px; border-radius:8px;
+  background:rgba(179,38,30,0.09); border-left:3px solid #b3261e; font-size:14px; }
+.seorow { display:grid; grid-template-columns:150px 1fr 56px; gap:10px;
+  align-items:center; margin-bottom:9px; }
+.seolabel { font-size:13.5px; }
+.seotrack { height:8px; background:var(--track); border-radius:4px; overflow:hidden; }
+.seofill { height:100%; border-radius:4px; }
+.seoval { font-size:13px; color:var(--muted); text-align:right; }
+.seonote { grid-column:1/-1; font-size:12.5px; color:var(--muted); margin:-4px 0 6px; }
+table { width:100%; border-collapse:collapse; font-size:14px; }
+th { text-align:left; font-size:12px; text-transform:uppercase;
+  letter-spacing:0.05em; color:var(--muted); padding:0 10px 9px 0;
+  border-bottom:1px solid var(--line); font-weight:600; }
+td { padding:10px 10px 10px 0; border-bottom:1px solid var(--line);
+  vertical-align:top; }
+tbody tr:last-child td { border-bottom:none; }
+.gain { color:#15803d; font-weight:600; }
+.scatterwrap { margin-bottom:20px; }
+.scatter { width:100%; max-width:400px; display:block; margin:0 auto; }
+.dotnum { font:600 3.4px ui-sans-serif,sans-serif; fill:#fff; text-anchor:middle; }
+.axlabel { font:3.6px ui-sans-serif,sans-serif; fill:var(--muted); text-anchor:middle; }
+.hint { text-align:center; font-size:12.5px; color:var(--muted); margin:6px 0 0; }
+ul.plain { margin:0; padding-left:20px; }
+ul.plain li { margin-bottom:7px; }
+.empty { color:var(--muted); font-style:italic; margin:0; }
+footer { text-align:center; color:var(--muted); font-size:12.5px; margin-top:34px; }
+@media (max-width:640px) {
+  .banner { flex-direction:column; text-align:center; }
+  .seorow { grid-template-columns:1fr; }
+  .seoval { text-align:left; }
+}
+</style>
+</head><body><div class="wrap">
+  <h1>Deligro — second audit (runtime) &mdash; Audit Report</h1>
+  <p class="meta">2026-08-19 &amp;middot; Next.js 16.3 · React 19.2 · TypeScript · Tailwind 4 · Supabase · Razorpay · OneSignal &amp;middot; Full repo PLUS the app actually running. Production build served on localhost, every route probed over HTTP, payload sizes and server render times measured, database queried directly for catalog size and query cost. Audit 1 listed &#x27;runtime behaviour&#x27; as unchecked; that gap hid the worst finding here.</p>
+
+  
+    <section class="banner" style="border-color:#c2410c">
+      <div class="banner-score" style="color:#c2410c">
+        <span class="banner-num">69</span>
+        <span class="banner-grade">D</span>
+      </div>
+      <div class="banner-body">
+        <h2>Overall health</h2>
+        <p>Running the app found that the SEO and PWA work from the first fix pass was completely inert: robots.txt, sitemap.xml and manifest.webmanifest all answered 307 redirect to /login for anonymous requests, because src/proxy.ts&#x27;s matcher did not exclude them. They were generated correctly and appeared in the build output — which is what I verified last time, and it was not enough. Googlebot has no session, so the sitemap listing 50 restaurants was unreachable, and so was the manifest that makes the app installable. Fixed this round and verified against a running production server, with the auth gates confirmed still intact. The second finding costs more over time: every customer downloads the entire city&#x27;s menu — 3,157 dishes, 1.21MB raw and 81KB gzipped — on the home, search and stores pages, while the page that shows one real menu is 30x smaller at 10KB. That is a deliberate trade for instant client-side search, and it is the wrong one for a tier-3 audience on patchy 4G. Hindi and Supabase Realtime remain the two largest items and are unchanged.</p>
+        
+      </div>
+    </section>
+
+  <section class="card"><h3>Scores by axis</h3><div class="gauges">
+    <div class="gauge">
+      <svg viewBox="0 0 150 150" width="150" height="150" role="img"
+           aria-label="Security score 86 out of 100">
+        <circle cx="75.0" cy="75.0" r="61.0" fill="none" stroke="var(--track)" stroke-width="11"/>
+        <circle cx="75.0" cy="75.0" r="61.0" fill="none" stroke="#4d7c0f" stroke-width="11"
+                stroke-linecap="round" stroke-dasharray="383.27"
+                stroke-dashoffset="53.66" transform="rotate(-90 75.0 75.0)"/>
+        <text x="75.0" y="71.0" text-anchor="middle" class="gauge-num" fill="#4d7c0f">86</text>
+        <text x="75.0" y="92.0" text-anchor="middle" class="gauge-grade">B</text>
+      </svg>
+      <div class="gauge-label">Security</div>
+    </div>
+    <div class="gauge">
+      <svg viewBox="0 0 150 150" width="150" height="150" role="img"
+           aria-label="Performance score 58 out of 100">
+        <circle cx="75.0" cy="75.0" r="61.0" fill="none" stroke="var(--track)" stroke-width="11"/>
+        <circle cx="75.0" cy="75.0" r="61.0" fill="none" stroke="#b3261e" stroke-width="11"
+                stroke-linecap="round" stroke-dasharray="383.27"
+                stroke-dashoffset="160.98" transform="rotate(-90 75.0 75.0)"/>
+        <text x="75.0" y="71.0" text-anchor="middle" class="gauge-num" fill="#b3261e">58</text>
+        <text x="75.0" y="92.0" text-anchor="middle" class="gauge-grade">F</text>
+      </svg>
+      <div class="gauge-label">Performance</div>
+    </div>
+    <div class="gauge">
+      <svg viewBox="0 0 150 150" width="150" height="150" role="img"
+           aria-label="SEO score 44 out of 100">
+        <circle cx="75.0" cy="75.0" r="61.0" fill="none" stroke="var(--track)" stroke-width="11"/>
+        <circle cx="75.0" cy="75.0" r="61.0" fill="none" stroke="#b3261e" stroke-width="11"
+                stroke-linecap="round" stroke-dasharray="383.27"
+                stroke-dashoffset="214.63" transform="rotate(-90 75.0 75.0)"/>
+        <text x="75.0" y="71.0" text-anchor="middle" class="gauge-num" fill="#b3261e">44</text>
+        <text x="75.0" y="92.0" text-anchor="middle" class="gauge-grade">F</text>
+      </svg>
+      <div class="gauge-label">SEO</div>
+    </div>
+    <div class="gauge">
+      <svg viewBox="0 0 150 150" width="150" height="150" role="img"
+           aria-label="Code Quality score 85 out of 100">
+        <circle cx="75.0" cy="75.0" r="61.0" fill="none" stroke="var(--track)" stroke-width="11"/>
+        <circle cx="75.0" cy="75.0" r="61.0" fill="none" stroke="#4d7c0f" stroke-width="11"
+                stroke-linecap="round" stroke-dasharray="383.27"
+                stroke-dashoffset="57.49" transform="rotate(-90 75.0 75.0)"/>
+        <text x="75.0" y="71.0" text-anchor="middle" class="gauge-num" fill="#4d7c0f">85</text>
+        <text x="75.0" y="92.0" text-anchor="middle" class="gauge-grade">B</text>
+      </svg>
+      <div class="gauge-label">Code Quality</div>
+    </div></div></section>
+
+  <section class="card">
+    <h3>Findings by severity</h3>
+    <div class="sevbar"><div class="seg" style="flex:2;background:#c2410c" title="2 high"></div><div class="seg" style="flex:3;background:#a16207" title="3 medium"></div><div class="seg" style="flex:3;background:#4b5563" title="3 low"></div></div><div class="chips"><span class="chip"><i style="background:#b3261e"></i>0 Critical</span><span class="chip"><i style="background:#c2410c"></i>2 High</span><span class="chip"><i style="background:#a16207"></i>3 Medium</span><span class="chip"><i style="background:#4b5563"></i>3 Low</span></div>
+  </section>
+
+  <section class="card">
+    <h3>All findings</h3>
+    
+        <details class="finding" >
+          <summary>
+            <span class="badge" style="background:#c2410c">HIGH</span>
+            <span class="ftitle">FIXED — robots.txt, sitemap.xml and manifest.webmanifest all answered 307 to /login</span>
+            <span class="faxis">SEO</span>
+          </summary>
+          <div class="fbody">
+            <code class="loc">src/proxy.ts:101 (matcher) · src/proxy.ts:91 (session gate)</code>
+            <p>All three files were generated correctly by src/app/{robots,sitemap,manifest}.ts and appeared in the build output — the exact thing verified during the previous fix pass, and not sufficient. The proxy matcher excluded _next/static, _next/image, favicon.ico and image extensions but not these three, so every anonymous request fell through to the session gate and was redirected. Googlebot has no session. The consequences were all silent: a crawler cannot read robots.txt so it never discovers the sitemap; it cannot read the sitemap so no restaurant page is indexed; a first-time visitor&#x27;s browser cannot read the manifest so Chrome never offers &#x27;Add to home screen&#x27; — precisely the visitor the manifest exists for. The entire SEO and PWA fix was inert from the moment it shipped.</p>
+            <div class="fix"><h4>Fix</h4><pre><code>One line, in the matcher:
+
+```diff
+-&quot;/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)&quot;
++&quot;/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)&quot;
+```
+
+All three are public by definition — nothing in them is user-scoped, so there is nothing for the session gate to protect. Verified on a running production server: robots.txt 200, sitemap.xml 200, manifest.webmanifest 200, while /admin and /checkout still answer 307. The lesson worth keeping: &#x27;it appears in the build output&#x27; is not &#x27;it is reachable&#x27; — every public file needs one HTTP request against a running server before it counts as shipped.</code></pre></div>
+            
+          </div>
+        </details>
+        <details class="finding" >
+          <summary>
+            <span class="badge" style="background:#c2410c">HIGH</span>
+            <span class="ftitle">Every catalog page ships the entire city&#x27;s menu — 3,157 dishes</span>
+            <span class="faxis">Performance</span>
+          </summary>
+          <div class="fbody">
+            <code class="loc">src/lib/search/dishes.ts:9 · src/lib/catalog.ts:33 · src/app/(customer)/page.tsx:13</code>
+            <p>Measured on a production build: / is 1,210,678 bytes raw (81KB gzipped, 1.3-2.5s server render), /search 1,248,670 bytes, /stores 1,200,779 bytes — while /restaurant/[slug], the page that shows one real menu, is 38,788 bytes (10KB gzipped, 0.5s). The page showing no menu is 30x larger than the page showing one. Payload composition of the home page: 3,207 price fields, 3,157 veg flags, 3,167 descriptions — the full menu of all 50 approved restaurants, confirmed against the database (50 approved restaurants, 3,797 menu items). This is deliberate and documented: dishes.ts says the catalog is loaded whole so client-side search &#x27;stays instant while typing&#x27;. It is the wrong trade for this audience. Instant local search is a luxury; 81KB of gzipped HTML plus 1.2MB to parse and hydrate on a low-end Android over patchy 4G is a cost paid on every visit by everyone, including the majority who never search. It also grows linearly with onboarding — at 100 vendors it doubles.</p>
+            <div class="fix"><h4>Fix</h4><pre><code>Move search server-side at the seam the code already names (`buildDishIndex`).
+
+1. A feed projection without menus:
+```ts
+// name, image, rating, eta, cuisines, price tier — no menu array
+export async function listRestaurantsForFeed(): Promise&lt;RestaurantCard[]&gt;
+```
+2. A search endpoint, debounced ~250ms client-side:
+```ts
+// GET /api/search?q=... over menu_items
+```
+3. The index that makes it fast:
+```sql
+create extension if not exists pg_trgm;
+create index on menu_items using gin (name gin_trgm_ops);
+```
+
+Expected: the home page drops from ~81KB to well under 15KB gzipped and stops growing with the vendor count; search costs one debounced request instead of a megabyte up front.</code></pre></div>
+            
+          </div>
+        </details>
+        <details class="finding" >
+          <summary>
+            <span class="badge" style="background:#a16207">MEDIUM</span>
+            <span class="ftitle">No &lt;h1&gt; on the home, search or stores pages</span>
+            <span class="faxis">SEO</span>
+          </summary>
+          <div class="fbody">
+            <code class="loc">src/app/(customer)/page.tsx · src/app/(customer)/search/page.tsx · src/app/(customer)/stores/page.tsx</code>
+            <p>Measured on rendered HTML: / has 0 h1, 3 h2 and 56 h3. /search and /stores also have 0. Only /restaurant/[slug] has one. Screen-reader users navigate by heading level and a crawler reads the h1 as the page&#x27;s subject, so this is a single defect scoring against both accessibility and SEO on three of the four main customer pages. The 56 h3 card titles with no h1 or h2 above them is not a hierarchy, it is a flat list wearing heading tags.</p>
+            <div class="fix"><h4>Fix</h4><pre><code>Give each page one &lt;h1&gt; — styled as the design already looks, or `sr-only` where there is no room for a visible title — and demote the card titles from h3 so the levels descend properly. On the home page the h1 is the greeting or &#x27;Order in Bemetara&#x27;; on /search it is &#x27;Search&#x27;; on /stores, &#x27;All restaurants&#x27;.</code></pre></div>
+            
+          </div>
+        </details>
+        <details class="finding" >
+          <summary>
+            <span class="badge" style="background:#a16207">MEDIUM</span>
+            <span class="ftitle">Admin cannot assign a rider, although the server action already authorizes admins</span>
+            <span class="faxis">functionality</span>
+          </summary>
+          <div class="fbody">
+            <code class="loc">src/app/manager/actions.ts:105 (assignRider) · src/components/admin/live-board.tsx (renders &quot;Unassigned&quot;, no action)</code>
+            <p>`assignRider` is a well-built action — role-checked as [&quot;manager&quot;, &quot;admin&quot;], handles the duplicate-key race with a human message (&quot;A rider took this order first&quot;), and degrades gracefully on a database without migration 0026&#x27;s location-source column. It is called from exactly one component: the manager order board. The admin console&#x27;s LiveBoard renders the word &quot;Unassigned&quot; in its rider column with nothing to click. So an admin watching a stuck order can see the problem and cannot fix it, despite the server already permitting them to. The only other path to a delivery row is a driver self-claiming through acceptDelivery, so if no rider is online an order sits in READY with no escalation and no operator able to intervene from the console they are already in.</p>
+            <div class="fix"><h4>Fix</h4><pre><code>Surface the existing action in the LiveBoard&#x27;s rider cell — a small picker on the &quot;Unassigned&quot; label, calling the same `assignRider(orderId, riderId)`. No permissions change is needed; the authorization already covers admin. This is purely a UI gap.</code></pre></div>
+            
+          </div>
+        </details>
+        <details class="finding" >
+          <summary>
+            <span class="badge" style="background:#a16207">MEDIUM</span>
+            <span class="ftitle">Still no realtime anywhere — re-confirmed, with the polling cost now measured</span>
+            <span class="faxis">realtime</span>
+          </summary>
+          <div class="fbody">
+            <code class="loc">src/components/shared/auto-refresh.tsx · supabase/migrations/ (all 40)</code>
+            <p>Re-verified across src/ and every migration: zero `.channel(`, zero `postgres_changes`, zero `supabase_realtime`. Polling is unchanged at 4s (admin orders, manager, driver), 8s (vendor kitchen, whenHidden), 3s (customer tracking), plus the 10s customer orders list added in the first fix pass. One admin-orders poll now measures at 211ms and 21KB, so a single open tab is roughly 900 queries and ~19MB per hour before the RSC payload around it. Cost still scales with open tabs rather than orders.</p>
+            <div class="fix"><h4>Fix</h4><pre><code>Unchanged from audit 1 — enable replication on `orders` and `deliveries`, then replace the timer with a postgres_changes subscription keeping a 60s poll as a dropped-socket net. The CSP already permits wss://*.supabase.co. Full migration and hook in AUDIT_REPORT.md.</code></pre></div>
+            <div class="manual"><strong>You must do this yourself:</strong> Enable Realtime for `orders` and `deliveries` in the Supabase dashboard (Database → Replication) after running the migration.</div>
+          </div>
+        </details>
+        <details class="finding" >
+          <summary>
+            <span class="badge" style="background:#4b5563">LOW</span>
+            <span class="ftitle">Verified — the order_items join added last round costs almost nothing</span>
+            <span class="faxis">Performance</span>
+          </summary>
+          <div class="fbody">
+            <code class="loc">src/lib/data-access/admin-orders.ts (listColumns)</code>
+            <p>A join was added to a query that polls every 4 seconds, and should have been measured at the time rather than reasoned about. Five runs each against the live database, median: without order_items 245ms / 17.2KB; with order_items 211ms / 21.1KB. The payload grows 3.9KB (23%) and there is no measurable latency cost — the timing difference is noise, and the &#x27;with&#x27; case was nominally faster. The trade was sound.</p>
+            <div class="fix"><h4>Fix</h4><pre><code>No action. Recorded because a polled query deserves a measurement, not an assumption.</code></pre></div>
+            
+          </div>
+        </details>
+        <details class="finding" >
+          <summary>
+            <span class="badge" style="background:#4b5563">LOW</span>
+            <span class="ftitle">Verified — runtime security headers and anonymous API behaviour hold up</span>
+            <span class="faxis">Security</span>
+          </summary>
+          <div class="fbody">
+            <code class="loc">next.config.ts (headers) · src/app/api/**</code>
+            <p>Not a defect; recorded as evidence. Every configured header is present on a live response: CSP, Strict-Transport-Security, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy, Permissions-Policy. Unauthenticated API probes: /api/orders 401, /api/addresses 401, /api/vendor/earnings 403, /api/{favorites,profile,refunds,reviews} 405, and /api/me returns 200 with {&quot;role&quot;:null} — which is correct, since it answers &#x27;who am I&#x27; and leaks nothing. After the proxy matcher change, /admin and /checkout still redirect anonymous callers, so opening the metadata files widened nothing.</p>
+            <div class="fix"><h4>Fix</h4><pre><code>No action.</code></pre></div>
+            
+          </div>
+        </details>
+        <details class="finding" >
+          <summary>
+            <span class="badge" style="background:#4b5563">LOW</span>
+            <span class="ftitle">Verified — typography fix landed and customer-facing error copy is a genuine strength</span>
+            <span class="faxis">Code Quality</span>
+          </summary>
+          <div class="fbody">
+            <code class="loc">src/app/globals.css:524 · src/components/auth/otp-login.tsx:352</code>
+            <p>Not a defect; recorded as evidence. Base font is 16px on the live response and pinch-zoom is restored. Small-text utility usage measures 414 against 416 at audit 1 — unchanged, as expected, since the base size changed rather than the utilities; six CSS rules still sit below 14px including one at 10.5px, which is the remaining work. Error copy is better than most production apps: errorText() maps every API code to a human sentence (&#x27;Code expired — request a new one&#x27;, &#x27;Too many tries. Request a new code.&#x27;) and no raw error code was observed reaching a user. The driver board matches it (&#x27;Another rider just grabbed this order&#x27;, &#x27;Wrong code — ask the customer again&#x27;). All of it in English, which is the standing Hindi finding.</p>
+            <div class="fix"><h4>Fix</h4><pre><code>Raise the remaining sub-14px CSS rules on customer-facing surfaces; the 10.5px one first.</code></pre></div>
+            
+          </div>
+        </details>
+  </section>
+
+  <section class="card"><h3>SEO breakdown</h3>
+        <div class="seorow">
+          <div class="seolabel">Crawlability &amp; indexing</div>
+          <div class="seotrack"><div class="seofill" style="width:36.0%;background:#b3261e"></div></div>
+          <div class="seoval">9/25</div>
+          <div class="seonote">robots/sitemap now reachable (were 307). App still login-walled for crawlers.</div>
+        </div>
+        <div class="seorow">
+          <div class="seolabel">On-page metadata</div>
+          <div class="seotrack"><div class="seofill" style="width:64.0%;background:#c2410c"></div></div>
+          <div class="seoval">16/25</div>
+          <div class="seonote">Restaurant pages have title, description, canonical, OG. Home/search/stores have no &lt;h1&gt;.</div>
+        </div>
+        <div class="seorow">
+          <div class="seolabel">Social &amp; structured data</div>
+          <div class="seotrack"><div class="seofill" style="width:60.0%;background:#c2410c"></div></div>
+          <div class="seoval">9/15</div>
+          <div class="seonote">Restaurant JSON-LD + OG images shipped; WhatsApp previews now render.</div>
+        </div>
+        <div class="seorow">
+          <div class="seolabel">Content quality</div>
+          <div class="seotrack"><div class="seofill" style="width:53.3%;background:#b3261e"></div></div>
+          <div class="seoval">8/15</div>
+          <div class="seonote">75/75 images have alt; all 4 icon-only buttons carry aria-labels. Heading hierarchy is flat.</div>
+        </div>
+        <div class="seorow">
+          <div class="seolabel">Technical &amp; CWV</div>
+          <div class="seotrack"><div class="seofill" style="width:40.0%;background:#b3261e"></div></div>
+          <div class="seoval">8/20</div>
+          <div class="seonote">Manifest reachable, 16px base, zoom restored. Offset by 81KB gzipped catalog payload and 1.3-2.5s render.</div>
+        </div></section>
+  
+  
+    <section class="card">
+      <h3>Prioritized actions</h3>
+      <div class="scatterwrap">
+        <svg viewBox="-6 0 112 98" class="scatter" role="img" aria-label="Impact versus effort chart">
+          <line x1="10" y1="88" x2="98" y2="88" stroke="var(--track)" stroke-width="0.5"/>
+          <line x1="10" y1="5" x2="10" y2="88" stroke="var(--track)" stroke-width="0.5"/>
+          <text x="54" y="95.5" class="axlabel">Effort &rarr;</text>
+          <text x="0" y="46" class="axlabel" transform="rotate(-90 0 46)">Impact &rarr;</text>
+          <circle cx="50" cy="18" r="3.6" fill="var(--accent)"/><text x="50" y="19.4" class="dotnum">1</text><circle cx="54" cy="15" r="3.6" fill="var(--accent)"/><text x="54" y="16.4" class="dotnum">2</text><circle cx="46" cy="18" r="3.6" fill="var(--accent)"/><text x="46" y="19.4" class="dotnum">3</text><circle cx="18" cy="58" r="3.6" fill="var(--accent)"/><text x="18" y="59.4" class="dotnum">4</text><circle cx="22" cy="61" r="3.6" fill="var(--accent)"/><text x="22" y="62.4" class="dotnum">5</text><circle cx="46" cy="33" r="3.6" fill="var(--accent)"/><text x="46" y="34.4" class="dotnum">6</text><circle cx="50" cy="36" r="3.6" fill="var(--accent)"/><text x="50" y="37.4" class="dotnum">7</text><circle cx="22" cy="33" r="3.6" fill="var(--accent)"/><text x="22" y="34.4" class="dotnum">8</text><circle cx="14" cy="83" r="3.6" fill="var(--accent)"/><text x="14" y="84.4" class="dotnum">9</text>
+        </svg>
+        <p class="hint">Top-left is where to start: high impact, low effort.</p>
+      </div>
+      <table class="actions">
+        <thead><tr><th>#</th><th>Action</th><th>Axis</th><th>Impact</th><th>Effort</th><th>Score gain</th></tr></thead>
+        <tbody><tr><td>1</td><td>Hindi — customer status words, driver board, vendor board</td><td>ux</td><td>Critical</td><td>Medium</td><td class='gain'>+15</td></tr><tr><td>2</td><td>Move search server-side; ship a feed projection without menus</td><td>Performance</td><td>Critical</td><td>Medium</td><td class='gain'>+22</td></tr><tr><td>3</td><td>Enable Supabase Realtime on orders + deliveries</td><td>realtime</td><td>Critical</td><td>Medium</td><td class='gain'>+20</td></tr><tr><td>4</td><td>Add one &lt;h1&gt; per page and fix the heading hierarchy</td><td>SEO</td><td>Medium</td><td>Low</td><td class='gain'>+6</td></tr><tr><td>5</td><td>Surface assignRider in the admin LiveBoard</td><td>functionality</td><td>Medium</td><td>Low</td><td class='gain'>+5</td></tr><tr><td>6</td><td>Open /, /search and /restaurant/* to anonymous visitors</td><td>SEO</td><td>High</td><td>Medium</td><td class='gain'>+12</td></tr><tr><td>7</td><td>Global offline banner + checkout submit guard</td><td>functionality</td><td>High</td><td>Medium</td><td class='gain'>+5</td></tr><tr><td>8</td><td>Set SITE_URL and SITE_INDEXABLE=true on the production host</td><td>SEO</td><td>High</td><td>Low</td><td class='gain'>+8</td></tr><tr><td>9</td><td>Raise the remaining sub-14px CSS rules, starting with 10.5px</td><td>ux</td><td>Low</td><td>Low</td><td class='gain'>+2</td></tr></tbody>
+      </table>
+    </section>
+  <section class="card"><h3>Dead code</h3><ul class="plain"><li>Re-checked with knip: 12 unused files at audit 1 are now 2, and both are deliberate — public/OneSignalSDKWorker.js (fetched by the SDK at runtime, a knip false positive) and src/components/shared/rating.tsx (parked work, restore path commented at restaurant-card.tsx:9 and :76).</li></ul></section>
+  <section class="card"><h3>What&#x27;s new &amp;mdash; modernization</h3><ul class="plain"><li>Next.js 16.3 / React 19.2 remain current; no framework upgrade needed.</li><li>pg_trgm is the missing piece for server-side dish search — a Postgres extension already available on Supabase, no new service.</li><li>scripts/qa/ still has a real suite (idor-suite, payments-signature, e2e-smoke, zap-baseline) that appears to run by hand. Wiring run-all.sh into CI remains the highest-leverage DX change, and would have caught the 307 regression in finding 1 if it probed the public metadata files.</li></ul></section>
+  <section class="card"><h3>Suggestions</h3><ul class="plain"><li>Add a CI smoke check that fetches /robots.txt, /sitemap.xml and /manifest.webmanifest against a started production server and fails on anything other than 200. This exact class of bug — correct file, unreachable route — is invisible to typecheck, lint and build, all three of which passed.</li><li>Order-status SMS as a fallback to web push; Renflair is already integrated for OTP and reaches every phone regardless of browser state.</li><li>Show the delivery OTP at display size on the tracking screen — it is already fetched, and two people reading a 4-digit code at a door need it large.</li><li>Icons alongside text on the driver and vendor boards; a rider recognises a shape before reading a word, which also partly hedges the language gap while translation is in progress.</li><li>Test on a real low-end Android over a throttled connection. Given the catalog payload finding, INP on the home page is where I would look first.</li></ul></section>
+  <section class="card"><h3>Not assessed</h3><ul class="plain"><li>Authenticated UI — every probe ran anonymous or as a guest. Admin, vendor, driver and manager boards were read as source and measured at the query layer, but not driven through a signed-in browser. The admin-orders Items column added last round is verified by typecheck, build and a live query returning real dish names, not by seeing it painted.</li><li>Live RLS policies — read from migrations again, not diffed against the running database. Policies can be altered in the dashboard without a migration; still worth an hour with the Supabase dashboard open.</li><li>Core Web Vitals on real hardware — server render times are measured, but LCP, INP and CLS on a low-end Android are not.</li><li>Razorpay webhooks under live traffic, screen-reader testing, and colour-contrast measurement.</li></ul></section>
+
+  <footer>Generated by the project-audit skill. Scores are advisory, not a security guarantee.</footer>
+</div></body></html>

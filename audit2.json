@@ -1,0 +1,139 @@
+{
+  "project": "Deligro — second audit (runtime)",
+  "date": "2026-08-19",
+  "stack": "Next.js 16.3 · React 19.2 · TypeScript · Tailwind 4 · Supabase · Razorpay · OneSignal",
+  "scope": "Full repo PLUS the app actually running. Production build served on localhost, every route probed over HTTP, payload sizes and server render times measured, database queried directly for catalog size and query cost. Audit 1 listed 'runtime behaviour' as unchecked; that gap hid the worst finding here.",
+
+  "summary": "Running the app found that the SEO and PWA work from the first fix pass was completely inert: robots.txt, sitemap.xml and manifest.webmanifest all answered 307 redirect to /login for anonymous requests, because src/proxy.ts's matcher did not exclude them. They were generated correctly and appeared in the build output — which is what I verified last time, and it was not enough. Googlebot has no session, so the sitemap listing 50 restaurants was unreachable, and so was the manifest that makes the app installable. Fixed this round and verified against a running production server, with the auth gates confirmed still intact. The second finding costs more over time: every customer downloads the entire city's menu — 3,157 dishes, 1.21MB raw and 81KB gzipped — on the home, search and stores pages, while the page that shows one real menu is 30x smaller at 10KB. That is a deliberate trade for instant client-side search, and it is the wrong one for a tier-3 audience on patchy 4G. Hindi and Supabase Realtime remain the two largest items and are unchanged.",
+
+  "overall": { "score": 69, "uncapped_score": 69, "capped": false },
+
+  "scores": {
+    "security":     { "score": 86, "note": "Runtime headers verified present; anon API probes correctly refused. /build gated, duplicate env deleted." },
+    "performance":  { "score": 58, "note": "Down from 66 — a measurement, not a regression. 3,157 dishes ship on every catalog page." },
+    "seo":          { "score": 44, "note": "Metadata files now actually reachable. Still login-walled; no <h1> on 3 of 4 main pages." },
+    "code_quality": { "score": 85, "note": "Dead code removed, deps declared, docs current with behaviour." }
+  },
+
+  "findings": [
+    {
+      "severity": "high",
+      "axis": "seo",
+      "title": "FIXED — robots.txt, sitemap.xml and manifest.webmanifest all answered 307 to /login",
+      "location": "src/proxy.ts:101 (matcher) · src/proxy.ts:91 (session gate)",
+      "impact": "All three files were generated correctly by src/app/{robots,sitemap,manifest}.ts and appeared in the build output — the exact thing verified during the previous fix pass, and not sufficient. The proxy matcher excluded _next/static, _next/image, favicon.ico and image extensions but not these three, so every anonymous request fell through to the session gate and was redirected. Googlebot has no session. The consequences were all silent: a crawler cannot read robots.txt so it never discovers the sitemap; it cannot read the sitemap so no restaurant page is indexed; a first-time visitor's browser cannot read the manifest so Chrome never offers 'Add to home screen' — precisely the visitor the manifest exists for. The entire SEO and PWA fix was inert from the moment it shipped.",
+      "fix": "One line, in the matcher:\n\n```diff\n-\"/((?!_next/static|_next/image|favicon.ico|.*\\\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)\"\n+\"/((?!_next/static|_next/image|favicon.ico|robots\\\\.txt|sitemap\\\\.xml|manifest\\\\.webmanifest|.*\\\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)\"\n```\n\nAll three are public by definition — nothing in them is user-scoped, so there is nothing for the session gate to protect. Verified on a running production server: robots.txt 200, sitemap.xml 200, manifest.webmanifest 200, while /admin and /checkout still answer 307. The lesson worth keeping: 'it appears in the build output' is not 'it is reachable' — every public file needs one HTTP request against a running server before it counts as shipped.",
+      "manual_action": null
+    },
+    {
+      "severity": "high",
+      "axis": "performance",
+      "title": "Every catalog page ships the entire city's menu — 3,157 dishes",
+      "location": "src/lib/search/dishes.ts:9 · src/lib/catalog.ts:33 · src/app/(customer)/page.tsx:13",
+      "impact": "Measured on a production build: / is 1,210,678 bytes raw (81KB gzipped, 1.3-2.5s server render), /search 1,248,670 bytes, /stores 1,200,779 bytes — while /restaurant/[slug], the page that shows one real menu, is 38,788 bytes (10KB gzipped, 0.5s). The page showing no menu is 30x larger than the page showing one. Payload composition of the home page: 3,207 price fields, 3,157 veg flags, 3,167 descriptions — the full menu of all 50 approved restaurants, confirmed against the database (50 approved restaurants, 3,797 menu items). This is deliberate and documented: dishes.ts says the catalog is loaded whole so client-side search 'stays instant while typing'. It is the wrong trade for this audience. Instant local search is a luxury; 81KB of gzipped HTML plus 1.2MB to parse and hydrate on a low-end Android over patchy 4G is a cost paid on every visit by everyone, including the majority who never search. It also grows linearly with onboarding — at 100 vendors it doubles.",
+      "fix": "Move search server-side at the seam the code already names (`buildDishIndex`).\n\n1. A feed projection without menus:\n```ts\n// name, image, rating, eta, cuisines, price tier — no menu array\nexport async function listRestaurantsForFeed(): Promise<RestaurantCard[]>\n```\n2. A search endpoint, debounced ~250ms client-side:\n```ts\n// GET /api/search?q=... over menu_items\n```\n3. The index that makes it fast:\n```sql\ncreate extension if not exists pg_trgm;\ncreate index on menu_items using gin (name gin_trgm_ops);\n```\n\nExpected: the home page drops from ~81KB to well under 15KB gzipped and stops growing with the vendor count; search costs one debounced request instead of a megabyte up front.",
+      "manual_action": null
+    },
+    {
+      "severity": "medium",
+      "axis": "seo",
+      "title": "No <h1> on the home, search or stores pages",
+      "location": "src/app/(customer)/page.tsx · src/app/(customer)/search/page.tsx · src/app/(customer)/stores/page.tsx",
+      "impact": "Measured on rendered HTML: / has 0 h1, 3 h2 and 56 h3. /search and /stores also have 0. Only /restaurant/[slug] has one. Screen-reader users navigate by heading level and a crawler reads the h1 as the page's subject, so this is a single defect scoring against both accessibility and SEO on three of the four main customer pages. The 56 h3 card titles with no h1 or h2 above them is not a hierarchy, it is a flat list wearing heading tags.",
+      "fix": "Give each page one <h1> — styled as the design already looks, or `sr-only` where there is no room for a visible title — and demote the card titles from h3 so the levels descend properly. On the home page the h1 is the greeting or 'Order in Bemetara'; on /search it is 'Search'; on /stores, 'All restaurants'.",
+      "manual_action": null
+    },
+    {
+      "severity": "medium",
+      "axis": "functionality",
+      "title": "Admin cannot assign a rider, although the server action already authorizes admins",
+      "location": "src/app/manager/actions.ts:105 (assignRider) · src/components/admin/live-board.tsx (renders \"Unassigned\", no action)",
+      "impact": "`assignRider` is a well-built action — role-checked as [\"manager\", \"admin\"], handles the duplicate-key race with a human message (\"A rider took this order first\"), and degrades gracefully on a database without migration 0026's location-source column. It is called from exactly one component: the manager order board. The admin console's LiveBoard renders the word \"Unassigned\" in its rider column with nothing to click. So an admin watching a stuck order can see the problem and cannot fix it, despite the server already permitting them to. The only other path to a delivery row is a driver self-claiming through acceptDelivery, so if no rider is online an order sits in READY with no escalation and no operator able to intervene from the console they are already in.",
+      "fix": "Surface the existing action in the LiveBoard's rider cell — a small picker on the \"Unassigned\" label, calling the same `assignRider(orderId, riderId)`. No permissions change is needed; the authorization already covers admin. This is purely a UI gap.",
+      "manual_action": null
+    },
+    {
+      "severity": "medium",
+      "axis": "realtime",
+      "title": "Still no realtime anywhere — re-confirmed, with the polling cost now measured",
+      "location": "src/components/shared/auto-refresh.tsx · supabase/migrations/ (all 40)",
+      "impact": "Re-verified across src/ and every migration: zero `.channel(`, zero `postgres_changes`, zero `supabase_realtime`. Polling is unchanged at 4s (admin orders, manager, driver), 8s (vendor kitchen, whenHidden), 3s (customer tracking), plus the 10s customer orders list added in the first fix pass. One admin-orders poll now measures at 211ms and 21KB, so a single open tab is roughly 900 queries and ~19MB per hour before the RSC payload around it. Cost still scales with open tabs rather than orders.",
+      "fix": "Unchanged from audit 1 — enable replication on `orders` and `deliveries`, then replace the timer with a postgres_changes subscription keeping a 60s poll as a dropped-socket net. The CSP already permits wss://*.supabase.co. Full migration and hook in AUDIT_REPORT.md.",
+      "manual_action": "Enable Realtime for `orders` and `deliveries` in the Supabase dashboard (Database → Replication) after running the migration."
+    },
+    {
+      "severity": "low",
+      "axis": "performance",
+      "title": "Verified — the order_items join added last round costs almost nothing",
+      "location": "src/lib/data-access/admin-orders.ts (listColumns)",
+      "impact": "A join was added to a query that polls every 4 seconds, and should have been measured at the time rather than reasoned about. Five runs each against the live database, median: without order_items 245ms / 17.2KB; with order_items 211ms / 21.1KB. The payload grows 3.9KB (23%) and there is no measurable latency cost — the timing difference is noise, and the 'with' case was nominally faster. The trade was sound.",
+      "fix": "No action. Recorded because a polled query deserves a measurement, not an assumption.",
+      "manual_action": null
+    },
+    {
+      "severity": "low",
+      "axis": "security",
+      "title": "Verified — runtime security headers and anonymous API behaviour hold up",
+      "location": "next.config.ts (headers) · src/app/api/**",
+      "impact": "Not a defect; recorded as evidence. Every configured header is present on a live response: CSP, Strict-Transport-Security, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy, Permissions-Policy. Unauthenticated API probes: /api/orders 401, /api/addresses 401, /api/vendor/earnings 403, /api/{favorites,profile,refunds,reviews} 405, and /api/me returns 200 with {\"role\":null} — which is correct, since it answers 'who am I' and leaks nothing. After the proxy matcher change, /admin and /checkout still redirect anonymous callers, so opening the metadata files widened nothing.",
+      "fix": "No action.",
+      "manual_action": null
+    },
+    {
+      "severity": "low",
+      "axis": "code_quality",
+      "title": "Verified — typography fix landed and customer-facing error copy is a genuine strength",
+      "location": "src/app/globals.css:524 · src/components/auth/otp-login.tsx:352",
+      "impact": "Not a defect; recorded as evidence. Base font is 16px on the live response and pinch-zoom is restored. Small-text utility usage measures 414 against 416 at audit 1 — unchanged, as expected, since the base size changed rather than the utilities; six CSS rules still sit below 14px including one at 10.5px, which is the remaining work. Error copy is better than most production apps: errorText() maps every API code to a human sentence ('Code expired — request a new one', 'Too many tries. Request a new code.') and no raw error code was observed reaching a user. The driver board matches it ('Another rider just grabbed this order', 'Wrong code — ask the customer again'). All of it in English, which is the standing Hindi finding.",
+      "fix": "Raise the remaining sub-14px CSS rules on customer-facing surfaces; the 10.5px one first.",
+      "manual_action": null
+    }
+  ],
+
+  "seo": {
+    "categories": [
+      { "name": "Crawlability & indexing", "score": 9, "max": 25, "note": "robots/sitemap now reachable (were 307). App still login-walled for crawlers." },
+      { "name": "On-page metadata", "score": 16, "max": 25, "note": "Restaurant pages have title, description, canonical, OG. Home/search/stores have no <h1>." },
+      { "name": "Social & structured data", "score": 9, "max": 15, "note": "Restaurant JSON-LD + OG images shipped; WhatsApp previews now render." },
+      { "name": "Content quality", "score": 8, "max": 15, "note": "75/75 images have alt; all 4 icon-only buttons carry aria-labels. Heading hierarchy is flat." },
+      { "name": "Technical & CWV", "score": 8, "max": 20, "note": "Manifest reachable, 16px base, zoom restored. Offset by 81KB gzipped catalog payload and 1.3-2.5s render." }
+    ]
+  },
+
+  "actions": [
+    { "action": "Hindi — customer status words, driver board, vendor board", "axis": "ux", "impact": "critical", "effort": "medium", "score_gain": "+15" },
+    { "action": "Move search server-side; ship a feed projection without menus", "axis": "performance", "impact": "critical", "effort": "medium", "score_gain": "+22" },
+    { "action": "Enable Supabase Realtime on orders + deliveries", "axis": "realtime", "impact": "critical", "effort": "medium", "score_gain": "+20" },
+    { "action": "Add one <h1> per page and fix the heading hierarchy", "axis": "seo", "impact": "medium", "effort": "low", "score_gain": "+6" },
+    { "action": "Surface assignRider in the admin LiveBoard", "axis": "functionality", "impact": "medium", "effort": "low", "score_gain": "+5" },
+    { "action": "Open /, /search and /restaurant/* to anonymous visitors", "axis": "seo", "impact": "high", "effort": "medium", "score_gain": "+12" },
+    { "action": "Global offline banner + checkout submit guard", "axis": "functionality", "impact": "high", "effort": "medium", "score_gain": "+5" },
+    { "action": "Set SITE_URL and SITE_INDEXABLE=true on the production host", "axis": "seo", "impact": "high", "effort": "low", "score_gain": "+8" },
+    { "action": "Raise the remaining sub-14px CSS rules, starting with 10.5px", "axis": "ux", "impact": "low", "effort": "low", "score_gain": "+2" }
+  ],
+
+  "dead_code": [
+    "Re-checked with knip: 12 unused files at audit 1 are now 2, and both are deliberate — public/OneSignalSDKWorker.js (fetched by the SDK at runtime, a knip false positive) and src/components/shared/rating.tsx (parked work, restore path commented at restaurant-card.tsx:9 and :76)."
+  ],
+
+  "modernization": [
+    "Next.js 16.3 / React 19.2 remain current; no framework upgrade needed.",
+    "pg_trgm is the missing piece for server-side dish search — a Postgres extension already available on Supabase, no new service.",
+    "scripts/qa/ still has a real suite (idor-suite, payments-signature, e2e-smoke, zap-baseline) that appears to run by hand. Wiring run-all.sh into CI remains the highest-leverage DX change, and would have caught the 307 regression in finding 1 if it probed the public metadata files."
+  ],
+
+  "suggestions": [
+    "Add a CI smoke check that fetches /robots.txt, /sitemap.xml and /manifest.webmanifest against a started production server and fails on anything other than 200. This exact class of bug — correct file, unreachable route — is invisible to typecheck, lint and build, all three of which passed.",
+    "Order-status SMS as a fallback to web push; Renflair is already integrated for OTP and reaches every phone regardless of browser state.",
+    "Show the delivery OTP at display size on the tracking screen — it is already fetched, and two people reading a 4-digit code at a door need it large.",
+    "Icons alongside text on the driver and vendor boards; a rider recognises a shape before reading a word, which also partly hedges the language gap while translation is in progress.",
+    "Test on a real low-end Android over a throttled connection. Given the catalog payload finding, INP on the home page is where I would look first."
+  ],
+
+  "not_assessed": [
+    "Authenticated UI — every probe ran anonymous or as a guest. Admin, vendor, driver and manager boards were read as source and measured at the query layer, but not driven through a signed-in browser. The admin-orders Items column added last round is verified by typecheck, build and a live query returning real dish names, not by seeing it painted.",
+    "Live RLS policies — read from migrations again, not diffed against the running database. Policies can be altered in the dashboard without a migration; still worth an hour with the Supabase dashboard open.",
+    "Core Web Vitals on real hardware — server render times are measured, but LCP, INP and CLS on a low-end Android are not.",
+    "Razorpay webhooks under live traffic, screen-reader testing, and colour-contrast measurement."
+  ]
+}
