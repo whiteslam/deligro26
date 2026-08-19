@@ -1,6 +1,6 @@
 import { formatINR } from "@/lib/utils/format";
 import type { SettlementLine } from "@/lib/data-access/admin-settlements";
-import type { SettlementTotals } from "@/lib/settlements/math";
+import { itemsLabel, type SettlementTotals } from "@/lib/settlements/math";
 
 /**
  * How a payout is shown — once, for every screen that shows one.
@@ -220,7 +220,26 @@ export function payWord(line: SettlementLine): string {
  * table that hides the commission column on a phone is a payout table an
  * operator cannot check on a phone.
  */
-export function PayoutLinesTable({ lines }: { lines: SettlementLine[] }) {
+/**
+ * Every order in the payout, one per row.
+ *
+ * The "Ordered" column is the one that makes a disputed line resolvable: an
+ * order code and an amount are not something a vendor can check against their
+ * own kitchen records, and "Chicken Biryani ×2" is. Names are the snapshot
+ * taken when the order was sold, so a later menu rename cannot rewrite a
+ * statement.
+ *
+ * `rowAction` is how the settlement preview puts a Mark paid control on each
+ * line without this table — shared with the saved statement, which must stay
+ * read-only — learning what paying is.
+ */
+export function PayoutLinesTable({
+  lines,
+  rowAction,
+}: {
+  lines: SettlementLine[];
+  rowAction?: (line: SettlementLine) => React.ReactNode;
+}) {
   if (lines.length === 0) {
     return (
       <p className="rounded-xl border border-line bg-surface-2 px-3.5 py-3 text-sm text-muted">
@@ -229,13 +248,18 @@ export function PayoutLinesTable({ lines }: { lines: SettlementLine[] }) {
     );
   }
 
+  const showItems = lines.some((l) => l.items.length > 0);
+
   return (
     <div className="overflow-x-auto rounded-xl border border-line">
-      <table className="w-full min-w-[720px] text-left text-sm">
+      <table className="w-full min-w-[860px] text-left text-sm">
         <caption className="sr-only">Payout for each order</caption>
         <thead className="border-b border-line bg-surface-2 text-xs uppercase tracking-wide text-muted">
           <tr>
             <th className="px-3 py-2.5 font-medium">Order</th>
+            {showItems ? (
+              <th className="px-3 py-2.5 font-medium">Ordered</th>
+            ) : null}
             <th className="px-3 py-2.5 font-medium">Paid by</th>
             <th className="px-3 py-2.5 text-right font-medium">Customer paid</th>
             <th className="px-3 py-2.5 text-right font-medium">Food</th>
@@ -244,12 +268,22 @@ export function PayoutLinesTable({ lines }: { lines: SettlementLine[] }) {
             <th className="px-3 py-2.5 text-right font-medium">Other</th>
             <th className="px-3 py-2.5 text-right font-medium">Refund</th>
             <th className="px-3 py-2.5 text-right font-medium">Shop gets</th>
+            {rowAction ? (
+              <th className="px-3 py-2.5 text-right font-medium">Settle</th>
+            ) : null}
           </tr>
         </thead>
         <tbody>
           {lines.map((l) => (
             <tr key={l.orderId} className="border-b border-line last:border-0">
               <td className="px-3 py-2.5 font-medium text-ink">{l.code}</td>
+              {showItems ? (
+                <td className="max-w-[260px] px-3 py-2.5 text-muted">
+                  <span className="line-clamp-2" title={itemsLabel(l.items)}>
+                    {l.items.length ? itemsLabel(l.items) : "—"}
+                  </span>
+                </td>
+              ) : null}
               <td className="px-3 py-2.5 text-muted">{payWord(l)}</td>
               <td className="px-3 py-2.5 text-right tabular-nums text-muted">
                 {l.orderTotal ? formatINR(l.orderTotal) : "—"}
@@ -277,6 +311,9 @@ export function PayoutLinesTable({ lines }: { lines: SettlementLine[] }) {
                 {l.contribution < 0 ? "− " : ""}
                 {formatINR(Math.abs(l.contribution))}
               </td>
+              {rowAction ? (
+                <td className="px-3 py-2.5 text-right">{rowAction(l)}</td>
+              ) : null}
             </tr>
           ))}
         </tbody>

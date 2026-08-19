@@ -3,14 +3,15 @@
 import { useState } from "react";
 import { Download, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { downloadBrandedWorkbook } from "@/lib/reports/xlsx";
 import type { ReportResult } from "@/lib/reports/kinds";
 
 /**
  * Getting a report out of the browser.
  *
- * Excel goes through SheetJS, which the project already carries for menu
- * imports — so a real .xlsx, with numbers as numbers, rather than a CSV that
- * Excel mangles the moment an order code looks like a date.
+ * Excel goes through the shared branded workbook builder (`@/lib/reports/xlsx`)
+ * so this sheet and a settlement statement leave the building looking like the
+ * same company sent them — masthead, title, period, generated-at.
  *
  * PDF goes through the browser's own print dialogue ("Save as PDF"), not a
  * bundled PDF library. That is a deliberate trade: a PDF renderer is ~300 KB of
@@ -22,48 +23,29 @@ import type { ReportResult } from "@/lib/reports/kinds";
 export function ReportExport({ report }: { report: ReportResult }) {
   const [busy, setBusy] = useState(false);
 
-  const filename = `${report.kind}-report-${new Date()
-    .toISOString()
-    .slice(0, 10)}`;
-
   const toExcel = async () => {
     setBusy(true);
     try {
-      // Imported on demand: SheetJS is large, and a report is usually read on
-      // screen and never exported.
-      const XLSX = await import("xlsx");
-
-      const header = report.table.columns.map((c) => c.label);
-      const body = report.table.rows.map((row) =>
-        report.table.columns.map((c) => row[c.key] ?? "")
-      );
-      if (report.table.totals) {
-        body.push(
-          report.table.columns.map((c) => report.table.totals![c.key] ?? "")
-        );
-      }
-
-      const sheet = XLSX.utils.aoa_to_sheet([
-        [report.title],
-        [report.subtitle],
-        [],
-        header,
-        ...body,
-      ]);
-      // Column widths from the longest cell, so nothing opens as "#####".
-      sheet["!cols"] = report.table.columns.map((c, i) => ({
-        wch: Math.min(
-          40,
-          Math.max(
-            c.label.length + 2,
-            ...body.map((r) => String(r[i] ?? "").length + 2)
-          )
+      await downloadBrandedWorkbook({
+        filename: `${report.kind}-report`,
+        sheetName: "Report",
+        title: report.title,
+        subtitle: report.subtitle,
+        // The figures the page leads with, restated in the file so a reader who
+        // only ever sees the sheet gets the same headline as the screen.
+        meta: report.highlights.map(
+          (h) => [h.label, h.note ? `${h.value} (${h.note})` : h.value] as [
+            string,
+            string,
+          ]
         ),
-      }));
-
-      const book = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(book, sheet, "Report");
-      XLSX.writeFile(book, `${filename}.xlsx`);
+        columns: report.table.columns.map((c) => ({
+          key: c.key,
+          label: c.label,
+        })),
+        rows: report.table.rows,
+        totals: report.table.totals ?? undefined,
+      });
     } finally {
       setBusy(false);
     }
@@ -71,7 +53,13 @@ export function ReportExport({ report }: { report: ReportResult }) {
 
   return (
     <div className="flex flex-wrap gap-2 print:hidden">
-      <Button type="button" size="sm" variant="secondary" onClick={toExcel} disabled={busy}>
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        onClick={toExcel}
+        disabled={busy}
+      >
         <Download className="size-4" />
         {busy ? "Preparing…" : "Download Excel"}
       </Button>

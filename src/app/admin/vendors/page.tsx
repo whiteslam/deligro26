@@ -1,35 +1,37 @@
 import Link from "next/link";
-import {
-  CheckCircle2,
-  ListOrdered,
-  Plus,
-  Store,
-  Tags,
-} from "lucide-react";
+import { CheckCircle2, ListOrdered, Plus, Store, Tags } from "lucide-react";
 import {
   getVendorCounts,
   listAwaitingApproval,
   listVendors,
+  storefrontGaps,
   type VendorListItem,
   type VendorStatus,
 } from "@/lib/data-access/admin-vendors";
 import { listCategories } from "@/lib/data-access/vendor-categories";
 import { AdminHero, EmptyState } from "@/components/admin/admin-ui";
+import { StatTile, StatTiles } from "@/components/admin/console-ui";
 import { ConsoleOnly } from "@/components/admin/console-only";
 import { VendorApprovalCards } from "@/components/admin/vendor-approval-cards";
-import { VendorStorefrontCard } from "@/components/admin/vendor-storefront-card";
+import { VendorProfileCard } from "@/components/admin/vendor-profile-card";
 import { AdminQuickLink } from "@/components/admin/admin-quick-link";
 import { TableFooter } from "@/components/admin/data-table";
 import { formatWaited } from "@/lib/utils/format";
 import { VendorSearchBar } from "./vendor-search-bar";
 
 /**
- * Admin → Vendors, laid out like a partner storefront rather than a spreadsheet.
+ * Admin → Vendors: a directory of partner profiles.
  *
- * Cover-first shop cards (the same language as /vendor/profile), a snapshot
- * strip, and the approval queue as mini storefronts. Search, paging, featured
- * slots, suspend and delete stay — they just sit on the card instead of in a
- * 960px table the phone frame cannot hold.
+ * Read top to bottom it answers three questions in the order they get asked —
+ * who is waiting on me, how is the roster doing, and who am I looking for. The
+ * queue is first because it is the only part with a deadline attached; the
+ * snapshot tiles are the console's own band (the same ones settlements uses),
+ * not a second set of stat cards invented for this page; the catalogue is last
+ * because it is browsing, not triage.
+ *
+ * Each shop renders as a profile rather than a spreadsheet row or a cover
+ * photo — see `VendorProfileCard` for why the cover-led version this replaced
+ * did not survive contact with a database where most shops have no photo.
  */
 export const dynamic = "force-dynamic";
 
@@ -90,28 +92,10 @@ export default async function AdminVendorsPage({
     return query ? `/admin/vendors?${query}` : "/admin/vendors";
   };
 
-  const snapshots = [
-    {
-      label: "All vendors",
-      value: String(counts.total),
-      hint: "On the platform",
-    },
-    {
-      label: "Active",
-      value: String(counts.active),
-      hint: "Taking orders",
-    },
-    {
-      label: "Needs attention",
-      value: String(counts.inactive + counts.suspended + awaiting.length),
-      hint: `${awaiting.length} waiting · ${counts.suspended} suspended`,
-    },
-    {
-      label: "Categories",
-      value: String(counts.categories),
-      hint: "Used to group the customer feed",
-    },
-  ];
+  // Counted over the page in hand, not the whole roster: a second COUNT query
+  // for a nudge is not worth it, and "3 of the 12 shown" is the honest reading
+  // of a figure derived from twelve rows.
+  const incomplete = result.items.filter((v) => storefrontGaps(v).length > 0);
 
   return (
     <>
@@ -133,104 +117,125 @@ export default async function AdminVendorsPage({
         why="Approving, suspending and searching all work here."
       />
 
+      {/* ---------- the queue: the only part of this page with a clock on it ---------- */}
       {awaiting.length > 0 ? (
-        <section className="vendor-profile-panel flex flex-col gap-4 rounded-[var(--radius-block)] border border-line bg-surface p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-          <div>
-            <p className="text-sm font-bold">
-              {awaiting.length} shop{awaiting.length === 1 ? "" : "s"} waiting
-              to go live
-            </p>
-            <p className="mt-0.5 text-xs text-muted">
-              {medianWait
-                ? `Median wait ${medianWait} · approving puts the storefront on the customer feed immediately`
-                : "Approving puts the storefront on the customer feed immediately"}
-            </p>
+        <section className="space-y-2.5">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="text-[14.5px] font-bold tracking-[-0.01em]">
+                Waiting to go live
+              </h2>
+              <p className="mt-0.5 text-xs text-muted">
+                {medianWait ? `Median wait ${medianWait}. ` : ""}
+                Approving puts the storefront on the customer feed immediately.
+              </p>
+            </div>
+            <span className="pill pill-pop shrink-0">
+              {awaiting.length} in queue
+            </span>
           </div>
-          <span className="pill pill-pop shrink-0">
-            {awaiting.length} in queue
-          </span>
+
+          <VendorApprovalCards vendors={awaiting.slice(0, QUEUE_SHOWN)} />
+
+          {awaiting.length > QUEUE_SHOWN ? (
+            <p className="text-xs text-muted">
+              The {QUEUE_SHOWN} longest-waiting of {awaiting.length}.{" "}
+              <Link
+                href="/admin/vendors?status=pending"
+                className="font-medium text-accent-ink"
+              >
+                See the rest
+              </Link>
+              .
+            </p>
+          ) : null}
         </section>
       ) : counts.total > 0 ? (
-        <section className="vendor-profile-panel flex items-center gap-3 rounded-[var(--radius-block)] border border-green/25 bg-green/5 px-4 py-3">
-          <CheckCircle2 className="size-5 shrink-0 text-green" />
-          <p className="text-sm font-medium text-green">
+        <section className="flex items-center gap-2.5 rounded-[var(--radius-block)] border border-green/25 bg-green/5 px-4 py-3">
+          <CheckCircle2 className="size-4 shrink-0 text-green" />
+          <p className="text-[13px] font-medium text-green">
             Approval queue is clear — every signup has been reviewed.
           </p>
         </section>
       ) : null}
 
-      {awaiting.length > 0 ? (
-        <>
-          <VendorApprovalCards vendors={awaiting.slice(0, QUEUE_SHOWN)} />
-          {awaiting.length > QUEUE_SHOWN ? (
-            <p className="text-xs text-muted">
-              Showing the {QUEUE_SHOWN} longest-waiting of {awaiting.length}.
-              The rest are in the catalogue below, filtered to Pending.
-            </p>
-          ) : null}
-        </>
-      ) : null}
-
-      <section className="grid grid-cols-2 gap-3 @3xl:grid-cols-4">
-        {snapshots.map((m, i) => (
-          <div
-            key={m.label}
-            className="vendor-profile-stat rounded-[var(--radius-block)] border border-line bg-surface p-4"
-            style={{ animationDelay: `${i * 60}ms` }}
-          >
-            <p className="text-label">{m.label}</p>
-            <p className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
-              {m.value}
-            </p>
-            <p className="mt-1 text-[11px] text-muted">{m.hint}</p>
-          </div>
-        ))}
-      </section>
-
-      <section className="rounded-[var(--radius-block)] border border-line bg-surface p-3.5">
-        <VendorSearchBar categories={categoryNames} />
-      </section>
-
-      {result.items.length === 0 ? (
-        <EmptyState
-          icon={Store}
-          title={filtered ? "No vendors match" : "No vendors yet"}
-          description={
-            filtered
-              ? "Try a different search or filter."
-              : "Add your first shop to start taking orders."
-          }
-          action={
-            !filtered ? (
-              <ConsoleOnly tool="Vendor onboarding" notice={false}>
-                <Link
-                  href="/admin/vendors/new"
-                  className="c-btn c-btn-dark press"
-                >
-                  <Plus className="size-3.5" strokeWidth={2.4} /> Add vendor
-                </Link>
-              </ConsoleOnly>
-            ) : null
+      <StatTiles>
+        <StatTile
+          label="Partners"
+          value={counts.total}
+          note={`${counts.active} taking orders`}
+        />
+        <StatTile
+          label="Needs attention"
+          value={counts.inactive + counts.suspended + awaiting.length}
+          note={`${awaiting.length} waiting · ${counts.suspended} suspended · ${counts.inactive} inactive`}
+        />
+        <StatTile
+          label="Unfinished storefronts"
+          value={incomplete.length}
+          note={
+            incomplete.length
+              ? "Missing a photo, address, category or phone — on this page"
+              : "Every shop on this page is complete"
           }
         />
-      ) : (
-        <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-2 @5xl:grid-cols-3">
-          {result.items.map((v) => (
-            <VendorStorefrontCard key={v.id} vendor={v} />
-          ))}
-        </div>
-      )}
+        <StatTile
+          label="Categories"
+          value={counts.categories}
+          note="How the customer feed is grouped"
+        />
+      </StatTiles>
 
-      {result.items.length > 0 ? (
-        <div className="rounded-[var(--radius-block)] border border-line bg-surface px-4 py-3">
-          <TableFooter
-            page={page}
-            totalPages={totalPages}
-            hrefFor={pageHref}
-            summary={`${result.total} vendor${result.total === 1 ? "" : "s"}${filtered ? " matching" : ""}`}
+      {/* ---------- the catalogue ---------- */}
+      <section className="space-y-3">
+        <VendorSearchBar categories={categoryNames} />
+
+        {result.items.length === 0 ? (
+          <EmptyState
+            icon={Store}
+            title={filtered ? "No vendors match" : "No vendors yet"}
+            description={
+              filtered
+                ? "Try a different search or filter."
+                : "Add your first shop to start taking orders."
+            }
+            action={
+              !filtered ? (
+                <ConsoleOnly tool="Vendor onboarding" notice={false}>
+                  <Link
+                    href="/admin/vendors/new"
+                    className="c-btn c-btn-dark press"
+                  >
+                    <Plus className="size-3.5" strokeWidth={2.4} /> Add vendor
+                  </Link>
+                </ConsoleOnly>
+              ) : null
+            }
           />
-        </div>
-      ) : null}
+        ) : (
+          <>
+            {/* auto-fill, not a fixed column count: the same grid then works in
+                the 390px phone frame and across a 1600px console without a
+                breakpoint per shell. */}
+            <ul className="grid grid-cols-[repeat(auto-fill,minmax(304px,1fr))] gap-3">
+              {result.items.map((v) => (
+                <li key={v.id} className="flex">
+                  <VendorProfileCard vendor={v} />
+                </li>
+              ))}
+            </ul>
+
+            <div className="rounded-[var(--radius-block)] border border-line bg-surface px-4 py-3">
+              <TableFooter
+                page={page}
+                totalPages={totalPages}
+                hrefFor={pageHref}
+                summary={`${result.total} vendor${result.total === 1 ? "" : "s"}${filtered ? " matching" : ""}`}
+              />
+            </div>
+          </>
+        )}
+      </section>
 
       <div className="grid gap-2 @3xl:grid-cols-2">
         <AdminQuickLink

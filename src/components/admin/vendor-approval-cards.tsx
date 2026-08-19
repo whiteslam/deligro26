@@ -1,15 +1,24 @@
 import Link from "next/link";
+import { Clock, MapPin, Phone } from "lucide-react";
 import { ApproveRestaurantButton } from "@/components/admin/approve-restaurant-button";
+import { RejectVendorButton } from "@/components/admin/reject-vendor-button";
+import { VendorAvatar } from "@/components/admin/vendor-profile-card";
 import {
-  GlassBadge,
-  StorefrontCover,
-} from "@/components/admin/vendor-storefront-card";
-import type { VendorListItem } from "@/lib/data-access/admin-vendors";
+  storefrontGaps,
+  type VendorListItem,
+} from "@/lib/data-access/admin-vendors";
 import { formatWaited } from "@/lib/utils/format";
+import { cn } from "@/lib/utils/cn";
 
 /**
- * Approval backlog as storefront cards — same cover language as the catalogue
- * and the vendor profile. Oldest first; wait time turns red after four days.
+ * The approval backlog, in the same profile language as the catalogue below it.
+ *
+ * Narrower than a catalogue card on purpose: the decision here is yes, no, or
+ * open it, and the only facts that inform it are who signed up, how long ago, and
+ * whether the storefront is finished enough to put in front of customers. What
+ * is missing is stated rather than implied — approving a shop with no photo and
+ * no address publishes an empty listing, and the queue is the last point where
+ * that is cheap to fix.
  */
 
 const OVERDUE_DAYS = 4;
@@ -27,77 +36,94 @@ export function VendorApprovalCards({
   if (!vendors.length) return null;
 
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(288px,1fr))] gap-3">
+    <ul className="grid grid-cols-[repeat(auto-fill,minmax(272px,1fr))] gap-3">
       {vendors.map((v) => {
         const overdue = isOverdue(v.createdAt);
-        const waited = formatWaited(v.createdAt);
+        const gaps = storefrontGaps(v);
 
         return (
-          <article
+          <li
             key={v.id}
-            className="vendor-profile-stat flex flex-col overflow-hidden rounded-[var(--radius-block)] border border-line bg-surface"
+            className={cn(
+              "vendor-profile-stat flex flex-col gap-3 rounded-[var(--radius-block)] border bg-surface p-3.5",
+              overdue ? "border-deal/40" : "border-line"
+            )}
           >
-            <StorefrontCover
-              name={v.name}
-              imageUrl={v.imageUrl}
-              accentTint={v.accentTint}
-              href={`/admin/vendors/${v.id}?tab=overview`}
-              kicker={v.category ?? "Uncategorised"}
-              subtitle={`/${v.slug}`}
-              className="h-[148px]"
-              badges={
-                <>
-                  <GlassBadge>Awaiting review</GlassBadge>
-                  <GlassBadge className={overdue ? "bg-deal/80" : undefined}>
-                    {waited}
-                  </GlassBadge>
-                </>
-              }
-            />
-
-            <div className="flex flex-1 flex-col gap-3 p-3.5">
-              <dl className="grid grid-cols-2 gap-3">
-                <Meta label="Owner" value={v.ownerName ?? "—"} />
-                <Meta label="Area" value={cityOf(v.address)} />
-              </dl>
-
-              <div className="mt-auto flex items-center gap-2">
-                <span className="flex-1">
-                  <ApproveRestaurantButton
-                    id={v.id}
-                    name={v.name}
-                    variant="compact"
-                  />
-                </span>
+            <div className="flex items-start gap-3">
+              <VendorAvatar
+                name={v.name}
+                imageUrl={v.imageUrl}
+                accentTint={v.accentTint}
+                className="size-11"
+              />
+              <div className="min-w-0 flex-1">
                 <Link
                   href={`/admin/vendors/${v.id}?tab=overview`}
-                  className="c-btn c-btn-outline press"
+                  className="block truncate text-[14.5px] font-bold leading-tight tracking-tight hover:text-accent-ink"
                 >
-                  Review
+                  {v.name}
                 </Link>
+                <p className="mt-0.5 truncate text-xs text-muted">
+                  {v.ownerName ?? "Owner not named"}
+                  {v.category ? ` · ${v.category}` : ""}
+                </p>
+                <p
+                  className={cn(
+                    "mt-1 inline-flex items-center gap-1 text-[11px] font-semibold",
+                    overdue ? "text-deal" : "text-muted"
+                  )}
+                >
+                  <Clock className="size-3" />
+                  Waiting {formatWaited(v.createdAt)}
+                </p>
               </div>
             </div>
-          </article>
+
+            <div className="space-y-1 text-[11.5px] text-muted">
+              {v.ownerMobile ? (
+                <p className="flex items-center gap-1.5">
+                  <Phone className="size-3 shrink-0" />
+                  <a
+                    href={`tel:${v.ownerMobile}`}
+                    className="truncate font-medium text-ink hover:text-accent-ink"
+                  >
+                    {v.ownerMobile}
+                  </a>
+                </p>
+              ) : null}
+              <p className="flex items-start gap-1.5">
+                <MapPin className="mt-0.5 size-3 shrink-0" />
+                <span className="line-clamp-1">
+                  {v.address ?? "No address given"}
+                </span>
+              </p>
+            </div>
+
+            {gaps.length > 0 ? (
+              <p className="rounded-lg bg-pop/10 px-2.5 py-1.5 text-[11px] font-medium text-pop-ink">
+                Goes live without a {gaps.join(", ")}
+              </p>
+            ) : null}
+
+            {/* Both verbs, then the way out of deciding today. Wraps rather
+                than shrinks: a truncated destructive button is a misclick. */}
+            <div className="mt-auto flex flex-wrap items-center gap-2">
+              <ApproveRestaurantButton
+                id={v.id}
+                name={v.name}
+                variant="compact"
+              />
+              <RejectVendorButton id={v.id} name={v.name} />
+              <Link
+                href={`/admin/vendors/${v.id}?tab=overview`}
+                className="c-btn-quiet press ml-auto"
+              >
+                Review
+              </Link>
+            </div>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
-}
-
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-label">{label}</dt>
-      <dd className="mt-0.5 truncate text-sm font-semibold">{value}</dd>
-    </div>
-  );
-}
-
-function cityOf(address: string | null): string {
-  if (!address) return "—";
-  const parts = address
-    .split(",")
-    .map((p) => p.trim())
-    .filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : "—";
 }

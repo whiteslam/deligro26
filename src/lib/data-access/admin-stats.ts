@@ -90,10 +90,11 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
       .from("deliveries")
       .select("driver_id")
       .in("status", ["assigned", "picked_up"]),
+    // Undecided signups only — see getAdminNavCounts for why not `approved`.
     supabase
       .from("restaurants")
       .select("id", { count: "exact", head: true })
-      .eq("approved", false),
+      .eq("status", "pending"),
   ]);
 
   const orders = todaysOrders.data ?? [];
@@ -174,11 +175,14 @@ export async function getAdminDashboard(): Promise<AdminDashboard> {
     countOf(() =>
       supabase.from("orders").select("id", { count: "exact", head: true })
     ),
+    // Shops nobody has ruled on yet. Not `approved = false`: the 0017 trigger
+    // un-approves anything that leaves 'active', so a disabled or rejected
+    // vendor would sit in this count with no action left that could clear it.
     countOf(() =>
       supabase
         .from("restaurants")
         .select("id", { count: "exact", head: true })
-        .eq("approved", false)
+        .eq("status", "pending")
     ),
     // Restaurants onboarded this week vs last.
     countOf(() =>
@@ -298,11 +302,14 @@ export async function getAdminNavCounts(): Promise<AdminNavCounts> {
   };
 
   const [pendingApprovals, pendingRefunds, liveOrders] = await Promise.all([
+    // Shops nobody has ruled on yet. Not `approved = false`: the 0017 trigger
+    // un-approves anything that leaves 'active', so a disabled or rejected
+    // vendor would sit in this count with no action left that could clear it.
     countOf(() =>
       supabase
         .from("restaurants")
         .select("id", { count: "exact", head: true })
-        .eq("approved", false)
+        .eq("status", "pending")
     ),
     countOf(() =>
       supabase
@@ -321,13 +328,18 @@ export async function getAdminNavCounts(): Promise<AdminNavCounts> {
   return { pendingApprovals, pendingRefunds, liveOrders };
 }
 
-/** Restaurants waiting on an admin — the real queue, not a hardcoded list. */
+/**
+ * Restaurants waiting on an admin — the real queue, not a hardcoded list.
+ *
+ * 'pending' is the undecided state; approving makes a shop active and rejecting
+ * suspends it, and both leave this list. See `listAwaitingApproval`.
+ */
 export async function listPendingRestaurants(): Promise<PendingRestaurant[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("restaurants")
     .select("id, name, slug, created_at")
-    .eq("approved", false)
+    .eq("status", "pending")
     .order("created_at", { ascending: true });
 
   if (error) throw error;

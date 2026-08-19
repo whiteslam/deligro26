@@ -70,8 +70,40 @@ export interface VendorListItem {
   imageUrl: string | null;
   accentTint: string | null;
   createdAt: string;
+  /** Customer rating (0002), and how many ratings it is an average of. */
+  rating: number;
+  ratingCount: number;
   /** Manual featured slot 1–10, or null when unranked (migration 0021). */
   sortPosition: number | null;
+}
+
+/**
+ * What is still missing from this shop's storefront, named the way an admin
+ * would say it on the phone to the owner.
+ *
+ * Derived from the list columns alone — no extra query — so the catalogue can
+ * show it on every card. It answers the question the admin vendors page exists
+ * for: not "who is on the platform" but "who is not finished yet", which is the
+ * difference between a listing that converts and one customers scroll past.
+ *
+ * Deliberately not the same list as the vendor's own profile checklist
+ * (`getVendorProfileSummary`): that one can see taglines, cuisines and opening
+ * hours, and this one is working from a directory row. Fewer items, all of them
+ * things an admin can actually chase.
+ */
+export function storefrontGaps(v: VendorListItem): string[] {
+  const gaps: string[] = [];
+  if (!v.imageUrl) gaps.push("photo");
+  if (!v.category) gaps.push("category");
+  if (!v.address) gaps.push("address");
+  if (!v.ownerMobile) gaps.push("phone");
+  return gaps;
+}
+
+/** Storefront completeness as a percentage, from the same four checks. */
+export function storefrontScore(v: VendorListItem): number {
+  const CHECKS = 4;
+  return Math.round(((CHECKS - storefrontGaps(v).length) / CHECKS) * 100);
 }
 
 export interface VendorDetail extends VendorListItem {
@@ -176,7 +208,8 @@ export interface ListVendorsResult {
 
 const LIST_SELECT = `
   id, slug, name, owner_name, owner_mobile, category, address,
-  commission_pct, status, is_open, image_url, accent_tint, created_at
+  commission_pct, status, is_open, image_url, accent_tint, created_at,
+  rating, rating_count
 `;
 
 const DETAIL_SELECT = `
@@ -187,7 +220,7 @@ const DETAIL_SELECT = `
   address, landmark, pincode, lat, lng,
   upi_id, bank_account_name, bank_account_number, bank_ifsc, bank_name,
   fssai_number, gst_number, pan_number,
-  status, is_open, image_url, accent_tint,
+  status, is_open, image_url, accent_tint, rating, rating_count,
   tc_accepted_at, tc_version, created_at,
   password_reset_at, owner_phone_verified
 `;
@@ -226,6 +259,8 @@ interface VendorRow {
   closing_time?: string | null;
   weekly_off?: string[] | null;
   address: string | null;
+  rating?: number | null;
+  rating_count?: number | null;
   landmark?: string | null;
   pincode?: string | null;
   lat?: number | null;
@@ -297,6 +332,8 @@ function mapListItem(row: VendorRow, platformDefault = 0): VendorListItem {
     imageUrl: row.image_url,
     accentTint: row.accent_tint,
     createdAt: row.created_at,
+    rating: Number(row.rating ?? 0),
+    ratingCount: Number(row.rating_count ?? 0),
     // Filled in by the caller from the resilient positions read (0021).
     sortPosition: null,
   };
@@ -437,11 +474,13 @@ export async function listVendors(
 /**
  * Shops waiting to go live, oldest first, with the full list columns.
  *
- * Filters on `approved = false`, which is the same predicate the nav badge
- * (`getAdminNavCounts`) and the dashboard queue (`listPendingRestaurants`) use.
- * Deliberately *not* `status = 'pending'`: those are two different fields with
- * two different lifecycles, and a queue that disagrees with the badge counting
- * it is a queue an operator stops trusting.
+ * Filters on `status = 'pending'`, i.e. shops nobody has ruled on yet — the
+ * same predicate the nav badge (`getAdminNavCounts`) and the dashboard queue
+ * (`listPendingRestaurants`) use, so the queue and the number counting it never
+ * disagree. It used to be `approved = false`, which the 0017 trigger also
+ * leaves true for every *decided* shop: disable a live vendor or reject a
+ * signup and it reappeared in "Waiting to go live" forever, because there is no
+ * further action that clears it. A queue you cannot empty is not a queue.
  *
  * The difference from `listPendingRestaurants` is only the column list — this
  * one carries the category, address and image the approval cards render — so
@@ -456,7 +495,7 @@ export async function listAwaitingApproval(
   const { data, error } = await supabase
     .from("restaurants")
     .select(LIST_SELECT)
-    .eq("approved", false)
+    .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(limit);
 

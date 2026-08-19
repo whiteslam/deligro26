@@ -1408,6 +1408,22 @@ body:has(.dashboard-shell) {
   border-color: var(--ink);
   color: var(--surface);
 }
+/* Its opposite number, same size and weight so the pair reads as one decision:
+   outlined in the warning tone at rest, solid on hover. */
+.c-btn-deny {
+  border: 1px solid color-mix(in srgb, var(--deal) 40%, transparent);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--deal);
+  transition: background-color 120ms, color 120ms, border-color 120ms;
+}
+.c-btn-deny:hover {
+  background: var(--deal);
+  border-color: var(--deal);
+  color: var(--surface);
+}
 .c-btn-quiet {
   border-radius: 6px;
   padding: 4px 8px;

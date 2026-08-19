@@ -6,6 +6,7 @@ import {
   breakdownOrder,
   checkTotals,
   sumSettlementTotals,
+  type OrderLineItem,
   type SettlementOrderBreakdown,
   type SettlementPaymentMethod,
   type SettlementPaymentStatus,
@@ -53,6 +54,8 @@ export type SettlementKind = "batch" | "instant";
 export interface SettlementLine {
   orderId: string;
   code: string;
+  /** What was ordered. Empty when the items could not be read. */
+  items: OrderLineItem[];
   /** What the customer paid. */
   orderTotal: number;
   deliveryFee: number;
@@ -349,6 +352,40 @@ function payoutFrom(
   };
 }
 
+/**
+ * What each of these orders actually contained, for the payout tables.
+ *
+ * A settlement line identified by code alone — "9F1A8540, ₹120" — is not
+ * something an operator or a vendor can check against anything. The dish names
+ * are what makes a disputed row resolvable ("that is the biryani we cancelled")
+ * without opening every order in another tab.
+ *
+ * Reads the `order_items` snapshot, not `menu_items`: the name stored on the
+ * line is what the dish was called when it was sold, which is the only version
+ * that belongs on a payout statement — a menu rename must not rewrite history.
+ */
+async function loadOrderItems(
+  orderIds: string[]
+): Promise<Map<string, OrderLineItem[]>> {
+  const map = new Map<string, OrderLineItem[]>();
+  if (orderIds.length === 0) return map;
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("order_items")
+    .select("order_id, name, qty")
+    .in("order_id", orderIds);
+  // A payout table without dish names is degraded, not broken — never take the
+  // settlement down over the decorative half of a row.
+  if (error) return map;
+  for (const row of data ?? []) {
+    const id = row.order_id as string;
+    const list = map.get(id) ?? [];
+    list.push({ name: String(row.name ?? "").trim() || "Item", qty: Number(row.qty ?? 1) });
+    map.set(id, list);
+  }
+  return map;
+}
+
 async function loadApprovedRefunds(
   orderIds: string[]
 ): Promise<Map<string, number>> {
@@ -401,7 +438,8 @@ async function alreadySettledOrderIds(
 function lineFor(
   o: OrderRow,
   terms: PayoutTerms,
-  refunds: Map<string, number>
+  refunds: Map<string, number>,
+  items?: Map<string, OrderLineItem[]>
 ): SettlementLine {
   const paymentMethod = asMethod(o.payment_method);
   const paymentStatus = asPayStatus(o.payment_status);
@@ -421,6 +459,7 @@ function lineFor(
   return {
     orderId: o.id,
     code: shortOrderId(o.id),
+    items: items?.get(o.id) ?? [],
     ...bd,
     paymentMethod,
     paymentStatus,
@@ -475,8 +514,12 @@ export async function previewSettlement(input: {
   const eligible = ((orders ?? []) as OrderRow[]).filter(
     (o) => !settled.has(o.id)
   );
-  const refunds = await loadApprovedRefunds(eligible.map((o) => o.id));
-  const lines = eligible.map((o) => lineFor(o, terms, refunds));
+  const ids = eligible.map((o) => o.id);
+  const [refunds, items] = await Promise.all([
+    loadApprovedRefunds(ids),
+    loadOrderItems(ids),
+  ]);
+  const lines = eligible.map((o) => lineFor(o, terms, refunds, items));
   const totals = sumSettlementTotals(lines);
 
   const startIso = periodStart.toISOString();
@@ -748,13 +791,16 @@ export async function listOrderPayouts(
   if (error) throw error;
 
   const rows = (orders ?? []) as OrderRow[];
-  const refunds = await loadApprovedRefunds(rows.map((o) => o.id));
-  const membership = await settlementMembership(restaurantId);
+  const [refunds, items, membership] = await Promise.all([
+    loadApprovedRefunds(rows.map((o) => o.id)),
+    loadOrderItems(rows.map((o) => o.id)),
+    settlementMembership(restaurantId),
+  ]);
 
   const priced: OrderPayoutRow[] = rows.map((o) => {
     const m = membership.get(o.id) ?? null;
     return {
-      ...lineFor(o, terms, refunds),
+      ...lineFor(o, terms, refunds, items),
       paid: m !== null,
       settlementId: m?.settlementId ?? null,
       settlementKind: m?.kind ?? null,
@@ -1064,6 +1110,14 @@ async function readSettlementLines(
       .order("created_at", { ascending: true })
   );
 
+  // The dish names are read live rather than snapshotted into the settlement
+  // line: `order_items` is itself the snapshot taken at checkout, and it is
+  // immutable for a delivered order, so there is nothing a second copy would
+  // protect against.
+  const items = await loadOrderItems(
+    rows.map((l) => l.order_id as string).filter(Boolean)
+  );
+
   return rows.map((l) => {
     const ord = l.orders as
       | { created_at: string }
@@ -1080,6 +1134,7 @@ async function readSettlementLines(
     return {
       orderId: l.order_id as string,
       code: shortOrderId(l.order_id as string),
+      items: items.get(l.order_id as string) ?? [],
       // Pre-0034 lines never stored the customer-side split. Reporting 0 is
       // honest — the money was never recorded — and only affects the top three
       // rows of an old statement, not any figure the vendor was paid on.

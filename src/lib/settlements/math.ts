@@ -30,6 +30,26 @@
  *                 deductions instead, and the line contributes a negative.
  */
 
+/**
+ * One dish on an order, as it was named when it was sold.
+ *
+ * Lives here rather than beside the query that loads it because the payout
+ * tables are rendered from Client Components, and `data-access/admin-settlements`
+ * is `server-only` — importing a formatting helper out of it would drag the
+ * service-role module graph into the browser bundle.
+ */
+export interface OrderLineItem {
+  name: string;
+  qty: number;
+}
+
+/** "Chicken Biryani ×2 · Coke" — the items on one line, for a table cell. */
+export function itemsLabel(items: OrderLineItem[]): string {
+  return items
+    .map((i) => (i.qty > 1 ? `${i.name} ×${i.qty}` : i.name))
+    .join(" · ");
+}
+
 export type SettlementPaymentMethod = "cod" | "online" | null;
 export type SettlementPaymentStatus =
   | "pending"

@@ -24,8 +24,9 @@ import {
 
 /**
  * Per-vendor controls on the admin list: view, edit, enable/disable, reset
- * password (reveals a one-time value), delete (guarded — a vendor with orders is
- * disabled, not removed). Each action runs through a transition and refreshes.
+ * password (reveals a one-time value), delete (confirmed twice, and guarded — a
+ * vendor with orders is disabled, not removed). Each action runs through a
+ * transition and refreshes.
  */
 export function VendorRowActions({
   id,
@@ -38,7 +39,11 @@ export function VendorRowActions({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  // Delete asks twice. Step 1 says what deleting does; step 2 is the point of
+  // no return, phrased as a last check rather than a repeat of the question —
+  // an operator who reflexively clicks through the first dialog still has to
+  // read a differently-worded second one before a shop and its menu are gone.
+  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [tempPw, setTempPw] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -54,7 +59,7 @@ export function VendorRowActions({
   const onDelete = () =>
     start(async () => {
       const res = await deleteVendorAction(id);
-      setConfirmDelete(false);
+      setDeleteStep(0);
       if (!res.ok) {
         window.alert(res.error ?? "Couldn't delete.");
         return;
@@ -153,13 +158,13 @@ export function VendorRowActions({
         disabled={pending}
         title="Delete"
         aria-label="Delete vendor"
-        onClick={() => setConfirmDelete(true)}
+        onClick={() => setDeleteStep(1)}
       >
         <Trash2 className="size-4" />
       </button>
 
       <ConfirmDialog
-        open={confirmDelete}
+        open={deleteStep === 1}
         title="Delete vendor?"
         message={
           <>
@@ -168,11 +173,29 @@ export function VendorRowActions({
             records intact.
           </>
         }
-        confirmLabel="Delete"
+        confirmLabel="Continue"
+        danger
+        busy={pending}
+        onConfirm={() => setDeleteStep(2)}
+        onClose={() => setDeleteStep(0)}
+      />
+
+      <ConfirmDialog
+        open={deleteStep === 2}
+        title="Delete permanently?"
+        message={
+          <>
+            Last check: <b className="text-ink">{name}</b>, its menu and its
+            owner login are deleted for good. There is no undo and no backup in
+            the admin — you would have to add the shop again from scratch.
+          </>
+        }
+        confirmLabel="Yes, delete permanently"
+        cancelLabel="Keep vendor"
         danger
         busy={pending}
         onConfirm={onDelete}
-        onClose={() => setConfirmDelete(false)}
+        onClose={() => setDeleteStep(0)}
       />
 
       <Modal
