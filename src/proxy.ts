@@ -96,8 +96,23 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except static assets and images.
+  // Run on everything except static assets and the public metadata files.
+  //
+  // robots.txt, sitemap.xml and manifest.webmanifest MUST be excluded here.
+  // They are generated correctly by src/app/{robots,sitemap,manifest}.ts and
+  // appear in the build output, but the proxy gate below sends any request
+  // without a session to /login — and Googlebot has no session. Every one of
+  // them answered 307 → /login, which means:
+  //
+  //   * a crawler cannot read robots.txt, so it never discovers the sitemap;
+  //   * it cannot read the sitemap, so no restaurant page is ever indexed;
+  //   * a first-time visitor's browser cannot read the manifest, so Chrome
+  //     never offers "Add to home screen" — precisely the visitor the manifest
+  //     exists for.
+  //
+  // All three are public by definition. Nothing in them is user-scoped, so
+  // there is nothing for the session gate to protect.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
