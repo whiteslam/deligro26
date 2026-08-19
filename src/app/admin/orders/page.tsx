@@ -52,6 +52,57 @@ const IN_FLIGHT: AdminOrderRow["status"][] = [
 
 type Search = { q?: string; status?: string };
 
+/** How many dish lines to print before collapsing the rest into a count. */
+const ITEM_LINES = 2;
+
+/**
+ * What was ordered, at a glance.
+ *
+ * Two lines then "+N more" rather than the whole basket: a nine-line order would
+ * set the row height for the entire table, and the operator reading this is
+ * scanning for "is this the biryani order" — the first couple of dishes answer
+ * that, and the row opens for the rest. The full list is on the `title`
+ * attribute, so hovering gives it without a navigation.
+ *
+ * Says nothing at all when there are no named lines. Legacy imported orders can
+ * arrive with unnamed items, and "0 items" would be a claim about the order
+ * rather than about what we know of it.
+ */
+function ItemsCell({
+  items,
+  count,
+}: {
+  items?: { name: string; qty: number }[];
+  count?: number;
+}) {
+  if (!items || items.length === 0) {
+    return <span className="text-[11.5px] text-muted">—</span>;
+  }
+
+  const shown = items.slice(0, ITEM_LINES);
+  const hidden = items.length - shown.length;
+  const full = items.map((i) => `${i.qty} × ${i.name}`).join(", ");
+
+  return (
+    <div className="min-w-0" title={full}>
+      {shown.map((item, i) => (
+        <p
+          key={`${item.name}-${i}`}
+          className="truncate text-[12px] leading-[1.45] text-ink"
+        >
+          <span className="text-data font-semibold text-muted">{item.qty}×</span>{" "}
+          {item.name}
+        </p>
+      ))}
+      {hidden > 0 ? (
+        <p className="text-[11px] font-medium text-muted">
+          +{hidden} more{count ? ` · ${count} items` : ""}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function AdminOrdersPage({
   searchParams,
 }: {
@@ -89,7 +140,11 @@ function renderOrders(
     return (
       o.code.toLowerCase().includes(needle) ||
       o.customer.toLowerCase().includes(needle) ||
-      o.restaurant.toLowerCase().includes(needle)
+      o.restaurant.toLowerCase().includes(needle) ||
+      // Now that the dish names are loaded, search them too — "biryani" is a
+      // thing an operator on a call actually types, and until this line it
+      // matched nothing.
+      (o.items ?? []).some((i) => i.name.toLowerCase().includes(needle))
     );
   });
 
@@ -125,10 +180,32 @@ function renderOrders(
       cell: (o) => (
         <div className="min-w-0">
           <p className="text-data text-xs font-semibold text-ink">{o.code}</p>
-          <p className="mt-0.5 truncate text-[11.5px] text-muted">{o.restaurant}</p>
           <p className="truncate text-[13px] text-ink @3xl:hidden">{o.customer}</p>
         </div>
       ),
+    },
+    {
+      // The shop used to be an unlabelled 11.5px muted line tucked under the
+      // order code — present, but not something anyone reads at a glance, and on
+      // a screen whose whole job is "which kitchen is this order sitting in" it
+      // needs to be a column with a header on it.
+      key: "restaurant",
+      header: "Vendor",
+      width: "w-[170px]",
+      cell: (o) => (
+        <p className="truncate text-[12.5px] font-medium text-ink" title={o.restaurant}>
+          {o.restaurant}
+        </p>
+      ),
+    },
+    {
+      // The food itself, which this screen never showed at all. An operator
+      // fielding "where is my order" or "they sent the wrong thing" had to open
+      // every row to find out what was in it.
+      key: "items",
+      header: "Items",
+      width: "w-[220px]",
+      cell: (o) => <ItemsCell items={o.items} count={o.itemCount} />,
     },
     {
       key: "customer",
@@ -226,7 +303,7 @@ function renderOrders(
         <SearchForm
           action="/admin/orders"
           defaultValue={q}
-          placeholder="Order code, customer or restaurant"
+          placeholder="Order code, customer, vendor or dish"
           carry={{ status: status ?? undefined }}
         />
 
@@ -254,6 +331,10 @@ function renderOrders(
         // to /admin/orders/undefined would 404 on tap.
         rowHref={(o) => (o.id ? `/admin/orders/${o.id}` : null)}
         rowTone={(o) => ((o.lateByMinutes ?? 0) > 0 ? "alert" : null)}
+        // Two columns wider than it was (Vendor, Items). At the old 840 default
+        // the dish names were the first thing to get squeezed, which defeats
+        // the point of showing them.
+        minWidth={1060}
         footer={
           <TableFooter
             page={1}

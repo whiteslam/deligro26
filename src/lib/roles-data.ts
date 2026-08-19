@@ -49,6 +49,13 @@ export interface KitchenOrder {
   /** When the kitchen accepted / packed it (0026) — drives the late badge. */
   acceptedAt?: string | null;
   readyAt?: string | null;
+  /**
+   * `orders.pickup_otp` (0006) — the code the counter reads to the rider at
+   * collection, and which the rider must then enter to mark the pickup. Shown
+   * on the Ready column only: it is the kitchen's proof that the person taking
+   * the bag is the courier this order was assigned to.
+   */
+  pickupOtp?: string | null;
 }
 
 export const RESTAURANT_NAME = "Saffron Kitchen";
@@ -207,16 +214,25 @@ export interface AdminOrderRow {
   paymentStatus?: PaymentStatus;
   /** Minutes past the expected handover, when the order is running late. */
   lateByMinutes?: number | null;
+  /**
+   * What was ordered, name and quantity only — enough to answer "what did they
+   * order?" without opening the row, which is the question an operator on a
+   * phone call actually has. Prices are not here; the detail view prints the
+   * bill. Empty when every line was unnamed (legacy imports), never faked.
+   */
+  items?: { name: string; qty: number }[];
+  /** Units across all lines, so "3 items" doesn't have to be recomputed per render. */
+  itemCount?: number;
 }
 
 export const ADMIN_ORDERS: AdminOrderRow[] = [
-  { code: "#D-4823", customer: "Rahul K.", restaurant: "Saffron Kitchen", status: "PLACED", total: 900, placedAt: "24 Jul, 8:24 PM" },
-  { code: "#B-9910", customer: "Karan V.", restaurant: "Blue Tokai Cafe", status: "KITCHEN", total: 420, placedAt: "24 Jul, 8:21 PM" },
-  { code: "#P-3345", customer: "Divya N.", restaurant: "Pizza Loft", status: "ON_THE_WAY", total: 660, placedAt: "24 Jul, 8:14 PM" },
-  { code: "#D-4818", customer: "Neha R.", restaurant: "Saffron Kitchen", status: "ON_THE_WAY", total: 560, placedAt: "24 Jul, 8:09 PM" },
-  { code: "#S-7781", customer: "Meera J.", restaurant: "South Spice", status: "DELIVERED", total: 340, placedAt: "24 Jul, 7:58 PM" },
-  { code: "#D-4801", customer: "Imran H.", restaurant: "Saffron Kitchen", status: "DELIVERED", total: 720, placedAt: "24 Jul, 7:44 PM" },
-  { code: "#B-9902", customer: "Sana P.", restaurant: "Blue Tokai Cafe", status: "CANCELLED", total: 210, placedAt: "24 Jul, 7:31 PM" },
+  { code: "#D-4823", customer: "Rahul K.", restaurant: "Saffron Kitchen", status: "PLACED", total: 900, placedAt: "24 Jul, 8:24 PM", items: [{ name: "Paneer Butter Masala", qty: 2 }, { name: "Butter Naan", qty: 4 }, { name: "Gulab Jamun", qty: 2 }], itemCount: 8 },
+  { code: "#B-9910", customer: "Karan V.", restaurant: "Blue Tokai Cafe", status: "KITCHEN", total: 420, placedAt: "24 Jul, 8:21 PM", items: [{ name: "Cold Coffee", qty: 2 }, { name: "Veg Sandwich", qty: 1 }], itemCount: 3 },
+  { code: "#P-3345", customer: "Divya N.", restaurant: "Pizza Loft", status: "ON_THE_WAY", total: 660, placedAt: "24 Jul, 8:14 PM", items: [{ name: "Farmhouse Pizza", qty: 1 }, { name: "Garlic Bread", qty: 2 }], itemCount: 3 },
+  { code: "#D-4818", customer: "Neha R.", restaurant: "Saffron Kitchen", status: "ON_THE_WAY", total: 560, placedAt: "24 Jul, 8:09 PM", items: [{ name: "Veg Biryani", qty: 2 }], itemCount: 2 },
+  { code: "#S-7781", customer: "Meera J.", restaurant: "South Spice", status: "DELIVERED", total: 340, placedAt: "24 Jul, 7:58 PM", items: [{ name: "Masala Dosa", qty: 2 }, { name: "Filter Coffee", qty: 2 }], itemCount: 4 },
+  { code: "#D-4801", customer: "Imran H.", restaurant: "Saffron Kitchen", status: "DELIVERED", total: 720, placedAt: "24 Jul, 7:44 PM", items: [{ name: "Chicken Handi", qty: 1 }, { name: "Tandoori Roti", qty: 6 }], itemCount: 7 },
+  { code: "#B-9902", customer: "Sana P.", restaurant: "Blue Tokai Cafe", status: "CANCELLED", total: 210, placedAt: "24 Jul, 7:31 PM", items: [{ name: "Cappuccino", qty: 1 }, { name: "Choco Croissant", qty: 1 }], itemCount: 2 },
 ];
 
 export interface ApprovalRow {

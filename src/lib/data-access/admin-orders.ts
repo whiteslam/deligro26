@@ -310,6 +310,16 @@ function listColumns(flags: Flags): string {
     flags.lifecycle ? ", accepted_at, ready_at" : "",
     ", restaurants(name, eta_min, eta_max)",
     ", customer:profiles!orders_customer_id_fkey(full_name)",
+    // What was actually ordered. The list used to show an order's code, its
+    // shop, its customer and its value but never the food — so the one question
+    // an operator taking a phone call has ("what did they order?") could only be
+    // answered by opening each row.
+    //
+    // `name, qty` only. The detail view pulls `price` too, because it prints a
+    // bill; a summary line does not need it and this query runs on a 4s poll.
+    // Not probed like the columns above: order_items is a base table the detail
+    // query already joins unconditionally.
+    ", order_items(name, qty)",
   ].join("");
 }
 
@@ -333,6 +343,7 @@ interface ListRow {
     | { full_name: string | null }
     | { full_name: string | null }[]
     | null;
+  order_items: { name: string | null; qty: number | null }[] | null;
 }
 
 /**
@@ -354,6 +365,18 @@ interface RankedRow {
 function mapListRow(r: ListRow, prepMinutes: number, now: number): RankedRow {
   const restaurant = one(r.restaurants);
   const status = adminOrderStatus(r.status);
+
+  // A line with no name is not a dish anyone can read out over the phone, and a
+  // qty of null is not a quantity — drop both rather than rendering "undefined ×
+  // null" on an operations screen. Legacy imported orders are the ones that have
+  // them; an order that loses every line this way simply shows no dish summary,
+  // which is honest, where a row of placeholders would not be.
+  const items = (r.order_items ?? [])
+    .map((line) => ({
+      name: (line.name ?? "").trim(),
+      qty: typeof line.qty === "number" && line.qty > 0 ? line.qty : 0,
+    }))
+    .filter((line) => line.name !== "" && line.qty > 0);
 
   const lateBy = minutesLate({
     status,
@@ -383,6 +406,8 @@ function mapListRow(r: ListRow, prepMinutes: number, now: number): RankedRow {
       paymentMethod: r.payment_method ?? undefined,
       paymentStatus: r.payment_status ?? undefined,
       lateByMinutes: lateBy,
+      items,
+      itemCount: items.reduce((n, line) => n + line.qty, 0),
     },
   };
 }
