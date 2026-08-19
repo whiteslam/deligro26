@@ -11,8 +11,11 @@ import {
   searchDishes,
   FOOD_CATEGORIES,
   type DishSort,
+  type RankContext,
   type SearchFilters,
 } from "@/lib/search/dishes";
+import { useLocation } from "@/stores/location-store";
+import { PINNED_LOCATION } from "@/lib/location/pinned";
 import { DishCard } from "@/components/search/dish-card";
 import { RestaurantCard } from "@/components/shared/restaurant-card";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -58,11 +61,18 @@ export function SearchView({
   initialCategory,
   initialQuery,
   restaurants,
+  rotationSeed,
 }: {
   initialCategory?: string;
   /** Carried over from the home field, so "See all results" keeps the words. */
   initialQuery?: string;
   restaurants: Restaurant[];
+  /**
+   * Today's date, from the server — see `lib/search/rotation.ts`. Passed in
+   * rather than read from the clock here so the server and client renders can
+   * never disagree about which day it is.
+   */
+  rotationSeed?: string;
 }) {
   const [query, setQuery] = useState(initialQuery ?? "");
   const [tab, setTab] = useState<Tab>("dishes");
@@ -90,9 +100,18 @@ export function SearchView({
     [chips, category]
   );
 
+  // Ranking measures from wherever the customer is — the same origin the header
+  // names and `ShopDistance` prints, so a row that reads "1.2 km" is a row that
+  // was ranked as 1.2 km. Bemetara until they detect a fix or pick an address.
+  const origin = useLocation((s) => s.coords) ?? PINNED_LOCATION.coords;
+  const ctx = useMemo<RankContext>(
+    () => ({ origin, rotationSeed }),
+    [origin, rotationSeed]
+  );
+
   const dishes = useMemo(
-    () => searchDishes(index, deferredQuery, filters, sort),
-    [index, deferredQuery, filters, sort]
+    () => searchDishes(index, deferredQuery, filters, sort, ctx),
+    [index, deferredQuery, filters, sort, ctx]
   );
 
   const shops = useMemo(
@@ -124,6 +143,16 @@ export function SearchView({
   // cuisine tags instead. Say so — otherwise "Rolls" quietly lists milkshakes.
   const byCuisineOnly = categoryBasis(index, category) === "cuisine";
   const partial = Boolean(typed) && Boolean(shown[0]?.partial);
+
+  // When a category chip is what emptied the screen, the useful thing to say is
+  // not "nothing matches" — it is "there are 10 of these, just not under Thali".
+  // Only computed when the screen is already empty and a category is on, so the
+  // common path does no extra work.
+  const withoutCategory = useMemo(() => {
+    if (dishes.length || !category || !typed) return 0;
+    return searchDishes(index, deferredQuery, { ...filters, category: null }, sort, ctx)
+      .length;
+  }, [dishes.length, category, typed, index, deferredQuery, filters, sort, ctx]);
 
   return (
     <div>
@@ -260,7 +289,14 @@ export function SearchView({
               ))}
             </div>
           ) : (
-            <NoResults query={typed} onClear={clearAll} kind="dish" />
+            <NoResults
+              query={typed}
+              onClear={clearAll}
+              kind="dish"
+              categoryLabel={activeCategory?.label ?? null}
+              elsewhere={withoutCategory}
+              onDropCategory={() => setCategory(null)}
+            />
           )
         ) : shops.length ? (
           <div className="mt-4 space-y-5">
@@ -300,11 +336,44 @@ function NoResults({
   query,
   onClear,
   kind,
+  categoryLabel = null,
+  elsewhere = 0,
+  onDropCategory,
 }: {
   query: string;
   onClear: () => void;
   kind: "dish" | "restaurant";
+  /** The category chip that is on, when one is. */
+  categoryLabel?: string | null;
+  /** How many dishes this same query finds with that chip off. */
+  elsewhere?: number;
+  onDropCategory?: () => void;
 }) {
+  // The category is the reason the screen is empty, and we know exactly how many
+  // results dropping it would bring back. Saying "no Thali matches EGG BIRYANI,
+  // but 10 other dishes do" answers the question the blank screen provokes;
+  // "nothing matches" next to a list of chips leaves someone to guess which one
+  // to poke. Worth the extra sentence for a first-time smartphone user.
+  const blockedByCategory = Boolean(categoryLabel) && elsewhere > 0;
+
+  if (blockedByCategory) {
+    return (
+      <EmptyState
+        className="mt-6"
+        icon={<Search className="size-7" />}
+        title={`No ${categoryLabel} matches “${query}”`}
+        description={`But ${elsewhere} other ${
+          elsewhere === 1 ? "dish matches" : "dishes match"
+        } — they're just not ${categoryLabel}.`}
+        action={
+          <Button onClick={onDropCategory}>
+            Show all {elsewhere} {elsewhere === 1 ? "result" : "results"}
+          </Button>
+        }
+      />
+    );
+  }
+
   return (
     <EmptyState
       className="mt-6"
