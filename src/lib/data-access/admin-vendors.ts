@@ -20,6 +20,11 @@ import { legiblePassword } from "@/lib/utils/password";
 import { toE164 } from "@/lib/auth/phone";
 import { checkOtp } from "@/lib/data-access/otp";
 import { getVendorPositions } from "@/lib/data-access/vendor-positions";
+import {
+  getVendorCredential,
+  listVendorCredentials,
+  storeVendorCredential,
+} from "@/lib/data-access/vendor-credentials";
 
 // Re-exported so existing importers keep working; the canonical definition lives
 // in the client-safe @/lib/vendor-status module.
@@ -58,6 +63,12 @@ export interface VendorListItem {
   name: string;
   ownerName: string | null;
   ownerMobile: string | null;
+  /**
+   * The address the owner signs in with. Required since 0039 — a vendor with no
+   * email cannot be issued a password, and mobile+password login resolves the
+   * account through it.
+   */
+  ownerEmail: string | null;
   category: string | null;
   address: string | null;
   commissionPct: number | null;
@@ -75,6 +86,12 @@ export interface VendorListItem {
   ratingCount: number;
   /** Manual featured slot 1–10, or null when unranked (migration 0021). */
   sortPosition: number | null;
+  /**
+   * The hand-off login password an admin can read back to the owner, or null
+   * when none has been issued (or 0039 isn't applied). Populated only by the
+   * admin-gated list/detail reads — see @/lib/data-access/vendor-credentials.
+   */
+  loginPassword: string | null;
 }
 
 /**
@@ -111,7 +128,6 @@ export interface VendorDetail extends VendorListItem {
   tagline: string | null;
   description: string | null;
   ownerAltMobile: string | null;
-  ownerEmail: string | null;
   cuisines: string[];
   minOrder: number;
   deliveryAvailable: boolean;
@@ -145,10 +161,7 @@ export interface VendorDetail extends VendorListItem {
   /** How often this vendor is paid out. */
   settlementCycle: SettlementCycle;
   menuItemCount: number;
-  /**
-   * When an admin last issued a one-time login password. The password itself is
-   * shown once, at generation, and never stored — see resetVendorPassword.
-   */
+  /** When an admin last issued a login password — see resetVendorPassword. */
   passwordResetAt: string | null;
   ownerPhoneVerified: boolean;
 }
@@ -207,7 +220,7 @@ export interface ListVendorsResult {
 }
 
 const LIST_SELECT = `
-  id, slug, name, owner_name, owner_mobile, category, address,
+  id, slug, name, owner_name, owner_mobile, owner_email, category, address,
   commission_pct, status, is_open, image_url, accent_tint, created_at,
   rating, rating_count
 `;
@@ -314,6 +327,7 @@ function mapListItem(row: VendorRow, platformDefault = 0): VendorListItem {
     name: row.name,
     ownerName: row.owner_name,
     ownerMobile: row.owner_mobile,
+    ownerEmail: row.owner_email ?? null,
     category: row.category,
     address: row.address,
     // null means "inherit the platform rate" — see migration 0032. Preserved as
@@ -336,6 +350,8 @@ function mapListItem(row: VendorRow, platformDefault = 0): VendorListItem {
     ratingCount: Number(row.rating_count ?? 0),
     // Filled in by the caller from the resilient positions read (0021).
     sortPosition: null,
+    // Filled in by the caller from the service-role credentials read (0039).
+    loginPassword: null,
   };
 }
 
@@ -350,7 +366,6 @@ function mapDetail(
     tagline: row.tagline ?? null,
     description: row.description ?? null,
     ownerAltMobile: row.owner_alt_mobile ?? null,
-    ownerEmail: row.owner_email ?? null,
     cuisines: (row.cuisines ?? []) as string[],
     minOrder: Number(row.min_order ?? 0),
     deliveryAvailable: row.delivery_available ?? true,
@@ -468,47 +483,21 @@ export async function listVendors(
   const { byId } = await getVendorPositions();
   for (const item of items) item.sortPosition = byId.get(item.id) ?? null;
 
+  // Attach the hand-off passwords (0039) in one query for the whole page, so
+  // the admin list can show the credential column without N round trips.
+  const credentials = await listVendorCredentials(items.map((i) => i.id));
+  for (const item of items) {
+    item.loginPassword = credentials.get(item.id) ?? null;
+  }
+
   return { items, total: count ?? 0, page, pageSize };
 }
 
-/**
- * Shops waiting to go live, oldest first, with the full list columns.
- *
- * Filters on `status = 'pending'`, i.e. shops nobody has ruled on yet — the
- * same predicate the nav badge (`getAdminNavCounts`) and the dashboard queue
- * (`listPendingRestaurants`) use, so the queue and the number counting it never
- * disagree. It used to be `approved = false`, which the 0017 trigger also
- * leaves true for every *decided* shop: disable a live vendor or reject a
- * signup and it reappeared in "Waiting to go live" forever, because there is no
- * further action that clears it. A queue you cannot empty is not a queue.
- *
- * The difference from `listPendingRestaurants` is only the column list — this
- * one carries the category, address and image the approval cards render — so
- * it stays here beside `listVendors`, whose service-role client and mapper it
- * reuses rather than reimplements. Admin-gated upstream (AGENTS.md §5).
- */
-export async function listAwaitingApproval(
-  limit = 24
-): Promise<VendorListItem[]> {
-  const supabase = createAdminClient();
-
-  const { data, error } = await supabase
-    .from("restaurants")
-    .select(LIST_SELECT)
-    .eq("status", "pending")
-    .order("created_at", { ascending: true })
-    .limit(limit);
-
-  if (error) {
-    if (isMissingSchema(error)) return [];
-    throw error;
-  }
-
-  const platformDefault = await getVendorCommissionDefault();
-  return ((data as VendorRow[] | null) ?? []).map((r) =>
-    mapListItem(r, platformDefault)
-  );
-}
+// `listAwaitingApproval` lived here: it re-queried `status = 'pending'` with
+// the full list columns to feed a separate card grid above the catalogue. The
+// Approvals tab is now `listVendors({ status: "pending" })` — same predicate,
+// same mapper, paged and sorted like every other tab — so the second query and
+// the second layout are both gone. `counts.pending` is what the badge reads.
 
 /** The six dashboard cards. A failing sub-count reads as 0, never blank. */
 export async function getVendorCounts(): Promise<VendorCounts> {
@@ -586,6 +575,7 @@ export async function getVendorDetail(id: string): Promise<VendorDetail | null> 
   );
   const { byId } = await getVendorPositions();
   detail.sortPosition = byId.get(id) ?? null;
+  detail.loginPassword = (await getVendorCredential(id))?.password ?? null;
   return detail;
 }
 
@@ -754,33 +744,37 @@ export interface ResetPasswordResult {
   tempPassword: string;
 }
 
-/**
- * Reset a vendor's login password to a fresh legible one and return it, for the
- * operator to relay. Service-role, because it acts on the auth user.
- *
- * The value is returned ONCE and is never persisted. It used to be written to
- * `restaurants.temp_password` so the Edit screen could re-show it, which meant
- * the row carried the vendor's live credential in plaintext — defeating the
- * bcrypt hashing Supabase Auth does, and turning any DB backup, read-replica or
- * over-broad policy into a set of working logins. Nothing ever cleared it
- * either, despite the "temp" in the name. If an operator loses the value they
- * press "Generate new password" again; that is cheap, and a rotated credential
- * is the correct answer to a mislaid one.
- */
-export async function resetVendorPassword(
-  id: string
-): Promise<ResetPasswordResult> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
+/** The owner's auth user id for a shop, or null when the shop has no login. */
+async function vendorOwnerId(restaurantId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .from("restaurants")
     .select("owner_id")
-    .eq("id", id)
+    .eq("id", restaurantId)
     .maybeSingle();
   if (error) throw error;
-  const ownerId = (data as { owner_id: string } | null)?.owner_id;
+  return (data as { owner_id: string } | null)?.owner_id ?? null;
+}
+
+/**
+ * Set a vendor's login password to `password` and keep an admin-readable copy.
+ *
+ * Two writes, in this order, and the order matters: Supabase Auth is the thing
+ * that authenticates, so if it refuses (weak password, deleted user) nothing is
+ * stored and the operator sees a failure rather than a credential that doesn't
+ * work. The copy in `vendor_login_credentials` is best-effort on top — see that
+ * module for why a plaintext copy exists at all and what contains it.
+ *
+ * `setBy` is the admin's profile id, recorded as the audit trail on the copy.
+ */
+async function applyVendorPassword(
+  restaurantId: string,
+  password: string,
+  setBy: string | null
+): Promise<void> {
+  const ownerId = await vendorOwnerId(restaurantId);
   if (!ownerId) throw new Error("vendor_not_found");
 
-  const password = legiblePassword();
   const admin = createAdminClient();
   const { error: upErr } = await admin.auth.admin.updateUserById(ownerId, {
     password,
@@ -788,14 +782,47 @@ export async function resetVendorPassword(
   });
   if (upErr) throw upErr;
 
-  // Record THAT a reset happened, for the audit trail — never the secret.
-  // Best-effort: the reset itself already succeeded.
+  await storeVendorCredential(restaurantId, ownerId, password, setBy);
+
+  // Record THAT a reset happened as well as the value, so the audit trail
+  // survives even if the credential row is later cleared.
   await admin
     .from("restaurants")
     .update({ password_reset_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", restaurantId);
+}
 
+/**
+ * Issue a fresh legible password for a vendor and return it.
+ *
+ * The value is also stored, admin-visible, in `vendor_login_credentials`
+ * (migration 0039). That is a deliberate reversal of audit finding C-2, which
+ * dropped the old `restaurants.temp_password`: shop owners here are onboarded
+ * in person and phone the admin desk when they lose their login, and rotating a
+ * working credential mid-service is the wrong answer to "what was my password".
+ * What made the old column unacceptable was that it sat on a row anon and
+ * authenticated could read; the replacement is a service-role-only table with
+ * RLS on and no policies. Read the 0039 header before touching this.
+ */
+export async function resetVendorPassword(
+  id: string,
+  setBy: string | null = null
+): Promise<ResetPasswordResult> {
+  const password = legiblePassword();
+  await applyVendorPassword(id, password, setBy);
   return { tempPassword: password };
+}
+
+/**
+ * Set a vendor's password to one the operator typed, rather than a generated
+ * one. Same storage and the same audit trail; the caller validates the length.
+ */
+export async function setVendorPassword(
+  id: string,
+  password: string,
+  setBy: string | null = null
+): Promise<void> {
+  await applyVendorPassword(id, password, setBy);
 }
 
 export interface VerifyPhoneResult {

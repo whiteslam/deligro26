@@ -393,7 +393,9 @@ export function RegistrationWizard({
           <>
             <p className="text-sm text-muted">
               The account is live with status <b className="text-ink">pending</b>.
-              Share this one-time login password now — it won&apos;t be shown again.
+              The owner signs in with their mobile number and this password. It
+              is saved against the shop, so you can read it back from the vendor
+              list if they lose it.
             </p>
             <div className="mt-3 flex items-center gap-2 rounded-xl bg-surface-2 p-2.5">
               <code className="text-data flex-1 break-all px-1 text-[15px] font-semibold text-ink">
@@ -518,9 +520,9 @@ function BasicStep({ data, update }: StepProps) {
       </div>
       <LogoUpload data={data} update={update} />
       <p className="text-xs text-muted">
-        The password isn&apos;t stored in the draft — re-enter it (or leave blank
-        to auto-generate) before creating the vendor. It&apos;s shown once on
-        creation and stays available on the Edit screen.
+        The password isn&apos;t kept in the draft — re-enter it (or leave blank
+        to auto-generate) before creating the vendor. Once the account exists it
+        is readable from the vendor list and the Edit screen.
       </p>
     </Card>
   );
@@ -1274,8 +1276,8 @@ function ReviewStep({
         </dl>
       </div>
       <p className="px-1 text-xs text-muted">
-        Creating the vendor generates a login account (status pending) and shows a
-        one-time password to hand off.
+        Creating the vendor generates a login account (status pending) and a
+        password to hand off. The owner signs in with their mobile number.
       </p>
     </div>
   );

@@ -34,6 +34,8 @@ export default async function EditVendorPage({
           call, and support calls happen away from a desk. */}
       <VendorCredentials
         id={vendor.id}
+        loginEmail={vendor.ownerEmail}
+        loginPassword={vendor.loginPassword}
         passwordResetAt={vendor.passwordResetAt}
         ownerMobile={vendor.ownerMobile}
         ownerPhoneVerified={vendor.ownerPhoneVerified}

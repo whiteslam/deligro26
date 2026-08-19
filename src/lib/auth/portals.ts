@@ -9,10 +9,10 @@ import type { Role } from "@/lib/auth";
  * admin console. Each portal now has its own sign-in page instead, and the
  * customer app is simply what you get at `/`.
  *
- *   /admin   → /admin/login    (email + password, or phone OTP)
- *   /vendor  → /vendor/login   (email + password, or phone OTP)
- *   /manager → /manager/login  (email + password, or phone OTP)
- *   /driver  → /driver/login   (email + password, or phone OTP)
+ *   /admin   → /admin/login    (email or mobile + password, or phone OTP)
+ *   /vendor  → /vendor/login   (email or mobile + password, or phone OTP)
+ *   /manager → /manager/login  (email or mobile + password, or phone OTP)
+ *   /driver  → /driver/login   (email or mobile + password, or phone OTP)
  *   customer → /login          (phone OTP, or browse as guest)
  *
  * The same account may hold more than one of these — signing in at a door does

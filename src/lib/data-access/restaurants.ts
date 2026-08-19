@@ -43,6 +43,8 @@ interface DbRestaurantRow {
   lng?: number | null;
   address?: string | null;
   offer: string | null;
+  // Optional: absent entirely on a database that predates migration 0041.
+  offer_expires_at?: string | null;
   promoted: boolean;
   // Optional: absent entirely on a database that predates migration 0036.
   prep_minutes?: number | null;
@@ -58,13 +60,18 @@ interface DbRestaurantRow {
  * run 0009 yet simply serves shops without a pin, and they fall back to the
  * seeded `distance_km`. Delete this branch once every environment is migrated.
  */
-function restaurantSelect(withLocation: boolean, withPace: boolean): string {
+function restaurantSelect(
+  withLocation: boolean,
+  withPace: boolean,
+  withOfferWindow: boolean
+): string {
   return `
     id, slug, name, tagline, is_open,
     image_url, accent_tint, cuisines, rating, rating_count,
     eta_min, eta_max, price_tier, cost_for_two, distance_km,
     ${withLocation ? "lat, lng, address," : ""}
     ${withPace ? "prep_minutes, busy_until, busy_extra_minutes," : ""}
+    ${withOfferWindow ? "offer_expires_at," : ""}
     offer, promoted,
     menu_items (
       id, external_id, name, description, price, veg, available,
@@ -77,6 +84,8 @@ function restaurantSelect(withLocation: boolean, withPace: boolean): string {
 let hasShopLocation: boolean | null = null;
 /** Same, for the 0036 pace columns. Separate because the migrations are. */
 let hasKitchenPace: boolean | null = null;
+/** Same, for 0041's `offer_expires_at`. */
+let hasOfferWindow: boolean | null = null;
 
 /** PostgREST's "column does not exist". */
 const UNDEFINED_COLUMN = "42703";
@@ -97,6 +106,7 @@ async function selectRestaurants<T>(
   // is absent, so a database with 0009 but not 0036 must not lose its shop pins
   // to a failed probe for the pace columns.
   const groups: Array<[() => boolean, (v: boolean) => void]> = [
+    [() => hasOfferWindow !== false, (v) => (hasOfferWindow = v)],
     [() => hasKitchenPace !== false, (v) => (hasKitchenPace = v)],
     [() => hasShopLocation !== false, (v) => (hasShopLocation = v)],
   ];
@@ -104,23 +114,38 @@ async function selectRestaurants<T>(
   for (const [optimistic, latch] of groups) {
     if (!optimistic()) continue;
     const { data, error } = await run(
-      restaurantSelect(hasShopLocation !== false, hasKitchenPace !== false)
+      restaurantSelect(
+        hasShopLocation !== false,
+        hasKitchenPace !== false,
+        hasOfferWindow !== false
+      )
     );
     if (!error) {
       if (hasShopLocation !== false) hasShopLocation = true;
       if (hasKitchenPace !== false) hasKitchenPace = true;
+      if (hasOfferWindow !== false) hasOfferWindow = true;
       return data;
     }
     if (error.code !== UNDEFINED_COLUMN) throw error;
     latch(false);
   }
 
-  const { data, error } = await run(restaurantSelect(false, false));
+  const { data, error } = await run(restaurantSelect(false, false, false));
   if (error) throw error;
   return data;
 }
 
 const FALLBACK_TINT = "linear-gradient(135deg,#f6c453,#e8552d)";
+
+/** The shop's badge, or nothing once the coupon behind it has lapsed. */
+function offerIfLive(
+  offer: string | null,
+  expiresAt: string | null | undefined
+): string | undefined {
+  if (!offer) return undefined;
+  if (expiresAt && Date.parse(expiresAt) < Date.now()) return undefined;
+  return offer;
+}
 
 function mapMenuItem(row: DbMenuItem, popularity?: Popularity): MenuItem {
   // Ranked by sales when there's enough history; otherwise the seeded flags
@@ -194,7 +219,11 @@ function mapRestaurant(row: DbRestaurantRow, popularity?: Popularity): Restauran
     lat: row.lat ?? null,
     lng: row.lng ?? null,
     address: row.address ?? null,
-    offer: row.offer ?? undefined,
+    // A badge with a lapsed campaign behind it is dropped on read. The trigger
+    // in 0041 fires when a coupon changes, and nothing fires at the moment one
+    // expires — so this is what keeps the card from advertising a promotion
+    // that ended overnight.
+    offer: offerIfLive(row.offer, row.offer_expires_at),
     promoted: row.promoted,
     open: row.is_open,
     categories,

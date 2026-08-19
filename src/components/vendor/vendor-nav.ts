@@ -3,6 +3,7 @@ import {
   IndianRupee,
   LayoutDashboard,
   Settings,
+  TicketPercent,
   User,
   UtensilsCrossed,
 } from "lucide-react";
@@ -60,6 +61,17 @@ export const VENDOR_NAV: VendorNavItem[] = [
     primary: true,
     tone: "green",
     match: (p) => p.startsWith("/vendor/earnings"),
+  },
+  {
+    // Money, not Catalogue: a promo code is the shop spending its own item
+    // revenue to buy orders, and it sits next to the screen that shows what
+    // that revenue is.
+    href: "/vendor/promotions",
+    label: "Promotions",
+    icon: TicketPercent,
+    group: "Money",
+    tone: "deal",
+    match: (p) => p.startsWith("/vendor/promotions"),
   },
   {
     href: "/vendor/profile",

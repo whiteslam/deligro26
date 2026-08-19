@@ -21,6 +21,7 @@ function Line({
   amount,
   note,
   negative,
+  positive,
   strong,
   rule,
 }: {
@@ -28,6 +29,8 @@ function Line({
   amount: number;
   note?: string;
   negative?: boolean;
+  /** Added back rather than taken off — the one row that goes the other way. */
+  positive?: boolean;
   strong?: boolean;
   /** Draw a divider above — marks a subtotal. */
   rule?: boolean;
@@ -56,9 +59,11 @@ function Line({
           "text-data shrink-0 tabular-nums",
           strong ? "text-[15px] font-bold text-ink" : "text-[13px] text-ink",
           negative && amount !== 0 ? "text-deal" : "",
+          positive && amount !== 0 ? "text-green" : "",
         ].join(" ")}
       >
         {negative && amount !== 0 ? "− " : ""}
+        {positive && amount !== 0 ? "+ " : ""}
         {formatINR(Math.abs(amount))}
       </span>
     </div>
@@ -90,6 +95,16 @@ export function OrderPayoutBreakdown({
       <Line label="Delivery fee (platform)" amount={line.deliveryFee} negative />
       <Line label="GST / taxes (government)" amount={line.taxAmount} negative />
       <Line label="Tip (rider keeps all of it)" amount={line.tip} negative />
+      {/* The one row that adds. Without it the statement does not reconcile:
+          the shop's food share is deliberately more than what the customer
+          paid, because Deligro paid the rest of it. */}
+      {line.platformDiscount > 0 ? (
+        <Line
+          label="Deligro promo code — we funded this"
+          amount={line.platformDiscount}
+          positive
+        />
+      ) : null}
       <Line
         label="Shop's share of the food"
         amount={line.foodGross}
@@ -128,9 +143,14 @@ export function OrderPayoutBreakdown({
       />
       {!line.remitsVendor ? (
         <p className="pt-1 text-[11.5px] leading-snug text-muted">
-          Cash order. The shop kept {formatINR(line.foodGross)} at the door, so
+          Cash order. The shop kept{" "}
+          {formatINR(line.foodGross - line.platformDiscount)} at the door, so
           the {formatINR(deductions + line.refundRecovered)} above is taken off
-          the next payout instead of being sent.
+          the next payout instead of being sent
+          {line.platformDiscount > 0
+            ? `, less the ${formatINR(line.platformDiscount)} promo code Deligro funded`
+            : ""}
+          .
         </p>
       ) : null}
     </div>

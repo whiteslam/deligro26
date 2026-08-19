@@ -135,10 +135,16 @@ BASE_URL=https://<host> npm run test:e2e
 ## 6. Rollback
 
 - [ ] The previous deployment is still promotable in Vercel.
-- [ ] Note that 0022 **drops** `restaurants.temp_password`. Rolling the *app*
+- [ ] Note that 0024 **drops** `restaurants.temp_password`. Rolling the *app*
       back is safe; rolling the *migration* back is not, and should not be
-      attempted — the column held plaintext credentials and its absence is the
-      fix. Older app builds that read it will error on that one admin screen.
+      attempted — the column held plaintext credentials on a publicly readable
+      row, and its absence is the fix. Older app builds that read it will error
+      on that one admin screen.
+- [ ] 0039 **adds** `vendor_login_credentials`, which holds vendor hand-off
+      passwords in clear on purpose (see SECURITY.md). Rolling the app back is
+      safe — nothing older reads the table. If you drop it, every stored vendor
+      password is gone and each affected shop needs a fresh one issued; the
+      logins themselves keep working, because Supabase Auth is the authority.
 
 ---
 

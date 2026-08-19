@@ -1,8 +1,14 @@
 import Link from "next/link";
-import { CheckCircle2, ListOrdered, Plus, Store, Tags } from "lucide-react";
+import {
+  CheckCircle2,
+  ListOrdered,
+  Plus,
+  Store,
+  Tags,
+  TriangleAlert,
+} from "lucide-react";
 import {
   getVendorCounts,
-  listAwaitingApproval,
   listVendors,
   storefrontGaps,
   type VendorListItem,
@@ -12,35 +18,65 @@ import { listCategories } from "@/lib/data-access/vendor-categories";
 import { AdminHero, EmptyState } from "@/components/admin/admin-ui";
 import { StatTile, StatTiles } from "@/components/admin/console-ui";
 import { ConsoleOnly } from "@/components/admin/console-only";
-import { VendorApprovalCards } from "@/components/admin/vendor-approval-cards";
-import { VendorProfileCard } from "@/components/admin/vendor-profile-card";
+import { VendorAvatar } from "@/components/admin/vendor-avatar";
 import { AdminQuickLink } from "@/components/admin/admin-quick-link";
-import { TableFooter } from "@/components/admin/data-table";
+import { ApproveRestaurantButton } from "@/components/admin/approve-restaurant-button";
+import { RejectVendorButton } from "@/components/admin/reject-vendor-button";
+import { FilterChips } from "@/components/admin/admin-filters";
+import {
+  DataTable,
+  TableFooter,
+  type Column,
+} from "@/components/admin/data-table";
 import { formatWaited } from "@/lib/utils/format";
-import { VendorSearchBar } from "./vendor-search-bar";
+import { cn } from "@/lib/utils/cn";
+import { VendorSearchBar, PAGE_SIZES } from "./vendor-search-bar";
+import { VendorPositionSelect } from "./vendor-position-select";
+import { VendorPasswordCell } from "./vendor-password-cell";
+import { VendorRowActions } from "./vendor-row-actions";
 
 /**
- * Admin → Vendors: a directory of partner profiles.
+ * Admin → Vendors: the partner directory, as a table.
  *
- * Read top to bottom it answers three questions in the order they get asked —
- * who is waiting on me, how is the roster doing, and who am I looking for. The
- * queue is first because it is the only part with a deadline attached; the
- * snapshot tiles are the console's own band (the same ones settlements uses),
- * not a second set of stat cards invented for this page; the catalogue is last
- * because it is browsing, not triage.
+ * This used to be a grid of profile cards. Each one was about 280px tall, so a
+ * roster of forty shops was a page you scrolled for a minute — and the facts an
+ * operator actually opens this screen for (who is waiting, what is this shop's
+ * number, what is their password) were spread across three regions of a card
+ * that mostly held whitespace. A directory is a table. One row per shop, the
+ * columns you can scan down, and the decorative half deleted.
  *
- * Each shop renders as a profile rather than a spreadsheet row or a cover
- * photo — see `VendorProfileCard` for why the cover-led version this replaced
- * did not survive contact with a database where most shops have no photo.
+ * The status filter is promoted to tabs, because the queue and the catalogue
+ * are two different jobs rather than two parts of one page: **Approvals** is
+ * triage with a clock on it and carries its own Approve/Reject column and a
+ * waiting time, everything else is browsing. The tab is the same `?status=`
+ * that the filter bar writes, so the two can never disagree.
  */
 export const dynamic = "force-dynamic";
-
-const QUEUE_SHOWN = 6;
 
 type Search = { [key: string]: string | string[] | undefined };
 
 function one(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
+}
+
+const STATUS_PILL: Record<VendorStatus, string> = {
+  active: "pill pill-green",
+  pending: "pill pill-pop",
+  suspended: "pill pill-deal",
+  inactive: "pill pill-muted",
+};
+
+const dateFmt = new Intl.DateTimeFormat("en-IN", {
+  month: "short",
+  year: "numeric",
+});
+
+/** A signup nobody has ruled on for this long is the queue's real failure mode. */
+const OVERDUE_DAYS = 4;
+
+function isOverdue(createdAt: string): boolean {
+  const ms = Date.now() - new Date(createdAt).getTime();
+  return Number.isFinite(ms) && ms > OVERDUE_DAYS * 86_400_000;
 }
 
 export default async function AdminVendorsPage({
@@ -59,49 +95,229 @@ export default async function AdminVendorsPage({
     | "status"
     | undefined;
   const page = Math.max(1, Number(one(sp.page) ?? "1") || 1);
-  const pageSize = 12;
+  const pageSize = PAGE_SIZES.includes(Number(one(sp.per)))
+    ? Number(one(sp.per))
+    : PAGE_SIZES[0];
 
-  const [counts, result, categories, awaiting] = await Promise.all([
+  const [counts, result, categories] = await Promise.all([
     getVendorCounts(),
     listVendors({ q, status, category, sort, page, pageSize }),
     listCategories(),
-    listAwaitingApproval().catch(() => [] as VendorListItem[]),
   ]);
-
-  const medianWait = (() => {
-    if (!awaiting.length) return null;
-    const ages = awaiting
-      .map((v) => new Date(v.createdAt).getTime())
-      .sort((a, b) => a - b);
-    const mid = ages[Math.floor(ages.length / 2)];
-    return formatWaited(new Date(mid).toISOString());
-  })();
 
   const totalPages = Math.max(1, Math.ceil(result.total / pageSize));
   const categoryNames = categories.map((c) => c.name);
-  const filtered = Boolean(q || status || category);
+  const filtered = Boolean(q || category);
+  const approvals = status === "pending";
 
-  const pageHref = (n: number) => {
+  const href = (next: Record<string, string | null>) => {
     const usp = new URLSearchParams();
-    if (q) usp.set("q", q);
-    if (status) usp.set("status", status);
-    if (category) usp.set("category", category);
-    if (sort) usp.set("sort", sort);
-    if (n > 1) usp.set("page", String(n));
+    const base: Record<string, string | null> = {
+      q: q || null,
+      status: status ?? null,
+      category: category ?? null,
+      sort: sort ?? null,
+      per: pageSize === PAGE_SIZES[0] ? null : String(pageSize),
+      page: page > 1 ? String(page) : null,
+      ...next,
+    };
+    for (const [key, value] of Object.entries(base)) {
+      if (value) usp.set(key, value);
+    }
     const query = usp.toString();
     return query ? `/admin/vendors?${query}` : "/admin/vendors";
   };
 
   // Counted over the page in hand, not the whole roster: a second COUNT query
-  // for a nudge is not worth it, and "3 of the 12 shown" is the honest reading
-  // of a figure derived from twelve rows.
+  // for a nudge is not worth it, and "3 of the 25 shown" is the honest reading
+  // of a figure derived from twenty-five rows.
   const incomplete = result.items.filter((v) => storefrontGaps(v).length > 0);
+  const noEmail = result.items.filter((v) => !v.ownerEmail);
+
+  const columns: Column<VendorListItem>[] = [
+    {
+      key: "shop",
+      header: "Shop",
+      role: "title",
+      width: "w-[240px]",
+      cell: (v) => (
+        <div className="flex min-w-0 items-center gap-2.5">
+          <VendorAvatar
+            name={v.name}
+            imageUrl={v.imageUrl}
+            accentTint={v.accentTint}
+          />
+          <div className="min-w-0">
+            <p className="truncate text-[13.5px] font-semibold leading-tight">
+              {v.name}
+            </p>
+            <p className="truncate text-[11px] text-muted">
+              /{v.slug}
+              {v.category ? ` · ${v.category}` : ""}
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "owner",
+      header: "Owner",
+      width: "w-[190px]",
+      cell: (v) => (
+        <div className="min-w-0">
+          <p className="truncate text-[12.5px] font-medium">
+            {v.ownerName ?? "—"}
+          </p>
+          {v.ownerMobile ? (
+            <a
+              href={`tel:${v.ownerMobile}`}
+              className="text-data block truncate text-[11.5px] text-muted hover:text-accent-ink"
+            >
+              {v.ownerMobile}
+            </a>
+          ) : (
+            <p className="text-[11.5px] text-muted">No mobile</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "email",
+      header: "Login email",
+      width: "w-[190px]",
+      cell: (v) =>
+        v.ownerEmail ? (
+          <span className="block truncate text-[12px]" title={v.ownerEmail}>
+            {v.ownerEmail}
+          </span>
+        ) : (
+          // Not a cosmetic gap: without an email there is no auth account to
+          // hang a password on, so this shop cannot be given a login at all.
+          <Link
+            href={`/admin/vendors/${v.id}/edit`}
+            className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-deal hover:underline"
+          >
+            <TriangleAlert className="size-3" /> Add an email
+          </Link>
+        ),
+    },
+    {
+      key: "password",
+      header: "Password",
+      width: "w-[210px]",
+      cell: (v) => (
+        <VendorPasswordCell id={v.id} name={v.name} password={v.loginPassword} />
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      role: "trailing",
+      width: "w-[130px]",
+      cell: (v) => {
+        const gaps = storefrontGaps(v);
+        return (
+          <div className="space-y-1">
+            <span className={STATUS_PILL[v.status]}>{v.status}</span>
+            {gaps.length > 0 ? (
+              <p
+                className="truncate text-[10.5px] text-muted"
+                title={`Missing ${gaps.join(", ")}`}
+              >
+                No {gaps.join(", ")}
+              </p>
+            ) : null}
+          </div>
+        );
+      },
+    },
+    approvals
+      ? {
+          key: "waiting",
+          header: "Waiting",
+          width: "w-[110px]",
+          cell: (v) => (
+            <span
+              className={cn(
+                "text-[12px] font-semibold",
+                isOverdue(v.createdAt) ? "text-deal" : "text-muted"
+              )}
+            >
+              {formatWaited(v.createdAt)}
+            </span>
+          ),
+        }
+      : {
+          key: "commission",
+          header: "Commission",
+          align: "right",
+          width: "w-[110px]",
+          cell: (v) => (
+            <div>
+              <p className="text-data text-[12.5px] font-semibold">
+                {v.effectiveCommissionPct}%
+              </p>
+              <p className="text-[10.5px] text-muted">
+                {v.inheritsPlatformRate ? "Platform" : "Own rate"}
+              </p>
+            </div>
+          ),
+        },
+    {
+      key: "since",
+      header: "Since",
+      role: "wideOnly",
+      width: "w-[92px]",
+      cell: (v) => (
+        <span className="text-[11.5px] text-muted">
+          {dateFmt.format(new Date(v.createdAt))}
+        </span>
+      ),
+    },
+    approvals
+      ? {
+          key: "decision",
+          header: "Decision",
+          role: "actions",
+          width: "w-[190px]",
+          cell: (v) => (
+            <div className="flex items-center gap-2">
+              <ApproveRestaurantButton id={v.id} name={v.name} variant="compact" />
+              <RejectVendorButton id={v.id} name={v.name} />
+            </div>
+          ),
+        }
+      : {
+          key: "slot",
+          header: "Feed slot",
+          role: "wideOnly",
+          width: "w-[110px]",
+          cell: (v) => <VendorPositionSelect id={v.id} position={v.sortPosition} />,
+        },
+    {
+      key: "actions",
+      header: "",
+      role: "actions",
+      align: "right",
+      width: "w-[176px]",
+      cell: (v) => (
+        <div className="flex justify-end">
+          <VendorRowActions
+            id={v.id}
+            name={v.name}
+            status={v.status}
+            showPasswordReset={false}
+          />
+        </div>
+      ),
+    },
+  ];
 
   return (
     <>
       <AdminHero
         title="Vendors"
-        tag={awaiting.length > 0 ? `${awaiting.length} waiting` : "Queue clear"}
+        tag={counts.pending > 0 ? `${counts.pending} waiting` : "Queue clear"}
         subtitle="Approve signups, then manage each shop like a storefront"
         action={
           <ConsoleOnly tool="Vendor onboarding" notice={false}>
@@ -117,40 +333,20 @@ export default async function AdminVendorsPage({
         why="Approving a signup, suspending a shop and searching the list all work on a phone — only adding a brand-new vendor needs the desk."
       />
 
-      {/* ---------- the queue: the only part of this page with a clock on it ---------- */}
-      {awaiting.length > 0 ? (
-        <section className="space-y-2.5">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div className="min-w-0">
-              <h2 className="text-[14.5px] font-bold tracking-[-0.01em]">
-                Waiting to go live
-              </h2>
-              <p className="mt-0.5 text-xs text-muted">
-                {medianWait ? `Median wait ${medianWait}. ` : ""}
-                Approving puts the storefront on the customer feed immediately.
-              </p>
-            </div>
-            <span className="pill pill-pop shrink-0">
-              {awaiting.length} in queue
-            </span>
-          </div>
-
-          <VendorApprovalCards vendors={awaiting.slice(0, QUEUE_SHOWN)} />
-
-          {awaiting.length > QUEUE_SHOWN ? (
-            <p className="text-xs text-muted">
-              The {QUEUE_SHOWN} longest-waiting of {awaiting.length}.{" "}
-              <Link
-                href="/admin/vendors?status=pending"
-                className="font-medium text-accent-ink"
-              >
-                See the rest
-              </Link>
-              .
-            </p>
-          ) : null}
-        </section>
-      ) : counts.total > 0 ? (
+      {/* The one part of this page with a clock on it gets a line of its own on
+          every tab, so switching away from Approvals doesn't hide the backlog. */}
+      {counts.pending > 0 && !approvals ? (
+        <Link
+          href="/admin/vendors?status=pending"
+          className="press flex items-center gap-2.5 rounded-[var(--radius-block)] border border-pop/30 bg-pop/[0.06] px-4 py-3"
+        >
+          <TriangleAlert className="size-4 shrink-0 text-pop-ink" />
+          <p className="text-[13px] font-medium text-pop-ink">
+            {counts.pending} signup{counts.pending === 1 ? "" : "s"} waiting to
+            go live — open Approvals to decide.
+          </p>
+        </Link>
+      ) : counts.pending === 0 && counts.total > 0 ? (
         <section className="flex items-center gap-2.5 rounded-[var(--radius-block)] border border-green/25 bg-green/5 px-4 py-3">
           <CheckCircle2 className="size-4 shrink-0 text-green" />
           <p className="text-[13px] font-medium text-green">
@@ -167,8 +363,8 @@ export default async function AdminVendorsPage({
         />
         <StatTile
           label="Needs attention"
-          value={counts.inactive + counts.suspended + awaiting.length}
-          note={`${awaiting.length} waiting · ${counts.suspended} suspended · ${counts.inactive} inactive`}
+          value={counts.inactive + counts.suspended + counts.pending}
+          note={`${counts.pending} waiting · ${counts.suspended} suspended · ${counts.inactive} inactive`}
         />
         <StatTile
           label="Unfinished storefronts"
@@ -180,61 +376,91 @@ export default async function AdminVendorsPage({
           }
         />
         <StatTile
-          label="Categories"
-          value={counts.categories}
-          note="How the customer feed is grouped"
+          label="No login email"
+          value={noEmail.length}
+          note={
+            noEmail.length
+              ? "Can't be issued a password until one is added"
+              : "Every shop on this page can sign in"
+          }
         />
       </StatTiles>
 
       {/* ---------- the catalogue ---------- */}
       <section className="space-y-3">
+        <FilterChips
+          label="Vendor status"
+          active={status ?? null}
+          hrefFor={(value) => href({ status: value, page: null })}
+          options={[
+            { value: "pending", label: "Approvals", count: counts.pending },
+            { value: "active", label: "Active", count: counts.active },
+            { value: "inactive", label: "Inactive", count: counts.inactive },
+            { value: "suspended", label: "Suspended", count: counts.suspended },
+          ]}
+        />
+
         <VendorSearchBar categories={categoryNames} />
 
-        {result.items.length === 0 ? (
-          <EmptyState
-            icon={Store}
-            title={filtered ? "No vendors match" : "No vendors yet"}
-            description={
-              filtered
-                ? "Try a different search or filter."
-                : "Add your first shop to start taking orders."
-            }
-            action={
-              !filtered ? (
-                <ConsoleOnly tool="Vendor onboarding" notice={false}>
-                  <Link
-                    href="/admin/vendors/new"
-                    className="c-btn c-btn-dark press"
-                  >
-                    <Plus className="size-3.5" strokeWidth={2.4} /> Add vendor
-                  </Link>
-                </ConsoleOnly>
-              ) : null
-            }
-          />
-        ) : (
-          <>
-            {/* auto-fill, not a fixed column count: the same grid then works in
-                the 390px phone frame and across a 1600px console without a
-                breakpoint per shell. */}
-            <ul className="grid grid-cols-[repeat(auto-fill,minmax(304px,1fr))] gap-3">
-              {result.items.map((v) => (
-                <li key={v.id} className="flex">
-                  <VendorProfileCard vendor={v} />
-                </li>
-              ))}
-            </ul>
-
-            <div className="rounded-[var(--radius-block)] border border-line bg-surface px-4 py-3">
-              <TableFooter
-                page={page}
-                totalPages={totalPages}
-                hrefFor={pageHref}
-                summary={`${result.total} vendor${result.total === 1 ? "" : "s"}${filtered ? " matching" : ""}`}
-              />
-            </div>
-          </>
-        )}
+        <DataTable
+          columns={columns}
+          rows={result.items}
+          rowKey={(v) => v.id}
+          rowHref={(v) => `/admin/vendors/${v.id}?tab=overview`}
+          caption="Vendors"
+          dense
+          minWidth={1240}
+          // Tint the rows that are actually a problem — a signup nobody has
+          // ruled on for four days, or a shop that cannot be given a login —
+          // rather than every row of the Approvals tab, which would tint the
+          // whole table and say nothing.
+          rowTone={(v) =>
+            !v.ownerEmail || (v.status === "pending" && isOverdue(v.createdAt))
+              ? "alert"
+              : null
+          }
+          empty={
+            <EmptyState
+              icon={Store}
+              title={
+                approvals
+                  ? "Nothing waiting"
+                  : filtered
+                    ? "No vendors match"
+                    : "No vendors yet"
+              }
+              description={
+                approvals
+                  ? "Every signup has been approved or declined."
+                  : filtered
+                    ? "Try a different search or filter."
+                    : "Add your first shop to start taking orders."
+              }
+              action={
+                !filtered && !approvals ? (
+                  <ConsoleOnly tool="Vendor onboarding" notice={false}>
+                    <Link
+                      href="/admin/vendors/new"
+                      className="c-btn c-btn-dark press"
+                    >
+                      <Plus className="size-3.5" strokeWidth={2.4} /> Add vendor
+                    </Link>
+                  </ConsoleOnly>
+                ) : null
+              }
+            />
+          }
+          footer={
+            <TableFooter
+              page={page}
+              totalPages={totalPages}
+              hrefFor={(n) => href({ page: n > 1 ? String(n) : null })}
+              summary={`${result.total} vendor${result.total === 1 ? "" : "s"}${
+                filtered || status ? " matching" : ""
+              }`}
+            />
+          }
+        />
       </section>
 
       <div className="grid gap-2 @3xl:grid-cols-2">

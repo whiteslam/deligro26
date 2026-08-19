@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PortalToShell } from "@/components/shared/portal-to-shell";
@@ -26,7 +27,6 @@ type FormValues = {
   name: string;
   tagline: string;
   cuisines: string;
-  offer: string;
   imageUrl: string;
   accentTint: string;
   etaMin: string;
@@ -41,7 +41,6 @@ function toForm(r: VendorRestaurantDetail): FormValues {
     name: r.name,
     tagline: r.tagline ?? "",
     cuisines: r.cuisines.join(", "),
-    offer: r.offer ?? "",
     imageUrl: r.imageUrl ?? "",
     accentTint: r.accentTint ?? "",
     etaMin: r.etaMin != null ? String(r.etaMin) : "",
@@ -168,7 +167,6 @@ export function VendorStoreEditSheet({
           name: values.name,
           tagline: values.tagline,
           cuisines,
-          offer: values.offer,
           imageUrl: values.imageUrl,
           accentTint: values.accentTint || null,
           etaMin,
@@ -293,15 +291,24 @@ export function VendorStoreEditSheet({
             <p className="text-[11px] text-muted">Comma-separated</p>
           </label>
 
-          <label className="block space-y-1.5">
-            <span className="text-label">Promo offer</span>
-            <input
-              value={values.offer}
-              onChange={(e) => set("offer", e.target.value)}
-              className={INPUT}
-              placeholder="20% off above ₹299"
-            />
-          </label>
+          {/* The promo badge used to be a free-text field here. It was a
+              claim with nothing behind it: a customer who read "20% off above
+              ₹299" had no code to type and nothing applied at checkout. It is
+              now derived from this shop's own promo codes (migration 0041) and
+              the column refuses writes from anywhere else — so the way to
+              advertise an offer is to run one. */}
+          <div className="rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+            <p className="text-label">Promo offer</p>
+            <p className="mt-1 text-[12px] text-muted">
+              Set by your promo codes, not typed here.{" "}
+              <Link
+                href="/vendor/promotions"
+                className="font-semibold text-accent underline-offset-2 hover:underline"
+              >
+                Manage promotions
+              </Link>
+            </p>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-1.5">

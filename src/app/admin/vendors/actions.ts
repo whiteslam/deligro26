@@ -9,6 +9,7 @@ import {
   setVendorStatus,
   deleteVendor,
   resetVendorPassword,
+  setVendorPassword,
   verifyVendorPhone,
   VENDOR_STATUSES,
   type VendorInput,
@@ -159,7 +160,13 @@ function validateVendor(input: VendorInput): string | null {
     (input.commissionPct < 0 || input.commissionPct > 100)
   )
     return "Commission must be between 0 and 100%.";
-  if (input.ownerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.ownerEmail))
+  // Mandatory, not optional. The vendor's login is an email/password account in
+  // Supabase Auth — mobile + password sign-in resolves the owner's profile and
+  // then signs in with this address. A shop saved without one cannot be issued
+  // a password at all, which is a support call nobody can resolve.
+  if (!input.ownerEmail)
+    return "An email address is required — the vendor's login is issued against it.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.ownerEmail))
     return "That email address doesn't look right.";
   // A shop with both methods off cannot take a single order. Refuse the save
   // rather than let the operator discover it from a customer complaint.
@@ -365,10 +372,11 @@ export interface ResetPasswordActionResult extends ActionResult {
 export async function resetVendorPasswordAction(
   id: string
 ): Promise<ResetPasswordActionResult> {
-  await requireRole("admin");
+  const profile = await requireRole("admin");
   if (!isSupabaseConfigured) return { ok: false, error: DEMO };
   try {
-    const { tempPassword } = await resetVendorPassword(id);
+    const { tempPassword } = await resetVendorPassword(id, profile.id);
+    revalidatePath("/admin/vendors");
     revalidatePath(`/admin/vendors/${id}/edit`);
     revalidatePath(`/admin/vendors/${id}`);
     return { ok: true, tempPassword };
@@ -378,6 +386,47 @@ export async function resetVendorPasswordAction(
       error: "Couldn't reset the password. Check the vendor has a login account.",
     };
   }
+}
+
+/** Shortest password an operator may type. Supabase Auth's own floor is 6. */
+const MIN_PASSWORD = 8;
+
+/**
+ * Set a vendor's password to a value the operator chose, rather than a
+ * generated one — for the owner who wants something they can remember. Stored
+ * and shown exactly like a generated one.
+ */
+export async function setVendorPasswordAction(
+  id: string,
+  password: string
+): Promise<ActionResult> {
+  const profile = await requireRole("admin");
+  if (!isSupabaseConfigured) return { ok: false, error: DEMO };
+
+  const value = password.trim();
+  if (value.length < MIN_PASSWORD) {
+    return {
+      ok: false,
+      error: `Password must be at least ${MIN_PASSWORD} characters.`,
+    };
+  }
+  if (/\s/.test(value)) {
+    return { ok: false, error: "Password can't contain spaces." };
+  }
+
+  try {
+    await setVendorPassword(id, value, profile.id);
+  } catch {
+    return {
+      ok: false,
+      error: "Couldn't set the password. Check the vendor has a login account.",
+    };
+  }
+
+  revalidatePath("/admin/vendors");
+  revalidatePath(`/admin/vendors/${id}/edit`);
+  revalidatePath(`/admin/vendors/${id}`);
+  return { ok: true };
 }
 
 /**

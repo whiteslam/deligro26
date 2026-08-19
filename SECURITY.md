@@ -28,6 +28,7 @@ Reference data layer: [`src/lib/data-access/orders.ts`](src/lib/data-access/orde
 | Can access… | Customer | Restaurant | Driver | Admin | Enforced by |
 |---|---|---|---|---|---|
 | Own orders | ✅ | – | – | ✅ | `orders — read` |
+| Place an order as themselves | ✅ | ❌ | ❌ | ✅ | `orders — customer insert` |
 | Others' orders | ❌ | ❌ | assigned & active only | ✅ | `is_active_driver_for()` |
 | Own menu/listing | – | ✅ | – | ✅ | `owns_restaurant()` |
 | Others' menus (write) | – | ❌ | – | ✅ | `menu — owner manage` |
@@ -36,6 +37,15 @@ Reference data layer: [`src/lib/data-access/orders.ts`](src/lib/data-access/orde
 
 Driver access auto-revokes when the delivery status leaves `assigned`/`picked_up`
 (delivered or reassigned) — the "assigned only, while active" rule, in SQL.
+
+Admin appears on the "place an order" row as of migration **0040**, and the row
+is worded "as themselves" on purpose: the policy still requires
+`customer_id = auth.uid()`, so an admin shops as one more customer and cannot
+post an order in anyone else's name. Before 0040 the owner's own account — which
+is an admin, because that is the account that runs the console — was refused at
+checkout by RLS and told to "sign in with your customer account", which does not
+exist. Writing an order *for* another person remains the phone-order path below:
+service role, re-checked role, stamped attribution.
 
 ### Manager — an operations role, not a small admin
 
@@ -108,10 +118,15 @@ guard is now SECURITY INVOKER and tests `current_user`, which really is
 also pins `total` at INSERT: `orders — customer insert` only ever checked row
 ownership, so a direct PostgREST call could post its own total.
 
+Migration **0040** widens that same policy by exactly one role — see the note
+under the role matrix. The INSERT pin is unaffected for everyone below admin,
+and admin was already exempt from it and from `guard_order_update()`.
+
 **Still to wire when you go live:** vendor payout settlement, and swapping any
 remaining portal mocks for the RLS-backed data layer.
 
-Coupon discounts are applied as of migration **0031** — see below.
+Coupon discounts are applied as of migration **0031**, and scoped to a shop
+with a recorded payer as of **0041** — see below.
 
 ## Coupons
 
@@ -138,7 +153,45 @@ A discount is money, so none of it is the client's to state:
 - **The order must still be `placed`.** A coupon cannot be applied to an order
   the kitchen has already accepted, which would change a bill someone agreed to.
 - `coupon_redemptions` has no INSERT/UPDATE/DELETE policy for anyone; reads are
-  RLS-scoped to the customer the row is about, plus admins.
+  RLS-scoped to the customer the row is about, plus admins — and, since 0041,
+  the vendor whose own code the row is against.
+- **A code cannot be read unless you already know it.** Until 0041 the
+  `coupons — read active` policy from 0006 handed every live code to anyone who
+  asked, `anon` included, which made the preview route's session requirement and
+  20/minute rate limit decorative. SELECT is now revoked from `anon`, and the
+  policies admit only admins (all rows) and vendors (their own). A shopper
+  reaches a coupon through `preview_coupon()`, which answers about one code they
+  named and nothing else.
+- **A scoped code only works at its shop.** `coupons.restaurant_id` is checked
+  against the order's own `restaurant_id` inside `apply_coupon_to_order()`, not
+  against a restaurant the client named.
+- **Who funds a discount is recorded on the order.** `orders.discount_funded_by`
+  is snapshotted from `coupons.funded_by` at redemption and is on the same
+  locked list as `discount` itself. Before 0041 there was no such column, so
+  every payout derived the shop's food value from a total that was already net
+  of the discount — the shop funded every platform promotion and paid
+  commission on the reduced value. `foodGrossFromOrder()` now adds a
+  platform-funded discount back, and the COD branch remits it, because on a
+  cash order the shop collected that much less at the door. A discount with no
+  recorded funder reads as vendor-absorbed, so applying the migration does not
+  silently re-price a settled backlog. A vendor may create only `funded_by = 'vendor'` codes,
+  enforced in the RLS `WITH CHECK`, so a shop cannot write a code the platform
+  would be billed for.
+- **One pricing implementation.** `price_coupon()` is called by both the preview
+  and the redemption. The TypeScript copy it replaced never checked
+  `max_redemptions` and could not check the restaurant, so the two answers could
+  disagree about the same code.
+
+**The offer badge is derived, not typed.** `restaurants.offer` used to be a free
+text field in the vendor's store editor — a shop could advertise "35% OFF up to
+₹120" with no code behind it and nothing a customer could do about it. Since
+0041 it is written only by `refresh_restaurant_offer()`, off that shop's own
+live coupons, and a `BEFORE INSERT OR UPDATE` trigger reverts the column for
+every caller except the definer function — service role and admin included,
+because a hand-set badge would be silently overwritten by the next coupon write.
+`offer_expires_at` carries the campaign's end so a lapsed offer stops
+advertising itself without anything having to run; the app drops the badge on
+read once it is past.
 
 The delivery fee is not discountable — the discount is capped at the food
 subtotal, because somebody still rides the order to the door. The discount comes
@@ -208,10 +261,10 @@ role check in its layout:
 
 | Portal | Door | Layout gate |
 | --- | --- | --- |
-| `/admin` | `/admin/login` — email + password, or phone OTP | `requireRole("admin")` |
-| `/vendor` | `/vendor/login` — email + password, or phone OTP | `requireVendorAccess()` (role **or** restaurant ownership) |
-| `/manager` | `/manager/login` — email + password, or phone OTP | `requireRole(["manager","admin"])` |
-| `/driver` | `/driver/login` — email + password, or phone OTP | `requireRole("driver")` |
+| `/admin` | `/admin/login` — email or mobile + password, or phone OTP | `requireRole("admin")` |
+| `/vendor` | `/vendor/login` — email or mobile + password, or phone OTP | `requireVendorAccess()` (role **or** restaurant ownership) |
+| `/manager` | `/manager/login` — email or mobile + password, or phone OTP | `requireRole(["manager","admin"])` |
+| `/driver` | `/driver/login` — email or mobile + password, or phone OTP | `requireRole("driver")` |
 | customer app | `/login` — phone OTP, or guest | none — the app is public to any account |
 | `/switch` | none — it is *behind* a door | `requireUser()`; lists only the caller's own surfaces |
 
@@ -237,6 +290,34 @@ list wrong can only offer a door the account cannot open — never open one. The
 old failure mode (routing *on* role) is not back: nothing here redirects an
 operator away from the customer app, and the choice is the person's, per sign-in,
 with no stored preference to poison.
+
+**Mobile + password (0039).** The first field on every operator door takes an
+email address *or* a mobile number. Vendors are onboarded by hand and are told
+their number and a password; most never learn the email address the account was
+created against, so an email-only door locks out the people it exists for. The
+mobile path runs through a Server Action (`src/app/(portal-auth)/actions.ts`),
+not the browser client, because number → profile → account email must stay
+behind the password check: the lookup uses the service role, the address is used
+immediately and never returned, and an unknown number and a wrong password give
+the same reply. It is rate-limited on two buckets — per caller IP and per number
+— so neither walking a list of numbers nor a distributed attempt on one number
+is cheap. It grants nothing: the portal layout's `requireRole()` /
+`requireVendorAccess()` still decides who is admitted.
+
+**Vendor passwords are stored, deliberately (0039).** This reverses audit
+finding C-2, and the reasoning is in the migration header rather than only in
+this paragraph. The admin desk is the support channel for shop owners who lose
+their login, and rotating a working credential mid-service is the wrong answer
+to "what was my password". What made the old `restaurants.temp_password`
+unacceptable was *where* it lived — a row anon and authenticated could read.
+The replacement is `vendor_login_credentials`: its own table, RLS enabled with
+zero policies, every privilege revoked from `anon`/`authenticated` and granted
+only to `service_role`, read solely through the `server-only`
+`src/lib/data-access/vendor-credentials.ts` from paths already gated by
+`requireRole("admin")`, with `updated_by` recording which admin last set it.
+Supabase Auth still holds the bcrypt hash that authenticates; this is a copy for
+hand-off, written in the same operation. The admin UI keeps it masked until a
+row is revealed, one at a time.
 
 Every door offers phone OTP as well as a password, because operator accounts are
 not all email accounts — the owner's admin account is a phone account seeded by

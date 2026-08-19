@@ -181,6 +181,7 @@ export type CouponFailure =
   | "invalid"
   | "expired"
   | "min_order"
+  | "wrong_restaurant"
   | "already_used"
   | "already_applied"
   | "exhausted"
@@ -367,7 +368,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const wantsCoupon = input.couponCode?.trim();
   let previewDiscount = 0;
   if (wantsCoupon) {
-    const preview = await evaluateCoupon(wantsCoupon, itemSubtotal);
+    const preview = await evaluateCoupon(wantsCoupon, itemSubtotal, restaurant.id);
     if (!preview.ok) throw new CouponRejected(preview.error as CouponFailure);
     previewDiscount = Math.max(0, Math.round(preview.discount ?? 0));
   }
@@ -526,6 +527,46 @@ export async function listVisibleOrders(): Promise<Order[]> {
     supabase
       .from("orders")
       .select(columns)
+      .order("created_at", { ascending: false })
+      .overrideTypes<Record<string, unknown>[]>()
+  );
+
+  return (data ?? []).map((row) => {
+    const record = row as Record<string, unknown>;
+    const restaurants = record.restaurants;
+    const restaurant = Array.isArray(restaurants) ? restaurants[0] : restaurants;
+    return { ...record, restaurants: restaurant ?? null } as Order;
+  });
+}
+
+/**
+ * The signed-in account's OWN orders — what the customer app means by "my
+ * orders".
+ *
+ * Not the same question as `listVisibleOrders()`, and the difference only shows
+ * up for an operator. "orders — read" (0001) grants an admin every row on the
+ * platform, so the owner/developer account shopping through the customer app
+ * saw the whole company's order book on /orders, with a stranger's delivery
+ * sitting in the "Active" card. RLS is the ceiling on what may be read; this
+ * query is the customer app choosing to stay under it and ask only for what the
+ * screen actually claims to show.
+ *
+ * For a plain customer the two return exactly the same rows — the filter is
+ * what RLS was already imposing — so this is the safe default for any
+ * customer-facing surface.
+ */
+export async function listMyOrders(): Promise<Order[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const data = await selectOrders<Record<string, unknown>[]>((columns) =>
+    supabase
+      .from("orders")
+      .select(columns)
+      .eq("customer_id", user.id)
       .order("created_at", { ascending: false })
       .overrideTypes<Record<string, unknown>[]>()
   );

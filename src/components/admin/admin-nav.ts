@@ -12,6 +12,7 @@ import {
   Settings,
   SlidersHorizontal,
   Store,
+  TicketPercent,
   UserCog,
   Users,
 } from "lucide-react";
@@ -151,6 +152,14 @@ export const ADMIN_NAV: AdminNavItem[] = [
     group: "Catalogue",
     tone: "pop",
     match: (p) => p.startsWith("/admin/banners"),
+  },
+  {
+    href: "/admin/coupons",
+    label: "Promo codes",
+    icon: TicketPercent,
+    group: "Catalogue",
+    tone: "deal",
+    match: (p) => p.startsWith("/admin/coupons"),
   },
   {
     href: "/admin/customers",

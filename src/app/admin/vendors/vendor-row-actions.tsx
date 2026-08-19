@@ -23,19 +23,29 @@ import {
 } from "./actions";
 
 /**
- * Per-vendor controls on the admin list: view, edit, enable/disable, reset
- * password (reveals a one-time value), delete (confirmed twice, and guarded — a
- * vendor with orders is disabled, not removed). Each action runs through a
- * transition and refreshes.
+ * Per-vendor controls: view, edit, enable/disable, reset password, delete
+ * (confirmed twice, and guarded — a vendor with orders is disabled, not
+ * removed). Each action runs through a transition and refreshes.
+ *
+ * The vendor table passes `showPasswordReset={false}`, because its password
+ * column already reveals, copies, regenerates and sets. The reset button here
+ * is for the vendor detail page, which has no such column.
  */
 export function VendorRowActions({
   id,
   name,
   status,
+  showPasswordReset = true,
 }: {
   id: string;
   name: string;
   status: VendorStatus;
+  /**
+   * Off on the vendor table, where the password column already carries reveal,
+   * copy, regenerate and set — a second key icon in the same row would be two
+   * controls for one job, and the quieter one wins.
+   */
+  showPasswordReset?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -142,16 +152,18 @@ export function VendorRowActions({
       >
         {enabled ? <PowerOff className="size-4" /> : <Power className="size-4" />}
       </button>
-      <button
-        type="button"
-        className={cn(base, tone.violet)}
-        disabled={pending}
-        title="Reset password"
-        aria-label="Reset vendor password"
-        onClick={onReset}
-      >
-        <KeyRound className="size-4" />
-      </button>
+      {showPasswordReset ? (
+        <button
+          type="button"
+          className={cn(base, tone.violet)}
+          disabled={pending}
+          title="Reset password"
+          aria-label="Reset vendor password"
+          onClick={onReset}
+        >
+          <KeyRound className="size-4" />
+        </button>
+      ) : null}
       <button
         type="button"
         className={cn(base, tone.deal)}
@@ -204,11 +216,12 @@ export function VendorRowActions({
           setTempPw(null);
           setCopied(false);
         }}
-        title="Temporary password"
+        title="New password"
       >
         <p className="text-sm text-muted">
-          Share this with <b className="text-ink">{name}</b> now — it isn&apos;t
-          stored and won&apos;t be shown again.
+          <b className="text-ink">{name}</b> signs in with their mobile number
+          and this password. It is saved against the shop, so you can read it
+          back from the vendor list if they lose it.
         </p>
         <div className="mt-3 flex items-center gap-2 rounded-xl bg-surface-2 p-2.5">
           <code className="text-data flex-1 break-all px-1 text-[15px] font-semibold text-ink">

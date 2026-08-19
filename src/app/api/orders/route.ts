@@ -38,6 +38,21 @@ function mapCreateError(message: string) {
   }
 }
 
+/**
+ * A PostgREST row-level-security refusal. These arrive as plain objects, not
+ * `Error`s, which is why they slipped past the mapping below and surfaced as a
+ * generic 500.
+ */
+function isRlsRefusal(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const e = err as { code?: unknown; message?: unknown };
+  return (
+    e.code === "42501" ||
+    (typeof e.message === "string" &&
+      e.message.includes("row-level security policy"))
+  );
+}
+
 /** GET /api/orders — orders visible to the signed-in user (RLS-scoped). */
 export async function GET() {
   if (!isSupabaseConfigured) {
@@ -71,7 +86,7 @@ export async function GET() {
   }
 }
 
-/** POST /api/orders — place an order (customer role, server-validated totals). */
+/** POST /api/orders — place an order (customer or admin, server-validated totals). */
 export async function POST(request: Request) {
   if (!isSupabaseConfigured) {
     return NextResponse.json(
@@ -136,8 +151,37 @@ export async function POST(request: Request) {
         { status: err.reason === "orders_paused" ? 503 : 400 }
       );
     }
+    // Postgres 42501 is the row-level security refusal. It is not a server
+    // fault and must not be reported as one: "orders — customer insert" admits
+    // 'customer' and (since 0040) 'admin', so this is what a driver, vendor or
+    // manager account gets when it tries to place an order. Signing in as the
+    // wrong role is the likeliest cause and the only one the customer can act
+    // on, so say that instead of "try again", which never works.
+    //
+    // The owner/developer account used to land here too — it is an admin, and
+    // admin was not on that list. 0040 put it there: an operator shops through
+    // the same app as everyone else, with no second identity to switch to.
+    if (isRlsRefusal(err)) {
+      return NextResponse.json(
+        {
+          error: "not_a_customer",
+          message:
+            "This account can't place orders. Sign in with your customer account and try again.",
+        },
+        { status: 403 }
+      );
+    }
     const message = err instanceof Error ? err.message : "server_error";
     const mapped = mapCreateError(message);
+    // An unmapped failure is the one case where the customer is told nothing
+    // useful ("Could not place the order") — so it is the one case that has to
+    // reach the server log, or there is no way to find out what happened. A
+    // PostgREST rejection arrives as a plain object, not an Error, and its
+    // `message`/`code`/`details` are the whole diagnosis; stringify it rather
+    // than logging `err.message`, which is undefined for exactly those.
+    if (mapped.error === "server_error") {
+      console.error("[orders] order refused, unmapped:", JSON.stringify(err), err);
+    }
     return NextResponse.json({ error: mapped.error }, { status: mapped.status });
   }
 }

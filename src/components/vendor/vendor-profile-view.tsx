@@ -376,10 +376,21 @@ export function VendorProfileView({
                     r.cuisines.length > 0 ? r.cuisines.join(" · ") : "Add cuisines"
                   }
                 />
+                {/* Derived from this shop's promo codes since 0041 — the row
+                    links to where it is actually set, because there is nowhere
+                    else to type it any more. */}
                 <Fact
                   icon={Sparkles}
                   label="Promo offer"
-                  value={r.offer?.trim() || "No active offer"}
+                  value={
+                    <Link
+                      href="/vendor/promotions"
+                      className="inline-flex items-center gap-1 text-accent"
+                    >
+                      {r.offer?.trim() || "Run a promotion"}
+                      <ExternalLink className="size-3.5" />
+                    </Link>
+                  }
                 />
                 <Fact
                   icon={MapPin}

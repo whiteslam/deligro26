@@ -67,7 +67,9 @@ function computeCompleteness(r: VendorRestaurantDetail | null): {
     { ok: Boolean(r.tagline?.trim()), label: "Tagline" },
     { ok: Boolean(r.imageUrl?.trim()), label: "Cover photo" },
     { ok: r.cuisines.length > 0, label: "Cuisines" },
-    { ok: Boolean(r.offer?.trim()), label: "Promo offer" },
+    // Derived from the shop's own coupons (0041), so this now measures
+    // "is a promotion running" rather than "has someone typed a slogan".
+    { ok: Boolean(r.offer?.trim()), label: "A live promotion" },
     { ok: r.etaMin != null && r.etaMax != null, label: "Delivery ETA" },
     { ok: r.costForTwo != null && r.costForTwo > 0, label: "Cost for two" },
     { ok: r.approved, label: "Admin approval" },

@@ -73,10 +73,27 @@ interface OrderRow {
   created_at: string;
   payment_method?: string | null;
   payment_status?: string | null;
+  /** 0031 / 0041. Absent on a database that predates them. */
+  discount?: number | null;
+  discount_funded_by?: string | null;
 }
 
 const ORDER_SELECT =
   "id, restaurant_id, total, delivery_fee, tax_amount, tip, status, created_at, payment_method, payment_status";
+/**
+ * 0041's funder columns, asked for separately.
+ *
+ * A report that names a column the database does not have is a 400, and these
+ * arrive later than everything else in ORDER_SELECT. Without them every
+ * discount prices as vendor-absorbed, which is what this file did before the
+ * columns existed — the report degrades to the old arithmetic rather than
+ * failing to render.
+ */
+const ORDER_SELECT_WITH_DISCOUNT = `${ORDER_SELECT}, discount, discount_funded_by`;
+/** PostgREST's "column does not exist". */
+const UNDEFINED_COLUMN = "42703";
+/** null = not probed yet; latches after the first query. */
+let hasDiscountFunding: boolean | null = null;
 
 /** IST calendar day of an instant, as "YYYY-MM-DD". */
 function dayOf(iso: string): string {
@@ -110,26 +127,36 @@ async function loadContext(filters: ReportFilters): Promise<Context | { error: s
   if (to < from) return { error: "The end date must be on or after the start date." };
 
   const supabase = createAdminClient();
-  let q = supabase
-    .from("orders")
-    .select(ORDER_SELECT)
-    .gte("created_at", from.toISOString())
-    .lt("created_at", addIstDays(to, 1).toISOString())
-    // Cancelled orders are not sales. They are counted separately by the
-    // orders report, which asks for them on purpose.
-    .neq("status", "cancelled");
+  const runOrders = (cols: string) => {
+    let q = supabase
+      .from("orders")
+      .select(cols)
+      .gte("created_at", from.toISOString())
+      .lt("created_at", addIstDays(to, 1).toISOString())
+      // Cancelled orders are not sales. They are counted separately by the
+      // orders report, which asks for them on purpose.
+      .neq("status", "cancelled");
 
-  if (filters.vendorId) q = q.eq("restaurant_id", filters.vendorId);
-  if (filters.payment && filters.payment !== "all") {
-    q = q.eq("payment_method", filters.payment);
+    if (filters.vendorId) q = q.eq("restaurant_id", filters.vendorId);
+    if (filters.payment && filters.payment !== "all") {
+      q = q.eq("payment_method", filters.payment);
+    }
+    return q.order("created_at", { ascending: true }).limit(MAX_ORDERS);
+  };
+
+  let result = await runOrders(
+    hasDiscountFunding === false ? ORDER_SELECT : ORDER_SELECT_WITH_DISCOUNT
+  );
+  if (result.error && hasDiscountFunding !== false) {
+    if (result.error.code !== UNDEFINED_COLUMN) throw result.error;
+    hasDiscountFunding = false;
+    result = await runOrders(ORDER_SELECT);
+  } else if (!result.error) {
+    hasDiscountFunding = hasDiscountFunding ?? true;
   }
+  if (result.error) throw result.error;
 
-  const { data, error } = await q
-    .order("created_at", { ascending: true })
-    .limit(MAX_ORDERS);
-  if (error) throw error;
-
-  const orders = (data ?? []) as OrderRow[];
+  const orders = (result.data ?? []) as unknown as OrderRow[];
   const ids = [...new Set(orders.map((o) => o.restaurant_id))];
 
   const [vendors, platformDefault, commissionGstPct, refunds] = await Promise.all([
@@ -206,6 +233,10 @@ function priceOrder(o: OrderRow, ctx: Context) {
     deliveryFee: Number(o.delivery_fee) || 0,
     taxAmount: Number(o.tax_amount) || 0,
     tip: Number(o.tip) || 0,
+    discount: Number(o.discount ?? 0) || 0,
+    // Anything not explicitly the platform's is the shop's, null included —
+    // see SettlementOrderInput.discountFundedBy on why that direction.
+    discountFundedBy: o.discount_funded_by === "platform" ? "platform" : "vendor",
     commissionPct: ctx.commissionPct.get(o.restaurant_id) ?? 0,
     commissionGstPct: ctx.commissionGstPct,
     otherCharges: ctx.otherCharges.get(o.restaurant_id) ?? 0,

@@ -118,10 +118,15 @@ export function VendorForm({
             />
           </Field>
         </div>
-        <Field label="Email">
+        <Field
+          label="Email"
+          required
+          hint="The vendor's login is issued against this address. They sign in with their mobile number and password, but without an email there is no account to hold one."
+        >
           <input
             name="ownerEmail"
             type="email"
+            required
             defaultValue={vendor.ownerEmail ?? ""}
             className={fieldCls}
           />

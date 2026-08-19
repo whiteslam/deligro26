@@ -95,11 +95,17 @@ export async function setRestaurantOpen(isOpen: boolean): Promise<boolean> {
   return Boolean(data?.id);
 }
 
+/**
+ * `offer` is deliberately absent. Since 0041 the badge is derived from the
+ * shop's own coupons and the column rejects writes from anyone but
+ * `refresh_restaurant_offer()` — so accepting it here would build a patch the
+ * database silently drops, which is worse than not offering the field.
+ * Promotions are edited at /vendor/promotions.
+ */
 export interface VendorRestaurantUpdateInput {
   name?: string;
   tagline?: string | null;
   cuisines?: string[];
-  offer?: string | null;
   imageUrl?: string | null;
   accentTint?: string | null;
   etaMin?: number | null;
@@ -203,7 +209,6 @@ export async function updateVendorRestaurant(
   if (input.tagline !== undefined)
     patch.tagline = input.tagline?.trim() || null;
   if (input.cuisines !== undefined) patch.cuisines = input.cuisines;
-  if (input.offer !== undefined) patch.offer = input.offer?.trim() || null;
   if (input.imageUrl !== undefined)
     patch.image_url = input.imageUrl?.trim() || null;
   if (input.accentTint !== undefined)

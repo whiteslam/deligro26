@@ -7,6 +7,7 @@ import {
   checkTotals,
   sumSettlementTotals,
   type OrderLineItem,
+  type SettlementDiscountFunding,
   type SettlementOrderBreakdown,
   type SettlementPaymentMethod,
   type SettlementPaymentStatus,
@@ -63,6 +64,12 @@ export interface SettlementLine {
   taxAmount: number;
   tip: number;
   foodGross: number;
+  /**
+   * How much of this order's discount Deligro funded (0041). The one figure on
+   * a statement that is added rather than deducted — without it `foodGross` is
+   * unexplainably larger than the customer-side split above it.
+   */
+  platformDiscount: number;
   commission: number;
   commissionGst: number;
   otherCharges: number;
@@ -187,6 +194,17 @@ function asMethod(v: string | null | undefined): SettlementPaymentMethod {
   return null;
 }
 
+/**
+ * Anything that is not literally `'platform'` reads as the shop's own discount,
+ * including the null every order carries from before 0041 — see the note on
+ * `SettlementOrderInput.discountFundedBy` for why that direction.
+ */
+function asDiscountFunding(
+  v: string | null | undefined
+): SettlementDiscountFunding {
+  return v === "platform" ? "platform" : "vendor";
+}
+
 function asPayStatus(v: string | null | undefined): SettlementPaymentStatus {
   if (
     v === "pending" ||
@@ -271,6 +289,9 @@ interface OrderRow {
   created_at: string;
   payment_method?: string | null;
   payment_status?: string | null;
+  /** 0031 / 0041. Absent on a database that predates them. */
+  discount?: number | null;
+  discount_funded_by?: string | null;
 }
 
 interface RestaurantRow {
@@ -449,6 +470,8 @@ function lineFor(
     deliveryFee: Number(o.delivery_fee) || 0,
     taxAmount: Number(o.tax_amount) || 0,
     tip: Number(o.tip) || 0,
+    discount: Number(o.discount ?? 0) || 0,
+    discountFundedBy: asDiscountFunding(o.discount_funded_by),
     commissionPct: terms.commissionPct,
     commissionGstPct: terms.commissionGstPct,
     otherCharges: terms.otherChargesPerOrder,
@@ -472,7 +495,69 @@ const ORDER_BASE_SELECT =
   "id, total, delivery_fee, tax_amount, tip, status, created_at";
 /** 0025 added the payment split; a database without it prices every order as COD. */
 const ORDER_PAY_COLUMNS = "orders.payment_method";
-const ORDER_SELECT = `${ORDER_BASE_SELECT}, payment_method, payment_status`;
+/**
+ * 0041 added the funder. Without it every discount reads as vendor-absorbed,
+ * which is what this file did before the column existed — a degraded database
+ * gets the old arithmetic rather than a broken screen.
+ */
+const ORDER_DISCOUNT_COLUMNS = "orders.discount_funded_by";
+
+function orderSelect(withPay: boolean, withDiscount: boolean): string {
+  return [
+    ORDER_BASE_SELECT,
+    withPay ? "payment_method, payment_status" : null,
+    withDiscount ? "discount, discount_funded_by" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+/**
+ * Read orders with both optional column groups, dropping one group at a time.
+ *
+ * `selectOptional` handles a single probe; order reads have two independent
+ * ones (0025's payment split, 0041's discount funder) and a database can have
+ * either without the other. Dropped newest-first so a database with 0025 but
+ * not 0041 does not lose its payment columns to a failed probe for the funder —
+ * the same ordering rule, and the same reason, as `selectRestaurants`.
+ */
+async function selectOrders(
+  run: (cols: string) => PromiseLike<PgResult>,
+  suffix = ""
+): Promise<Row[]> {
+  const withSuffix = (cols: string) => (suffix ? `${cols}, ${suffix}` : cols);
+  const groups: Array<[string, () => boolean]> = [
+    [ORDER_DISCOUNT_COLUMNS, () => !columnKnownMissing(ORDER_DISCOUNT_COLUMNS)],
+    [ORDER_PAY_COLUMNS, () => !columnKnownMissing(ORDER_PAY_COLUMNS)],
+  ];
+
+  for (const [key, optimistic] of groups) {
+    if (!optimistic()) continue;
+    const result = await run(
+      withSuffix(
+        orderSelect(
+          !columnKnownMissing(ORDER_PAY_COLUMNS),
+          !columnKnownMissing(ORDER_DISCOUNT_COLUMNS)
+        )
+      )
+    );
+    if (!result.error) {
+      if (!columnKnownMissing(ORDER_PAY_COLUMNS)) {
+        rememberColumn(ORDER_PAY_COLUMNS, true);
+      }
+      if (!columnKnownMissing(ORDER_DISCOUNT_COLUMNS)) {
+        rememberColumn(ORDER_DISCOUNT_COLUMNS, true);
+      }
+      return asRows(result.data);
+    }
+    if (!isMissingColumn(result.error)) throw result.error;
+    rememberColumn(key, false);
+  }
+
+  const last = await run(withSuffix(ORDER_BASE_SELECT));
+  if (last.error) throw last.error;
+  return asRows(last.data);
+}
 
 /**
  * Build a preview for a vendor + IST-inclusive date range (from/to as YYYY-MM-DD).
@@ -501,20 +586,19 @@ export async function previewSettlement(input: {
   const terms = await termsFor(rest);
 
   const supabase = createAdminClient();
-  const { data: orders, error: oErr } = await supabase
-    .from("orders")
-    .select(ORDER_SELECT)
-    .eq("restaurant_id", input.restaurantId)
-    .eq("status", "delivered")
-    .gte("created_at", periodStart.toISOString())
-    .lt("created_at", periodEnd.toISOString())
-    .order("created_at", { ascending: true });
-  if (oErr) throw oErr;
+  const orders = (await selectOrders((cols) =>
+    supabase
+      .from("orders")
+      .select(cols)
+      .eq("restaurant_id", input.restaurantId)
+      .eq("status", "delivered")
+      .gte("created_at", periodStart.toISOString())
+      .lt("created_at", periodEnd.toISOString())
+      .order("created_at", { ascending: true })
+  )) as unknown as OrderRow[];
 
   const settled = await alreadySettledOrderIds(input.restaurantId);
-  const eligible = ((orders ?? []) as OrderRow[]).filter(
-    (o) => !settled.has(o.id)
-  );
+  const eligible = orders.filter((o) => !settled.has(o.id));
   const ids = eligible.map((o) => o.id);
   const [refunds, items] = await Promise.all([
     loadApprovedRefunds(ids),
@@ -574,10 +658,10 @@ export async function settlementEstimateFor(input: {
   const terms = await termsFor(rest);
 
   const supabase = createAdminClient();
-  const orders = (await selectOptional(ORDER_PAY_COLUMNS, (withPay) =>
+  const orders = (await selectOrders((cols) =>
     supabase
       .from("orders")
-      .select(withPay ? ORDER_SELECT : ORDER_BASE_SELECT)
+      .select(cols)
       .eq("restaurant_id", input.restaurantId)
       .eq("status", "delivered")
       .gte("created_at", input.from.toISOString())
@@ -834,25 +918,23 @@ export async function listOrderPayouts(
   const terms = await termsFor(rest);
 
   const supabase = createAdminClient();
-  let query = supabase
-    .from("orders")
-    .select(ORDER_SELECT)
-    .eq("restaurant_id", restaurantId)
-    .eq("status", "delivered");
-
   const from = filters.fromDate ? parseIstDateInput(filters.fromDate) : null;
   const to = filters.toDate ? parseIstDateInput(filters.toDate) : null;
   if (filters.fromDate && !from) return { error: "Use dates as YYYY-MM-DD." };
   if (filters.toDate && !to) return { error: "Use dates as YYYY-MM-DD." };
-  if (from) query = query.gte("created_at", from.toISOString());
-  if (to) query = query.lt("created_at", addIstDays(to, 1).toISOString());
 
-  const { data: orders, error } = await query
-    .order("created_at", { ascending: false })
-    .limit(Math.min(500, Math.max(1, filters.limit ?? 200)));
-  if (error) throw error;
-
-  const rows = (orders ?? []) as OrderRow[];
+  const rows = (await selectOrders((cols) => {
+    let query = supabase
+      .from("orders")
+      .select(cols)
+      .eq("restaurant_id", restaurantId)
+      .eq("status", "delivered");
+    if (from) query = query.gte("created_at", from.toISOString());
+    if (to) query = query.lt("created_at", addIstDays(to, 1).toISOString());
+    return query
+      .order("created_at", { ascending: false })
+      .limit(Math.min(500, Math.max(1, filters.limit ?? 200)));
+  })) as unknown as OrderRow[];
   const [refunds, items, membership] = await Promise.all([
     loadApprovedRefunds(rows.map((o) => o.id)),
     loadOrderItems(rows.map((o) => o.id)),
@@ -953,12 +1035,13 @@ export async function markOrderPaid(input: {
   if (!UUID_RE.test(input.orderId)) return { error: "Invalid order." };
 
   const supabase = createAdminClient();
-  const { data: order, error } = await supabase
-    .from("orders")
-    .select(`${ORDER_SELECT}, restaurant_id`)
-    .eq("id", input.orderId)
-    .maybeSingle();
-  if (error) throw error;
+  const found = await selectOrders(
+    (cols) => supabase.from("orders").select(cols).eq("id", input.orderId),
+    "restaurant_id"
+  );
+  const order = found[0] as unknown as
+    | (OrderRow & { restaurant_id: string })
+    | undefined;
   if (!order) return { error: "Order not found." };
 
   const row = order as OrderRow & { restaurant_id: string };
@@ -1205,6 +1288,25 @@ async function readSettlementLines(
       taxAmount: Number(l.tax_amount ?? 0) || 0,
       tip: Number(l.tip ?? 0) || 0,
       foodGross,
+      // Derived rather than stored. `food_gross` on a line with a
+      // platform-funded coupon is deliberately MORE than the customer-side
+      // split adds up to, and the difference is exactly what the platform
+      // gave away — so a column would be a second copy of a number already
+      // implied by four others, and one more thing to keep in step.
+      //
+      // Guarded on `order_total`, because a pre-0034 line stored no split at
+      // all: without this the whole food value would read as a giveaway.
+      platformDiscount:
+        Number(l.order_total ?? 0) > 0
+          ? Math.max(
+              0,
+              foodGross -
+                (Number(l.order_total ?? 0) -
+                  Number(l.delivery_fee ?? 0) -
+                  Number(l.tax_amount ?? 0) -
+                  Number(l.tip ?? 0))
+            )
+          : 0,
       commission,
       commissionGst,
       otherCharges,

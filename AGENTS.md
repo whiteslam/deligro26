@@ -35,6 +35,14 @@ Both have a log table at the bottom. Fill it in; the history is the point.
 3. **Server Actions are public HTTP endpoints.** Every exported `"use server"`
    function starts with a role check. No exceptions for "internal" helpers.
 4. **Credentials are never stored in reproducible form.** Show once, then drop.
+   The single, documented exception is `vendor_login_credentials` (migration
+   0039): vendors are onboarded by hand and the admin desk has to read their
+   login back to them. It is defensible only because of its containment — own
+   table, RLS on with no policies, all privileges revoked from
+   `anon`/`authenticated`, `service_role` only, reached through the
+   `server-only` `vendor-credentials.ts` behind `requireRole("admin")`. Do not
+   extend the exception, and do not put a plaintext credential on a table that
+   anon or authenticated can read — that was audit finding C-2.
 5. **`createAdminClient()` bypasses RLS.** Every call needs an authorization
    check above it in the same path.
 6. **Rate-limit every write endpoint.** `user.id` when authenticated,

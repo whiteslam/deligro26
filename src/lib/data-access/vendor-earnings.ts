@@ -1,5 +1,11 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import {
+  columnKnownMissing,
+  columnKnownPresent,
+  isMissingColumn,
+  rememberColumn,
+} from "@/lib/data-access/schema-probe";
 import { shortOrderId } from "@/lib/utils/order-map";
 import {
   addIstDays,
@@ -93,6 +99,57 @@ interface OrderRow {
   tax_amount: number | null;
   status: string;
   created_at: string;
+  /** 0031. Rupees the customer didn't pay. Absent before that migration. */
+  discount?: number | null;
+  /** 0041. Who absorbed it — `"vendor"` or `"platform"`. */
+  discount_funded_by?: string | null;
+}
+
+/**
+ * `orders.discount_funded_by` arrives with 0041, `orders.discount` with 0031.
+ *
+ * Probed once per process rather than guessed: asking PostgREST for a column
+ * that doesn't exist is a hard 400, so a database mid-rollout would lose the
+ * whole earnings screen rather than one line of it. Without the columns the
+ * figures are what they were before 0031 — customer-paid totals — which is the
+ * honest reading of a database that has no coupons.
+ */
+const COUPON_COLUMNS = "orders.discount_funded_by";
+
+async function couponColumnsAvailable(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<boolean> {
+  if (columnKnownPresent(COUPON_COLUMNS)) return true;
+  if (columnKnownMissing(COUPON_COLUMNS)) return false;
+
+  const { error } = await supabase
+    .from("orders")
+    .select("discount, discount_funded_by")
+    .limit(1);
+  const present = !isMissingColumn(error);
+  rememberColumn(COUPON_COLUMNS, present);
+  return present;
+}
+
+/**
+ * What one order was worth to this shop.
+ *
+ * `orders.total` is what the *customer* paid, and since 0031 that is net of any
+ * coupon. Reading it as the shop's revenue is how the vendor came to fund every
+ * platform promotion silently: a ₹100 code run by Deligro took ₹100 off this
+ * number and nothing anywhere said the shop should be made whole.
+ *
+ * So the discount is added back, and then taken off again only when the shop
+ * ran the promotion itself. A shop-funded code is a real cost to the shop and
+ * belongs in these figures; a platform-funded one is not.
+ *
+ * On a database before 0031 both fields are absent, `discount` reads 0, and
+ * this is `total` — exactly what it was.
+ */
+function shopValue(row: OrderRow): number {
+  const discount = Number(row.discount ?? 0) || 0;
+  const vendorFunded = row.discount_funded_by === "vendor" ? discount : 0;
+  return (Number(row.total) || 0) + discount - vendorFunded;
 }
 
 function startOfDay(d: Date): Date {
@@ -215,14 +272,14 @@ function sumRevenue(rows: OrderRow[]): {
   let tax = 0;
   for (const row of rows) {
     if (!isRevenue(row.status)) continue;
-    const total = Number(row.total) || 0;
+    const value = shopValue(row);
     const fee = Number(row.delivery_fee) || 0;
     const taxAmt = Number(row.tax_amount) || 0;
-    revenue += total;
+    revenue += value;
     orders += 1;
     delivery += fee;
     tax += taxAmt;
-    items += Math.max(0, total - fee - taxAmt);
+    items += Math.max(0, value - fee - taxAmt);
   }
   return { revenue, orders, items, delivery, tax };
 }
@@ -252,7 +309,7 @@ function buildDailySeries(
     const key = startOfDay(new Date(row.created_at)).toISOString().slice(0, 10);
     const i = index.get(key);
     if (i === undefined) continue;
-    points[i].revenue += Number(row.total) || 0;
+    points[i].revenue += shopValue(row);
     points[i].orders += 1;
   }
   return points;
@@ -269,7 +326,7 @@ function buildHourlySeries(rows: OrderRow[]): VendorEarningsSummary["hourly"] {
     if (!isRevenue(row.status)) continue;
     const h = new Date(row.created_at).getHours();
     hours[h].orders += 1;
-    hours[h].revenue += Number(row.total) || 0;
+    hours[h].revenue += shopValue(row);
   }
   return hours;
 }
@@ -287,7 +344,7 @@ function buildWeekdaySeries(rows: OrderRow[]): EarningsSeriesPoint[] {
     const label = DAY_LABELS[new Date(row.created_at).getDay()];
     const i = index.get(label);
     if (i === undefined) continue;
-    buckets[i].revenue += Number(row.total) || 0;
+    buckets[i].revenue += shopValue(row);
     buckets[i].orders += 1;
   }
   return buckets;
@@ -306,6 +363,11 @@ export async function getVendorEarningsSummary(
   const fetchFrom = window.prevStart.toISOString();
   const fetchTo = window.end.toISOString();
 
+  // Every query below asks for the coupon columns or none of them, so the whole
+  // screen reads one way or the other rather than mixing net and gross figures.
+  const coupons = await couponColumnsAvailable(supabase);
+  const money = coupons ? "total, discount, discount_funded_by" : "total";
+
   const [
     ordersResult,
     pendingResult,
@@ -316,24 +378,24 @@ export async function getVendorEarningsSummary(
   ] = await Promise.all([
     supabase
       .from("orders")
-      .select("id, total, delivery_fee, tax_amount, status, created_at")
+      .select(`id, ${money}, delivery_fee, tax_amount, status, created_at`)
       .eq("restaurant_id", restaurantId)
       .gte("created_at", fetchFrom)
       .lt("created_at", fetchTo)
       .order("created_at", { ascending: false }),
     supabase
       .from("orders")
-      .select("total")
+      .select(money)
       .eq("restaurant_id", restaurantId)
       .in("status", [...PENDING_STATUSES]),
     supabase
       .from("orders")
-      .select("total")
+      .select(money)
       .eq("restaurant_id", restaurantId)
       .eq("status", "delivered"),
     supabase
       .from("orders")
-      .select("total")
+      .select(money)
       .eq("restaurant_id", restaurantId)
       .in("status", [...REVENUE_STATUSES])
       .gte("created_at", todayStart.toISOString()),
@@ -354,7 +416,9 @@ export async function getVendorEarningsSummary(
 
   if (ordersResult.error) throw ordersResult.error;
 
-  const allRows = (ordersResult.data ?? []) as OrderRow[];
+  // The column list is assembled at runtime (see `money`), so PostgREST's
+  // type parser can't narrow it — the shape is asserted here instead.
+  const allRows = (ordersResult.data ?? []) as unknown as OrderRow[];
   const periodRows = allRows.filter((r) => {
     const t = new Date(r.created_at).getTime();
     return t >= window.start.getTime() && t < window.end.getTime();
@@ -374,36 +438,36 @@ export async function getVendorEarningsSummary(
   for (const row of periodRows) {
     if (row.status === "cancelled") {
       cancelledCount += 1;
-      cancelledValue += Number(row.total) || 0;
+      cancelledValue += shopValue(row);
     }
     if (row.status === "delivered") {
       deliveredOrders += 1;
-      deliveredRevenue += Number(row.total) || 0;
+      deliveredRevenue += shopValue(row);
     }
   }
 
-  const pendingRows = pendingResult.data ?? [];
+  const pendingRows = (pendingResult.data ?? []) as unknown as OrderRow[];
   let pendingCount = 0;
   let pendingValue = 0;
   for (const r of pendingRows) {
     pendingCount += 1;
-    pendingValue += Number(r.total) || 0;
+    pendingValue += shopValue(r);
   }
 
-  const lifetimeRows = lifetimeResult.data ?? [];
+  const lifetimeRows = (lifetimeResult.data ?? []) as unknown as OrderRow[];
   let lifetimeTotal = 0;
   let lifetimeOrders = 0;
   for (const r of lifetimeRows) {
     lifetimeOrders += 1;
-    lifetimeTotal += Number(r.total) || 0;
+    lifetimeTotal += shopValue(r);
   }
 
-  const todayRows = todayResult.data ?? [];
+  const todayRows = (todayResult.data ?? []) as unknown as OrderRow[];
   let todayRevenue = 0;
   let todayOrders = 0;
   for (const r of todayRows) {
     todayOrders += 1;
-    todayRevenue += Number(r.total) || 0;
+    todayRevenue += shopValue(r);
   }
 
   const series =

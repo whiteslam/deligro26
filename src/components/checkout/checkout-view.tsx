@@ -121,6 +121,8 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
     code: string;
     discount: number;
     pricedAt: number;
+    /** The shop it was priced for — a scoped code doesn't travel (0041). */
+    pricedFor: string | null;
   } | null>(null);
   const [couponBusy, setCouponBusy] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
@@ -128,6 +130,13 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   if (coupon && coupon.pricedAt !== subtotal) {
     setCoupon(null);
     setCouponError("Your basket changed — apply the code again.");
+  } else if (coupon && coupon.pricedFor !== restaurantSlug) {
+    // Switching restaurants empties the basket, so this is nearly always
+    // caught by the subtotal check above — nearly, because two shops can
+    // total the same. A code scoped to the shop it was priced for would
+    // otherwise be shown as applied at a shop that will refuse it.
+    setCoupon(null);
+    setCouponError("You're ordering from a different restaurant — apply the code again.");
   }
 
   const discount = coupon?.discount ?? 0;
@@ -179,20 +188,32 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   const applyCoupon = async () => {
     const code = couponInput.trim();
     if (!code) return;
+    // Nothing to price a scoped code against. Unreachable from the UI — the
+    // checkout only renders with a basket — but the request would be rejected
+    // as invalid input rather than saying why.
+    if (!restaurantSlug) {
+      setCouponError("Add something to your basket first.");
+      return;
+    }
     setCouponBusy(true);
     setCouponError(null);
     try {
       const res = await fetch("/api/coupons/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, subtotal }),
+        body: JSON.stringify({ code, subtotal, restaurantSlug }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
         setCouponError(couponMessage(data.error, data.minOrder));
         return;
       }
-      setCoupon({ code: data.code, discount: data.discount, pricedAt: subtotal });
+      setCoupon({
+        code: data.code,
+        discount: data.discount,
+        pricedAt: subtotal,
+        pricedFor: restaurantSlug,
+      });
       setCouponInput("");
     } catch {
       setCouponError("Couldn't check that code. Try again.");
@@ -408,10 +429,6 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
       setAddFormRequested(true);
       return;
     }
-    if (!courierInstructions.trim()) {
-      setError("Add instructions for the courier.");
-      return;
-    }
 
     setStatus("processing");
 
@@ -569,14 +586,14 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   }
 
   return (
-    <div className="relative min-h-full bg-surface-2">
+    <div className="relative flex min-h-full flex-1 flex-col">
       <CheckoutHeader
         title={restaurantName ?? "Checkout"}
         onBack={() => router.back()}
         onClear={clearCart}
       />
 
-      <div className="space-y-3 px-4 pb-4 pt-3">
+      <div className="flex-1 space-y-3 px-4 pb-4 pt-3">
         <section className="card overflow-hidden">
           {addrLoading ? (
             <p className="flex items-center gap-2 p-4 text-sm text-muted">
@@ -699,10 +716,7 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
                   placeholder="Instructions for the courier"
                   value={courierInstructions}
                   onChange={setCourierInstructions}
-                  required
                 />
-
-                <p className="text-xs text-muted">*Required fields</p>
 
                 <Link
                   href="/profile/addresses"
@@ -895,7 +909,10 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
         ) : null}
       </div>
 
-      <div className="glass sticky bottom-0 z-20 border-t border-line p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      {/* `.screen-dock`, not `.glass`: the page ground and a fade, so the screen
+          reads as one sheet rather than a header slab, a content slab and a
+          button slab. It pays the home-indicator inset itself. */}
+      <div className="screen-dock sticky bottom-0 z-20 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
         {ordersClosed ? (
           <p className="mb-2 flex items-center gap-1.5 text-center text-sm font-medium text-deal">
             <AlertTriangle className="size-4 shrink-0" />
@@ -985,6 +1002,8 @@ function couponMessage(error?: string, minOrder?: number): string {
       return minOrder
         ? `Spend ${formatINR(minOrder)} on food to use this code.`
         : "Your basket is below this code's minimum.";
+    case "wrong_restaurant":
+      return "That code doesn't work at this restaurant.";
     case "already_used":
       return "You've already used this code.";
     case "exhausted":
@@ -1082,7 +1101,7 @@ function CheckoutHeader({
   onClear?: () => void;
 }) {
   return (
-    <header className="glass sticky top-0 z-20 flex items-center gap-3 px-4 py-3">
+    <header className="app-header sticky top-0 z-20 flex items-center gap-3 px-4 py-3">
       <button
         onClick={onBack}
         aria-label="Go back"
@@ -1113,19 +1132,16 @@ function CheckoutField({
   placeholder,
   value,
   onChange,
-  required,
 }: {
   label?: string;
   placeholder: string;
   value: string;
   onChange: (value: string) => void;
-  required?: boolean;
 }) {
   return (
     <label className="block">
       {label ? (
         <span className="mb-1.5 block text-xs font-medium text-muted">
-          {required ? "*" : ""}
           {label}
         </span>
       ) : null}

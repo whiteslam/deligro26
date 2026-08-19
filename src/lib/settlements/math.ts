@@ -28,6 +28,12 @@
  *   online paid → the platform holds it and remits `vendorNet` (less refunds).
  *   COD         → the shop already took the cash, so the platform recovers the
  *                 deductions instead, and the line contributes a negative.
+ *
+ * A coupon complicates the first line only. `orders.total` is what the customer
+ * paid, and since 0031 that is net of any discount — so reading it as the food
+ * value made the shop fund every platform promotion. Since 0041 the order also
+ * records WHO funded it, and a platform-funded discount is added back before
+ * the food value is struck: see `platformFunded` below.
  */
 
 /**
@@ -59,11 +65,27 @@ export type SettlementPaymentStatus =
   | "refunded"
   | null;
 
+export type SettlementDiscountFunding = "platform" | "vendor" | null;
+
 export interface SettlementOrderInput {
   total: number;
   deliveryFee: number;
   taxAmount: number;
   tip: number;
+  /** `orders.discount` (0031). Rupees the customer did not pay. */
+  discount?: number;
+  /**
+   * `orders.discount_funded_by` (0041).
+   *
+   * **Null is treated as vendor-absorbed**, which is what every order placed
+   * before 0041 silently was. That is deliberately not the *fair* reading —
+   * every coupon before 0041 was platform-wide, so no shop ever opted in — but
+   * re-pricing a settled backlog off a column that did not exist when those
+   * orders were taken is an operator's decision, not a migration's side effect.
+   * Backfilling `discount_funded_by = 'platform'` on the old rows is what makes
+   * those vendors whole, and it is one statement when someone chooses to.
+   */
+  discountFundedBy?: SettlementDiscountFunding;
   commissionPct: number;
   /** GST charged on the platform commission, whole percent. */
   commissionGstPct?: number;
@@ -82,6 +104,12 @@ export interface SettlementOrderBreakdown {
   taxAmount: number;
   tip: number;
   foodGross: number;
+  /**
+   * The part of the order's discount the platform paid for. Added back into
+   * `foodGross`, and remitted to the shop on a COD order where the shop
+   * collected that much less cash at the door.
+   */
+  platformDiscount: number;
   commission: number;
   commissionGst: number;
   otherCharges: number;
@@ -103,18 +131,39 @@ export function platformDeductions(
   return b.commission + b.commissionGst + b.otherCharges;
 }
 
+/**
+ * What the platform gave away on this order out of its own margin.
+ *
+ * Anything not explicitly marked `'platform'` is the shop's — including a null,
+ * for the reason on `discountFundedBy`. Erring towards "the shop funded it"
+ * keeps this from quietly increasing a payout on incomplete data; the shop is
+ * made whole by recording the funder, which every order has done since 0041.
+ */
+export function platformFundedDiscount(input: {
+  discount?: number;
+  discountFundedBy?: SettlementDiscountFunding;
+}): number {
+  if (input.discountFundedBy !== "platform") return 0;
+  return Math.max(0, Math.round(input.discount ?? 0));
+}
+
 export function foodGrossFromOrder(input: {
   total: number;
   deliveryFee: number;
   taxAmount: number;
   tip: number;
+  discount?: number;
+  discountFundedBy?: SettlementDiscountFunding;
 }): number {
   return Math.max(
     0,
     Math.round(input.total) -
       Math.round(input.deliveryFee) -
       Math.round(input.taxAmount) -
-      Math.round(input.tip)
+      Math.round(input.tip) +
+      // The shop sold this much food. That the platform chose to charge the
+      // customer less for it is between the platform and the customer.
+      platformFundedDiscount(input)
   );
 }
 
@@ -149,6 +198,7 @@ export function breakdownOrder(
   const tip = Math.round(input.tip);
 
   const foodGross = foodGrossFromOrder(input);
+  const platformDiscount = platformFundedDiscount(input);
   const commission = commissionOn(foodGross, input.commissionPct);
   const commissionGst = gstOnCommission(commission, input.commissionGstPct ?? 0);
   const otherCharges = Math.max(0, Math.round(input.otherCharges ?? 0));
@@ -165,9 +215,15 @@ export function breakdownOrder(
     input.paymentMethod === "online" && input.paymentStatus === "paid";
   const refundRecovered = Math.max(0, Math.round(input.approvedRefunds));
 
+  // On an online order the platform holds the whole payment, so restoring the
+  // discount into `foodGross` above is already the whole fix — `vendorNet`
+  // carries it. On COD the shop collected the cash at the door and collected
+  // `platformDiscount` less of it than the food was worth, so the platform owes
+  // it back; without this term the shop funds every platform promotion on the
+  // payment method this app actually runs on.
   const contribution = remitsVendor
     ? vendorNet - refundRecovered
-    : -deductions - refundRecovered;
+    : platformDiscount - deductions - refundRecovered;
 
   return {
     orderTotal,
@@ -175,6 +231,7 @@ export function breakdownOrder(
     taxAmount,
     tip,
     foodGross,
+    platformDiscount,
     // Report the clamped figures, not the notional ones: the statement must
     // show what was actually taken, or it will not reconcile with the payout.
     commission: Math.min(commission, deductions),

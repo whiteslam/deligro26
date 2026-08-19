@@ -21,7 +21,11 @@ export default async function CheckoutPage() {
   ]);
 
   return (
-    <div className="relative -mb-[92px] min-h-full">
+    // `owns-bottom` drops the shell's 80px tab-bar reservation (the tab bar is
+    // hidden on checkout), so the sticky order dock can reach the bottom edge.
+    // The column stretches to the full scroller height so the dock still sits
+    // at the foot of the screen when the basket is short enough not to scroll.
+    <div className="owns-bottom relative flex min-h-full flex-col">
       <CheckoutView
         config={{
           deliveryFee: s.deliveryFee,

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/data-access/vendor-categories";
 import { legiblePassword } from "@/lib/utils/password";
 import { toE164 } from "@/lib/auth/phone";
+import { storeVendorCredential } from "@/lib/data-access/vendor-credentials";
 import type { Role } from "@/lib/auth";
 
 /**
@@ -288,9 +289,9 @@ async function insertVendorRestaurant(
       owner_alt_mobile: data.altMobile ?? null,
       owner_email: email,
       owner_phone_verified: Boolean(mobileE164 && data.phoneVerified),
-      // The password is returned to the wizard once, for hand-off, and is not
-      // stored: Supabase Auth already holds the bcrypt hash, and a plaintext
-      // copy here would be a live credential sitting in a table row.
+      // A password was issued at creation. The value itself goes to the
+      // service-role-only `vendor_login_credentials` table (0039), never onto
+      // this publicly-readable row — that was audit finding C-2.
       password_reset_at: new Date().toISOString(),
       // Left unset, a new vendor inherits the platform rate (NULL, migration
       // 0032). The old `?? 0` would now register every new shop as an explicit
@@ -486,6 +487,11 @@ export async function createVendorAccount(
       data,
       operatorId
     );
+
+    // Keep an admin-readable copy so the desk can read the login back to the
+    // owner later. Best-effort: the account already exists and the wizard shows
+    // the value once regardless.
+    await storeVendorCredential(restaurantId, ownerId, password, operatorId);
 
     return { restaurantId, ownerId, password };
   } catch (err) {

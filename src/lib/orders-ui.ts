@@ -2,7 +2,7 @@ import "server-only";
 import { ACTIVE_ORDER, PAST_ORDERS } from "@/lib/data";
 import {
   getOrderById,
-  listVisibleOrders,
+  listMyOrders,
 } from "@/lib/data-access/orders";
 import { getProfile } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -59,7 +59,11 @@ export async function getOrdersPageData(): Promise<OrdersPageData> {
   }
 
   try {
-    const rows = await listVisibleOrders();
+    // `listMyOrders`, not `listVisibleOrders`: this screen says "your orders"
+    // and must mean it. An admin — the owner's own phone is one — is allowed by
+    // RLS to read every order on the platform, so the visible list would fill
+    // /orders with strangers' deliveries and put one of them in the Active card.
+    const rows = await listMyOrders();
     if (!rows.length) {
       return { active: null, past: [], isDemo: false, ok: true };
     }

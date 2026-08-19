@@ -332,6 +332,30 @@ button.card:active {
   background: var(--bg);
 }
 
+/* ---------- Screen dock ----------
+   The foot-of-screen counterpart to .app-header, and it exists for the same
+   reason: a --surface panel with a rule across the top turns a screen into
+   three stacked slabs — header, content, button — instead of one sheet with
+   cards floating on it. The dock paints the page ground too, so the only thing
+   with an edge is the content itself.
+
+   Losing the rule costs the cue that there is more to scroll, so the dock hands
+   it back as a short fade: content dissolves into the ground above the button
+   rather than being cut off by a line. `position: sticky` on the dock is what
+   the ::before resolves against, so callers must keep it. */
+.screen-dock {
+  background: var(--bg);
+}
+.screen-dock::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 100%;
+  height: 24px;
+  pointer-events: none;
+  background: linear-gradient(to top, var(--bg), transparent);
+}
+
 /* A row that collapses to nothing without anyone hard-coding its height: the
    1fr → 0fr grid row is animatable, so the content and its padding shrink away
    smoothly whatever they happen to measure. Used by the feed header to shed its
@@ -552,6 +576,22 @@ button.card:active {
    otherwise white icons would end up on light content. */
 .app-scroll:has(.immersive) {
   padding-top: 0;
+}
+
+/* ---------- Screens that own the bottom edge ----------
+   The shells reserve 80px at the foot of the scroller so the tab bar never
+   covers the last row. A screen that hides the tab bar and docks its own bar
+   there (checkout's "Place order") must give that strip back: `bottom: 0` on a
+   sticky child resolves against its containing block, so the reserved padding
+   used to strand the dock 80px above the phone's bottom edge with the page
+   background showing beneath it. Opt out here rather than cancelling the
+   padding with a negative margin — a negative margin moves the flow, not the
+   box the sticky dock is anchored inside, so the gap survived it.
+
+   Unlayered, so it beats the `pb-[80px]` utility on the same element whatever
+   the specificity: Tailwind's utilities live in @layer utilities. */
+.app-scroll:has(.owns-bottom) {
+  padding-bottom: 0;
 }
 .app-shell:has(.immersive) .status-bar {
   background: linear-gradient(

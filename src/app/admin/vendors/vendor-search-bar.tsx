@@ -4,15 +4,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Search, X } from "lucide-react";
 import { fieldCls } from "@/components/ui/field";
-import { VENDOR_STATUSES } from "@/lib/vendor-status";
-
-const STATUS_LABEL: Record<string, string> = {
-  all: "All statuses",
-  pending: "Pending",
-  active: "Active",
-  inactive: "Inactive",
-  suspended: "Suspended",
-};
 
 const SORTS: { value: string; label: string }[] = [
   { value: "recent", label: "Newest first" },
@@ -22,9 +13,21 @@ const SORTS: { value: string; label: string }[] = [
 ];
 
 /**
- * Search / filter / sort for the vendor list. Everything lives in the URL, so
- * the server component reads `searchParams` and the state survives refresh and
- * the browser back button. The text box is debounced; the selects apply at once.
+ * Rows per page. The first entry is the default, and is what the page falls
+ * back to for an absent or bogus `?per=` — so the list can never be talked into
+ * an unbounded query. `listVendors` caps at 100 as well.
+ */
+export const PAGE_SIZES = [25, 50, 100];
+
+/**
+ * Search / filter / sort / page-size for the vendor table. Everything lives in
+ * the URL, so the server component reads `searchParams` and the state survives
+ * refresh and the browser back button. The text box is debounced; the selects
+ * apply at once.
+ *
+ * Status is deliberately NOT here — it is the tab row above, which is the same
+ * `?status=` parameter. Two controls writing one value is how a filter bar and
+ * a tab row end up disagreeing about what you are looking at.
  */
 export function VendorSearchBar({ categories }: { categories: string[] }) {
   const router = useRouter();
@@ -56,9 +59,9 @@ export function VendorSearchBar({ categories }: { categories: string[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
-  const status = params.get("status") ?? "all";
   const category = params.get("category") ?? "";
   const sort = params.get("sort") ?? "recent";
+  const per = params.get("per") ?? String(PAGE_SIZES[0]);
 
   return (
     <div
@@ -73,7 +76,7 @@ export function VendorSearchBar({ categories }: { categories: string[] }) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search shop, owner or mobile…"
+          placeholder="Search shop, owner, mobile or handle…"
           className={`${fieldCls} pl-10 pr-10`}
           aria-label="Search vendors"
         />
@@ -89,22 +92,7 @@ export function VendorSearchBar({ categories }: { categories: string[] }) {
         ) : null}
       </div>
 
-      <div className="grid grid-cols-3 gap-2 @3xl:w-[420px] @3xl:shrink-0">
-        <select
-          value={status}
-          onChange={(e) =>
-            push({ status: e.target.value === "all" ? null : e.target.value, page: null })
-          }
-          className={`${fieldCls} px-2.5 text-sm`}
-          aria-label="Filter by status"
-        >
-          {["all", ...VENDOR_STATUSES].map((s) => (
-            <option key={s} value={s}>
-              {STATUS_LABEL[s]}
-            </option>
-          ))}
-        </select>
-
+      <div className="grid grid-cols-3 gap-2 @3xl:w-[440px] @3xl:shrink-0">
         <select
           value={category}
           onChange={(e) => push({ category: e.target.value || null, page: null })}
@@ -128,6 +116,25 @@ export function VendorSearchBar({ categories }: { categories: string[] }) {
           {SORTS.map((s) => (
             <option key={s.value} value={s.value}>
               {s.label}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={per}
+          onChange={(e) =>
+            push({
+              per:
+                e.target.value === String(PAGE_SIZES[0]) ? null : e.target.value,
+              page: null,
+            })
+          }
+          className={`${fieldCls} px-2.5 text-sm`}
+          aria-label="Rows per page"
+        >
+          {PAGE_SIZES.map((n) => (
+            <option key={n} value={n}>
+              {n} per page
             </option>
           ))}
         </select>
