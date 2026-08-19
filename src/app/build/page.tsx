@@ -17,10 +17,14 @@ import {
   getBuildDbSnapshot,
   type BuildDbSnapshot,
 } from "@/lib/data-access/build-stats";
+import { requireRole } from "@/lib/auth";
 
 export const metadata: Metadata = {
-  title: "Deligro · Build tracker",
+  title: "Build tracker",
   description: "5-week delivery plan and live progress by role.",
+  // Belt and braces alongside the role check below and the Disallow in
+  // robots.ts: an internal roadmap has no business in a search result.
+  robots: { index: false, follow: false },
 };
 
 const ICON: Record<TaskStatus, React.ComponentType<{ className?: string }>> = {
@@ -275,6 +279,15 @@ export default async function BuildTrackerPage({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
+  // Operators only. This page publishes the internal delivery plan — what is
+  // done, what is blocked, what the architecture is — next to live row counts
+  // from getBuildDbSnapshot(), which is a rough measure of order, vendor and
+  // customer volume. src/proxy.ts only asks for a guest cookie on routes like
+  // this one, and a guest cookie is one click on the sign-in screen, so until
+  // now any visitor could read all of it. Information disclosure rather than a
+  // vulnerability, but in a one-city market it is free intelligence.
+  await requireRole("admin");
+
   const { tab: tabParam } = await searchParams;
   const tab: BuildTab = isBuildTab(tabParam) ? tabParam : "customer";
   const tabConfig = BUILD_TABS.find((t) => t.id === tab)!;

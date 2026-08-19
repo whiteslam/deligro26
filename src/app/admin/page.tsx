@@ -24,7 +24,7 @@ import {
   type ShareSegment,
 } from "@/components/admin/console-ui";
 import { ConsoleOnly } from "@/components/admin/console-only";
-import { GmvOrdersChart } from "@/components/admin/admin-charts";
+import { GmvOrdersChart } from "@/components/admin/gmv-chart-lazy";
 import { LiveBoard } from "@/components/admin/live-board";
 import { ApprovalQueue } from "@/components/admin/approval-queue";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -270,7 +270,7 @@ export default async function AdminOverviewPage({
                 /admin/orders is the same data in a form that stacks. */}
             <ConsoleOnly
               tool="The live order board"
-              why="Open board, above, works on a phone."
+              why="Open board, above, is the same orders in a list that stacks — that is the phone version of this."
             >
               <LiveBoard rows={board.rows} />
             </ConsoleOnly>
@@ -343,7 +343,7 @@ export default async function AdminOverviewPage({
                 is not, and it costs a charting library to draw. */}
             <ConsoleOnly
               tool="The GMV chart"
-              why="The totals beside this heading are the same period."
+              why="The two figures beside this heading cover the same period, and they are the part worth reading on a phone anyway."
             >
               <GmvOrdersChart days={series.days} />
             </ConsoleOnly>

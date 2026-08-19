@@ -22,6 +22,7 @@
     "db:import-legacy-login": "npx tsx scripts/import-legacy-login.ts",
     "db:generate-legacy-customers-sql": "npx tsx scripts/generate-legacy-customers-sql.ts",
     "db:generate-legacy-sql": "npx tsx scripts/generate-legacy-seed-sql.ts",
+    "test:ranking": "npx tsx scripts/qa/dish-ranking.ts",
     "test:idor": "npx tsx scripts/qa/idor-suite.ts",
     "test:payments": "npx tsx scripts/qa/payments-signature.ts",
     "test:e2e": "npx tsx scripts/qa/e2e-smoke.ts",
@@ -39,6 +40,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^2.15.4",
+    "server-only": "^0.0.1",
     "tailwind-merge": "^3.6.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zustand": "^5.0.14"
@@ -51,7 +53,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "ws": "^8.21.0"
+    "typescript": "^5"
   }
 }
