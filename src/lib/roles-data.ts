@@ -117,12 +117,39 @@ export const PREPARING_ORDERS: KitchenOrder[] = [
 ];
 
 /* ---------- Driver (rider) ---------- */
+
+/**
+ * One end of a delivery, as a rider needs to read it.
+ *
+ * `area` is the short line a card can show without wrapping — a shop name, a
+ * "Home"/"Work" label. `address` is the thing you can actually find: the street
+ * line the customer typed, flat number and entry code included, or the address
+ * the vendor pinned. They are separate fields because the board used to have
+ * only the first one and call it an address, which is how a rider ended up
+ * standing in a lane with the word "Home" on their screen.
+ *
+ * `address` is optional because it genuinely may not be recorded — a shop that
+ * has never been pinned (pre-0009), an order imported from the legacy system.
+ * The UI says so in that case rather than leaving a blank line where the
+ * directions should be.
+ */
+export interface DeliveryStop {
+  /** Short label: the shop's name, or the customer's "Home"/"Work". */
+  area: string;
+  /** The findable address. Undefined when none was ever recorded. */
+  address?: string;
+  /** Landmark/pincode tail, when the shop or address carries one. */
+  landmark?: string;
+  /** Map pin, when this end has one. */
+  point?: { lat: number; lng: number };
+}
+
 export interface DeliveryJob {
   id: string;
   code: string;
   restaurant: string;
-  pickupArea: string;
-  dropArea: string;
+  pickup: DeliveryStop;
+  drop: DeliveryStop;
   /** Undefined when the shop or the address has no coordinates. */
   distanceKm?: number;
   payout: number;
@@ -135,8 +162,16 @@ export const AVAILABLE_JOBS: DeliveryJob[] = [
     id: "j-2201",
     code: "#D-4821",
     restaurant: "Saffron Kitchen",
-    pickupArea: "Koramangala 6th Block",
-    dropArea: "Koramangala 5th Block",
+    pickup: {
+      area: "Saffron Kitchen",
+      address: "12, 6th Block, Koramangala",
+      landmark: "Opposite Jyoti Nivas College",
+    },
+    drop: {
+      area: "Home",
+      address: "402, Ashirwad Residency, 5th Block, Koramangala",
+      landmark: "Gate 2",
+    },
     distanceKm: 2.3,
     payout: 48,
     items: 4,
@@ -146,8 +181,12 @@ export const AVAILABLE_JOBS: DeliveryJob[] = [
     id: "j-2202",
     code: "#B-9910",
     restaurant: "Blue Tokai Cafe",
-    pickupArea: "Indiranagar",
-    dropArea: "Domlur",
+    pickup: { area: "Blue Tokai Cafe", address: "946, 12th Main, Indiranagar" },
+    drop: {
+      area: "Work",
+      address: "Prestige Atlanta, 80 Feet Road, Domlur",
+      landmark: "Tower B reception",
+    },
     distanceKm: 3.1,
     payout: 62,
     items: 2,
@@ -157,8 +196,8 @@ export const AVAILABLE_JOBS: DeliveryJob[] = [
     id: "j-2203",
     code: "#P-3345",
     restaurant: "Pizza Loft",
-    pickupArea: "HSR Sector 1",
-    dropArea: "HSR Sector 4",
+    pickup: { area: "Pizza Loft", address: "27, HSR Sector 1" },
+    drop: { area: "Home", address: "8, 14th Main, HSR Sector 4" },
     distanceKm: 1.8,
     payout: 40,
     items: 3,
@@ -166,11 +205,14 @@ export const AVAILABLE_JOBS: DeliveryJob[] = [
   },
 ];
 
+/**
+ * The demo rider's day. `earnings`, `onlineHours` and `rating` are gone: the
+ * board no longer shows a money figure (riders here are salaried — see the
+ * "Salary model on the board" task in build-plan.ts), and the other two were
+ * numbers this platform has never tracked for anybody.
+ */
 export const DRIVER_TODAY = {
-  earnings: 640,
   trips: 12,
-  onlineHours: 5.5,
-  rating: 4.8,
 };
 
 /* ---------- Admin ---------- */

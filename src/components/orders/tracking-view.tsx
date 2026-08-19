@@ -28,14 +28,11 @@ import { shortOrderId, isOrderPaid, type UiOrder } from "@/lib/utils/order-map";
 import type { OrderEta } from "@/lib/orders/eta";
 import { formatINR } from "@/lib/utils/format";
 import { DEFAULT_CENTER } from "@/lib/maps/config";
+// The same helper the rider's own "Call customer" control uses. This file used
+// to carry a byte-identical private copy, which is how the two ends of one
+// phone call end up disagreeing about what counts as a dialable number.
+import { callablePhone } from "@/lib/utils/phone";
 import { cn } from "@/lib/utils/cn";
-
-function callablePhone(phone: string | undefined): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 10) return null;
-  return digits.startsWith("91") ? `+${digits}` : `+91${digits.slice(-10)}`;
-}
 
 /** "1 minute" / "12 minutes" — the lateness line reads as a sentence. */
 function minutesLabel(n: number): string {
@@ -414,52 +411,94 @@ export function TrackingView({
           </div>
         ) : null}
 
+        {/* The courier, as an ID card.
+
+            It was a plain row — initial, name, "Your courier", call button —
+            which is the same layout this app uses for a saved address or a
+            payment method, and it read like one. The person about to knock on
+            your door is not a list item. This is the identification a customer
+            can hold their phone up against: the platform's name on it, the
+            rider's name, their Deligro ID, and one control that does the one
+            thing you would want to do with it. */}
         {displayRider && !delivered && !cancelled ? (
-          <div className="card flex items-center gap-3 p-4">
-            <span className="grid size-12 place-items-center rounded-full bg-surface-2 text-lg font-extrabold text-ink">
-              {displayRider.name.charAt(0)}
-            </span>
-            <div className="flex-1">
-              <p className="text-[15px] font-bold">{displayRider.name}</p>
-              {/* Only shown when we actually know it. Every rider used to be
-                  labelled "4.9 ★ · Bike" — a rating we have never collected. */}
-              {displayRider.rating !== undefined ? (
-                <p className="flex items-center gap-1 text-xs text-muted">
-                  <Star className="size-3 fill-pop text-pop" />
-                  {displayRider.rating}
-                  {displayRider.vehicle ? ` · ${displayRider.vehicle}` : ""}
+          <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-[var(--shadow-md)]">
+            <div className="flex items-center justify-between gap-2 bg-ink px-4 py-1.5">
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[color:var(--surface)]">
+                Deligro rider
+              </span>
+              <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--surface)]/70">
+                <ShieldCheck className="size-3" /> Verified
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 p-3.5">
+              <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-surface-2 text-xl font-extrabold text-ink">
+                {displayRider.name.charAt(0).toUpperCase()}
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] font-extrabold leading-tight">
+                  {displayRider.name}
                 </p>
-              ) : displayRider.vehicle ? (
-                <p className="text-xs text-muted">{displayRider.vehicle}</p>
+                {/* The ID is the point of the card: it is the thing a customer
+                    can quote to support about one specific courier, and the
+                    thing that makes "is this my rider?" answerable at the door
+                    rather than a matter of trusting whoever turned up. */}
+                {displayRider.id ? (
+                  <p className="text-data mt-0.5 text-[11px] font-bold tracking-[0.12em] text-muted">
+                    ID {displayRider.id}
+                  </p>
+                ) : null}
+                {/* Only shown when we actually know it. Every rider used to be
+                    labelled "4.9 ★ · Bike" — a rating we have never collected. */}
+                {displayRider.rating !== undefined ? (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-muted">
+                    <Star className="size-3 fill-pop text-pop" />
+                    {displayRider.rating}
+                    {displayRider.vehicle ? ` · ${displayRider.vehicle}` : ""}
+                  </p>
+                ) : displayRider.vehicle ? (
+                  <p className="mt-1 text-xs text-muted">{displayRider.vehicle}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-muted">
+                    Bringing your order to the door
+                  </p>
+                )}
+              </div>
+
+              {/* A "Message rider" button used to sit beside this: permanently
+                  disabled, 50% opacity, no explanation, right next to a Call
+                  button that works. There is no chat backend and none is
+                  planned, so it was not a control waiting on data — it was a
+                  control waiting on a feature. Removed rather than left greyed
+                  out; calling is how you reach your rider, and the button that
+                  does it is now the only one offered. */}
+              {riderTel ? (
+                <a
+                  href={`tel:${riderTel}`}
+                  aria-label={`Call ${displayRider.name}`}
+                  className="press flex shrink-0 flex-col items-center gap-1 rounded-xl bg-accent px-3.5 py-2.5 text-[var(--on-accent)] shadow-[var(--glow-accent)]"
+                >
+                  <Phone className="size-5" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">
+                    Call
+                  </span>
+                </a>
               ) : (
-                <p className="text-xs text-muted">Your courier</p>
+                <button
+                  type="button"
+                  aria-label="Call rider"
+                  disabled
+                  title="No phone number recorded for this rider"
+                  className="press flex shrink-0 flex-col items-center gap-1 rounded-xl bg-accent px-3.5 py-2.5 text-[var(--on-accent)] opacity-50 shadow-[var(--glow-accent)]"
+                >
+                  <Phone className="size-5" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">
+                    Call
+                  </span>
+                </button>
               )}
             </div>
-            {/* A "Message rider" button used to sit here: permanently disabled,
-                50% opacity, no explanation, right next to a Call button that
-                works. There is no chat backend and none is planned, so it was
-                not a control waiting on data — it was a control waiting on a
-                feature. Removed rather than left greyed out; calling is how you
-                reach your rider, and the button that does it is now the only
-                one offered. */}
-            {riderTel ? (
-              <a
-                href={`tel:${riderTel}`}
-                aria-label="Call rider"
-                className="press grid size-11 place-items-center rounded-full bg-accent text-[var(--on-accent)] shadow-[var(--glow-accent)]"
-              >
-                <Phone className="size-5" />
-              </a>
-            ) : (
-              <button
-                type="button"
-                aria-label="Call rider"
-                disabled
-                className="press grid size-11 place-items-center rounded-full bg-accent text-[var(--on-accent)] opacity-50 shadow-[var(--glow-accent)]"
-              >
-                <Phone className="size-5" />
-              </button>
-            )}
           </div>
         ) : null}
 

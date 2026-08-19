@@ -115,35 +115,66 @@ export async function assignRider(
 
   const supabase = await createClient();
 
+  // Read the row whatever its status. It used to filter to the claimed
+  // statuses, which was correct only while `deliveries` rows came into being at
+  // the moment a rider accepted. Dispatch (0042) now leaves an `unassigned` row
+  // carrying an offer, and the insert below would hit the unique constraint on
+  // `order_id` and tell the manager "a rider took this order first" about an
+  // order no rider had touched.
   const { data: existing } = await supabase
     .from("deliveries")
     .select("id, status")
     .eq("order_id", orderId)
-    .in("status", ["assigned", "picked_up", "delivered"])
     .maybeSingle();
-  if (existing) {
+
+  if (existing && existing.status !== "unassigned") {
     return { ok: false, error: "This order already has a rider." };
   }
 
   // No coordinates, and `driver_location_source: 'none'` says so out loud. The
   // tracking map draws an estimate until the rider's device reports a real fix
   // — seeding a fake position here is the exact bug slice D removed.
-  const insert = (withSource: boolean) =>
-    supabase.from("deliveries").insert({
-      order_id: orderId,
-      driver_id: riderId,
-      status: "assigned",
-      assigned_at: new Date().toISOString(),
-      ...(withSource ? { driver_location_source: "none" } : {}),
-    });
+  const claim = {
+    driver_id: riderId,
+    status: "assigned" as const,
+    assigned_at: new Date().toISOString(),
+  };
+
+  // A manager assigning deliberately OVERRIDES whatever dispatch offered: they
+  // can see the board and the rider in front of them, and the automatic pick
+  // cannot. `offered_driver_id` is left alone — it is the record of who the
+  // system asked, which stays true whether or not that is who was sent.
+  const write = (withSource: boolean) =>
+    existing
+      ? supabase
+          .from("deliveries")
+          .update({
+            ...claim,
+            ...(withSource ? { driver_location_source: "none" } : {}),
+          })
+          .eq("id", existing.id)
+          // The optimistic lock the insert path gets for free from the unique
+          // constraint: if a rider accepted the offer between our read and this
+          // write, no row matches and we say so rather than reporting a
+          // dispatch that never happened.
+          .eq("status", "unassigned")
+          .select("id")
+      : supabase
+          .from("deliveries")
+          .insert({
+            order_id: orderId,
+            ...claim,
+            ...(withSource ? { driver_location_source: "none" } : {}),
+          })
+          .select("id");
 
   let withSource = !columnKnownMissing(LOCATION_SOURCE_COLUMN);
-  let { error } = await insert(withSource);
+  let { data, error } = await write(withSource);
 
   if (error && withSource && isMissingColumn(error)) {
     rememberColumn(LOCATION_SOURCE_COLUMN, false);
     withSource = false;
-    ({ error } = await insert(false));
+    ({ data, error } = await write(false));
   } else if (!error && withSource) {
     rememberColumn(LOCATION_SOURCE_COLUMN, true);
   }
@@ -153,6 +184,9 @@ export async function assignRider(
       return { ok: false, error: "A rider took this order first." };
     }
     return { ok: false, error: "That didn't go through. Try again." };
+  }
+  if ((data ?? []).length === 0) {
+    return { ok: false, error: "A rider took this order first." };
   }
 
   revalidatePath("/manager");

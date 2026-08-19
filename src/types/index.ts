@@ -161,6 +161,17 @@ export interface Order {
 
 export interface Rider {
   name: string;
+  /**
+   * The rider's Deligro ID, as printed on the card the customer is shown at
+   * the door. Derived from the profile id (same `shortOrderId` shape used for
+   * order codes), so it is stable, non-guessable in either direction, and
+   * something a customer can quote to support about a specific courier.
+   *
+   * Optional because a mock order has no profile behind it, and because a real
+   * one whose rider row could not be read should show a card without an ID
+   * rather than no card at all.
+   */
+  id?: string;
   /** We don't rate riders yet. Undefined = unknown, never a flattering guess. */
   rating?: number;
   vehicle?: string;

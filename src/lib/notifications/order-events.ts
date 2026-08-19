@@ -105,6 +105,34 @@ export async function notifyVendor(
   }
 }
 
+/**
+ * Push to one rider, by profile id.
+ *
+ * Unlike `notifyCustomer`/`notifyVendor` this takes the recipient directly:
+ * dispatch has already decided who to ask (see rider-dispatch.ts), and looking
+ * the rider back up from the order would mean reading a `driver_id` that is
+ * deliberately still null while an offer is outstanding.
+ */
+export async function notifyDriver(
+  driverId: string,
+  heading: string,
+  message: string
+): Promise<void> {
+  if (!isPushConfigured) return;
+  try {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from("profiles")
+      .select("onesignal_id")
+      .eq("id", driverId)
+      .maybeSingle();
+
+    await pushToPlayer(data?.onesignal_id, heading, message, "/driver");
+  } catch {
+    // swallow — fire-and-forget
+  }
+}
+
 /* ---------- customer-facing transitions ---------- */
 
 /**
@@ -196,6 +224,74 @@ export function notifyRefundDecided(
     approved
       ? `Your refund for order #${shortOrderId(orderId)} was approved.`
       : `We couldn't approve the refund for order #${shortOrderId(orderId)}. Contact support if this looks wrong.`
+  );
+}
+
+/* ---------- rider-facing ---------- */
+
+/**
+ * The kitchen just accepted — go and be there when it comes off the pass.
+ *
+ * This is the notification the rider never used to get. Orders appeared in the
+ * available pool at `ready`, which is the moment the food is already sitting on
+ * the counter going cold: the road leg started from wherever the rider happened
+ * to be, after they happened to notice. Told at `kitchen` instead, with the
+ * prep estimate, a rider can be at the shop when the bag is.
+ *
+ * `readyInMinutes` is the kitchen leg from `kitchenPrepMinutes` — the same
+ * number the customer's countdown is built on, so the two cannot disagree.
+ */
+export function notifyDriverPickupOffered(
+  driverId: string,
+  opts: {
+    orderId: string;
+    restaurantName: string;
+    readyInMinutes: number;
+    /** Shown so the rider can judge whether to set off now. */
+    pickupArea?: string | null;
+  }
+): Promise<void> {
+  const where = opts.pickupArea?.trim() ? ` (${opts.pickupArea.trim()})` : "";
+  return notifyDriver(
+    driverId,
+    "Pickup coming your way 🛵",
+    `${opts.restaurantName}${where} is cooking order #${shortOrderId(
+      opts.orderId
+    )} — ready in about ${opts.readyInMinutes} min. Head over.`
+  );
+}
+
+/** Packed and waiting. Sent to whichever rider dispatch picked at ready-time. */
+export function notifyDriverPickupReady(
+  driverId: string,
+  opts: { orderId: string; restaurantName: string }
+): Promise<void> {
+  return notifyDriver(
+    driverId,
+    "Order ready to collect 📦",
+    `${opts.restaurantName} has packed order #${shortOrderId(
+      opts.orderId
+    )}. It's held for you — accept it in the app.`
+  );
+}
+
+/**
+ * The rider is at the door.
+ *
+ * Fired once, from the rider's own location report, when they first come within
+ * the arrival radius of the drop (see reportDriverLocation). Worded as *nearly*
+ * there rather than *here*: 500 m is a couple of minutes on a bike, and a
+ * customer who comes downstairs on this message should not be standing in the
+ * street for five minutes wondering whether they misread it.
+ */
+export function notifyRiderArriving(orderId: string, riderName?: string | null): Promise<void> {
+  const who = riderName?.trim() || "Your rider";
+  return notifyCustomer(
+    orderId,
+    "Your rider is here 🛵",
+    `${who} has reached your place with order #${shortOrderId(
+      orderId
+    )}. Have your delivery code ready.`
   );
 }
 

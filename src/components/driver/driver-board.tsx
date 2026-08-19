@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Banknote,
   Bike,
+  ChefHat,
   MapPin,
   Package,
   Navigation,
@@ -17,14 +18,18 @@ import {
   LocateFixed,
   LocateOff,
   ShieldCheck,
+  Store,
+  Timer,
 } from "lucide-react";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { StatCard, SectionTitle, Pill } from "@/components/roles/role-ui";
 import { EmptyState } from "@/components/shared/empty-state";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { formatINR } from "@/lib/utils/format";
-import { callablePhone, mapsDirectionsUrl } from "@/lib/utils/phone";
+import { callablePhone, stopDirectionsUrl } from "@/lib/utils/phone";
 import type { DriverBoardData } from "@/lib/data-access/driver-orders";
+import type { DeliveryStop } from "@/lib/roles-data";
+import { cn } from "@/lib/utils/cn";
 import { acceptDeliveryAction, advanceDeliveryAction } from "@/app/driver/actions";
 
 /**
@@ -214,6 +219,97 @@ function useLocationReporting(activeOrderId: string | null): ReportingState {
   return state;
 }
 
+/**
+ * The address of one end of a job, written out.
+ *
+ * Two rules, both learned from the version this replaces. Nothing here
+ * `truncate`s — an address cut off at the width of a phone is not an address —
+ * and the label ("Home", the shop's name) never appears *instead of* the street
+ * line, only above it. The label is how the rider recognises the stop; the line
+ * is how they find it.
+ */
+function StopLines({ stop }: { stop: DeliveryStop }) {
+  return (
+    <>
+      {stop.address ? (
+        <p className="text-sm leading-snug text-ink">{stop.address}</p>
+      ) : (
+        <p className="text-sm leading-snug text-muted">
+          No street address recorded — call before you set off.
+        </p>
+      )}
+      {stop.landmark ? (
+        <p className="text-sm leading-snug text-muted">{stop.landmark}</p>
+      ) : null}
+    </>
+  );
+}
+
+/** The full address block on the active delivery card. */
+function ActiveStop({
+  heading,
+  name,
+  stop,
+  distanceKm,
+}: {
+  heading: string;
+  name: string;
+  stop: DeliveryStop | null;
+  distanceKm?: number;
+}) {
+  if (!stop) return null;
+  return (
+    <div className="rounded-2xl border border-line bg-surface-2 p-3.5">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
+          <MapPin className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-label">{heading}</p>
+            <span className="text-data shrink-0 text-xs text-muted">
+              {distanceKm !== undefined ? `${distanceKm} km` : "Distance unknown"}
+            </span>
+          </div>
+          <p className="mt-0.5 font-bold leading-tight">{name}</p>
+          {/* The saved label ("Home", "Work") only when it adds something the
+              name above hasn't already said — on the pickup leg the "area" IS
+              the shop's name, and printing it twice is what the old card did. */}
+          {stop.area && stop.area !== name ? (
+            <p className="text-xs font-semibold text-muted">{stop.area}</p>
+          ) : null}
+          <div className="mt-1.5 space-y-0.5">
+            <StopLines stop={stop} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** One line of address on a compact job card. */
+function JobStop({
+  icon,
+  label,
+  stop,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  stop: DeliveryStop;
+}) {
+  return (
+    <div className="flex items-start gap-2">
+      <span className="mt-0.5 shrink-0 text-muted">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
+          {label} · {stop.area}
+        </p>
+        <StopLines stop={stop} />
+      </div>
+    </div>
+  );
+}
+
 export function DriverBoard({
   initial,
   live,
@@ -225,11 +321,21 @@ export function DriverBoard({
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const { available, active, today } = initial;
+  const { available, upcoming, active, today } = initial;
   const customerTel = callablePhone(active?.customerPhone);
   const [otp, setOtp] = useState("");
   const [otpError, setOtpError] = useState<string | null>(null);
   const [acceptError, setAcceptError] = useState<string | null>(null);
+
+  // Where this leg ends. Derived from the leg rather than carried as a separate
+  // `navigateTo` pin on the active delivery, so the address printed on the card
+  // and the place the Navigate button opens are the same fact and cannot drift.
+  const destination = active
+    ? active.leg === "TO_PICKUP"
+      ? active.job.pickup
+      : active.job.drop
+    : null;
+  const navigationUrl = destination ? stopDirectionsUrl(destination) : null;
 
   // Tied to the delivery: a rider carrying someone's dinner is sharing their
   // position for as long as they are carrying it. (This used to be phrased
@@ -246,9 +352,11 @@ export function DriverBoard({
           setAcceptError(
             result.error === "already_taken"
               ? "Another rider just grabbed this order."
-              : result.error === "rate_limited"
-                ? "Too many attempts — wait a minute and try again."
-                : "Couldn't accept the order. Try again."
+              : result.error === "reserved"
+                ? "That one is held for another rider for a few more minutes."
+                : result.error === "rate_limited"
+                  ? "Too many attempts — wait a minute and try again."
+                  : "Couldn't accept the order. Try again."
           );
         }
         // Refresh either way: on success the job becomes active; on a lost race
@@ -309,22 +417,23 @@ export function DriverBoard({
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-bold leading-tight">
-            {live ? "Open to all riders" : "Demo data"}
+            {live ? "On the dispatch list" : "Demo data"}
           </p>
           <p className="text-xs text-muted">
             {live
-              ? "Every order below is offered to every rider — first to accept takes it. There's no shift or duty status yet."
+              ? "Pickups are offered to whoever is free and nearest first, and open to everyone after a few minutes. There's no shift or duty status yet."
               : "Connect Supabase for live requests"}
           </p>
         </div>
       </div>
 
-      {/* Today. "Online 5.5 h" and "Rating 4.8 ★" used to sit here as constants —
-          the same numbers for every driver, every day. We track neither. */}
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Today's earnings" value={formatINR(today.earnings)} tone="green" />
-        <StatCard label="Trips" value={String(today.trips)} tone="accent" />
-      </div>
+      {/* Today. This was a two-up with "Today's earnings" beside it — a money
+          figure on a salaried rider's board. It is gone from the data as well as
+          from here (DriverBoardData.today has no `earnings` field any more), so
+          a screen cannot put it back by accident. "Online 5.5 h" and
+          "Rating 4.8 ★" went earlier: constants, identical for every driver
+          forever, standing in for two things we have never tracked. */}
+      <StatCard label="Trips today" value={String(today.trips)} tone="accent" />
 
       {/* Active delivery */}
       {active ? (
@@ -406,48 +515,51 @@ export function DriverBoard({
                 </div>
               )}
 
-              <div className="flex items-start gap-3">
-                <span className="mt-0.5 grid size-9 place-items-center rounded-full bg-accent-soft text-accent">
-                  <MapPin className="size-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-label">
-                    {active.leg === "TO_PICKUP" ? "Pick up from" : "Deliver to"}
-                  </p>
-                  <p className="truncate font-semibold">
-                    {active.leg === "TO_PICKUP"
-                      ? active.job.restaurant
-                      : active.job.customer}
-                  </p>
-                  <p className="truncate text-sm text-muted">
-                    {active.leg === "TO_PICKUP"
-                      ? active.job.pickupArea
-                      : active.job.dropArea}
-                  </p>
-                </div>
-                <span className="text-data text-sm text-muted">
-                  {active.job.distanceKm !== undefined
-                    ? `${active.job.distanceKm} km`
-                    : "Distance unknown"}
-                </span>
-              </div>
+              {/* The address, in full and not truncated.
+
+                  This block used to be three lines that between them never said
+                  where to go: a heading, the shop or customer's NAME, and then
+                  `pickupArea`/`dropArea` — which were the shop's name again and
+                  the customer's saved LABEL. A rider on the delivery leg was
+                  shown "Deliver to / Priya S. / Home", all of it `truncate`d to
+                  one line, and expected to find it. The street line the customer
+                  typed at checkout — flat number, entry code, floor, landmark,
+                  courier note, all of it — was sitting in the same row we were
+                  reading and was being thrown away.
+
+                  It now wraps rather than truncating. An address that doesn't
+                  fit on one line is not an address you can cut in half. */}
+              <ActiveStop
+                heading={active.leg === "TO_PICKUP" ? "Pick up from" : "Deliver to"}
+                name={
+                  active.leg === "TO_PICKUP"
+                    ? active.job.restaurant
+                    : active.job.customer
+                }
+                stop={destination}
+                distanceKm={active.job.distanceKm}
+              />
 
               {/* Both of these were full-width outline buttons with no onClick,
                   no href and no disabled state — so they looked and pressed
                   like working controls and did nothing, to a courier standing
                   at an address they don't know. They now open the phone's maps
-                  app and dialler, and degrade to a visibly-disabled control
-                  when the pin or the number isn't recorded (the pattern the
-                  customer's own call button already used). */}
+                  app and dialler.
+
+                  Navigate is primary, and it is the one control on this screen
+                  that has to be unmissable: it is what a rider presses while
+                  holding a bag. It falls back to the written address when the
+                  end has no pin (a vendor who skipped the map step in the
+                  onboarding wizard used to leave the rider with a greyed-out
+                  button), and only greys out when there is neither. */}
               <div className="flex gap-2">
-                {active.navigateTo ? (
+                {navigationUrl ? (
                   <a
-                    href={mapsDirectionsUrl(active.navigateTo)}
+                    href={navigationUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={buttonClasses({
-                      variant: "outline",
-                      size: "sm",
+                      size: "md",
                       className: "flex-1",
                     })}
                   >
@@ -455,17 +567,16 @@ export function DriverBoard({
                   </a>
                 ) : (
                   <Button
-                    variant="outline"
-                    size="sm"
+                    size="md"
                     className="flex-1"
                     disabled
                     title={
                       active.leg === "TO_PICKUP"
-                        ? "This shop hasn't been pinned on the map"
-                        : "This address has no map pin"
+                        ? "This shop has no map pin and no address on file"
+                        : "This address has no map pin and no street line"
                     }
                   >
-                    <Navigation className="size-4" /> No pin
+                    <Navigation className="size-4" /> No address
                   </Button>
                 )}
 
@@ -474,7 +585,7 @@ export function DriverBoard({
                     href={`tel:${customerTel}`}
                     className={buttonClasses({
                       variant: "outline",
-                      size: "sm",
+                      size: "md",
                       className: "flex-1",
                     })}
                   >
@@ -483,7 +594,7 @@ export function DriverBoard({
                 ) : (
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="md"
                     className="flex-1"
                     disabled
                     title="No phone number recorded for this customer"
@@ -577,6 +688,88 @@ export function DriverBoard({
         </section>
       ) : null}
 
+      {/* Coming up — the kitchen has accepted, dispatch picked this rider, and
+          the food is still being cooked.
+
+          This section could not exist before dispatch did. Orders only ever
+          surfaced to riders at `ready`, which is the moment the bag is already
+          sitting on the pass going cold, so every road leg started from a
+          standing start wherever the rider happened to be when they noticed.
+          Told at acceptance instead, with the kitchen's own prep estimate, a
+          rider can already be at the counter. Nothing here is accept-able yet —
+          it is a heads-up and it says so; the order moves down to the pool
+          below, held for them, the moment the vendor marks it packed. */}
+      {upcoming.length > 0 ? (
+        <section>
+          <SectionTitle right={<Pill tone="accent">Held for you</Pill>}>
+            Coming up
+          </SectionTitle>
+          <p className="mb-3 text-xs text-muted">
+            {active
+              ? "Queued for after your current drop — the kitchen is still cooking it."
+              : "Still cooking. Head over now and it'll be waiting for you; it moves into Available orders the moment the kitchen packs it."}
+          </p>
+          <div className="space-y-3">
+            {upcoming.map(({ job, readyInMinutes }) => {
+              const url = stopDirectionsUrl(job.pickup);
+              return (
+                <div key={job.id} className="card p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-start gap-2.5">
+                      <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
+                        <ChefHat className="size-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-bold leading-tight">{job.restaurant}</p>
+                        <p className="text-xs text-muted">
+                          Order {job.code} · {job.items} items
+                        </p>
+                      </div>
+                    </div>
+                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-bold text-ink">
+                      <Timer className="size-3.5" />
+                      {readyInMinutes === null
+                        ? "Cooking"
+                        : readyInMinutes === 0
+                          ? "Any moment"
+                          : `~${readyInMinutes} min`}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 space-y-2.5">
+                    <JobStop
+                      icon={<Store className="size-3.5" />}
+                      label="Pick up"
+                      stop={job.pickup}
+                    />
+                    <JobStop
+                      icon={<MapPin className="size-3.5" />}
+                      label="Drop"
+                      stop={job.drop}
+                    />
+                  </div>
+
+                  {url ? (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={buttonClasses({
+                        variant: "outline",
+                        size: "sm",
+                        className: "mt-3 w-full",
+                      })}
+                    >
+                      <Navigation className="size-4" /> Navigate to the kitchen
+                    </a>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
       {/* Available orders */}
       <section>
         <SectionTitle
@@ -604,7 +797,13 @@ export function DriverBoard({
             ) : null}
             <div className="space-y-3">
             {available.map((job) => (
-              <div key={job.id} className="card p-4">
+              <div
+                key={job.id}
+                className={cn(
+                  "card p-4",
+                  job.reservedForYou && "border-accent ring-1 ring-accent"
+                )}
+              >
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-semibold">{job.restaurant}</p>
                   <span className="text-data flex items-center text-green">
@@ -612,13 +811,25 @@ export function DriverBoard({
                     {job.payout}
                   </span>
                 </div>
-                <div className="mt-2 space-y-1 text-sm text-muted">
-                  <p className="flex items-center gap-1.5">
-                    <MapPin className="size-3.5 shrink-0" /> Pick up · {job.pickupArea}
+                {job.reservedForYou ? (
+                  <p className="mt-1 text-xs font-bold text-accent">
+                    Held for you for a few minutes — then it opens to everyone.
                   </p>
-                  <p className="flex items-center gap-1.5">
-                    <Navigation className="size-3.5 shrink-0" /> Drop · {job.dropArea}
-                  </p>
+                ) : null}
+                {/* Was two truncated lines that said the shop's name and the
+                    word "Home". A rider deciding whether to take a job needs to
+                    know where the job GOES. */}
+                <div className="mt-3 space-y-2.5">
+                  <JobStop
+                    icon={<Store className="size-3.5" />}
+                    label="Pick up"
+                    stop={job.pickup}
+                  />
+                  <JobStop
+                    icon={<MapPin className="size-3.5" />}
+                    label="Drop"
+                    stop={job.drop}
+                  />
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">

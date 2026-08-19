@@ -9,9 +9,13 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { AVAILABLE_JOBS, DRIVER_TODAY } from "@/lib/roles-data";
 
 const DEMO_BOARD: DriverBoardData = {
-  available: AVAILABLE_JOBS,
+  // Nothing is reserved in the demo: there is no dispatch without a backend to
+  // dispatch from, so every card reads as open to everyone — which is what a
+  // no-backend install actually is.
+  available: AVAILABLE_JOBS.map((job) => ({ ...job, reservedForYou: false })),
+  upcoming: [],
   active: null,
-  today: { trips: DRIVER_TODAY.trips, earnings: DRIVER_TODAY.earnings },
+  today: { trips: DRIVER_TODAY.trips },
 };
 
 export default async function DriverPage() {

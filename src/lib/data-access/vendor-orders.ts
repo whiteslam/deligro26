@@ -14,6 +14,7 @@ import {
   notifyOrderReady,
 } from "@/lib/notifications/order-events";
 import { queueRefundForOrder } from "@/lib/data-access/refunds";
+import { clearOffer, dispatchOrder } from "@/lib/dispatch/rider-dispatch";
 import {
   columnKnownMissing,
   isMissingColumn,
@@ -446,14 +447,18 @@ const KITCHEN_TRANSITIONS: Record<
 };
 
 /**
- * Tell both sides of the order what just happened.
+ * Tell both sides of the order what just happened — and, since dispatch exists,
+ * a third side: the rider who should be heading for the shop.
  *
  * Pushes are fire-and-forget by contract (order-events swallows its own
  * failures) and are therefore not awaited: the transition is already committed,
  * and a push outage must never undo a status the database has accepted.
  *
  * The refund IS awaited, because whether the money is coming back is part of
- * the sentence we are about to send the customer.
+ * the sentence we are about to send the customer. **Dispatch is awaited too**,
+ * for a different reason — it writes the offer row the driver board reads, and
+ * an un-awaited write is one a serverless runtime may abandon. Like the pushes
+ * it swallows its own failures, so awaiting it cannot cost the transition.
  */
 async function announceKitchenTransition(
   orderId: string,
@@ -463,11 +468,30 @@ async function announceKitchenTransition(
 ): Promise<void> {
   if (status === "kitchen") {
     void notifyOrderAccepted(orderId, restaurantName);
+    // And the other half of the acceptance, which nobody used to be told: a
+    // rider. Orders only ever surfaced to couriers at `ready`, i.e. once the
+    // food was already on the pass, so every road leg began from a standing
+    // start. dispatchOrder picks the rider who is not mid-delivery (and, among
+    // those, the nearest to this shop) and sends them the prep estimate so they
+    // can be at the counter when the bag is.
+    //
+    // Awaited, unlike the pushes around it, because it WRITES — the offer row
+    // is what holds the order for that rider and what the board reads. It
+    // swallows its own failures by contract, so awaiting it cannot turn a
+    // dispatch outage into a failed transition; it only stops the write being
+    // abandoned when the serverless invocation ends.
+    await dispatchOrder(orderId, "accepted");
     return;
   }
 
   if (status === "ready") {
     void notifyOrderReady(orderId);
+    // Re-run rather than reuse the rider picked at acceptance: twenty minutes
+    // of cooking later, that rider may be halfway across town with somebody
+    // else's dinner. This is also what re-stamps `offered_at`, i.e. what starts
+    // the exclusivity window the board and `acceptDelivery` both read — so it
+    // is awaited for the same reason as the acceptance branch above.
+    await dispatchOrder(orderId, "ready");
     return;
   }
 
@@ -493,6 +517,11 @@ async function announceKitchenTransition(
       err
     );
   }
+
+  // The kitchen is not making this order, so the rider dispatch asked to come
+  // and get it should stop being asked. Left in place the offer row would be
+  // read by every driver board from now until someone cleaned the table by hand.
+  await clearOffer(orderId);
 
   void notifyOrderCancelled(orderId, { byVendor: true, refundQueued });
 }

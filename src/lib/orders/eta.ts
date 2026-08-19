@@ -143,19 +143,37 @@ function clamp(value: number, min: number, max: number): number {
  * pretending cooking began when the order was placed — which would quietly
  * report a punctual order as overdue.
  */
-export function computeOrderEta(input: OrderEtaInput): OrderEta {
-  const now = input.now ?? Date.now();
-
+/**
+ * The kitchen leg on its own, in minutes.
+ *
+ * Split out of `computeOrderEta` so dispatch can quote it to a rider — "ready in
+ * about 18 minutes" is the whole point of telling somebody about a pickup
+ * before the food exists — without also computing a road leg and a due time it
+ * has no use for. One implementation, so the number a rider is told to plan
+ * around cannot drift from the number the customer's countdown is built on.
+ */
+export function kitchenPrepMinutes(input: {
+  /** `restaurants.prep_minutes` (0036). */
+  restaurantPrepMinutes?: number | null;
+  /** `platform_settings.default_prep_minutes`. */
+  defaultPrepMinutes?: number | null;
+}): number {
   // This kitchen's own pace when it has declared one, the admin's platform-wide
   // number when it hasn't. Same clamp either way: both are free-text fields, and
   // a stray 0 must not turn every estimate into nonsense.
-  const prepMinutes = clamp(
+  return clamp(
     positiveMinutes(input.restaurantPrepMinutes) ??
       positiveMinutes(input.defaultPrepMinutes) ??
       DEFAULT_SETTINGS.defaultPrepMinutes,
     MIN_PREP_MINUTES,
     MAX_PREP_MINUTES
   );
+}
+
+export function computeOrderEta(input: OrderEtaInput): OrderEta {
+  const now = input.now ?? Date.now();
+
+  const prepMinutes = kitchenPrepMinutes(input);
 
   // The band. eta_min is the number the storefront and checkout showed, so it
   // is what we count down to; eta_max is what we are held to.

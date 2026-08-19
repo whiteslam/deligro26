@@ -9,7 +9,7 @@ import {
 } from "@/lib/tracking/rider-position";
 import { computeOrderEta, type OrderEta } from "@/lib/orders/eta";
 import { getSettings } from "@/lib/settings";
-import { dbStatusToUi } from "@/lib/utils/order-map";
+import { dbStatusToUi, shortOrderId } from "@/lib/utils/order-map";
 import {
   columnKnownMissing,
   isMissingColumn,
@@ -330,6 +330,10 @@ export async function getOrderTrackingSnapshot(
       // out rather than filled in with a flattering "4.9 ★ · Bike".
       rider = {
         name: driver.full_name?.trim() || "Your courier",
+        // The same short form order codes use. It is what the ID card shows and
+        // what a customer would read out to support — a UUID is not something
+        // anybody says down a phone.
+        id: shortOrderId(delivery.driver_id),
         phone: driver.phone?.trim() || "",
       };
     }

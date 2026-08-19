@@ -2,11 +2,18 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { shortOrderId } from "@/lib/utils/order-map";
 import { notifyOnTheWay, notifyDelivered } from "@/lib/notifications/order-events";
-import type { DeliveryJob } from "@/lib/roles-data";
+import type { DeliveryJob, DeliveryStop } from "@/lib/roles-data";
 import { riderPayout, type RiderPayoutConfig } from "@/lib/pricing";
 import { getSettings } from "@/lib/settings";
 import { haversineKm } from "@/lib/geo/distance";
 import { PINNED_LOCATION } from "@/lib/location/pinned";
+import { kitchenPrepMinutes } from "@/lib/orders/eta";
+import {
+  DISPATCH_COLUMNS,
+  offerStateFor,
+  type OfferRow,
+} from "@/lib/dispatch/rider-dispatch";
+import { notifyRiderArriving } from "@/lib/notifications/order-events";
 import {
   columnKnownMissing,
   isMissingColumn,
@@ -79,14 +86,13 @@ export interface DriverActive {
    */
   pickupCodeRequired: boolean;
   /**
-   * Where THIS leg ends — the shop before pickup, the customer's pin after.
-   * Feeds the Navigate control, which was a button with no handler.
-   *
-   * Null when that end has never been pinned (or on a database predating
-   * migration 0009, which has no shop coordinates at all). The control renders
-   * disabled in that case rather than pretending to work.
+   * The customer's delivery code, when the leg is gated by it, is NOT here —
+   * see `pickupCodeRequired`. Where the leg ENDS is not here either: it is
+   * `job.pickup` or `job.drop`, chosen by `leg`. There used to be a separate
+   * `navigateTo` pin on this object, which meant the Navigate button and the
+   * address printed above it were two different facts about the same place and
+   * could disagree — and did, because only one of them carried a street line.
    */
-  navigateTo: { lat: number; lng: number } | null;
   /**
    * The customer's phone, for the Call control — which was likewise inert.
    *
@@ -98,13 +104,47 @@ export interface DriverActive {
   customerPhone: string | null;
 }
 
+/** An order in the open pool, plus whether dispatch is holding it for this rider. */
+export interface AvailableJob extends DeliveryJob {
+  /**
+   * True while this order is inside its exclusivity window and the window
+   * belongs to the rider reading the board. Orders held for *somebody else* are
+   * not flagged — they are simply not in the list.
+   */
+  reservedForYou: boolean;
+}
+
+/**
+ * A pickup this rider has been given advance notice of: the kitchen has
+ * accepted it and is cooking, and dispatch picked this rider to collect it.
+ *
+ * The board could not show these before, because nothing existed before `ready`
+ * — which is the moment the food is already on the pass. This is the difference
+ * between a rider who is at the counter when the bag is and one who is told
+ * about it afterwards.
+ */
+export interface UpcomingPickup {
+  job: DeliveryJob;
+  /**
+   * Minutes the kitchen still needs, from `accepted_at` plus this shop's prep
+   * leg — the same model the customer's countdown is built on. Null when the
+   * order has no acceptance stamp to measure from.
+   */
+  readyInMinutes: number | null;
+}
+
 export interface DriverBoardData {
-  available: DeliveryJob[];
+  available: AvailableJob[];
+  /** Accepted by a kitchen, offered to this rider, not packed yet. */
+  upcoming: UpcomingPickup[];
   active: DriverActive | null;
-  // onlineHours (5.5) and rating (4.8) used to be constants sitting in the LIVE
-  // board: every driver, forever, was shown the same made-up shift length and
-  // the same made-up rating. We track neither, so we report neither.
-  today: { trips: number; earnings: number };
+  // `earnings` used to sit here beside `trips`, and a money figure does not
+  // belong on a salaried rider's board (see the "Salary model on the board"
+  // task in build-plan.ts) — so the FIELD is gone, not merely the tile that
+  // rendered it. onlineHours (5.5) and rating (4.8) went earlier, for a
+  // different reason: they were constants, identical for every driver forever,
+  // standing in for two things this platform has never tracked.
+  today: { trips: number };
 }
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -137,6 +177,23 @@ function payoutFor(
   return riderPayout(rate, { itemSubtotal, tip });
 }
 
+/**
+ * The pickup end, as `ORDER_SELECT` reads it.
+ *
+ * `address` is the vendor's own reverse-geocoded street line (migration 0009,
+ * the same migration as `lat`/`lng` — which is why it can ride the existing
+ * geo probe rather than needing one of its own). `landmark`/`pincode` are 0017
+ * and are deliberately NOT here: adding them would widen this query's probe
+ * group from "has 0009 and 0013" to "has 0017 as well", so a database at 0016
+ * would silently lose shop coordinates and the tip to gain a landmark.
+ */
+interface OrderShop {
+  name: string;
+  address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+}
+
 interface OrderRow {
   id: string;
   total: number;
@@ -144,10 +201,7 @@ interface OrderRow {
   tax_amount?: number;
   tip?: number;
   address: { label?: string; line?: string; lat?: number; lng?: number } | null;
-  restaurants:
-    | { name: string; lat?: number | null; lng?: number | null }
-    | { name: string; lat?: number | null; lng?: number | null }[]
-    | null;
+  restaurants: OrderShop | OrderShop[] | null;
   profiles: { full_name: string | null } | { full_name: string | null }[] | null;
   order_items: { qty: number }[];
 }
@@ -168,16 +222,42 @@ function jobDistance(r: OrderRow): number | undefined {
   return Math.round(haversineKm(from, to) * 10) / 10;
 }
 
+/** Trimmed, or undefined — never an empty string a card would render as a gap. */
+function text(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 function toJob(r: OrderRow, rate: RiderPayoutConfig): DeliveryJob {
-  const restaurant = one(r.restaurants)?.name ?? "Kitchen";
+  const shop = one(r.restaurants);
+  const restaurant = shop?.name ?? "Kitchen";
   const customer = one(r.profiles)?.full_name?.trim() || "Customer";
   const items = (r.order_items ?? []).reduce((n, i) => n + i.qty, 0);
+
+  // Both ends carry a findable address now. They did not before: `pickupArea`
+  // was the shop's NAME (so the pickup line said "Saffron Kitchen" twice and
+  // never said where it was) and `dropArea` was `address.label ?? address.line`
+  // — which meant a rider whose customer had saved their address as "Home" was
+  // handed the word "Home" and expected to deliver to it. The street line the
+  // customer actually typed at checkout, flat number and entry code included,
+  // was in the row the whole time and was being thrown away by that `??`.
+  const pickup: DeliveryStop = {
+    area: restaurant,
+    address: text(shop?.address),
+    point: pointOf(shop?.lat, shop?.lng) ?? undefined,
+  };
+  const drop: DeliveryStop = {
+    area: text(r.address?.label) ?? "Delivery",
+    address: text(r.address?.line),
+    point: pointOf(r.address?.lat, r.address?.lng) ?? undefined,
+  };
+
   return {
     id: r.id,
     code: `#${shortOrderId(r.id)}`,
     restaurant,
-    pickupArea: restaurant,
-    dropArea: r.address?.label ?? r.address?.line ?? "Delivery",
+    pickup,
+    drop,
     // Was hardcoded to 2.5 for every job, on every screen, forever.
     distanceKm: jobDistance(r),
     payout: payoutFor(r, rate),
@@ -186,8 +266,16 @@ function toJob(r: OrderRow, rate: RiderPayoutConfig): DeliveryJob {
   };
 }
 
+/**
+ * `profiles` is disambiguated by name because `orders` has two foreign keys to
+ * it: `customer_id` and `placed_by` (migration 0029). A bare `profiles(...)`
+ * embed is a hard PGRST201 from PostgREST, not a missing column, so the legacy
+ * retry below cannot rescue it — the whole board 500s. The rider needs the
+ * person receiving the food, which is `customer_id`; `placed_by` is the staff
+ * account that typed a phone order.
+ */
 const ORDER_SELECT =
-  "id, total, delivery_fee, tax_amount, tip, address, restaurants(name, lat, lng), profiles(full_name), order_items(qty)";
+  "id, total, delivery_fee, tax_amount, tip, address, restaurants(name, address, lat, lng), profiles!orders_customer_id_fkey(full_name), order_items(qty)";
 
 /**
  * The same query for a database that predates migrations 0009 (shop coords) and
@@ -195,7 +283,7 @@ const ORDER_SELECT =
  * and the board silently shows a driver no jobs at all.
  */
 const ORDER_SELECT_LEGACY =
-  "id, total, delivery_fee, tax_amount, address, restaurants(name), profiles(full_name), order_items(qty)";
+  "id, total, delivery_fee, tax_amount, address, restaurants(name), profiles!orders_customer_id_fkey(full_name), order_items(qty)";
 
 let ordersHaveGeoAndTip: boolean | null = null;
 
@@ -313,7 +401,7 @@ async function activeCustomerPhone(
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("orders")
-    .select("profiles(phone)")
+    .select("profiles!orders_customer_id_fkey(phone)")
     .eq("id", orderId)
     .maybeSingle()
     .overrideTypes<{ profiles: { phone: string | null } | { phone: string | null }[] | null }>();
@@ -351,10 +439,10 @@ function paymentInstruction(detail: ActiveOrderDetail): CashInstruction {
 export async function getDriverBoard(driverId: string): Promise<DriverBoardData> {
   const supabase = createAdminClient();
 
-  // One read for the whole board, so every number on it — each offer card's
-  // payout and the day's earnings total — is quoted at the same configured
-  // rate. `getSettings()` is request-cached and falls back to the shared
-  // defaults on an un-migrated database.
+  // One read for the whole board, so every payout quoted on it comes from the
+  // same configured rate. `getSettings()` is request-cached and falls back to
+  // the shared defaults on an un-migrated database; the prep estimates on the
+  // upcoming-pickup cards read `defaultPrepMinutes` from the same object.
   const settings = await getSettings();
   const rate: RiderPayoutConfig = {
     commission: settings.riderCommission,
@@ -386,7 +474,6 @@ export async function getDriverBoard(driverId: string): Promise<DriverBoardData>
       ]);
       const instruction = paymentInstruction(detail);
 
-      const shop = one(order.restaurants);
       active = {
         job: toJob(order, rate),
         leg,
@@ -398,22 +485,12 @@ export async function getDriverBoard(driverId: string): Promise<DriverBoardData>
         },
         pickupCodeRequired:
           leg === "TO_PICKUP" && Boolean(detail.pickupOtp?.trim()),
-        navigateTo:
-          leg === "TO_PICKUP"
-            ? pointOf(shop?.lat, shop?.lng)
-            : pointOf(order.address?.lat, order.address?.lng),
         customerPhone,
       };
     }
   }
 
   // Available pool: orders that are ready and not already taken by a rider.
-  const { data: taken } = await supabase
-    .from("deliveries")
-    .select("order_id, status")
-    .in("status", ["assigned", "picked_up", "delivered"]);
-  const takenIds = new Set((taken ?? []).map((d) => d.order_id as string));
-
   const readyRows = await selectJobs<OrderRow[]>((columns) =>
     supabase
       .from("orders")
@@ -422,42 +499,199 @@ export async function getDriverBoard(driverId: string): Promise<DriverBoardData>
       .order("created_at", { ascending: true })
       .overrideTypes<OrderRow[]>()
   );
+  const readyIds = (readyRows ?? []).map((r) => r.id);
 
-  const available = (readyRows ?? [])
-    .filter((r) => !takenIds.has(r.id))
-    .map((r) => toJob(r, rate));
+  // Scoped to the orders on this board. This used to select every delivery on
+  // the platform that had ever reached `assigned` — including every `delivered`
+  // row ever written — to answer a question about at most a handful of ready
+  // orders, so the cost of drawing one rider's board grew with the lifetime
+  // order count. The set it produces is identical either way.
+  const { data: taken } = readyIds.length
+    ? await supabase
+        .from("deliveries")
+        .select("order_id, status")
+        .in("order_id", readyIds)
+        .in("status", ["assigned", "picked_up", "delivered"])
+    : { data: [] };
+  const takenIds = new Set((taken ?? []).map((d) => d.order_id as string));
 
-  // Today's completed trips + earnings for this driver.
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  type DoneRow = { order: OrderRow | OrderRow[] | null };
-  const doneRows = await selectJobs<DoneRow[]>((columns) =>
-    supabase
-      .from("deliveries")
-      // Only the charge columns are needed here, and they're the ones that may
-      // not exist yet — so this rides the same pre-migration fallback.
-      .select(
-        columns.includes("tip")
-          ? "order:orders(total, delivery_fee, tax_amount, tip)"
-          : "order:orders(total, delivery_fee, tax_amount)"
-      )
-      .eq("driver_id", driverId)
-      .eq("status", "delivered")
-      .gte("delivered_at", startOfDay.toISOString())
-      .overrideTypes<DoneRow[]>()
+  // Who each open order is currently held for. Empty map on a database without
+  // 0042, which is exactly the old free-for-all: nothing is held, everything is
+  // offered to everyone, first thumb wins.
+  const now = Date.now();
+  const offers = await readOffers(supabase, readyIds);
+
+  const available: AvailableJob[] = [];
+  for (const r of readyRows ?? []) {
+    if (takenIds.has(r.id)) continue;
+    const state = offerStateFor(driverId, offers.get(r.id), now);
+    // Held for somebody else: not shown at all, rather than shown and refused.
+    if (state === "held") continue;
+    available.push({ ...toJob(r, rate), reservedForYou: state === "mine" });
+  }
+  // Whatever is being held for this rider goes to the top — it is the one card
+  // on the screen that will stop being theirs if they scroll past it.
+  available.sort((a, b) => Number(b.reservedForYou) - Number(a.reservedForYou));
+
+  const upcoming = await readUpcomingPickups(
+    supabase,
+    driverId,
+    rate,
+    settings.defaultPrepMinutes,
+    now
   );
 
-  const done = doneRows ?? [];
-  const earnings = done.reduce((sum, d) => {
-    const order = one(d.order);
-    return sum + (order ? payoutFor(order, rate) : 0);
-  }, 0);
+  // Today's completed trips. A count, and only a count: this used to embed the
+  // charge columns off every delivered order so it could total the day's
+  // commission, which is a query (and a pre-migration fallback for `tip`) that
+  // existed solely to produce a money figure the board no longer shows.
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const { count } = await supabase
+    .from("deliveries")
+    .select("id", { count: "exact", head: true })
+    .eq("driver_id", driverId)
+    .eq("status", "delivered")
+    .gte("delivered_at", startOfDay.toISOString());
 
   return {
     available,
+    upcoming,
     active,
-    today: { trips: done.length, earnings },
+    today: { trips: count ?? 0 },
   };
+}
+
+/**
+ * order id → who it is currently offered to, for the orders on this board.
+ *
+ * One query for the whole board rather than one per card. Soft-fails to an
+ * empty map, which is the pre-dispatch behaviour — every ready order visible to
+ * every rider — rather than an empty board.
+ */
+async function readOffers(
+  supabase: AdminClient,
+  orderIds: string[]
+): Promise<Map<string, OfferRow>> {
+  const out = new Map<string, OfferRow>();
+  if (columnKnownMissing(DISPATCH_COLUMNS) || orderIds.length === 0) return out;
+
+  const { data, error } = await supabase
+    .from("deliveries")
+    .select("order_id, offered_driver_id, offered_at")
+    // Scoped to the orders actually on this board. Reading every standing offer
+    // would make the query grow with the platform rather than with the screen.
+    .in("order_id", orderIds)
+    .eq("status", "unassigned")
+    .not("offered_driver_id", "is", null)
+    .overrideTypes<
+      { order_id: string; offered_driver_id: string | null; offered_at: string | null }[]
+    >();
+
+  if (error) {
+    if (isMissingColumn(error)) rememberColumn(DISPATCH_COLUMNS, false);
+    return out;
+  }
+  rememberColumn(DISPATCH_COLUMNS, true);
+
+  for (const row of data ?? []) {
+    out.set(row.order_id, {
+      offeredDriverId: row.offered_driver_id,
+      offeredAt: row.offered_at,
+    });
+  }
+  return out;
+}
+
+interface UpcomingOrderRow extends OrderRow {
+  accepted_at?: string | null;
+  restaurants:
+    | (OrderShop & { prep_minutes?: number | null })
+    | (OrderShop & { prep_minutes?: number | null })[]
+    | null;
+}
+
+/**
+ * Pickups this rider has been given notice of: still cooking, offered to them.
+ *
+ * Gated on the 0042 probe, and that gate is what makes the rest of the query
+ * safe to write plainly. `orders.accepted_at` is 0026 and
+ * `restaurants.prep_minutes` is 0036, both of which any database carrying 0042
+ * necessarily has — so this needs no fallback of its own, unlike the pool query
+ * above, which has to work on environments as far back as 0008.
+ *
+ * A failure here costs the heads-up section, never the board.
+ */
+async function readUpcomingPickups(
+  supabase: AdminClient,
+  driverId: string,
+  rate: RiderPayoutConfig,
+  defaultPrepMinutes: number,
+  now: number
+): Promise<UpcomingPickup[]> {
+  if (columnKnownMissing(DISPATCH_COLUMNS)) return [];
+
+  try {
+    const { data: mine, error } = await supabase
+      .from("deliveries")
+      .select("order_id")
+      .eq("status", "unassigned")
+      .eq("offered_driver_id", driverId)
+      .overrideTypes<{ order_id: string }[]>();
+
+    if (error) {
+      if (isMissingColumn(error)) rememberColumn(DISPATCH_COLUMNS, false);
+      return [];
+    }
+    rememberColumn(DISPATCH_COLUMNS, true);
+
+    const ids = (mine ?? []).map((r) => r.order_id);
+    if (ids.length === 0) return [];
+
+    // `kitchen` only. An offer made at acceptance whose order has since become
+    // `ready` belongs in the pool below, where it can actually be accepted —
+    // showing it in both places would read as two jobs.
+    const { data: rows } = await supabase
+      .from("orders")
+      .select(
+        "id, total, delivery_fee, tax_amount, tip, address, accepted_at, restaurants(name, address, lat, lng, prep_minutes), profiles!orders_customer_id_fkey(full_name), order_items(qty)"
+      )
+      .in("id", ids)
+      .eq("status", "kitchen")
+      .order("accepted_at", { ascending: true })
+      .overrideTypes<UpcomingOrderRow[]>();
+
+    return (rows ?? []).map((r) => ({
+      job: toJob(r, rate),
+      readyInMinutes: readyIn(r, defaultPrepMinutes, now),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * How much longer the kitchen needs, in whole minutes.
+ *
+ * `accepted_at` + this shop's prep leg, floored at zero — an order already past
+ * its estimate reads as "any moment now", which is true, rather than as a
+ * negative number. Null without an acceptance stamp: there is then nothing to
+ * measure from, and quoting the raw prep time would restart the clock every
+ * time the rider's board refreshed.
+ */
+function readyIn(
+  r: UpcomingOrderRow,
+  defaultPrepMinutes: number,
+  now: number
+): number | null {
+  const acceptedMs = r.accepted_at ? Date.parse(r.accepted_at) : NaN;
+  if (!Number.isFinite(acceptedMs)) return null;
+
+  const prep = kitchenPrepMinutes({
+    restaurantPrepMinutes: one(r.restaurants)?.prep_minutes,
+    defaultPrepMinutes,
+  });
+  return Math.max(0, Math.round((acceptedMs + prep * 60_000 - now) / 60_000));
 }
 
 /** Claim a ready order: create the delivery row assigned to this driver. */
@@ -467,14 +701,33 @@ export async function acceptDelivery(
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = createAdminClient();
 
-  // Guard against a double-claim race.
+  // Guard against a double-claim race, and against taking an order dispatch is
+  // currently holding for somebody else.
+  //
+  // This read used to filter to the claimed statuses, so it could not see the
+  // `unassigned` row an offer now leaves behind — and the insert below would
+  // then hit the unique constraint on `order_id` and report "already taken" for
+  // an order nobody had taken. It reads the row whatever its status and decides
+  // here instead.
   const { data: existing } = await supabase
     .from("deliveries")
     .select("id, status")
     .eq("order_id", orderId)
-    .in("status", ["assigned", "picked_up", "delivered"])
     .maybeSingle();
-  if (existing) return { ok: false, error: "already_taken" };
+
+  if (existing && existing.status !== "unassigned") {
+    return { ok: false, error: "already_taken" };
+  }
+
+  if (existing) {
+    const held = await offerHeldFromOther(supabase, existing.id, driverId);
+    // Fails closed: an offer we could not read is treated as somebody else's.
+    // The window is three minutes, so the cost of being wrong is a rider
+    // waiting three minutes; the cost the other way is two riders sent to the
+    // same shop.
+    if (held) return { ok: false, error: "reserved" };
+    return claimOffer(supabase, existing.id, driverId);
+  }
 
   // No coordinates. This insert used to seed driver_lat/driver_lng with a fixed
   // offset from the centre of Bemetara — 21.7157 + 0.012, 81.5335 - 0.008 — and
@@ -515,6 +768,82 @@ export async function acceptDelivery(
     }
     throw error;
   }
+  return { ok: true };
+}
+
+/** Is this delivery inside an exclusivity window belonging to another rider? */
+async function offerHeldFromOther(
+  supabase: AdminClient,
+  deliveryId: string,
+  driverId: string
+): Promise<boolean> {
+  if (columnKnownMissing(DISPATCH_COLUMNS)) return false;
+
+  const { data, error } = await supabase
+    .from("deliveries")
+    .select("offered_driver_id, offered_at")
+    .eq("id", deliveryId)
+    .maybeSingle()
+    .overrideTypes<{ offered_driver_id: string | null; offered_at: string | null }>();
+
+  if (error) {
+    if (isMissingColumn(error)) {
+      rememberColumn(DISPATCH_COLUMNS, false);
+      return false;
+    }
+    throw error;
+  }
+  rememberColumn(DISPATCH_COLUMNS, true);
+
+  return (
+    offerStateFor(driverId, {
+      offeredDriverId: data?.offered_driver_id ?? null,
+      offeredAt: data?.offered_at ?? null,
+    }) === "held"
+  );
+}
+
+/**
+ * Turn a standing offer row into this rider's delivery.
+ *
+ * `.eq("status", "unassigned")` is the optimistic lock that replaces the unique
+ * constraint the insert path relies on: two riders racing on an open offer both
+ * reach here, and only the first update matches a row. `offered_driver_id` is
+ * deliberately left as it was — it is the record of who dispatch asked, which
+ * stays true whether or not that is who came.
+ */
+async function claimOffer(
+  supabase: AdminClient,
+  deliveryId: string,
+  driverId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const claim = (withSource: boolean) =>
+    supabase
+      .from("deliveries")
+      .update({
+        driver_id: driverId,
+        status: "assigned",
+        assigned_at: new Date().toISOString(),
+        ...(withSource ? { driver_location_source: "none" } : {}),
+      })
+      .eq("id", deliveryId)
+      .eq("status", "unassigned")
+      .select("id")
+      .overrideTypes<{ id: string }[]>();
+
+  let withSource = !columnKnownMissing(LOCATION_SOURCE_COLUMN);
+  let { data, error } = await claim(withSource);
+
+  if (error && withSource && isMissingColumn(error)) {
+    rememberColumn(LOCATION_SOURCE_COLUMN, false);
+    withSource = false;
+    ({ data, error } = await claim(false));
+  } else if (!error && withSource) {
+    rememberColumn(LOCATION_SOURCE_COLUMN, true);
+  }
+
+  if (error) throw error;
+  if ((data ?? []).length === 0) return { ok: false, error: "already_taken" };
   return { ok: true };
 }
 
@@ -581,8 +910,8 @@ export async function reportDriverLocation(
       })
       .eq("driver_id", driverId)
       .in("status", ["assigned", "picked_up"])
-      .select("id")
-      .overrideTypes<{ id: string }[]>();
+      .select("id, order_id, status")
+      .overrideTypes<ReportedRow[]>();
 
   let withSource = !columnKnownMissing(LOCATION_SOURCE_COLUMN);
   let { data, error } = await update(withSource);
@@ -600,10 +929,116 @@ export async function reportDriverLocation(
 
   if (error) throw error;
 
+  const rows = data ?? [];
+
+  // Awaited, not fired and forgotten: this runs inside a POST the rider's phone
+  // makes every ten seconds, and an un-awaited promise in a serverless request
+  // is one the runtime is free to kill mid-flight. It swallows its own failures,
+  // so awaiting it cannot cost the position write that already succeeded.
+  await maybeAnnounceArrival(supabase, rows[0], driverId, { lat, lng });
+
   // Nothing matched: this rider has no delivery in flight (finished on another
   // device, or reassigned by an operator). Not an error — but the caller should
   // stop reporting rather than keep asking.
-  return { ok: true, active: (data ?? []).length > 0 };
+  return { ok: true, active: rows.length > 0 };
+}
+
+interface ReportedRow {
+  id: string;
+  order_id: string;
+  status: string;
+}
+
+/**
+ * How close the rider gets before the customer is told they have arrived.
+ *
+ * 500 m, straight-line. Chosen to be the distance at which "come down" is
+ * useful rather than the distance at which it is literally true: a courier
+ * 500 m out is a minute or two away on a bike, which is roughly how long it
+ * takes somebody to find their shoes and get to a gate. Measuring it as the
+ * crow flies makes it generous in a lane and about right on a main road, and
+ * being early here is the harmless direction.
+ */
+const ARRIVAL_RADIUS_M = 500;
+
+/**
+ * Tell the customer their rider is here — once, on the delivery leg only.
+ *
+ * The latch is `deliveries.arrival_notified_at` (0042) and it is what makes
+ * this feature possible at all: the position that triggers it arrives every ten
+ * seconds for the rest of the delivery, so without somewhere to record that we
+ * have already said it, a customer whose courier is parking outside would be
+ * notified every ten seconds until they were handed their food.
+ *
+ * Only `picked_up`. A rider on the way TO the shop passes within 500 m of
+ * plenty of addresses, including sometimes the customer's own, and none of that
+ * means their dinner has arrived.
+ *
+ * Best-effort throughout. A database without 0042 has no latch, so it gets no
+ * notification rather than an unbounded stream of them — silence is the correct
+ * failure here, and it clears itself the moment the migration is applied.
+ */
+async function maybeAnnounceArrival(
+  supabase: AdminClient,
+  row: ReportedRow | undefined,
+  driverId: string,
+  at: { lat: number; lng: number }
+): Promise<void> {
+  if (!row || row.status !== "picked_up") return;
+  if (columnKnownMissing(DISPATCH_COLUMNS)) return;
+
+  try {
+    const { data: delivery, error } = await supabase
+      .from("deliveries")
+      .select("arrival_notified_at")
+      .eq("id", row.id)
+      .maybeSingle()
+      .overrideTypes<{ arrival_notified_at: string | null }>();
+
+    if (error) {
+      if (isMissingColumn(error)) rememberColumn(DISPATCH_COLUMNS, false);
+      return;
+    }
+    rememberColumn(DISPATCH_COLUMNS, true);
+    if (delivery?.arrival_notified_at) return;
+
+    const { data: order } = await supabase
+      .from("orders")
+      .select("address")
+      .eq("id", row.order_id)
+      .maybeSingle()
+      .overrideTypes<{ address: { lat?: number; lng?: number } | null }>();
+
+    const drop = pointOf(order?.address?.lat, order?.address?.lng);
+    // An address with no pin cannot be arrived at. The rider still has the
+    // street line on their screen; there is simply nothing to measure.
+    if (!drop) return;
+    if (haversineKm(at, drop) * 1000 > ARRIVAL_RADIUS_M) return;
+
+    // Stamp BEFORE notifying, and only act on a row that was still unstamped:
+    // two location posts can overlap (the phone retries after a tunnel), and
+    // this is what stops both of them sending. A push we then fail to deliver
+    // costs one message; a latch we set after sending can cost dozens.
+    const { data: latched } = await supabase
+      .from("deliveries")
+      .update({ arrival_notified_at: new Date().toISOString() })
+      .eq("id", row.id)
+      .is("arrival_notified_at", null)
+      .select("id")
+      .overrideTypes<{ id: string }[]>();
+    if ((latched ?? []).length === 0) return;
+
+    const { data: rider } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", driverId)
+      .maybeSingle();
+
+    await notifyRiderArriving(row.order_id, rider?.full_name ?? null);
+  } catch {
+    // Fire-and-forget by contract: a rider's position must still be recorded
+    // when the notification path fails.
+  }
 }
 
 /**

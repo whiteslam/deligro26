@@ -272,7 +272,7 @@ export const MILESTONES: Milestone[] = [
       },
       {
         title: "Rotate vendor passwords + Supabase keys",
-        detail: "Outstanding action from the audit — restaurants.temp_password held live credentials in clear until 0024 dropped the column",
+        detail: "Outstanding action from the audit — restaurants.temp_password held live credentials on a publicly readable row until 0024 dropped it. Passwords issued before then are still live and should be rotated; 0039 keeps their replacements in a service-role-only table instead",
         db: "auth.users",
         status: "todo",
       },
@@ -336,8 +336,8 @@ export const MILESTONES: Milestone[] = [
       {
         title: "Coupons",
         detail:
-          "Wired end to end (closes audit M-7). Checkout has a code field and an itemised bill; the discount is re-derived server-side by apply_coupon_to_order() from the order's own items and recorded in coupon_redemptions in the same transaction. Codes are single-use per customer by default — before this they had no limit of any kind, so any code was a permanent price cut",
-        db: "coupons · coupon_redemptions · orders.discount (migration 0031)",
+          "Wired end to end (closes audit M-7). Checkout has a code field and an itemised bill; the discount is re-derived server-side by apply_coupon_to_order() from the order's own items and recorded in coupon_redemptions in the same transaction. Codes are single-use per customer by default — before this they had no limit of any kind, so any code was a permanent price cut. 0041 made them creatable: /admin/coupons and /vendor/promotions, codes scoped to one shop, funded_by recorded on the order so settlement bills the right party, and the shop's offer badge derived from its own live codes instead of typed into a free-text field",
+        db: "coupons · coupon_redemptions · orders.discount · orders.discount_funded_by · restaurants.offer (migrations 0031, 0041)",
         status: "done",
       },
       {
@@ -427,7 +427,7 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
         },
         {
           title: "Owner login credentials",
-          detail: "Import script issues temp passwords. They are no longer persisted — 0024 dropped restaurants.temp_password (audit C-2); the wizard shows a password once and drops it",
+          detail: "Owners sign in with their mobile number and a password. The value is kept in vendor_login_credentials (0039) — service-role only, admin-readable — so the desk can read it back; the publicly readable restaurants.temp_password that audit C-2 found was dropped in 0024 and is not coming back",
           db: "auth.users",
           status: "done",
         },
@@ -651,14 +651,36 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
         {
           title: "Salary model on the board",
           detail:
-            "Still shows both. `DriverBoardData.today.earnings` is a money figure on the board, and `DeliveryJob.payout` puts a per-trip commission on every job card — computed by payoutFor()/riderPayout(). Removing them means dropping the two fields, not hiding them in the UI: a salaried rider's client should not be able to read a commission it is not paid",
+            "Half done. `DriverBoardData.today.earnings` is gone — the FIELD, not just the tile, so a screen cannot put it back — and the day's read is now a plain count. `DeliveryJob.payout` still puts a per-trip commission on every job card (payoutFor()/riderPayout()), and it has to go the same way: dropped from the type, not hidden in the UI",
           db: "riderPayout() · rider_commission",
-          status: "todo",
+          status: "active",
+        },
+        {
+          title: "Dispatch — offer the pickup to one rider",
+          detail:
+            "At vendor-accept, chooseRider() picks whoever is not mid-delivery and, among those, nearest the shop (last reported fix, ignored past 30 min); an unanswered offer counts as load, so several vendors accepting at once fan out instead of piling on one idle rider. If the whole fleet is committed it falls back to least-loaded then nearest. The pick is recorded as deliveries.offered_driver_id and pushed to that rider with the kitchen's prep estimate, then re-run at `ready`. It is a first refusal, not an assignment: after EXCLUSIVE_OFFER_MS the order opens to everyone, so an ignored offer never strands an order",
+          db: "deliveries.offered_driver_id · offered_at",
+          status: "done",
         },
         {
           title: "Accept available delivery",
-          detail: "acceptDelivery inserts deliveries.status = assigned (service role)",
+          detail:
+            "acceptDelivery claims the order for the rider (service role): it updates the standing offer row where one exists and inserts otherwise, refusing an order still inside another rider's exclusivity window",
           db: "deliveries",
+          status: "done",
+        },
+        {
+          title: "Addresses a rider can actually navigate to",
+          detail:
+            "DeliveryJob carries a DeliveryStop at each end — label, full street line, landmark, pin — instead of the old pickupArea/dropArea, which were the shop's name repeated and the customer's saved LABEL (\"Home\"). Navigate opens the maps app on the pin, falling back to a geocode of the written address for the many shops no vendor has pinned",
+          db: "orders.address · restaurants.address/lat/lng",
+          status: "done",
+        },
+        {
+          title: "Arrival notification at 500 m",
+          detail:
+            "The rider's own position report fires a one-time push to the customer when they first come within ARRIVAL_RADIUS_M of the drop, latched on deliveries.arrival_notified_at so a ten-second location ping cannot become a ten-second notification",
+          db: "deliveries.arrival_notified_at",
           status: "done",
         },
         {
@@ -677,7 +699,7 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
         {
           title: "Current job clarity",
           detail:
-            "Mostly there: `DriverActive.leg` is a real TO_PICKUP/TO_CUSTOMER phase, and the card carries pickupArea, dropArea and a cash-vs-prepaid instruction. What is missing is *what they are delivering* — the job still says `items: 4`, a count, so a rider cannot check the bag against the order",
+            "Mostly there: `DriverActive.leg` is a real TO_PICKUP/TO_CUSTOMER phase, and the card now carries the full address of whichever end the leg is heading for plus a cash-vs-prepaid instruction. What is missing is *what they are delivering* — the job still says `items: 4`, a count, so a rider cannot check the bag against the order",
           db: "deliveries.status · order_items",
           status: "active",
         },
@@ -847,7 +869,7 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
       tasks: [
         {
           title: "Portal routes + nav",
-          detail: "/admin · /admin/orders · /admin/refunds · /admin/settlements · /admin/banners · /admin/vendors · /admin/customers · /admin/settings",
+          detail: "/admin · /admin/orders · /admin/refunds · /admin/settlements · /admin/banners · /admin/coupons · /admin/vendors · /admin/customers · /admin/settings",
           db: "—",
           status: "done",
         },

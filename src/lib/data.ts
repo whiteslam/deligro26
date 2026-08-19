@@ -426,6 +426,7 @@ export const ACTIVE_ORDER: Order = {
   ],
   rider: {
     name: "Shantanu G.",
+    id: "DLGR4821",
     rating: 4.9,
     vehicle: "Bike",
     phone: "+91 98••• ••210",

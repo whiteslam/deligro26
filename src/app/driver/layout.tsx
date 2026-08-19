@@ -1,20 +1,45 @@
-import { RoleTopBar } from "@/components/roles/role-ui";
+import { StatusBar } from "@/components/layout/status-bar";
+import { DriverHeader } from "@/components/driver/driver-header";
 import { requireRole } from "@/lib/auth";
 
+/**
+ * The courier app runs in the phone frame, not the console shell.
+ *
+ * It used to render `.dashboard-shell` — the responsive web layout built for
+ * the admin and vendor consoles — capped at 640px. On a laptop that produced a
+ * 640px column of full-width cards floating on a page, which is not a thing any
+ * rider will ever look at: the driver app is used one-handed, on a phone, at a
+ * gate, and nowhere else. `.device` is the same frame the customer app uses, so
+ * the layout being developed against is the layout that ships.
+ *
+ * No app↔web switch, unlike admin and vendor. Those two have a genuine desktop
+ * audience — an operator at a desk, a kitchen with a tablet on the pass — and
+ * the toggle exists so they can work at the size they actually have. There is
+ * no desktop courier, so a switch would only offer a layout nobody should pick.
+ *
+ * The 80px foot padding on the scroller matches the other phone shells; there
+ * is no tab bar here (the courier app is one screen), so it is breathing room
+ * above the home indicator rather than clearance for a bar.
+ */
 export default async function DriverLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requireRole("driver"); // delivery partners only
+  // Delivery partners only — and it hands back the profile it already read, so
+  // naming the rider in the header costs no second query. (`getProfile` is not
+  // memoised, so calling it again here would be a real extra round trip.)
+  const profile = await requireRole("driver");
+
   return (
-    <div className="dashboard-shell">
-      <RoleTopBar
-        role="Driver partner"
-        accent="var(--blue)"
-        signOutTo="/driver/login"
-      />
-      <main className="dashboard-main max-w-[640px]">{children}</main>
+    <div className="device">
+      <div className="app-shell">
+        <div className="app-scroll no-scrollbar pb-[80px]">
+          <DriverHeader name={profile.full_name} />
+          <div className="@container px-4 pb-6 pt-4">{children}</div>
+        </div>
+        <StatusBar />
+      </div>
     </div>
   );
 }

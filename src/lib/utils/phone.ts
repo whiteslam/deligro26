@@ -21,15 +21,50 @@ export function callablePhone(
 }
 
 /**
- * Turn-by-turn to a pin, in whatever the device uses for maps.
+ * Turn-by-turn to a destination, in whatever the device uses for maps.
  *
  * `google.com/maps/dir/` rather than a `geo:` URI: geo: is Android-only and
  * silently dead on iOS, while this resolves to the Google Maps app when it is
- * installed on either platform and to the web map when it isn't.
+ * installed on either platform and to the web map when it isn't. `dir/?api=1`
+ * starts navigation from wherever the device currently is, which is the only
+ * origin a rider ever wants.
+ *
+ * Takes a pin OR an address string. The string form is not a downgrade to be
+ * embarrassed about: a great many shops on this platform have never been pinned
+ * (`restaurants.lat` is null until a vendor places the marker), and Google's
+ * geocoder finding "12, 6th Block, Koramangala" is enormously more use to
+ * somebody holding a bag of food than a button that is greyed out because a
+ * vendor skipped a step in the onboarding wizard.
+ *
+ * Returns null when there is neither — the caller renders the control disabled
+ * and says why, rather than opening a map of nowhere.
  */
-export function mapsDirectionsUrl(point: { lat: number; lng: number }): string {
-  const destination = `${point.lat},${point.lng}`;
+export function mapsDirectionsUrl(
+  destination: { lat: number; lng: number } | string | null | undefined
+): string | null {
+  const query =
+    typeof destination === "string"
+      ? destination.trim()
+      : destination
+        ? `${destination.lat},${destination.lng}`
+        : "";
+  if (!query) return null;
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-    destination
+    query
   )}`;
+}
+
+/**
+ * The best map destination for a stop: its pin if it has one, its written
+ * address if not.
+ *
+ * A pin is preferred because it is exact — a street line can geocode to the
+ * middle of a long road — but "approximately right" beats "no directions".
+ */
+export function stopDirectionsUrl(stop: {
+  address?: string;
+  area?: string;
+  point?: { lat: number; lng: number };
+}): string | null {
+  return mapsDirectionsUrl(stop.point ?? stop.address ?? null);
 }

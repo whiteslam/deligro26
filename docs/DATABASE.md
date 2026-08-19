@@ -203,10 +203,19 @@ A shop / restaurant listing. Vendor account = `profiles` where `role = 'restaura
 
 **`address` JSON shape**
 
+`line` is the full findable address, not a summary: checkout concatenates the
+saved street line with the apartment, entry code, floor, building name and
+courier note. It is what the rider's board prints and what `mapsDirectionsUrl`
+geocodes when the pin is absent. `lat`/`lng` are the delivery pin — optional
+(an address saved before the map picker has none), and what the 500 m arrival
+notification measures against.
+
 ```json
 {
   "label": "Home",
-  "line": "Koramangala 5th Block, Bengaluru"
+  "line": "402, Ashirwad Residency, Koramangala 5th Block, Bengaluru, Gate 2",
+  "lat": 21.7157,
+  "lng": 81.5335
 }
 ```
 
@@ -215,6 +224,13 @@ Optional `lat` / `lng` may be added from map picker.
 **Indexes:** `customer_id`, `restaurant_id`
 
 **RLS:** Customer own orders; restaurant own `restaurant_id`; driver assigned active delivery; manager read + advance `status` (`0023`); admin all.
+
+**INSERT** is `customer_id = auth.uid()` plus a role in (`customer`,
+`admin`) — admin joined as of `0040` so the owner's own account, which is an
+admin, can shop through the customer app. It inserts as *itself*; posting an
+order in another person's name is still the phone-order path below. Because
+admin reads every row, customer-facing screens ask `listMyOrders()`
+(`customer_id = me`) rather than leaning on RLS to scope the list.
 
 **Column guard:** `guard_order_update()` — anyone who is not admin or the
 service role may move `status` and nothing else. `channel`, `placed_by`,
@@ -255,20 +271,40 @@ Line items snapshotted at order time (price/name frozen even if menu changes).
 
 ### `deliveries`
 
-One delivery row per order (1:1).
+One delivery row per order (1:1, enforced by the UNIQUE on `order_id`).
+
+Since `0042` the row can exist **before** anybody is carrying the order: dispatch
+writes an `unassigned` row holding an offer the moment the vendor accepts. Code
+that asks "does this order have a rider?" must therefore test `driver_id` (or
+`status <> 'unassigned'`), never the mere existence of the row.
 
 | Column | Type | Default | Notes |
 |--------|------|---------|-------|
 | `id` | `uuid` PK | `gen_random_uuid()` | |
 | `order_id` | `uuid` UNIQUE | — | FK → `orders(id)` |
-| `driver_id` | `uuid` | null | FK → `profiles(id)` |
+| `driver_id` | `uuid` | null | FK → `profiles(id)`. Null until a rider **accepts** |
 | `status` | `delivery_status` | `unassigned` | |
 | `assigned_at` | `timestamptz` | null | |
+| `picked_up_at` | `timestamptz` | null | Start of the road leg (`0008`) |
 | `delivered_at` | `timestamptz` | null | |
+| `driver_lat` | `double precision` | null | Last reported fix (`0008`) |
+| `driver_lng` | `double precision` | null | (`0008`) |
+| `driver_location_at` | `timestamptz` | null | When that fix arrived (`0008`) |
+| `driver_location_source` | `text` | null | `gps` \| `none`. Null/`none` = the customer's map is showing an interpolation and must say so (`0026`) |
+| `offered_driver_id` | `uuid` | null | FK → `profiles(id)` SET NULL. Who dispatch picked — a first refusal, **not** an assignment (`0042`) |
+| `offered_at` | `timestamptz` | null | Start of the exclusivity window (`EXCLUSIVE_OFFER_MS`, `0042`) |
+| `arrival_notified_at` | `timestamptz` | null | Once-only latch behind the 500 m "your rider is here" push (`0042`) |
 
-**Index:** `driver_id`
+**Index:** `driver_id`; partial index on `offered_driver_id` (`0042`)
 
-**DAL:** [`driver-orders.ts`](../src/lib/data-access/driver-orders.ts)
+**RLS:** unchanged by `0042` — `driver_id = auth.uid()`, the owning vendor, or
+admin. The offered rider is deliberately *not* admitted: see the header of
+`0042_rider_dispatch.sql` for why that clause would leak one rider's live
+position to another. The driver board reads this table service-role behind
+`requireRole("driver")`.
+
+**DAL:** [`driver-orders.ts`](../src/lib/data-access/driver-orders.ts),
+[`rider-dispatch.ts`](../src/lib/dispatch/rider-dispatch.ts)
 
 ---
 
@@ -396,7 +432,7 @@ Server-only OTP storage for phone login. **No RLS policies** — only service-ro
 | `profiles` | own | own | own | all |
 | `restaurants` | read approved | own CRUD | — | all |
 | `menu_items` | read approved menus | own CRUD | — | all |
-| `orders` | own CRUD insert | own restaurant | assigned active | all |
+| `orders` | own insert + read | own restaurant | assigned active | all (+ own insert) |
 | `order_items` | via order | via order | via order | via order |
 | `deliveries` | — | read own restaurant | own assignment | all |
 | `refunds` | request own | — | — | decide |
