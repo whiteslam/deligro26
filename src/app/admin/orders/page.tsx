@@ -161,6 +161,7 @@ function renderOrders(
   const worst = all.reduce((m, o) => Math.max(m, o.lateByMinutes ?? 0), 0);
   const cancelled = all.filter((o) => o.status === "CANCELLED").length;
   const value = all.reduce((sum, o) => sum + o.total, 0);
+  const profit = all.reduce((sum, o) => sum + (o.profit ?? 0), 0);
 
   const href = (next: Partial<Search>) => {
     const usp = new URLSearchParams();
@@ -268,6 +269,24 @@ function renderOrders(
       ),
     },
     {
+      // Commission + GST on commission + other charges, at the vendor's own
+      // rate — what the platform keeps from this order. Nothing to show on a
+      // cancelled order, and undefined on the demo seed rows.
+      key: "profit",
+      header: "You earn",
+      role: "wideOnly",
+      align: "right",
+      width: "w-[96px]",
+      cell: (o) =>
+        o.profit != null ? (
+          <span className="text-data text-[13px] font-semibold tabular-nums text-green">
+            {formatINR(o.profit)}
+          </span>
+        ) : (
+          <span className="text-data text-[13px] text-muted">—</span>
+        ),
+    },
+    {
       key: "actions",
       header: "",
       role: "actions",
@@ -331,10 +350,10 @@ function renderOrders(
         // to /admin/orders/undefined would 404 on tap.
         rowHref={(o) => (o.id ? `/admin/orders/${o.id}` : null)}
         rowTone={(o) => ((o.lateByMinutes ?? 0) > 0 ? "alert" : null)}
-        // Two columns wider than it was (Vendor, Items). At the old 840 default
-        // the dish names were the first thing to get squeezed, which defeats
-        // the point of showing them.
-        minWidth={1060}
+        // Three columns wider than it was (Vendor, Items, You earn). At the old
+        // 840 default the dish names were the first thing to get squeezed,
+        // which defeats the point of showing them.
+        minWidth={1160}
         footer={
           <TableFooter
             page={1}
@@ -387,6 +406,11 @@ function renderOrders(
           label="Value in window"
           value={formatINR(value)}
           note={`Across ${all.length} order${all.length === 1 ? "" : "s"}`}
+        />
+        <StatTile
+          label="Profit in window"
+          value={formatINR(profit)}
+          note="Commission + GST + other charges, at each vendor's rate"
         />
       </StatTiles>
 

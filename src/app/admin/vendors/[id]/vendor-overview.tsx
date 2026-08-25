@@ -39,6 +39,7 @@ const EMPTY_SERIES: AdminSeries = {
   days: [],
   totals: { orders: 0, gmv: 0 },
   peak: null,
+  olderOrders: 0,
 };
 
 const SLICE_COLOR: Record<string, string> = {

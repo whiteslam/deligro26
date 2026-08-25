@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  Calendar,
   Clock,
   MapPin,
   Phone,
@@ -11,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { PortalToShell } from "@/components/shared/portal-to-shell";
 import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
@@ -275,15 +275,11 @@ export function VendorOrderHistoryDialog({
           </div>
 
           {range === "date" ? (
-            <label className="flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2">
-              <Calendar className="size-4 text-muted" />
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-transparent text-sm outline-none"
-              />
-            </label>
+            <DatePicker
+              value={date}
+              onChange={setDate}
+              className="bg-surface-2"
+            />
           ) : null}
 
           <form

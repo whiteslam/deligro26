@@ -86,8 +86,12 @@ export function AdminShell({
         />
         {/* Outside `.device`: a folder upload started on the food photos page
             keeps running wherever the operator goes next, so its progress
-            belongs to the console, not to the screen that began it. */}
-        <FoodUploadDock />
+            belongs to the console, not to the screen that began it.
+            Pinned to the LEFT on desktop widths, not the dock's own default
+            right side — `DesktopShellSwitcher` a few lines up is also fixed,
+            viewport-level, and anchored bottom-right, so the two would
+            otherwise land in the same corner. */}
+        <FoodUploadDock className="sm:left-4 sm:right-auto" />
       </>
     );
   }

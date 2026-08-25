@@ -12,7 +12,6 @@ import {
   Navigation,
   Phone,
   CheckCircle2,
-  IndianRupee,
   KeyRound,
   Loader2,
   LocateFixed,
@@ -382,8 +381,14 @@ export function DriverBoard({
                 ? "Wrong code — ask the restaurant to read it again."
               : result.error === "rate_limited"
                 ? "Too many attempts — wait a minute and try again."
-                : "Couldn't update. Try again."
+                : result.error === "order_not_active"
+                  ? "This order is no longer active — it may have been cancelled. Refreshing your board."
+                  : "Couldn't update. Try again."
           );
+          // A cancelled/reassigned order won't become active again by
+          // retrying — refresh now so the stale job clears from the board
+          // instead of leaving the rider stuck retapping a dead delivery.
+          if (result.error === "order_not_active") router.refresh();
           return;
         }
         setOtp("");
@@ -681,7 +686,7 @@ export function DriverBoard({
                 </div>
               )}
               <p className="text-center text-xs text-muted">
-                Order {active.job.code} · payout {formatINR(active.job.payout)}
+                Order {active.job.code}
               </p>
             </div>
           </div>
@@ -804,13 +809,7 @@ export function DriverBoard({
                   job.reservedForYou && "border-accent ring-1 ring-accent"
                 )}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-semibold">{job.restaurant}</p>
-                  <span className="text-data flex items-center text-green">
-                    <IndianRupee className="size-3.5" />
-                    {job.payout}
-                  </span>
-                </div>
+                <p className="font-semibold">{job.restaurant}</p>
                 {job.reservedForYou ? (
                   <p className="mt-1 text-xs font-bold text-accent">
                     Held for you for a few minutes — then it opens to everyone.

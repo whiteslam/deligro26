@@ -14,7 +14,7 @@ import {
   notifyOrderReady,
 } from "@/lib/notifications/order-events";
 import { queueRefundForOrder } from "@/lib/data-access/refunds";
-import { clearOffer, dispatchOrder } from "@/lib/dispatch/rider-dispatch";
+import { cancelDeliveryForOrder, dispatchOrder } from "@/lib/dispatch/rider-dispatch";
 import {
   columnKnownMissing,
   isMissingColumn,
@@ -518,10 +518,11 @@ async function announceKitchenTransition(
     );
   }
 
-  // The kitchen is not making this order, so the rider dispatch asked to come
-  // and get it should stop being asked. Left in place the offer row would be
-  // read by every driver board from now until someone cleaned the table by hand.
-  await clearOffer(orderId);
+  // The kitchen is not making this order, so any rider dispatch asked to come
+  // and get it — offered or already accepted — should stop being asked, and
+  // stop being able to complete it. See cancelDeliveryForOrder's own comment
+  // for why an already-accepted delivery is cancelled rather than deleted.
+  await cancelDeliveryForOrder(orderId);
 
   void notifyOrderCancelled(orderId, { byVendor: true, refundQueued });
 }

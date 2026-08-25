@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { fieldCls, labelCls } from "@/components/ui/field";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   REPORT_KINDS,
   type PaymentFilter,
@@ -68,22 +69,20 @@ export function ReportFilters({
       <div className="grid gap-3 rounded-xl border border-line bg-surface p-4 @xl:grid-cols-2 @4xl:grid-cols-4">
         <label className="block space-y-1.5">
           <span className={labelCls}>From</span>
-          <input
-            type="date"
+          <DatePicker
             className={fieldCls}
             value={from}
             disabled={pending}
-            onChange={(e) => navigate({ from: e.target.value })}
+            onChange={(v) => navigate({ from: v })}
           />
         </label>
         <label className="block space-y-1.5">
           <span className={labelCls}>To</span>
-          <input
-            type="date"
+          <DatePicker
             className={fieldCls}
             value={to}
             disabled={pending}
-            onChange={(e) => navigate({ to: e.target.value })}
+            onChange={(v) => navigate({ to: v })}
           />
         </label>
         <label className="block space-y-1.5">

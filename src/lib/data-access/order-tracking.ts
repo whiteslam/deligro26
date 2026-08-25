@@ -8,6 +8,7 @@ import {
   type TrackPoint,
 } from "@/lib/tracking/rider-position";
 import { computeOrderEta, type OrderEta } from "@/lib/orders/eta";
+import { kitchenPace } from "@/lib/orders/kitchen-pace";
 import { getSettings } from "@/lib/settings";
 import { dbStatusToUi, shortOrderId } from "@/lib/utils/order-map";
 import {
@@ -80,6 +81,9 @@ interface RestaurantRef {
   lng?: number | null;
   /** 0036 — this kitchen's own prep leg. Absent before the migration. */
   prep_minutes?: number | null;
+  /** 0036 — the "we're slammed" bump. Same grant as prep_minutes. */
+  busy_until?: string | null;
+  busy_extra_minutes?: number | null;
 }
 
 interface TrackedOrderRow {
@@ -118,7 +122,9 @@ function orderColumns(withLifecycle: boolean, withPrep: boolean): string {
   return [
     "id, status, created_at, address, restaurant_id",
     withLifecycle ? ", accepted_at, ready_at" : "",
-    `, restaurants ( eta_min, eta_max, lat, lng${withPrep ? ", prep_minutes" : ""} )`,
+    // busy_until/busy_extra_minutes are the same 0036 migration and the same
+    // grant statement as prep_minutes, so they ride the same probe flag.
+    `, restaurants ( eta_min, eta_max, lat, lng${withPrep ? ", prep_minutes, busy_until, busy_extra_minutes" : ""} )`,
   ].join("");
 }
 
@@ -342,6 +348,16 @@ export async function getOrderTrackingSnapshot(
   const status = dbStatusToUi(order.status);
   const settings = await getSettings();
 
+  // Bumped by any live "we're slammed" band, the same way the storefront card
+  // this customer ordered from was — otherwise an order running exactly on the
+  // schedule it was actually promised reads as late here.
+  const pace = kitchenPace({
+    etaMin: restaurant?.eta_min ?? null,
+    etaMax: restaurant?.eta_max ?? null,
+    busyUntil: restaurant?.busy_until ?? null,
+    busyExtraMinutes: restaurant?.busy_extra_minutes ?? null,
+  });
+
   const eta = computeOrderEta({
     status,
     createdAt: order.created_at,
@@ -349,8 +365,8 @@ export async function getOrderTrackingSnapshot(
     readyAt: order.ready_at ?? null,
     pickedUpAt: delivery?.picked_up_at ?? null,
     restaurantPrepMinutes: restaurant?.prep_minutes ?? null,
-    etaMin: restaurant?.eta_min ?? null,
-    etaMax: restaurant?.eta_max ?? null,
+    etaMin: pace.etaMin,
+    etaMax: pace.etaMax,
     defaultPrepMinutes: settings.defaultPrepMinutes,
   });
 
@@ -429,14 +445,21 @@ export async function getOrderEta(orderId: string): Promise<OrderEta | null> {
   const restaurant = one(order.restaurants);
   const settings = await getSettings();
 
+  const pace = kitchenPace({
+    etaMin: restaurant?.eta_min ?? null,
+    etaMax: restaurant?.eta_max ?? null,
+    busyUntil: restaurant?.busy_until ?? null,
+    busyExtraMinutes: restaurant?.busy_extra_minutes ?? null,
+  });
+
   return computeOrderEta({
     status: dbStatusToUi(order.status),
     createdAt: order.created_at,
     acceptedAt: order.accepted_at ?? null,
     readyAt: order.ready_at ?? null,
     restaurantPrepMinutes: restaurant?.prep_minutes ?? null,
-    etaMin: restaurant?.eta_min ?? null,
-    etaMax: restaurant?.eta_max ?? null,
+    etaMin: pace.etaMin,
+    etaMax: pace.etaMax,
     defaultPrepMinutes: settings.defaultPrepMinutes,
   });
 }

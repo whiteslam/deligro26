@@ -8,6 +8,14 @@ import {
   isMissingColumn,
   rememberColumn,
 } from "@/lib/data-access/schema-probe";
+import { breakdownOrder, platformDeductions } from "@/lib/settlements/math";
+import {
+  effectiveCommissionPct,
+  getCommissionGstPct,
+  getVendorCommissionDefault,
+} from "@/lib/data-access/admin-commission";
+import { daysAgo, startOfToday, trend, type Trend } from "@/lib/data-access/admin-stats";
+import { kitchenPace } from "@/lib/orders/kitchen-pace";
 import type { AdminOrderRow } from "@/lib/roles-data";
 import type { PaymentMethod, PaymentStatus } from "@/types";
 
@@ -221,6 +229,16 @@ const LIFECYCLE_COLUMNS = "orders.accepted_at";
 const TIP_COLUMN = "orders.tip";
 /** Also 0026, but a different table and a different query. */
 const LOCATION_SOURCE_COLUMN = "deliveries.driver_location_source";
+/**
+ * `restaurants.other_charges_per_order` arrives in 0034 (same key
+ * `admin-settlements.ts` probes, so the two share one cached answer).
+ */
+const RESTAURANT_TERM_COLUMN = "restaurants.other_charges_per_order";
+/**
+ * `restaurants.busy_until` / `busy_extra_minutes` arrive together in 0036
+ * (same key `order-tracking.ts` probes for the same columns).
+ */
+const KITCHEN_PACE_COLUMN = "restaurants.prep_minutes";
 
 type Flags = Record<string, boolean>;
 
@@ -298,17 +316,29 @@ const UUID_RE =
    The list
    ============================================================ */
 
+// Newest-migration-first, as `selectProbed` requires: kitchen pace is 0036,
+// other_charges_per_order is 0034, lifecycle is 0026, payment is 0025, tip is
+// 0013.
 const LIST_GROUPS: ProbeGroup[] = [
+  { key: "kitchenPace", column: KITCHEN_PACE_COLUMN },
+  { key: "restaurantTerms", column: RESTAURANT_TERM_COLUMN },
   { key: "lifecycle", column: LIFECYCLE_COLUMNS },
   { key: "payment", column: PAYMENT_COLUMNS },
+  { key: "tip", column: TIP_COLUMN },
 ];
 
 function listColumns(flags: Flags): string {
   return [
-    "id, status, total, created_at",
+    "id, status, total, delivery_fee, tax_amount, created_at",
+    flags.tip ? ", tip" : "",
     flags.payment ? ", payment_method, payment_status" : "",
     flags.lifecycle ? ", accepted_at, ready_at" : "",
-    ", restaurants(name, eta_min, eta_max)",
+    // `commission_pct` is 0017 and unconditional here, same as
+    // admin-settlements.ts's RESTAURANT_BASE — a database carrying 0025/0026
+    // (both probed above) necessarily has it too.
+    `, restaurants(name, eta_min, eta_max, commission_pct${
+      flags.restaurantTerms ? ", other_charges_per_order" : ""
+    }${flags.kitchenPace ? ", busy_until, busy_extra_minutes" : ""})`,
     ", customer:profiles!orders_customer_id_fkey(full_name)",
     // What was actually ordered. The list used to show an order's code, its
     // shop, its customer and its value but never the food — so the one question
@@ -327,18 +357,30 @@ interface RestaurantRef {
   name: string | null;
   eta_min?: number | null;
   eta_max?: number | null;
+  /** 0036 — the "we're slammed" bump. */
+  busy_until?: string | null;
+  busy_extra_minutes?: number | null;
+}
+
+/** The list's restaurant embed, with the rate this row's profit is priced at. */
+interface ListRestaurantRef extends RestaurantRef {
+  commission_pct: number | null;
+  other_charges_per_order?: number | null;
 }
 
 interface ListRow {
   id: string;
   status: string;
   total: number;
+  delivery_fee: number | null;
+  tax_amount: number | null;
+  tip?: number | null;
   created_at: string;
   payment_method?: PaymentMethod | null;
   payment_status?: PaymentStatus | null;
   accepted_at?: string | null;
   ready_at?: string | null;
-  restaurants: RestaurantRef | RestaurantRef[] | null;
+  restaurants: ListRestaurantRef | ListRestaurantRef[] | null;
   customer:
     | { full_name: string | null }
     | { full_name: string | null }[]
@@ -362,7 +404,70 @@ interface RankedRow {
   lateBy: number | null;
 }
 
-function mapListRow(r: ListRow, prepMinutes: number, now: number): RankedRow {
+/**
+ * What the platform keeps from an order: commission + GST on commission +
+ * other charges, at the vendor's own rate. The same three figures the
+ * Settlements screen calls "Platform keeps" — reusing `breakdownOrder` rather
+ * than re-deriving them keeps every screen that quotes this number from ever
+ * disagreeing with the others.
+ *
+ * `paymentMethod`/`paymentStatus`/`approvedRefunds` are irrelevant to this
+ * figure (they only steer `contribution`, which is discarded below), so
+ * placeholders stand in rather than pulling refunds into a screen that polls
+ * every 4 seconds. Discount funding is left unset for the same reason —
+ * `foodGrossFromOrder`'s default (every discount reads as vendor-absorbed) is
+ * the safe direction to be wrong in for a live estimate, not a payout.
+ */
+function platformEarningsOn(
+  order: { total: number; deliveryFee: number; taxAmount: number; tip: number },
+  commissionPct: number,
+  commissionGstPct: number,
+  otherCharges: number
+): number {
+  const bd = breakdownOrder({
+    total: order.total,
+    deliveryFee: order.deliveryFee,
+    taxAmount: order.taxAmount,
+    tip: order.tip,
+    commissionPct,
+    commissionGstPct,
+    otherCharges,
+    paymentMethod: null,
+    paymentStatus: null,
+    approvedRefunds: 0,
+  });
+  return platformDeductions(bd);
+}
+
+/** Null for a cancelled order: there is no food value to take a cut of. */
+function profitFor(
+  r: Pick<ListRow, "total" | "delivery_fee" | "tax_amount" | "tip">,
+  status: AdminOrderRow["status"],
+  restaurant: ListRestaurantRef | null,
+  commissionDefaultPct: number,
+  commissionGstPct: number
+): number | null {
+  if (status === "CANCELLED") return null;
+  return platformEarningsOn(
+    {
+      total: r.total,
+      deliveryFee: r.delivery_fee ?? 0,
+      taxAmount: r.tax_amount ?? 0,
+      tip: r.tip ?? 0,
+    },
+    effectiveCommissionPct(restaurant?.commission_pct, commissionDefaultPct),
+    commissionGstPct,
+    Math.max(0, Math.round(restaurant?.other_charges_per_order ?? 0))
+  );
+}
+
+function mapListRow(
+  r: ListRow,
+  prepMinutes: number,
+  now: number,
+  commissionDefaultPct: number,
+  commissionGstPct: number
+): RankedRow {
   const restaurant = one(r.restaurants);
   const status = adminOrderStatus(r.status);
 
@@ -378,13 +483,24 @@ function mapListRow(r: ListRow, prepMinutes: number, now: number): RankedRow {
     }))
     .filter((line) => line.name !== "" && line.qty > 0);
 
+  // Bumped by any live "we're slammed" band — matches order-tracking.ts's
+  // customer-facing figure, so an order running exactly on the schedule the
+  // customer was actually promised doesn't get flagged late on this board.
+  const pace = kitchenPace({
+    etaMin: restaurant?.eta_min,
+    etaMax: restaurant?.eta_max,
+    busyUntil: restaurant?.busy_until,
+    busyExtraMinutes: restaurant?.busy_extra_minutes,
+    now,
+  });
+
   const lateBy = minutesLate({
     status,
     createdAt: r.created_at,
     acceptedAt: r.accepted_at,
     readyAt: r.ready_at,
-    etaMin: restaurant?.eta_min,
-    etaMax: restaurant?.eta_max,
+    etaMin: pace.etaMin,
+    etaMax: pace.etaMax,
     prepMinutes,
     now,
   });
@@ -408,6 +524,7 @@ function mapListRow(r: ListRow, prepMinutes: number, now: number): RankedRow {
       lateByMinutes: lateBy,
       items,
       itemCount: items.reduce((n, line) => n + line.qty, 0),
+      profit: profitFor(r, status, restaurant, commissionDefaultPct, commissionGstPct),
     },
   };
 }
@@ -425,7 +542,11 @@ export async function listAllOrders(limit = 50): Promise<AdminOrderRow[]> {
   // requireRole("admin"), which runs before this page renders (AGENTS.md §5).
   const supabase = createAdminClient();
 
-  const settings = await getSettings();
+  const [settings, commissionDefaultPct, commissionGstPct] = await Promise.all([
+    getSettings(),
+    getVendorCommissionDefault(),
+    getCommissionGstPct(),
+  ]);
   const prepMinutes = clampPrepMinutes(settings.defaultPrepMinutes);
 
   const [recent, active] = await Promise.all([
@@ -454,7 +575,12 @@ export async function listAllOrders(limit = 50): Promise<AdminOrderRow[]> {
   const byId = new Map<string, RankedRow>();
   for (const raw of [...(recent.data ?? []), ...(active.data ?? [])]) {
     const r = raw as unknown as ListRow;
-    if (!byId.has(r.id)) byId.set(r.id, mapListRow(r, prepMinutes, now));
+    if (!byId.has(r.id)) {
+      byId.set(
+        r.id,
+        mapListRow(r, prepMinutes, now, commissionDefaultPct, commissionGstPct)
+      );
+    }
   }
 
   return [...byId.values()]
@@ -538,6 +664,7 @@ export interface AdminOrderDetail {
 }
 
 const DETAIL_GROUPS: ProbeGroup[] = [
+  { key: "kitchenPace", column: KITCHEN_PACE_COLUMN },
   { key: "lifecycle", column: LIFECYCLE_COLUMNS },
   { key: "payment", column: PAYMENT_COLUMNS },
   { key: "tip", column: TIP_COLUMN },
@@ -550,7 +677,9 @@ function detailColumns(flags: Flags): string {
     flags.payment ? ", payment_method, payment_status" : "",
     flags.lifecycle ? ", accepted_at, ready_at, cancelled_at" : "",
     ", order_items(name, qty, price)",
-    ", restaurants(id, name, slug, eta_min, eta_max)",
+    `, restaurants(id, name, slug, eta_min, eta_max${
+      flags.kitchenPace ? ", busy_until, busy_extra_minutes" : ""
+    })`,
     ", customer:profiles!orders_customer_id_fkey(id, full_name, phone)",
   ].join("");
 }
@@ -699,6 +828,15 @@ export async function getAdminOrderDetail(
   const settings = await getSettings();
   const delivery = await readDelivery(supabase, row.id);
 
+  // Bumped by any live "we're slammed" band — see mapListRow's identical use
+  // on the board.
+  const pace = kitchenPace({
+    etaMin: restaurant?.eta_min,
+    etaMax: restaurant?.eta_max,
+    busyUntil: restaurant?.busy_until,
+    busyExtraMinutes: restaurant?.busy_extra_minutes,
+  });
+
   return {
     id: row.id,
     code: `#${shortOrderId(row.id)}`,
@@ -746,11 +884,159 @@ export async function getAdminOrderDetail(
       createdAt: row.created_at,
       acceptedAt: row.accepted_at,
       readyAt: row.ready_at,
-      etaMin: restaurant?.eta_min,
-      etaMax: restaurant?.eta_max,
+      etaMin: pace.etaMin,
+      etaMax: pace.etaMax,
       prepMinutes: clampPrepMinutes(settings.defaultPrepMinutes),
       now: Date.now(),
     }),
     delivery,
   };
+}
+
+/* ============================================================
+   Platform earnings — for the dashboard KPI strip
+   ============================================================ */
+
+export interface PlatformEarnings {
+  today: number;
+  trend: Trend;
+}
+
+interface EarningsOrderRow {
+  restaurant_id: string | null;
+  total: number | null;
+  delivery_fee: number | null;
+  tax_amount: number | null;
+  tip: number | null;
+  created_at: string;
+}
+
+/**
+ * One vendor's rate for the earnings sum below: an override where the shop has
+ * one, the platform default otherwise, plus its fixed other-charges figure.
+ *
+ * `other_charges_per_order` is 0034 and optional; unlike the probed list/detail
+ * queries above, this reads a handful of restaurant rows keyed by id, so the
+ * probe is a plain try-then-drop rather than `selectProbed`'s group machinery.
+ */
+interface RestaurantRateRow {
+  id: string;
+  commission_pct: number | null;
+  other_charges_per_order?: number | null;
+}
+
+async function loadRestaurantRates(
+  supabase: ReturnType<typeof createAdminClient>,
+  ids: string[]
+): Promise<Map<string, { commissionPct: number | null; otherCharges: number }>> {
+  const map = new Map<string, { commissionPct: number | null; otherCharges: number }>();
+  if (ids.length === 0) return map;
+
+  // Two independent calls rather than reassigning a destructured `data`/`error`
+  // across them — supabase-js infers the row type from the first call and
+  // rejects a second with a different column list (the same gotcha
+  // `selectOptional` in admin-settlements.ts is written around).
+  const withExtras = !columnKnownMissing(RESTAURANT_TERM_COLUMN);
+  const rows: RestaurantRateRow[] = withExtras
+    ? await (async () => {
+        const res = await supabase
+          .from("restaurants")
+          .select("id, commission_pct, other_charges_per_order")
+          .in("id", ids)
+          .overrideTypes<RestaurantRateRow[]>();
+        if (res.error) {
+          if (!isMissingColumn(res.error)) throw res.error;
+          rememberColumn(RESTAURANT_TERM_COLUMN, false);
+          const retry = await supabase
+            .from("restaurants")
+            .select("id, commission_pct")
+            .in("id", ids)
+            .overrideTypes<RestaurantRateRow[]>();
+          if (retry.error) throw retry.error;
+          return retry.data ?? [];
+        }
+        rememberColumn(RESTAURANT_TERM_COLUMN, true);
+        return res.data ?? [];
+      })()
+    : await (async () => {
+        const res = await supabase
+          .from("restaurants")
+          .select("id, commission_pct")
+          .in("id", ids)
+          .overrideTypes<RestaurantRateRow[]>();
+        if (res.error) throw res.error;
+        return res.data ?? [];
+      })();
+
+  for (const row of rows) {
+    map.set(row.id, {
+      commissionPct: row.commission_pct,
+      otherCharges: Math.max(0, Math.round(Number(row.other_charges_per_order ?? 0))),
+    });
+  }
+  return map;
+}
+
+/**
+ * Platform earnings — commission + GST on commission + other charges, at each
+ * vendor's own rate — for today, with the same week-over-week trend the rest
+ * of the dashboard KPI strip carries (`getAdminDashboard`'s `trends.gmv`).
+ *
+ * Reads with `createAdminClient()` rather than the cookie-bound client the
+ * rest of the dashboard uses: `restaurants.commission_pct` is revoked from
+ * anon/authenticated by migration 0032 (see admin-commission.ts), so this is
+ * the one dashboard figure the RLS-scoped client genuinely cannot compute.
+ * Authorized the same way as every other admin-commission read in this file —
+ * the /admin layout's `requireRole("admin")` runs before this is ever called
+ * (AGENTS.md §5).
+ *
+ * Cancelled orders are excluded: there is no food value to take a cut of.
+ */
+export async function getPlatformEarnings(): Promise<PlatformEarnings> {
+  const supabase = createAdminClient();
+  const d14 = daysAgo(14);
+  const d7 = daysAgo(7);
+  const todayStart = startOfToday();
+
+  const [ordersResult, commissionDefaultPct, commissionGstPct] = await Promise.all([
+    supabase
+      .from("orders")
+      .select("restaurant_id, total, delivery_fee, tax_amount, tip, created_at")
+      .neq("status", "cancelled")
+      .gte("created_at", d14)
+      .overrideTypes<EarningsOrderRow[]>(),
+    getVendorCommissionDefault(),
+    getCommissionGstPct(),
+  ]);
+  if (ordersResult.error) throw ordersResult.error;
+  const rows = ordersResult.data ?? [];
+
+  const restaurantIds = [
+    ...new Set(rows.map((r) => r.restaurant_id).filter((id): id is string => Boolean(id))),
+  ];
+  const rates = await loadRestaurantRates(supabase, restaurantIds);
+
+  let today = 0;
+  let curr = 0;
+  let prev = 0;
+  for (const r of rows) {
+    const rate = r.restaurant_id ? rates.get(r.restaurant_id) : undefined;
+    const earnings = platformEarningsOn(
+      {
+        total: r.total ?? 0,
+        deliveryFee: r.delivery_fee ?? 0,
+        taxAmount: r.tax_amount ?? 0,
+        tip: r.tip ?? 0,
+      },
+      effectiveCommissionPct(rate?.commissionPct, commissionDefaultPct),
+      commissionGstPct,
+      rate?.otherCharges ?? 0
+    );
+
+    if (r.created_at >= d7) curr += earnings;
+    else if (r.created_at >= d14) prev += earnings;
+    if (r.created_at >= todayStart) today += earnings;
+  }
+
+  return { today, trend: trend(curr, prev) };
 }

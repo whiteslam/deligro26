@@ -4,6 +4,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { RazorpayError, toPaise } from "@/lib/payments/razorpay";
 import { refundRazorpayPayment } from "@/lib/payments/refunds";
 import {
+  findSettlementForOrder,
+  flagSettlementForRefund,
+} from "@/lib/data-access/admin-settlements";
+import { shortOrderId } from "@/lib/utils/order-map";
+import {
   columnKnownMissing,
   isMissingColumn,
   rememberColumn,
@@ -468,6 +473,14 @@ export type RefundDecision =
       approved: boolean;
       /** True only when Razorpay reported the money PROCESSED back. */
       settled: boolean;
+      /**
+       * Set when this order's payout was already booked into a settlement —
+       * draft or paid — at the moment the refund was approved. There is no
+       * automatic clawback (see `flagSettlementForRefund`'s own comment); this
+       * is the caller's cue to surface that to the admin immediately, on top
+       * of the note already written onto the settlement itself.
+       */
+      settlementWarning?: string | null;
     }
   | { ok: false; error: RefundDecisionError };
 
@@ -719,11 +732,41 @@ export async function decideRefund(
     await mirrorRefundOntoLedger(refund.orderId, paymentRowId);
   }
 
+  // An approved refund moves money back out. If this order's payout was
+  // already booked into a settlement — draft or paid — that settlement's
+  // total now overstates what the vendor should actually receive/kept, and
+  // nothing recomputes it automatically. Flag it rather than let the mismatch
+  // surface later as an unexplained accounting discrepancy.
+  let settlementWarning: string | null = null;
+  if (decision === "approved") {
+    try {
+      const ref = await findSettlementForOrder(refund.orderId);
+      if (ref && ref.status !== "void") {
+        settlementWarning =
+          ref.status === "paid"
+            ? `This order's payout was already settled and paid (settlement #${shortOrderId(ref.id)}). The refund does not adjust that settlement automatically — reconcile it by hand.`
+            : `This order is in an unpaid draft settlement (#${shortOrderId(ref.id)}). Void and rebuild that settlement so it reflects the refund before paying it.`;
+        await flagSettlementForRefund(
+          ref.id,
+          `Refund ${id} (₹${refund.amount}) approved for order ${refund.orderId} on ${new Date().toISOString()} — after this settlement was ${ref.status === "paid" ? "paid" : "drafted"}. Reconcile by hand.`
+        );
+      }
+    } catch (err) {
+      // Never let a failure here read back as the refund itself failing —
+      // the money has already moved by this point.
+      console.error(
+        `[decideRefund] could not check settlement membership for order ${refund.orderId}`,
+        err
+      );
+    }
+  }
+
   return {
     ok: true,
     orderId: refund.orderId,
     approved: decision === "approved",
     settled: Boolean(settledAt),
+    settlementWarning,
   };
 }
 

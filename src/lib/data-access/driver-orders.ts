@@ -3,7 +3,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { shortOrderId } from "@/lib/utils/order-map";
 import { notifyOnTheWay, notifyDelivered } from "@/lib/notifications/order-events";
 import type { DeliveryJob, DeliveryStop } from "@/lib/roles-data";
-import { riderPayout, type RiderPayoutConfig } from "@/lib/pricing";
 import { getSettings } from "@/lib/settings";
 import { haversineKm } from "@/lib/geo/distance";
 import { PINNED_LOCATION } from "@/lib/location/pinned";
@@ -154,30 +153,6 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 }
 
 /**
- * What the rider is paid for this order, at the rate the admin configured.
- *
- * The commission is taken on the FOOD subtotal (total minus the fee, the tax
- * and the tip) — it used to be taken on the gross, so riders were being paid a
- * percentage of the customer's GST — and the tip is then passed through in full.
- *
- * `rate` comes from `platform_settings`. It used to come from the pricing.ts
- * constants, which meant `rider_commission` and `rider_min_payout` were editable
- * in the admin form, validated, clamped, written to the database, and read by
- * nothing: a rate change saved successfully and paid nobody differently.
- */
-function payoutFor(
-  r: Pick<OrderRow, "total" | "delivery_fee" | "tax_amount" | "tip">,
-  rate: RiderPayoutConfig
-): number {
-  const tip = r.tip ?? 0;
-  const itemSubtotal = Math.max(
-    0,
-    (r.total ?? 0) - (r.delivery_fee ?? 0) - (r.tax_amount ?? 0) - tip
-  );
-  return riderPayout(rate, { itemSubtotal, tip });
-}
-
-/**
  * The pickup end, as `ORDER_SELECT` reads it.
  *
  * `address` is the vendor's own reverse-geocoded street line (migration 0009,
@@ -228,7 +203,7 @@ function text(value: string | null | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function toJob(r: OrderRow, rate: RiderPayoutConfig): DeliveryJob {
+function toJob(r: OrderRow): DeliveryJob {
   const shop = one(r.restaurants);
   const restaurant = shop?.name ?? "Kitchen";
   const customer = one(r.profiles)?.full_name?.trim() || "Customer";
@@ -260,7 +235,6 @@ function toJob(r: OrderRow, rate: RiderPayoutConfig): DeliveryJob {
     drop,
     // Was hardcoded to 2.5 for every job, on every screen, forever.
     distanceKm: jobDistance(r),
-    payout: payoutFor(r, rate),
     items,
     customer,
   };
@@ -439,15 +413,10 @@ function paymentInstruction(detail: ActiveOrderDetail): CashInstruction {
 export async function getDriverBoard(driverId: string): Promise<DriverBoardData> {
   const supabase = createAdminClient();
 
-  // One read for the whole board, so every payout quoted on it comes from the
-  // same configured rate. `getSettings()` is request-cached and falls back to
-  // the shared defaults on an un-migrated database; the prep estimates on the
-  // upcoming-pickup cards read `defaultPrepMinutes` from the same object.
+  // Riders are salaried, not paid per order — see the "Salary model on the
+  // board" task in build-plan.ts. `getSettings()` is still read once here for
+  // `defaultPrepMinutes`, which the upcoming-pickup cards need.
   const settings = await getSettings();
-  const rate: RiderPayoutConfig = {
-    commission: settings.riderCommission,
-    minPayout: settings.riderMinPayout,
-  };
 
   // Active delivery for this driver (assigned or picked up).
   type ActiveRow = { status: string; order: OrderRow | OrderRow[] | null };
@@ -475,7 +444,7 @@ export async function getDriverBoard(driverId: string): Promise<DriverBoardData>
       const instruction = paymentInstruction(detail);
 
       active = {
-        job: toJob(order, rate),
+        job: toJob(order),
         leg,
         payment: {
           instruction,
@@ -527,7 +496,7 @@ export async function getDriverBoard(driverId: string): Promise<DriverBoardData>
     const state = offerStateFor(driverId, offers.get(r.id), now);
     // Held for somebody else: not shown at all, rather than shown and refused.
     if (state === "held") continue;
-    available.push({ ...toJob(r, rate), reservedForYou: state === "mine" });
+    available.push({ ...toJob(r), reservedForYou: state === "mine" });
   }
   // Whatever is being held for this rider goes to the top — it is the one card
   // on the screen that will stop being theirs if they scroll past it.
@@ -536,7 +505,6 @@ export async function getDriverBoard(driverId: string): Promise<DriverBoardData>
   const upcoming = await readUpcomingPickups(
     supabase,
     driverId,
-    rate,
     settings.defaultPrepMinutes,
     now
   );
@@ -625,7 +593,6 @@ interface UpcomingOrderRow extends OrderRow {
 async function readUpcomingPickups(
   supabase: AdminClient,
   driverId: string,
-  rate: RiderPayoutConfig,
   defaultPrepMinutes: number,
   now: number
 ): Promise<UpcomingPickup[]> {
@@ -662,7 +629,7 @@ async function readUpcomingPickups(
       .overrideTypes<UpcomingOrderRow[]>();
 
     return (rows ?? []).map((r) => ({
-      job: toJob(r, rate),
+      job: toJob(r),
       readyInMinutes: readyIn(r, defaultPrepMinutes, now),
     }));
   } catch {
@@ -717,6 +684,22 @@ export async function acceptDelivery(
 
   if (existing && existing.status !== "unassigned") {
     return { ok: false, error: "already_taken" };
+  }
+
+  // The order itself must be ready for pickup. An offer can exist earlier, at
+  // `kitchen`, purely as advance notice (see readUpcomingPickups) — the board
+  // already withholds the Accept control until `ready`, but that's a UI choice,
+  // not a guarantee. Without this check, a rider holding the order id from the
+  // upcoming-pickups list could accept (or claim a standing offer) before the
+  // kitchen has even started, or after the order was cancelled/delivered by
+  // some other path, creating a live delivery nobody can act on correctly.
+  const { data: order } = await supabase
+    .from("orders")
+    .select("status")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (!order || order.status !== "ready") {
+    return { ok: false, error: "not_ready" };
   }
 
   if (existing) {
@@ -1087,14 +1070,32 @@ export async function advanceDelivery(
       return { ok: false, error: "bad_pickup_otp" };
     }
 
-    await supabase
+    // Conditional on the order still being `ready` — the only status a delivery
+    // reaches `assigned` from. Without this, an order the vendor cancelled out
+    // from under this rider (see cancelDeliveryForOrder) would get silently
+    // resurrected to `on_the_way` here, purely because the rider's own delivery
+    // row still says `assigned`.
+    const { data: movedOrder, error: orderErr } = await supabase
+      .from("orders")
+      .update({ status: "on_the_way" })
+      .eq("id", orderId)
+      .eq("status", "ready")
+      .select("id")
+      .maybeSingle();
+    if (orderErr) throw orderErr;
+    if (!movedOrder) {
+      return { ok: false, error: "order_not_active" };
+    }
+
+    const { error: deliveryErr } = await supabase
       .from("deliveries")
       .update({
         status: "picked_up",
         picked_up_at: new Date().toISOString(),
       })
       .eq("id", delivery.id);
-    await supabase.from("orders").update({ status: "on_the_way" }).eq("id", orderId);
+    if (deliveryErr) throw deliveryErr;
+
     await notifyOnTheWay(orderId);
     return { ok: true };
   }
@@ -1110,11 +1111,27 @@ export async function advanceDelivery(
     if (!expected || (otp ?? "").replace(/\D/g, "") !== expected) {
       return { ok: false, error: "bad_otp" };
     }
-    await supabase
+
+    // Same guard as above, for the same reason: the order must still actually
+    // be `on_the_way` for this rider's `delivered` write to be trusted.
+    const { data: movedOrder, error: orderErr } = await supabase
+      .from("orders")
+      .update({ status: "delivered" })
+      .eq("id", orderId)
+      .eq("status", "on_the_way")
+      .select("id")
+      .maybeSingle();
+    if (orderErr) throw orderErr;
+    if (!movedOrder) {
+      return { ok: false, error: "order_not_active" };
+    }
+
+    const { error: deliveryErr } = await supabase
       .from("deliveries")
       .update({ status: "delivered", delivered_at: new Date().toISOString() })
       .eq("id", delivery.id);
-    await supabase.from("orders").update({ status: "delivered" }).eq("id", orderId);
+    if (deliveryErr) throw deliveryErr;
+
     await notifyDelivered(orderId);
 
     // Deliberately NOT touching payment_status. A COD order that reaches this

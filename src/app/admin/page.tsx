@@ -7,6 +7,7 @@ import {
   type Trend,
 } from "@/lib/data-access/admin-stats";
 import {
+  ALL_TIME,
   getAdminSeries,
   getOrderStatusMix,
   type AdminSeries,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/data-access/admin-series";
 import { getLiveBoard } from "@/lib/data-access/admin-dispatch";
 import { getSettlementStats } from "@/lib/data-access/admin-settlements";
+import { getPlatformEarnings, type PlatformEarnings } from "@/lib/data-access/admin-orders";
 import { AdminHero, ChartCard, Panel, RangeTabs } from "@/components/admin/admin-ui";
 import {
   DecisionRow,
@@ -58,18 +60,25 @@ const RANGES = [
   { value: 7, label: "7 days" },
   { value: 14, label: "14 days" },
   { value: 30, label: "30 days" },
+  { value: ALL_TIME, label: "All time" },
 ];
 
 const EMPTY_SERIES: AdminSeries = {
   days: [],
   totals: { orders: 0, gmv: 0 },
   peak: null,
+  olderOrders: 0,
 };
 
 const NO_COUNTS: AdminNavCounts = {
   pendingApprovals: 0,
   pendingRefunds: 0,
   liveOrders: 0,
+};
+
+const NO_EARNINGS: PlatformEarnings = {
+  today: 0,
+  trend: { pct: 0, direction: "flat" },
 };
 
 /** "+8.4%" / "−2.1%" / "0%" — pre-formatted for the KPI strip. */
@@ -87,7 +96,7 @@ export default async function AdminOverviewPage({
   const requested = Number(daysParam);
   const days = RANGES.some((r) => r.value === requested) ? requested : 7;
 
-  const [dash, pending, series, mix, board, counts, settlements] =
+  const [dash, pending, series, mix, board, counts, settlements, earnings] =
     await Promise.all([
       getAdminDashboard(),
       listPendingRestaurants(),
@@ -106,6 +115,9 @@ export default async function AdminOverviewPage({
       isSupabaseConfigured
         ? getSettlementStats().catch(() => ({ draftCount: 0 }))
         : Promise.resolve({ draftCount: 0 }),
+      isSupabaseConfigured
+        ? getPlatformEarnings().catch(() => NO_EARNINGS)
+        : Promise.resolve(NO_EARNINGS),
     ]);
 
   const now = new Intl.DateTimeFormat("en-IN", {
@@ -135,6 +147,19 @@ export default async function AdminOverviewPage({
       value: formatINR(dash.today.gmv),
       delta: { label: deltaLabel(dash.trends.gmv), direction: dash.trends.gmv.direction, note: "vs last week" },
       spark: spark.map((d) => d.gmv),
+    },
+    {
+      label: "Platform earnings today",
+      value: formatINR(earnings.today),
+      unit: "commission + GST + charges",
+      delta: {
+        label: deltaLabel(earnings.trend),
+        direction: earnings.trend.direction,
+        note: "vs last week",
+      },
+      // No sparkline: unlike GMV, this needs a per-day vendor-rate recompute
+      // the series query above doesn't do, and a KPI without a history line is
+      // an honest gap rather than a fabricated one (see the note above).
     },
     {
       label: "Orders today",
@@ -315,7 +340,11 @@ export default async function AdminOverviewPage({
           <ChartCard
             className="flex-1"
             title="Sales and orders"
-            subtitle={`${rangeLabel} · bars are orders, line is sales`}
+            subtitle={
+              series.olderOrders > 0
+                ? `Last ${series.days.length} days · bars are orders, line is sales · ${nf.format(series.olderOrders)} earlier orders not shown`
+                : `${rangeLabel} · bars are orders, line is sales`
+            }
             height={196}
             action={
               <div className="flex gap-5 text-right">

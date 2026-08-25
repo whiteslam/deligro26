@@ -11,6 +11,8 @@ import { rateLimit } from "@/lib/rate-limit";
 export interface ActionResult {
   ok: boolean;
   error?: string;
+  /** Non-blocking: the action succeeded, but there's something to know about it. */
+  warning?: string;
 }
 
 /**
@@ -95,7 +97,8 @@ export async function decideRefundAction(
 
   revalidatePath("/admin/refunds");
   revalidatePath("/admin");
-  return { ok: true };
+  revalidatePath("/admin/settlements");
+  return { ok: true, warning: result.settlementWarning ?? undefined };
 }
 
 /**

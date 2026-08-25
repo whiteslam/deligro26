@@ -1080,6 +1080,96 @@ export async function markOrderPaid(input: {
   });
 }
 
+/** Which settlement, if any, an order's payout has already been booked into. */
+export interface OrderSettlementRef {
+  id: string;
+  status: SettlementStatus;
+  kind: SettlementKind;
+}
+
+/**
+ * Whether — and where — an order has already been settled.
+ *
+ * `vendor_settlement_orders` carries UNIQUE(order_id), so at most one row can
+ * ever match. Used both to reverse an instant payout (below) and, from
+ * `refunds.ts`, to flag a refund approved for an order whose payout is already
+ * booked — a settlement's own total is frozen the moment it's written, so a
+ * later refund has nothing to automatically net against.
+ */
+export async function findSettlementForOrder(
+  orderId: string
+): Promise<OrderSettlementRef | null> {
+  const supabase = createAdminClient();
+  const { data: line, error } = await supabase
+    .from("vendor_settlement_orders")
+    .select("settlement_id")
+    .eq("order_id", orderId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!line) return null;
+
+  const settlementId = line.settlement_id as string;
+  const [header] = await selectOptional(HEADER_EXTRAS, (extras) =>
+    supabase
+      .from("vendor_settlements")
+      .select(`id, status${extras ? ", kind" : ""}`)
+      .eq("id", settlementId)
+      .maybeSingle()
+  );
+  if (!header) return null;
+
+  return {
+    id: settlementId,
+    status: header.status as SettlementStatus,
+    kind: asKind(header.kind),
+  };
+}
+
+/**
+ * Record, on the settlement itself, that a refund landed for one of its
+ * orders after the fact.
+ *
+ * There is no automatic clawback: a settlement's `net_payable` is frozen the
+ * instant it's written, `voidSettlement` refuses to reverse a `paid` header
+ * (see its own comment — "record a correction instead"), and inventing a
+ * negative adjustment line here would assert a reconciliation step that
+ * doesn't exist elsewhere in the ledger. What this can do honestly is make the
+ * mismatch impossible to miss: appended to `notes`, which the settlement
+ * detail page already renders, so an operator opening the settlement a refund
+ * was flagged against sees it right there rather than having to cross-reference
+ * `/admin/refunds` by hand.
+ *
+ * Best-effort. Called after a refund has already been approved and the money
+ * already moved — a failure to write this note must not read back as the
+ * refund itself having failed.
+ */
+export async function flagSettlementForRefund(
+  settlementId: string,
+  note: string
+): Promise<void> {
+  try {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from("vendor_settlements")
+      .select("notes")
+      .eq("id", settlementId)
+      .maybeSingle();
+
+    const existing = (data?.notes as string | null)?.trim();
+    const notes = existing ? `${existing}\n${note}` : note;
+
+    await supabase
+      .from("vendor_settlements")
+      .update({ notes })
+      .eq("id", settlementId);
+  } catch (err) {
+    console.error(
+      `[flagSettlementForRefund] could not flag settlement ${settlementId}`,
+      err
+    );
+  }
+}
+
 /**
  * Move an order back to Unpaid.
  *
@@ -1094,33 +1184,17 @@ export async function markOrderUnpaid(input: {
 }): Promise<{ ok: true } | { error: string }> {
   if (!UUID_RE.test(input.orderId)) return { error: "Invalid order." };
 
-  const supabase = createAdminClient();
-  const { data: line, error } = await supabase
-    .from("vendor_settlement_orders")
-    .select("settlement_id")
-    .eq("order_id", input.orderId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!line) return { error: "This order is not marked paid." };
+  const ref = await findSettlementForOrder(input.orderId);
+  if (!ref) return { error: "This order is not marked paid." };
 
-  const settlementId = line.settlement_id as string;
-  const [header] = await selectOptional(HEADER_EXTRAS, (extras) =>
-    supabase
-      .from("vendor_settlements")
-      .select(`id, status${extras ? ", kind" : ""}`)
-      .eq("id", settlementId)
-      .maybeSingle()
-  );
-  if (!header) return { error: "This order is not marked paid." };
-
-  if (asKind(header.kind) !== "instant") {
+  if (ref.kind !== "instant") {
     return {
       error:
         "This order is part of a settlement batch. Void that settlement to release it.",
     };
   }
 
-  return voidSettlement({ id: settlementId, adminId: input.adminId });
+  return voidSettlement({ id: ref.id, adminId: input.adminId });
 }
 
 /* ------------------------------------------------------------------
