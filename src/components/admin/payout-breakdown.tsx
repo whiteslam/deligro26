@@ -124,6 +124,7 @@ export function OrderPayoutBreakdown({
         negative
       />
       <Line label="Other charges" amount={line.otherCharges} negative />
+      <Line label="You earn" amount={deductions} strong rule />
       {line.refundRecovered > 0 ? (
         <Line
           label="Refund recovered"
@@ -178,6 +179,8 @@ export function PayoutTotals({
   mismatch?: number;
 }) {
   const owesPlatform = totals.netPayable < 0;
+  const platformEarnings =
+    totals.commission + totals.commissionGst + totals.otherCharges;
 
   return (
     <div className="space-y-0.5">
@@ -199,6 +202,7 @@ export function PayoutTotals({
         negative
       />
       <Line label="Other charges" amount={totals.otherCharges} negative />
+      <Line label="You earn" amount={platformEarnings} strong rule />
       <Line
         label="Refunds recovered"
         amount={totals.refundsRecovered}
@@ -272,7 +276,7 @@ export function PayoutLinesTable({
 
   return (
     <div className="overflow-x-auto rounded-xl border border-line">
-      <table className="w-full min-w-[860px] text-left text-sm">
+      <table className="w-full min-w-[940px] text-left text-sm">
         <caption className="sr-only">Payout for each order</caption>
         <thead className="border-b border-line bg-surface-2 text-xs uppercase tracking-wide text-muted">
           <tr>
@@ -286,6 +290,7 @@ export function PayoutLinesTable({
             <th className="px-3 py-2.5 text-right font-medium">Commission</th>
             <th className="px-3 py-2.5 text-right font-medium">GST</th>
             <th className="px-3 py-2.5 text-right font-medium">Other</th>
+            <th className="px-3 py-2.5 text-right font-medium">You earn</th>
             <th className="px-3 py-2.5 text-right font-medium">Refund</th>
             <th className="px-3 py-2.5 text-right font-medium">Shop gets</th>
             {rowAction ? (
@@ -319,6 +324,9 @@ export function PayoutLinesTable({
               </td>
               <td className="px-3 py-2.5 text-right tabular-nums">
                 {l.otherCharges ? formatINR(l.otherCharges) : "—"}
+              </td>
+              <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-ink">
+                {formatINR(l.commission + l.commissionGst + l.otherCharges)}
               </td>
               <td className="px-3 py-2.5 text-right tabular-nums">
                 {l.refundRecovered ? formatINR(l.refundRecovered) : "—"}

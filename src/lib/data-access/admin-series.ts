@@ -43,6 +43,14 @@ export interface AdminSeries {
   totals: { orders: number; gmv: number };
   /** Busiest day in the window, or null when the window is empty. */
   peak: DailyPoint | null;
+  /**
+   * Orders older than `days` — always 0 for an explicit 7/14/30-day request,
+   * only ever nonzero for "All time" once real history outgrows
+   * `MAX_SERIES_DAYS`. The chart still stops there rather than drawing an
+   * unbounded number of daily bars; this is how the page says so instead of
+   * quietly showing a partial history as the complete one.
+   */
+  olderOrders: number;
 }
 
 /**
@@ -73,14 +81,30 @@ function dayKey(d: Date): string {
 export const SERIES_DAYS = 30;
 
 /**
+ * "All time" — as far back as the platform's real history goes. Passed as the
+ * `days` argument, distinct from any real day count.
+ */
+export const ALL_TIME = 0;
+
+/**
+ * The chart is one bar per day, so it cannot draw an unbounded number of them
+ * legibly — or cheaply. This is the ceiling both an explicit `days` value and
+ * `ALL_TIME` are clamped to; `AdminSeries.olderOrders` is how the page finds
+ * out it was hit.
+ */
+const MAX_SERIES_DAYS = 180;
+
+/**
  * Daily orders and GMV for the last `days` days, oldest first, zero-filled.
+ * `ALL_TIME` asks for the whole history, capped at `MAX_SERIES_DAYS`.
  *
  * Returns an empty-but-complete series on failure rather than throwing: a
  * missing chart is recoverable, a dashboard that 500s because one aggregate
  * query failed is not.
  */
 export async function getAdminSeries(days = SERIES_DAYS): Promise<AdminSeries> {
-  const span = Math.max(1, Math.min(days, 180));
+  const span =
+    days === ALL_TIME ? MAX_SERIES_DAYS : Math.max(1, Math.min(days, MAX_SERIES_DAYS));
 
   // Build the buckets first, so the shape of the answer never depends on what
   // came back from the database.
@@ -97,6 +121,7 @@ export async function getAdminSeries(days = SERIES_DAYS): Promise<AdminSeries> {
   }
 
   const since = new Date(now - span * 86_400_000).toISOString();
+  let olderOrders = 0;
 
   try {
     const supabase = await createClient();
@@ -119,6 +144,16 @@ export async function getAdminSeries(days = SERIES_DAYS): Promise<AdminSeries> {
         bucket.gmv += Number(row.total ?? 0);
       }
     }
+
+    // Only worth asking for "All time": an explicit 7/14/30-day request was
+    // never claiming to be complete, so there is nothing to disclose.
+    if (days === ALL_TIME) {
+      const { count } = await supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .lt("created_at", since);
+      olderOrders = count ?? 0;
+    }
   } catch {
     // Fall through to the zero-filled series.
   }
@@ -133,7 +168,12 @@ export async function getAdminSeries(days = SERIES_DAYS): Promise<AdminSeries> {
     null
   );
 
-  return { days: list, totals, peak: totals.orders > 0 ? peak : null };
+  return {
+    days: list,
+    totals,
+    peak: totals.orders > 0 ? peak : null,
+    olderOrders,
+  };
 }
 
 /** Customer-facing stage labels, matching the Orders screen's pills. */
@@ -159,19 +199,23 @@ const STATUS_ORDER = [
 /**
  * How the last `days` days of orders ended up, by stage — the donut's data.
  * Stages with no orders are omitted; a window with nothing in it returns [].
+ *
+ * `ALL_TIME` reads every order ever placed. Unlike the daily chart, a status
+ * count has no per-bucket rendering cost to protect — it's one column, summed
+ * — so there is no cap to disclose here.
  */
 export async function getOrderStatusMix(days = 7): Promise<StatusSlice[]> {
-  const since = new Date(
-    Date.now() - Math.max(1, days) * 86_400_000
-  ).toISOString();
+  const since =
+    days === ALL_TIME
+      ? null
+      : new Date(Date.now() - Math.max(1, days) * 86_400_000).toISOString();
 
   let rows: { status: string | null }[] = [];
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("orders")
-      .select("status")
-      .gte("created_at", since);
+    let query = supabase.from("orders").select("status");
+    if (since) query = query.gte("created_at", since);
+    const { data, error } = await query;
     if (error) return [];
     rows = (data ?? []) as { status: string | null }[];
   } catch {

@@ -381,8 +381,8 @@ export function SettingsForm({
 
         <Card
           className="@3xl:order-6"
-          title="Dispatch and rider payout"
-          desc="Operational defaults and the formula riders are paid by."
+          title="Dispatch"
+          desc="Operational defaults for routing and prep time."
         >
           <Row label="Default prep time" hint="Minutes, when a shop has not set its own." htmlFor="defaultPrepMinutes">
             <Num
@@ -399,6 +399,12 @@ export function SettingsForm({
               step={0.5}
             />
           </Row>
+          {/* Riders are salaried monthly, not paid a per-order commission — see
+              the "Salary model on the board" task in build-plan.ts. These two
+              fields are commented out rather than deleted in case a per-order
+              model comes back; while they're hidden, saving this form keeps
+              writing the defaults `actions.ts` falls back to, which is harmless
+              since nothing reads them for pay.
           <Row
             label="Rider commission"
             hint="Percent of the food subtotal paid to the rider."
@@ -419,6 +425,7 @@ export function SettingsForm({
               defaultValue={settings.riderMinPayout}
             />
           </Row>
+          */}
         </Card>
 
         <Card

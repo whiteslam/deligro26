@@ -651,9 +651,9 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
         {
           title: "Salary model on the board",
           detail:
-            "Half done. `DriverBoardData.today.earnings` is gone — the FIELD, not just the tile, so a screen cannot put it back — and the day's read is now a plain count. `DeliveryJob.payout` still puts a per-trip commission on every job card (payoutFor()/riderPayout()), and it has to go the same way: dropped from the type, not hidden in the UI",
-          db: "riderPayout() · rider_commission",
-          status: "active",
+            "Done. `DriverBoardData.today.earnings` and `DeliveryJob.payout` are both gone — the FIELDS, not just the tiles, so a screen cannot put them back. `payoutFor()` is deleted from driver-orders.ts; `riderPayout()`/`RIDER_COMMISSION` stay in pricing.ts, unused, in case a per-order model comes back. The admin Settings form's Rider commission / minimum payout fields are commented out rather than deleted for the same reason.",
+          db: "riderPayout() · rider_commission (unused)",
+          status: "done",
         },
         {
           title: "Dispatch — offer the pickup to one rider",

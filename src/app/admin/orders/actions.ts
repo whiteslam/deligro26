@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { queueRefundForOrder } from "@/lib/data-access/refunds";
+import { cancelDeliveryForOrder } from "@/lib/dispatch/rider-dispatch";
 import {
   notifyOrderCancelled,
   notifyOrderAccepted,
@@ -217,6 +218,11 @@ export async function cancelOrderAsAdmin(
           : "That didn't go through. Try again.",
     };
   }
+
+  // A driver may already have accepted this order. Stop them completing a
+  // delivery for an order an admin just cancelled — see the function's own
+  // comment for why an accepted delivery is cancelled rather than deleted.
+  await cancelDeliveryForOrder(orderId);
 
   void notifyOrderCancelled(orderId, { refundQueued });
   // The kitchen may already be cooking this. Telling them is not optional.

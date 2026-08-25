@@ -29,12 +29,15 @@ const ORIGIN_LABELS: Record<RefundRow["origin"], string> = {
 export function RefundCard({ refund: r }: { refund: RefundRow }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const decide = (decision: "approved" | "denied") =>
     startTransition(async () => {
       setError(null);
+      setWarning(null);
       const result = await decideRefundAction(r.id, decision);
       if (!result.ok) setError(result.error ?? "Failed");
+      else if (result.warning) setWarning(result.warning);
     });
 
   // Only a captured online payment can come back through the gateway. Anything
@@ -117,6 +120,12 @@ export function RefundCard({ refund: r }: { refund: RefundRow }) {
                 ? `Sent to Razorpay and not settled yet · ${r.providerRefundId}.`
                 : "Approved. Settle this one off-platform — nothing was sent to a gateway."}
       </p>
+
+      {warning ? (
+        <p className="mt-2 rounded-lg bg-deal-soft px-2.5 py-2 text-xs leading-relaxed font-medium text-deal">
+          {warning}
+        </p>
+      ) : null}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
         {error ? (

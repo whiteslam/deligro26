@@ -92,7 +92,10 @@ export function clampTip(tip: number): number {
   return Math.min(Math.max(Math.round(tip), 0), MAX_TIP);
 }
 
-/* ---------- Rider payout ---------- */
+/* ---------- Rider payout ----------
+   Currently unused: riders are salaried monthly, not paid a per-order
+   commission (see the "Salary model on the board" task in build-plan.ts).
+   Left defined, not deleted, in case a per-order model comes back. */
 
 /** Share of the food bill that goes to the rider, before an admin sets one. */
 export const RIDER_COMMISSION = 0.08;

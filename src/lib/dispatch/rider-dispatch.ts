@@ -491,26 +491,45 @@ export async function dispatchOrder(
 }
 
 /**
- * Drop a standing offer for an order nobody will ever collect.
+ * Stop any delivery in progress for an order that is no longer proceeding.
  *
  * An `unassigned` delivery row is created at vendor-accept and normally becomes
  * a real delivery when a rider takes it. An order that is *cancelled* while
- * cooking never gets that far, and its offer row would otherwise sit in the
- * table for good — read by every board load, forever, for an order that no
- * longer exists as far as anyone is concerned.
+ * still just an offer never gets that far, and the row is deleted outright —
+ * read by every board load, forever, for an order that no longer exists as far
+ * as anyone is concerned.
  *
- * Scoped to `status = 'unassigned'` so it can never delete a delivery somebody
- * is actually carrying. Best-effort: a leaked row is untidy, not harmful.
+ * A rider who has already accepted the job (`assigned`/`picked_up`) is a
+ * different case: deleting that row would make an active delivery vanish out
+ * from under them mid-trip rather than stop it, so it is marked `cancelled`
+ * instead. `getDriverBoard`'s active-delivery query
+ * (`.in("status", ["assigned", "picked_up"])`) already excludes that status, so
+ * the job disappears from the rider's board the same way a completed one would.
+ * Without this, a rider whose order is cancelled after they accepted it keeps
+ * seeing it as their active job, can still complete it, and `advanceDelivery`
+ * would walk the order back through `on_the_way`/`delivered` — resurrecting an
+ * order that is cancelled and refunded.
+ *
+ * Best-effort, like the offer-clearing it replaces: this runs after the
+ * order's own status write has already succeeded, so a failure here must not
+ * fail the cancellation itself — it leaves a stale delivery row rather than an
+ * order the caller believes is cancelled but isn't.
  */
-export async function clearOffer(orderId: string): Promise<void> {
-  if (columnKnownMissing(DISPATCH_COLUMNS)) return;
+export async function cancelDeliveryForOrder(orderId: string): Promise<void> {
   try {
     const supabase = createAdminClient();
+    if (!columnKnownMissing(DISPATCH_COLUMNS)) {
+      await supabase
+        .from("deliveries")
+        .delete()
+        .eq("order_id", orderId)
+        .eq("status", "unassigned");
+    }
     await supabase
       .from("deliveries")
-      .delete()
+      .update({ status: "cancelled" })
       .eq("order_id", orderId)
-      .eq("status", "unassigned");
+      .in("status", ["assigned", "picked_up"]);
   } catch {
     // swallow — see the module header
   }

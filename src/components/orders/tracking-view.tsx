@@ -223,7 +223,11 @@ export function TrackingView({
   return (
     <div className="relative">
       {toast ? (
-        <div className="animate-slide-up glass fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 shadow-[var(--shadow-md)]">
+        // Cleared below the status bar AND the sticky PageHeader beneath it
+        // (top-[calc(var(--status-h)+1rem)] is the pattern used elsewhere for
+        // the status bar alone) — this toast used to sit at a flat top-4 and
+        // briefly cover the header's back button right after placing an order.
+        <div className="animate-slide-up glass fixed left-1/2 top-[calc(var(--status-h)+3.75rem)] z-50 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 shadow-[var(--shadow-md)]">
           <span className="grid size-6 place-items-center rounded-full bg-green text-[var(--on-green)]">
             <Check className="size-4" strokeWidth={3} />
           </span>

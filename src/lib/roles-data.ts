@@ -152,7 +152,6 @@ export interface DeliveryJob {
   drop: DeliveryStop;
   /** Undefined when the shop or the address has no coordinates. */
   distanceKm?: number;
-  payout: number;
   items: number;
   customer: string;
 }
@@ -173,7 +172,6 @@ export const AVAILABLE_JOBS: DeliveryJob[] = [
       landmark: "Gate 2",
     },
     distanceKm: 2.3,
-    payout: 48,
     items: 4,
     customer: "Aarav M.",
   },
@@ -188,7 +186,6 @@ export const AVAILABLE_JOBS: DeliveryJob[] = [
       landmark: "Tower B reception",
     },
     distanceKm: 3.1,
-    payout: 62,
     items: 2,
     customer: "Karan V.",
   },
@@ -199,7 +196,6 @@ export const AVAILABLE_JOBS: DeliveryJob[] = [
     pickup: { area: "Pizza Loft", address: "27, HSR Sector 1" },
     drop: { area: "Home", address: "8, 14th Main, HSR Sector 4" },
     distanceKm: 1.8,
-    payout: 40,
     items: 3,
     customer: "Divya N.",
   },
@@ -265,6 +261,12 @@ export interface AdminOrderRow {
   items?: { name: string; qty: number }[];
   /** Units across all lines, so "3 items" doesn't have to be recomputed per render. */
   itemCount?: number;
+  /**
+   * What the platform keeps from this order — commission + GST on commission +
+   * other charges, at the vendor's own rate. Null for a cancelled order (no
+   * food value to take a cut of) and undefined on the demo seed rows.
+   */
+  profit?: number | null;
 }
 
 export const ADMIN_ORDERS: AdminOrderRow[] = [

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { queueRefundForOrder } from "@/lib/data-access/refunds";
+import { cancelDeliveryForOrder } from "@/lib/dispatch/rider-dispatch";
 import {
   notifyOrderCancelled,
   notifyVendorOrderCancelled,
@@ -57,8 +58,26 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "too_late" }, { status: 409 });
   }
 
-  const { error } = await admin.from("orders").update({ status: "cancelled" }).eq("id", id);
+  // Conditional on the status just read: without this, a status change that
+  // lands in the gap between that read and this write (the vendor accepting or
+  // rejecting it) would be silently overwritten by a cancel decided against
+  // stale state.
+  const { data: cancelled, error } = await admin
+    .from("orders")
+    .update({ status: "cancelled" })
+    .eq("id", id)
+    .eq("status", order.status)
+    .select("id");
   if (error) return NextResponse.json({ error: "server_error" }, { status: 500 });
+  if (!cancelled || cancelled.length === 0) {
+    return NextResponse.json({ error: "too_late" }, { status: 409 });
+  }
+
+  // A driver may already have accepted this order (offered while it was still
+  // `kitchen`, before the pool-visible `ready` stage). Stop them completing a
+  // delivery for an order that is now cancelled — see the function's own
+  // comment for why an accepted delivery is cancelled rather than deleted.
+  await cancelDeliveryForOrder(id);
 
   // Ownership was established above, which is what authorizes the service-role
   // write inside queueRefundForOrder. It returns queued:false for a COD order

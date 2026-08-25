@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
+import { DatePicker } from "@/components/ui/date-picker";
 
 /**
  * Shop + date filters for the order payouts screen. GET-driven, so the server
@@ -54,22 +55,18 @@ export function OrderPayoutFilters({
       </label>
       <label className="block space-y-1.5 text-sm">
         <span className="font-medium text-ink">From</span>
-        <input
-          type="date"
-          className="h-11 w-full rounded-xl border border-line bg-bg px-3 text-ink"
+        <DatePicker
           value={fromDate}
           disabled={pending}
-          onChange={(e) => navigate({ from: e.target.value })}
+          onChange={(v) => navigate({ from: v })}
         />
       </label>
       <label className="block space-y-1.5 text-sm">
         <span className="font-medium text-ink">To</span>
-        <input
-          type="date"
-          className="h-11 w-full rounded-xl border border-line bg-bg px-3 text-ink"
+        <DatePicker
           value={toDate}
           disabled={pending}
-          onChange={(e) => navigate({ to: e.target.value })}
+          onChange={(v) => navigate({ to: v })}
         />
       </label>
     </div>

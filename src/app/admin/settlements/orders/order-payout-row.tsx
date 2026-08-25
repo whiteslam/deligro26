@@ -74,6 +74,7 @@ export function OrderPayoutRowCard({
 
   const amount = Math.abs(row.contribution);
   const shopIsOwed = row.contribution >= 0;
+  const youEarn = row.commission + row.commissionGst + row.otherCharges;
 
   return (
     <li className="rounded-xl border border-line bg-surface">
@@ -94,7 +95,8 @@ export function OrderPayoutRowCard({
                 month: "short",
                 timeZone: "Asia/Kolkata",
               })}{" "}
-              · {payWord(row)} · customer paid {formatINR(row.orderTotal)}
+              · {payWord(row)} · customer paid {formatINR(row.orderTotal)} · you
+              earn {formatINR(youEarn)}
             </span>
           </span>
           {open ? (

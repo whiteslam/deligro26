@@ -58,18 +58,18 @@ export interface AdminDashboard {
   };
 }
 
-function startOfToday(): string {
+export function startOfToday(): string {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   return now.toISOString();
 }
 
-function daysAgo(n: number): string {
+export function daysAgo(n: number): string {
   return new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
 }
 
 /** Growth of `curr` over `prev`. A jump from nothing reads as up, not ∞. */
-function trend(curr: number, prev: number): Trend {
+export function trend(curr: number, prev: number): Trend {
   if (prev <= 0) {
     if (curr <= 0) return { pct: 0, direction: "flat" };
     return { pct: 100, direction: "up" };

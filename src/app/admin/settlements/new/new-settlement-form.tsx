@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { DatePicker } from "@/components/ui/date-picker";
 
 /**
  * GET-driven filters: changing vendor/dates navigates so the server can
@@ -78,22 +79,18 @@ export function NewSettlementForm({
       </label>
       <label className="block space-y-1.5 text-sm">
         <span className="font-medium text-ink">From (IST)</span>
-        <input
-          type="date"
-          className="h-11 w-full rounded-xl border border-line bg-bg px-3 text-ink"
+        <DatePicker
           value={fromDate}
           disabled={pending}
-          onChange={(e) => navigate({ from: e.target.value })}
+          onChange={(v) => navigate({ from: v })}
         />
       </label>
       <label className="block space-y-1.5 text-sm">
         <span className="font-medium text-ink">To (IST)</span>
-        <input
-          type="date"
-          className="h-11 w-full rounded-xl border border-line bg-bg px-3 text-ink"
+        <DatePicker
           value={toDate}
           disabled={pending}
-          onChange={(e) => navigate({ to: e.target.value })}
+          onChange={(v) => navigate({ to: v })}
         />
       </label>
       </div>
