@@ -30,7 +30,8 @@ import {
 } from "@/components/admin/data-table";
 import { formatWaited } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
-import { VendorSearchBar, PAGE_SIZES } from "./vendor-search-bar";
+import { VendorSearchBar } from "./vendor-search-bar";
+import { PAGE_SIZES } from "./page-sizes";
 import { VendorPositionSelect } from "./vendor-position-select";
 import { VendorPasswordCell } from "./vendor-password-cell";
 import { VendorRowActions } from "./vendor-row-actions";
