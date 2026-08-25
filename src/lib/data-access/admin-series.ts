@@ -79,7 +79,10 @@ export const SERIES_DAYS = 30;
  * missing chart is recoverable, a dashboard that 500s because one aggregate
  * query failed is not.
  */
-export async function getAdminSeries(days = SERIES_DAYS): Promise<AdminSeries> {
+export async function getAdminSeries(
+  days = SERIES_DAYS,
+  restaurantId?: string
+): Promise<AdminSeries> {
   const span = Math.max(1, Math.min(days, 180));
 
   // Build the buckets first, so the shape of the answer never depends on what
@@ -100,11 +103,13 @@ export async function getAdminSeries(days = SERIES_DAYS): Promise<AdminSeries> {
 
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("orders")
       .select("total, created_at")
       .gte("created_at", since)
       .order("created_at");
+    if (restaurantId) query = query.eq("restaurant_id", restaurantId);
+    const { data, error } = await query;
 
     if (!error) {
       for (const row of (data ?? []) as {
@@ -160,7 +165,10 @@ const STATUS_ORDER = [
  * How the last `days` days of orders ended up, by stage — the donut's data.
  * Stages with no orders are omitted; a window with nothing in it returns [].
  */
-export async function getOrderStatusMix(days = 7): Promise<StatusSlice[]> {
+export async function getOrderStatusMix(
+  days = 7,
+  restaurantId?: string
+): Promise<StatusSlice[]> {
   const since = new Date(
     Date.now() - Math.max(1, days) * 86_400_000
   ).toISOString();
@@ -168,10 +176,9 @@ export async function getOrderStatusMix(days = 7): Promise<StatusSlice[]> {
   let rows: { status: string | null }[] = [];
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("orders")
-      .select("status")
-      .gte("created_at", since);
+    let query = supabase.from("orders").select("status").gte("created_at", since);
+    if (restaurantId) query = query.eq("restaurant_id", restaurantId);
+    const { data, error } = await query;
     if (error) return [];
     rows = (data ?? []) as { status: string | null }[];
   } catch {

@@ -80,6 +80,7 @@ export async function setCategoryImageAction(
   // The strip is on the customer home page, which is where the change has to
   // show up — revalidating only the admin route would confirm a save nobody sees.
   revalidatePath("/", "layout");
+  revalidatePath("/admin/storage");
   revalidatePath("/admin/settings/categories");
   return { ok: true };
 }

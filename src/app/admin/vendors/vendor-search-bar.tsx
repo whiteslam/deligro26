@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Search, X } from "lucide-react";
 import { fieldCls } from "@/components/ui/field";
+import { PAGE_SIZES } from "./page-sizes";
 
 const SORTS: { value: string; label: string }[] = [
   { value: "recent", label: "Newest first" },
@@ -11,13 +12,6 @@ const SORTS: { value: string; label: string }[] = [
   { value: "name", label: "Name A–Z" },
   { value: "status", label: "Status" },
 ];
-
-/**
- * Rows per page. The first entry is the default, and is what the page falls
- * back to for an absent or bogus `?per=` — so the list can never be talked into
- * an unbounded query. `listVendors` caps at 100 as well.
- */
-export const PAGE_SIZES = [25, 50, 100];
 
 /**
  * Search / filter / sort / page-size for the vendor table. Everything lives in

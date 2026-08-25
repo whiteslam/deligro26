@@ -104,7 +104,7 @@ const CATEGORY_TINT: Record<HomeCategoryId, string> = {
  *
  * These are stock photographs of the dish family, not of any particular shop's
  * food. An operator replaces any of them with a real photo of the real product
- * from Admin → Settings → Categories, which writes `category_images` (migration
+ * from Admin → Storage, which writes `category_images` (migration
  * 0037) and takes effect without a deploy. See `lib/categories.ts`.
  *
  * `images.unsplash.com` is one of only two hosts the CSP allows for images (the

@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { shrinkForUpload } from "@/lib/images/shrink";
 
 /**
- * The background queue behind Admin → Food photos → "Upload a folder".
+ * The background queue behind Admin → Storage → "Upload a folder".
  *
  * It lives in a module-level store rather than in the page for one reason: an
  * operator who drops a folder of two hundred photos in should be able to walk

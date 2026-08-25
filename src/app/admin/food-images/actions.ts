@@ -49,6 +49,7 @@ export async function updateFoodImageAction(
     return { ok: false, error: "Couldn't save that photo. Try again." };
   }
 
+  revalidatePath("/admin/storage");
   revalidatePath("/admin/food-images");
   return { ok: true };
 }
@@ -66,6 +67,7 @@ export async function deleteFoodImageAction(
     return { ok: false, error: "Couldn't delete that photo. Try again." };
   }
 
+  revalidatePath("/admin/storage");
   revalidatePath("/admin/food-images");
   return { ok: true };
 }
