@@ -25,6 +25,7 @@
     "test:ranking": "npx tsx scripts/qa/dish-ranking.ts",
     "test:idor": "npx tsx scripts/qa/idor-suite.ts",
     "test:payments": "npx tsx scripts/qa/payments-signature.ts",
+    "test:app-version": "npx tsx scripts/qa/app-version.ts",
     "test:e2e": "npx tsx scripts/qa/e2e-smoke.ts",
     "test:zap": "bash scripts/qa/zap-baseline.sh",
     "test:qa": "bash scripts/qa/run-all.sh"

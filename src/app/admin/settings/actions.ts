@@ -12,6 +12,7 @@ import {
   setCommissionGstPct,
   setVendorCommissionDefault,
 } from "@/lib/data-access/admin-commission";
+import { safeApkUrl } from "@/lib/releases/app-version";
 import type { PlatformSettings } from "@/types";
 
 export interface ActionResult {
@@ -38,6 +39,38 @@ function bool(form: FormData, name: string): boolean {
 }
 
 /**
+ * One app's release track, read off the form.
+ *
+ * The minimum is clamped to the latest rather than rejected. A minimum above
+ * the latest is the one setting on this page with no way back: it force-updates
+ * every installed app to a build that does not exist, and the APK URL it hands
+ * them is the release they are already on. The 0043 CHECK constraint would
+ * refuse the row, but that throws away the rest of a saved form over a typo in
+ * a spinner — and on a pre-0043 database there is no constraint at all.
+ *
+ * Floored at 1 to match the same constraint, and to keep the fallback identity
+ * that `app-version.ts` relies on: every real build is >= 1.
+ */
+function releaseTrack(
+  form: FormData,
+  app: "rider" | "customer",
+  current: { latest: number; min: number }
+): { latest: number; min: number; url: string; notes: string } {
+  const latest = Math.max(1, int(form.get(`${app}ApkVersionCode`), current.latest));
+  const min = Math.max(1, int(form.get(`${app}ApkMinVersionCode`), current.min));
+  return {
+    latest,
+    min: Math.min(min, latest),
+    // https only, and dropped rather than rejected — see `safeApkUrl`. An
+    // operator who pastes an http link gets an empty field back on the next
+    // render, which is the visible signal; storing it would put a MITM-able
+    // install URL in front of a fleet.
+    url: safeApkUrl(str(form.get(`${app}ApkUrl`))),
+    notes: str(form.get(`${app}ApkNotes`)),
+  };
+}
+
+/**
  * Read the settings form into the domain shape. Percentages → fractions.
  *
  * `current` is what is stored right now, for fields the form no longer renders.
@@ -45,6 +78,14 @@ function bool(form: FormData, name: string): boolean {
 function parse(form: FormData, current: PlatformSettings): PlatformSettings {
   const taxPct = num(form.get("taxRatePct"), 5);
   const commissionPct = num(form.get("riderCommissionPct"), 8);
+  const rider = releaseTrack(form, "rider", {
+    latest: current.riderApkVersionCode,
+    min: current.riderApkMinVersionCode,
+  });
+  const customer = releaseTrack(form, "customer", {
+    latest: current.customerApkVersionCode,
+    min: current.customerApkMinVersionCode,
+  });
   return {
     deliveryFee: int(form.get("deliveryFee"), 29),
     // Stored as a fraction; the admin edits whole percent. Clamp 0–100%.
@@ -92,6 +133,15 @@ function parse(form: FormData, current: PlatformSettings): PlatformSettings {
         )
       )
     ),
+
+    riderApkVersionCode: rider.latest,
+    riderApkMinVersionCode: rider.min,
+    riderApkUrl: rider.url,
+    riderApkNotes: rider.notes,
+    customerApkVersionCode: customer.latest,
+    customerApkMinVersionCode: customer.min,
+    customerApkUrl: customer.url,
+    customerApkNotes: customer.notes,
   };
 }
 

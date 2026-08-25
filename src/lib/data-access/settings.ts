@@ -76,6 +76,14 @@ interface SettingsRow {
   feature_online_payment?: boolean;
   review_window_days?: number;
   review_edit_window_hours?: number;
+  rider_apk_version_code?: number;
+  rider_apk_min_version_code?: number;
+  rider_apk_url?: string;
+  rider_apk_notes?: string;
+  customer_apk_version_code?: number;
+  customer_apk_min_version_code?: number;
+  customer_apk_url?: string;
+  customer_apk_notes?: string;
 }
 
 /**
@@ -102,6 +110,26 @@ const OPTIONAL_GROUPS = [
     write: (input: PlatformSettings): Record<string, unknown> => ({
       review_window_days: input.reviewWindowDays,
       review_edit_window_hours: input.reviewEditWindowHours,
+    }),
+  },
+  {
+    /**
+     * Migration 0043. All eight columns arrive together, so the one probe key
+     * answers for the set — the same reasoning as the 0033 pair above.
+     */
+    key: "platform_settings.rider_apk_version_code",
+    select:
+      "rider_apk_version_code, rider_apk_min_version_code, rider_apk_url, rider_apk_notes, " +
+      "customer_apk_version_code, customer_apk_min_version_code, customer_apk_url, customer_apk_notes",
+    write: (input: PlatformSettings): Record<string, unknown> => ({
+      rider_apk_version_code: input.riderApkVersionCode,
+      rider_apk_min_version_code: input.riderApkMinVersionCode,
+      rider_apk_url: input.riderApkUrl,
+      rider_apk_notes: input.riderApkNotes,
+      customer_apk_version_code: input.customerApkVersionCode,
+      customer_apk_min_version_code: input.customerApkMinVersionCode,
+      customer_apk_url: input.customerApkUrl,
+      customer_apk_notes: input.customerApkNotes,
     }),
   },
 ] as const;
@@ -189,6 +217,26 @@ function mapSettings(row: SettingsRow): PlatformSettings {
     reviewEditWindowHours: Number(
       row.review_edit_window_hours ?? DEFAULT_SETTINGS.reviewEditWindowHours
     ),
+    // Absent columns (pre-0043) fall back to the shared defaults, which pin
+    // every version code to 1 — so a database without the migration reports
+    // every app as current rather than as needing an update it has no URL for.
+    riderApkVersionCode: Number(
+      row.rider_apk_version_code ?? DEFAULT_SETTINGS.riderApkVersionCode
+    ),
+    riderApkMinVersionCode: Number(
+      row.rider_apk_min_version_code ?? DEFAULT_SETTINGS.riderApkMinVersionCode
+    ),
+    riderApkUrl: row.rider_apk_url ?? DEFAULT_SETTINGS.riderApkUrl,
+    riderApkNotes: row.rider_apk_notes ?? DEFAULT_SETTINGS.riderApkNotes,
+    customerApkVersionCode: Number(
+      row.customer_apk_version_code ?? DEFAULT_SETTINGS.customerApkVersionCode
+    ),
+    customerApkMinVersionCode: Number(
+      row.customer_apk_min_version_code ??
+        DEFAULT_SETTINGS.customerApkMinVersionCode
+    ),
+    customerApkUrl: row.customer_apk_url ?? DEFAULT_SETTINGS.customerApkUrl,
+    customerApkNotes: row.customer_apk_notes ?? DEFAULT_SETTINGS.customerApkNotes,
   };
 }
 

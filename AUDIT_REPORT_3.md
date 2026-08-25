@@ -6,6 +6,32 @@
 
 ---
 
+## Remediation status — 2026-08-26
+
+Verified against the merged tree (`master` after the `office` merge), finding by
+finding. **Both CRITICALs and all four HIGHs are closed.** The findings below
+are left as written — the reasoning is the record of why the fix looks as it
+does — with the status of each recorded here rather than edited into the text.
+
+| # | Finding | Status |
+|---|---|---|
+| CRITICAL | Cancelled order resurrected to `delivered` | **Fixed.** Both writes in `advanceDelivery` are now conditional on the expected prior status (`.eq("status", …)`) and check the returned row, and `cancelDeliveryForOrder` is called from **all three** cancel paths — customer route, `cancelOrderAsAdmin`, and vendor reject — not just the vendor one. |
+| CRITICAL | Refunds after settlement never clawed back | **Fixed as flagging**, which is what the finding's own suggested fix offered as the alternative to an automatic reversal. `decideRefund` now calls `findSettlementForOrder`, writes a note onto the settlement via `flagSettlementForRefund`, and returns a `settlementWarning` that the admin refund card renders inline — distinct wording for a paid settlement (reconcile by hand) versus a draft one (void and rebuild). No silent gap remains; there is still no automatic negative adjustment line, deliberately. |
+| HIGH | Customer self-cancel TOCTOU | **Fixed.** The update carries `.eq("status", order.status)` and a zero-row result returns 409 `too_late`. |
+| HIGH | `acceptDelivery` never validates order status | **Fixed.** The order must read `ready` before a delivery row is created. |
+| HIGH | Driver status writes ignore Supabase errors | **Fixed.** Both branches check `{error}` and return `order_not_active` rather than an unconditional `{ok: true}`. |
+| HIGH | Shell-switcher covers the upload dock | **Fixed differently than suggested.** Rather than portalling `FoodUploadDock`, it is pinned left on desktop (`sm:left-4 sm:right-auto`) so the two fixed, viewport-level elements no longer share the bottom-right corner. Resolves the collision; the portal inconsistency itself remains. |
+| MEDIUM | No draft-settlement warning at refund time | **Fixed** by the same `settlementWarning` path as CRITICAL #2. |
+| MEDIUM | Kitchen busy bump missing from ETA/lateness | **Fixed.** `order-tracking.ts` and `admin-orders.ts` both select `busy_until`/`busy_extra_minutes` and run them through `kitchenPace()`, matching `restaurants.ts`. |
+| MEDIUM | "Order placed" toast covers the sticky header | **Fixed.** Offset to `top-[calc(var(--status-h)+3.75rem)]`. |
+| LOW | Orphaned dispatch offers on customer/admin cancel | **Fixed** by the same cleanup as CRITICAL #1. |
+| MEDIUM | Admin status-override writes no `deliveries` row | **Open.** The audit rated the fix optional (a UI note). Behaviour is unchanged and still deliberate. |
+| LOW | Two IST calendar implementations | **Open.** `cycle.ts` and `ist-time.ts` still agree; no fix attempted. |
+| LOW | Vendor gross revenue includes in-flight orders | **Open, and intentional** — labelled in the UI, flagged for skim-risk only. |
+| LOW | Live board needs horizontal scroll below 660px | **Open, and intentional** — a design decision recorded in the component's own comment. |
+
+---
+
 ## Executive summary
 
 Read this part even if you read nothing else.

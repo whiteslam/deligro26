@@ -1,6 +1,14 @@
 # App version check API — design
 
-Status: approved (approach + contract confirmed in chat 2026-08-25)
+Status: **implemented** 2026-08-26 — migration `0043_app_release_config.sql`,
+`src/lib/releases/app-version.ts`, `src/app/api/app-version/route.ts`, the
+"App releases" card on `/admin/settings/platform`, and
+`scripts/qa/app-version.ts` (+ six route cases in `scripts/qa/e2e-smoke.ts`).
+Built as designed, with one addition the design did not call for: the APK URL is
+**https-only**, enforced both when saved and when served — see "Deviations" at
+the foot of this document.
+
+(Approach + contract confirmed in chat 2026-08-25.)
 
 ## Goal
 
@@ -154,3 +162,31 @@ page.
 - Manual check: save values in the new admin Settings card, confirm the
   route reflects them immediately (no caching to invalidate — same as every
   other setting).
+
+---
+
+## Deviations from this design, as built
+
+**The APK URL is https-only** (`safeApkUrl` in `src/lib/releases/app-version.ts`).
+The design treated the URL as an opaque string. It is not: whatever is at the
+end of it gets *installed*, by a phone already configured to accept sideloaded
+builds. Over plain http, any network between the rider and the file can return a
+different APK and the app has no signal that it did — which makes the update
+channel a better attack than the thing it is updating. An http, `javascript:`,
+`data:` or relative value is dropped to `""` rather than rejected, so a paste
+mistake costs the link and not the rest of the settings form; `updateAvailable`
+still travels, so the app can say "an update exists, ask the office" instead of
+going silent. Enforced on the way out as well as on the way in, because the
+write-side check only covers rows saved after this shipped.
+
+**`min` is clamped to `latest` in three places**, not just the CHECK constraint
+the design specified: the constraint, the admin action, and `appVersionAnswer`
+itself. A floor above the latest build is the only setting on that page with no
+way back — it force-updates every installed app to a release that does not
+exist, and hands them the APK they already have. The constraint does not exist
+on a pre-0043 database, and the answer is what actually reaches the fleet.
+
+**No unit-test framework was added.** The design's "unit test" is
+`scripts/qa/app-version.ts`, table-driven in the style of
+`scripts/qa/payments-signature.ts`, and wired into `npm run test:qa`. The route
+cases live in `scripts/qa/e2e-smoke.ts`, which already drives a running app.

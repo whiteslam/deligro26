@@ -47,4 +47,19 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   // so changing one means changing all three.
   reviewWindowDays: 14,
   reviewEditWindowHours: 48,
+
+  // Mirrors the 0043 column defaults exactly, and that agreement is what makes
+  // `GET /api/app-version` safe with no fallback branch: any real installed
+  // build has a versionCode >= 1, so against these values it is neither behind
+  // the latest nor below the minimum, and the route answers "you are current".
+  // An unreadable settings row therefore stops offering updates rather than
+  // force-updating a fleet it cannot describe.
+  riderApkVersionCode: 1,
+  riderApkMinVersionCode: 1,
+  riderApkUrl: "",
+  riderApkNotes: "",
+  customerApkVersionCode: 1,
+  customerApkMinVersionCode: 1,
+  customerApkUrl: "",
+  customerApkNotes: "",
 };

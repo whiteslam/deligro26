@@ -144,6 +144,85 @@ function Num({
   );
 }
 
+/**
+ * One app's release track. Both apps take the same four fields, and the pair of
+ * version codes only means anything read together, so they are rendered from
+ * one component rather than eight hand-written rows that could drift apart.
+ *
+ * `min` carries `max={latest}` purely as a hint to the number spinner — the
+ * form is a public HTTP endpoint, so the real clamp is in `actions.ts` and the
+ * 0043 CHECK constraint behind it.
+ */
+function AppRelease({
+  app,
+  label,
+  latest,
+  min,
+  url,
+  notes,
+}: {
+  app: "rider" | "customer";
+  label: string;
+  latest: number;
+  min: number;
+  url: string;
+  notes: string;
+}) {
+  const key = (field: string) => `${app}Apk${field}`;
+  return (
+    <>
+      <div className="border-t border-[color:var(--c-divider)] pt-[11px] first:border-t-0">
+        <span className="block text-[12.5px] font-bold text-ink">{label}</span>
+      </div>
+      <Row
+        label="Latest version code"
+        hint="The versionCode of the newest APK you have published."
+        htmlFor={key("VersionCode")}
+      >
+        <Num
+          id={key("VersionCode")}
+          name={key("VersionCode")}
+          defaultValue={latest}
+          min={1}
+        />
+      </Row>
+      <Row
+        label="Minimum supported"
+        hint="Anything below this is forced to update. Cannot exceed the latest."
+        htmlFor={key("MinVersionCode")}
+      >
+        <Num
+          id={key("MinVersionCode")}
+          name={key("MinVersionCode")}
+          defaultValue={min}
+          min={1}
+          max={latest}
+        />
+      </Row>
+      <Stacked
+        label="APK download URL"
+        hint="Where the app sends people to update. Must be https — an http link is dropped on save, because anything on the network could swap the file being installed."
+      >
+        <input
+          name={key("Url")}
+          defaultValue={url}
+          type="url"
+          className="c-field c-field-wide"
+          placeholder="https://.../rider-v45.apk"
+        />
+      </Stacked>
+      <Stacked label="Release notes" hint="Shown in the update prompt.">
+        <textarea
+          name={key("Notes")}
+          defaultValue={notes}
+          rows={2}
+          className="c-field c-field-wide resize-y"
+        />
+      </Stacked>
+    </>
+  );
+}
+
 export function SettingsForm({
   settings,
   razorpayConfigured = false,
@@ -511,6 +590,41 @@ export function SettingsForm({
               className="c-field c-field-wide resize-y"
             />
           </Stacked>
+        </Card>
+
+        <Card
+          className="@3xl:order-7 @3xl:col-span-2"
+          title="App releases"
+          desc="What the rider and customer Android apps are told when they check for an update. There is no Play Store behind these — the apps install from the APK link you put here."
+        >
+          <div className="grid grid-cols-1 gap-x-6 @3xl:grid-cols-2">
+            <div>
+              <AppRelease
+                app="rider"
+                label="Rider app"
+                latest={settings.riderApkVersionCode}
+                min={settings.riderApkMinVersionCode}
+                url={settings.riderApkUrl}
+                notes={settings.riderApkNotes}
+              />
+            </div>
+            <div>
+              <AppRelease
+                app="customer"
+                label="Customer app"
+                latest={settings.customerApkVersionCode}
+                min={settings.customerApkMinVersionCode}
+                url={settings.customerApkUrl}
+                notes={settings.customerApkNotes}
+              />
+            </div>
+          </div>
+          <Note>
+            Raising the minimum takes effect on the next check every installed
+            app makes, and there is no way to undo it for someone already
+            blocked — they can only go forwards, to the APK at the URL above.
+            Publish the file first, then raise the numbers.
+          </Note>
         </Card>
       </div>
 

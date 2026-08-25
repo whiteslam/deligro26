@@ -326,6 +326,32 @@ export interface PlatformSettings {
   reviewWindowDays: number;
   /** Hours after posting that a customer may still edit or withdraw a review. */
   reviewEditWindowHours: number;
+
+  // ---- Android app releases (0043) ----
+  /**
+   * What the rider and customer Android apps are told when they ask
+   * `GET /api/app-version`. Both apps are distributed as a direct `.apk`, not
+   * through Play, so this is the only channel that can move a fleet off a bad
+   * build — see `src/lib/releases/app-version.ts` for how the two version codes
+   * become "update available" and "must update".
+   *
+   * Every code defaults to 1 rather than 0, here and in the 0043 column
+   * defaults, so an un-migrated or unreadable backend answers "you are current"
+   * for any real installed build instead of force-updating everyone.
+   */
+  riderApkVersionCode: number;
+  /** Oldest rider build still allowed to run. Below it, the app must update. */
+  riderApkMinVersionCode: number;
+  /** Direct download URL for the latest rider APK. Empty = nothing to offer. */
+  riderApkUrl: string;
+  /** Release notes shown in the rider app's update prompt. */
+  riderApkNotes: string;
+
+  customerApkVersionCode: number;
+  /** Oldest customer build still allowed to run. */
+  customerApkMinVersionCode: number;
+  customerApkUrl: string;
+  customerApkNotes: string;
 }
 
 /** How the customer intends to pay. Mirrors the `payment_method` enum (0025). */
