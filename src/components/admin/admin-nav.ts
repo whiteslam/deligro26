@@ -139,7 +139,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   },
   {
     href: "/admin/food-images",
-    label: "Food photos",
+    label: "Photo storage",
     icon: ImageIcon,
     group: "Catalogue",
     tone: "green",

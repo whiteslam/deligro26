@@ -9,7 +9,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { FoodImageLibrary } from "./food-image-library";
 
 /**
- * Admin → Food photos.
+ * Admin → Photo storage.
  *
  * One photo per dish, uploaded once and reused by every shop that sells it.
  * When a shop adds "Chicken Biryani" to its menu the right photo is attached by
@@ -41,7 +41,7 @@ export default async function FoodImagesPage({
   return (
     <>
       <AdminHero
-        title="Food photos"
+        title="Photo storage"
         tag={ready ? `${images.length} photo${images.length === 1 ? "" : "s"}` : undefined}
         subtitle="One shared picture per dish — shops get the right one automatically"
       />
