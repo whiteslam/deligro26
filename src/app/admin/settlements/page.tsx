@@ -70,14 +70,6 @@ function waitLabel(days: number): string {
   return `${days} days`;
 }
 
-/** The draft builder, pre-filled with exactly the orders this row counted. */
-function buildHref(r: VendorSettlementQueueRow): string {
-  const params = new URLSearchParams({ restaurantId: r.restaurantId });
-  if (r.suggestedFrom) params.set("from", r.suggestedFrom);
-  if (r.suggestedTo) params.set("to", r.suggestedTo);
-  return `/admin/settlements/new?${params.toString()}`;
-}
-
 /** Rows per page. Both tables are scanned, not read, so a screenful is plenty. */
 const QUEUE_PAGE_SIZE = 20;
 const BATCH_PAGE_SIZE = 20;
@@ -297,6 +289,7 @@ export default async function AdminSettlementsPage({
       key: "flags",
       header: "Status",
       role: "trailing",
+      align: "right",
       width: "w-[118px]",
       cell: (r) => (
         <div className="flex flex-wrap items-center justify-end gap-1">
@@ -346,7 +339,7 @@ export default async function AdminSettlementsPage({
     },
     {
       key: "actions",
-      header: "",
+      header: "Actions",
       role: "actions",
       align: "right",
       width: "w-[168px]",
@@ -356,16 +349,8 @@ export default async function AdminSettlementsPage({
             href={`/admin/settlements/orders?vendor=${r.restaurantId}&state=unpaid`}
             className="c-btn press whitespace-nowrap"
           >
-            Orders
+            View Orders
           </Link>
-          {r.orderCount > 0 ? (
-            <Link
-              href={buildHref(r)}
-              className="c-btn-affirm press whitespace-nowrap"
-            >
-              Build draft
-            </Link>
-          ) : null}
         </div>
       ),
     },
