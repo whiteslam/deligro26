@@ -188,6 +188,61 @@ async function main() {
     else fail(`GET /api/app-version with ${name} → 400`, `got ${res.status}`);
   }
 
+  // PWA surface. Every one of these must answer 200 to a browser with NO
+  // session: a service-worker script that redirects does not register, and a
+  // precache of /offline that follows a redirect stores the LOGIN page as the
+  // offline screen. Both were real — see the proxy matcher's comment.
+  for (const [path, type] of [
+    ["/OneSignalSDKWorker.js", "javascript"],
+    ["/sw-core.js", "javascript"],
+    ["/offline.html", "text/html"],
+    ["/manifest.webmanifest", "application/manifest+json"],
+  ] as const) {
+    const res = await get(path);
+    const ct = res.headers.get("content-type") ?? "";
+    if (res.status !== 200) {
+      fail(`GET ${path} anonymous → 200`, `got ${res.status}`);
+    } else if (!ct.includes(type)) {
+      fail(`GET ${path} content-type`, `got ${ct}`);
+    } else {
+      pass(`GET ${path} anonymous → 200 (${type})`);
+    }
+  }
+
+  {
+    const res = await get("/manifest.webmanifest");
+    const m = (await res.json()) as Record<string, unknown>;
+    const icons = Array.isArray(m.icons) ? m.icons : [];
+    const maskable = icons.some(
+      (i) => typeof i === "object" && i !== null &&
+        String((i as { purpose?: string }).purpose ?? "").includes("maskable")
+    );
+    const installable =
+      m.name && m.short_name && m.start_url && m.display === "standalone" &&
+      icons.length > 0 && maskable;
+    if (installable) pass("manifest is installable (name, start_url, standalone, maskable icon)");
+    else fail("manifest is installable", JSON.stringify({ ...m, icons: icons.length }));
+  }
+
+  {
+    // The offline fallback has to be the offline screen, not a sign-in form —
+    // and it has to stand on its own, with no Next chunk to hydrate. A build
+    // that reintroduced a framework dependency here would cache fine and then
+    // render the app's error boundary on every disconnection.
+    const body = await (await get("/offline.html")).text();
+    // Look for real references, not the string: this file's own comment
+    // explains why it must not depend on /_next/ chunks, and a naive
+    // `includes` matched that prose.
+    const standalone = !/(?:src|href)\s*=\s*["'][^"']*\/_next\//.test(body);
+    if (!/offline/i.test(body)) {
+      fail("/offline.html renders the offline screen", "no offline copy in the body");
+    } else if (!standalone) {
+      fail("/offline.html is self-contained", "references /_next/ — it must not need chunks");
+    } else {
+      pass("/offline.html renders the offline screen, self-contained");
+    }
+  }
+
   summarize();
   if (results.some((r) => !r.ok)) process.exit(1);
 }

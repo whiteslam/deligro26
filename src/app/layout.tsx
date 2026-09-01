@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { InlineScript } from "@/components/shared/inline-script";
+import { PwaProvider } from "@/components/pwa/pwa-provider";
 import { IS_INDEXABLE, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -64,6 +65,13 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
+  // Required for `env(safe-area-inset-*)` to resolve to anything but 0. This
+  // stylesheet has used those insets from the start — --status-h, the tab bar's
+  // bottom padding, the sticky docks — and without viewport-fit they were all
+  // silently computing to zero on exactly the devices they were written for, so
+  // an installed app on a notched iPhone drew its status bar under the notch
+  // and its tab bar under the home indicator.
+  viewportFit: "cover",
   // No `maximumScale`. Pinch-zoom is the only escape hatch a customer with weak
   // near vision has, and this app's audience skews toward first-time smartphone
   // users, shopkeepers reading the vendor board, and riders squinting at a phone
@@ -95,6 +103,9 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >
         {children}
+        {/* Last child, and renders nothing until after hydration: the PWA layer
+            is additive, so it must never be in the way of the app painting. */}
+        <PwaProvider />
       </body>
     </html>
   );

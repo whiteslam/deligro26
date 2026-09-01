@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>No connection · Deligro</title>
+<!--
+  The service worker's offline fallback.
+
+  Plain, self-contained HTML rather than a Next route, and that is the whole
+  point. The first version of this WAS a route (`src/app/offline/page.tsx`), and
+  it failed in exactly the situation it exists for: the HTML was cached fine,
+  but a Next page needs its `/_next/static/chunks/*` to hydrate, those chunks
+  are only ever cached if the app happened to request them while online, and
+  when they 404 the router throws — so every offline navigation rendered the
+  app's "Something went wrong" error boundary instead of this screen. Verified
+  in headless Chrome against a stopped server.
+
+  So: no framework, no chunk, no external stylesheet, no font file. Colours are
+  copied from globals.css rather than imported, because a stylesheet is one more
+  thing that has to be in the cache. They are duplicated deliberately; if the
+  palette changes, this file drifting is a cosmetic issue on a screen nobody
+  should see for long, which is a far better failure than a blank page.
+-->
+<style>
+  :root {
+    --bg: #f4f3f0;
+    --surface: #fcfcfb;
+    --ink: #0e1417;
+    --muted: #52585e;
+    --line: #dedcd6;
+  }
+  /* Matches the app's dark theme. The app sets data-theme from localStorage
+     before paint; this page cannot read that reliably before its own styles
+     apply, so it follows the OS instead — the common case, and never wrong
+     enough to be unreadable. */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1215;
+      --surface: #171b1f;
+      --ink: #f2f5f4;
+      --muted: #97a0a6;
+      --line: #2a3036;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px calc(24px + env(safe-area-inset-right, 0px))
+             calc(24px + env(safe-area-inset-bottom, 0px))
+             calc(24px + env(safe-area-inset-left, 0px));
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 22rem; text-align: center; }
+  .glyph {
+    width: 56px; height: 56px; margin: 0 auto 16px;
+    display: grid; place-items: center;
+    border-radius: 16px; background: var(--surface);
+    border: 1px solid var(--line);
+  }
+  h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+  p { font-size: 14px; line-height: 1.6; color: var(--muted); margin: 6px 0 0; }
+  button {
+    margin-top: 20px;
+    font: inherit; font-size: 14px; font-weight: 600;
+    color: var(--bg); background: var(--ink);
+    border: 0; border-radius: 12px;
+    /* 44px min target — this is the only control on the screen and it is
+       often tapped one-handed, in a hurry, on a moving vehicle. */
+    padding: 12px 20px; min-height: 44px;
+    cursor: pointer;
+  }
+  button:active { opacity: 0.85; }
+  button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .note { margin-top: 22px; font-size: 12px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="glyph" aria-hidden="true">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+         stroke-linejoin="round" style="color: var(--muted)">
+      <path d="m2 2 20 20"/>
+      <path d="M5.8 5.8A7 7 0 0 0 4 10a4 4 0 0 0 4 4h7"/>
+      <path d="M9.5 4.2A6 6 0 0 1 19 9a3.5 3.5 0 0 1 1.5 6.6"/>
+    </svg>
+  </div>
+
+  <h1>You&rsquo;re offline</h1>
+  <p>
+    Deligro needs a connection to show live menus, prices and order updates.
+    Pages you&rsquo;ve already opened may still work.
+  </p>
+
+  <button type="button" id="retry">Try again</button>
+
+  <p class="note">This screen goes away by itself once you&rsquo;re back online.</p>
+</main>
+
+<script>
+  // Inline, because an external script is one more request that cannot succeed.
+  (function () {
+    var btn = document.getElementById("retry");
+    var reloading = false;
+    function retry() {
+      if (reloading) return;
+      reloading = true;
+      btn.textContent = "Reconnecting…";
+      location.reload();
+    }
+    btn.addEventListener("click", retry);
+    // The important half: a phone that finds signal in someone's pocket should
+    // not need them to notice and tap anything.
+    window.addEventListener("online", retry);
+  })();
+</script>
+</body>
+</html>

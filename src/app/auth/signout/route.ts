@@ -20,5 +20,14 @@ export async function POST(request: Request) {
     new URL(request.url).searchParams.get("next"),
     CUSTOMER_LOGIN
   );
-  return NextResponse.redirect(new URL(next, request.url), { status: 303 });
+
+  // Mark the landing page so the client knows a session actually ENDED here.
+  // Without it the only signal is "we are on a login page", and /login is the
+  // customer app's entry screen — every anonymous visitor starts there, so
+  // treating that as a sign-out wiped the service worker's caches on ordinary
+  // first visits. `safeNextPath` has already rejected anything that is not a
+  // relative in-app path, so this only ever appends to one of our own routes.
+  const target = new URL(next, request.url);
+  target.searchParams.set("signedout", "1");
+  return NextResponse.redirect(target, { status: 303 });
 }

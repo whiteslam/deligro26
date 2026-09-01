@@ -25,7 +25,14 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Deligro",
     description:
       "Freshly made, delivered warm — usually in under 30 minutes. Order from restaurants across Bemetara.",
+    // Stable identity for the installed app. Without it a browser derives the id
+    // from start_url, so changing that later would be treated as a different app
+    // and the installed icon would orphan.
+    id: "/",
     start_url: "/",
+    scope: "/",
+    lang: "en-IN",
+    dir: "ltr",
     display: "standalone",
     orientation: "portrait",
     background_color: "#ffffff",
@@ -44,5 +51,35 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "maskable",
       },
     ],
+    // Long-press the installed icon. Only three, and each is a place someone
+    // actually goes with intent — a shortcut list that mirrors the tab bar is
+    // just a second tab bar the user has to read.
+    //
+    // `/orders` and `/switch` both sit behind a sign-in redirect, which is the
+    // correct behaviour: the shortcut takes you to the door, and the door knows
+    // where you were going.
+    shortcuts: [
+      {
+        name: "Search restaurants",
+        short_name: "Search",
+        url: "/search",
+        icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
+      },
+      {
+        name: "My orders",
+        short_name: "Orders",
+        url: "/orders",
+        icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
+      },
+      {
+        name: "Open my console",
+        short_name: "Console",
+        url: "/switch",
+        icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
+      },
+    ],
+    // There is no native app to hand off to, so never let a store listing
+    // pre-empt the install prompt.
+    prefer_related_applications: false,
   };
 }

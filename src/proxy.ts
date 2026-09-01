@@ -25,7 +25,12 @@ import {
 // still happens server-side in each portal's layout via requireRole(). Proxy
 // stays coarse and DB-free so it's cheap.
 
-/** Auth pages — always reachable without a session. */
+/**
+ * Auth pages — always reachable without a session.
+ *
+ * The offline fallback is NOT here — it is `public/offline.html`, a static file
+ * excluded in the matcher below alongside the service-worker scripts.
+ */
 const PUBLIC_PATHS = [CUSTOMER_LOGIN, "/portals", ...PORTAL_LOGIN_PATHS];
 
 /** Entry page a signed-in user should be bounced away from (already onboarded). */
@@ -112,7 +117,16 @@ export const config = {
   //
   // All three are public by definition. Nothing in them is user-scoped, so
   // there is nothing for the session gate to protect.
+  //
+  // The two service-worker scripts are excluded for exactly the same reason,
+  // and it was exactly the same bug: the exclusion list above covers images but
+  // not .js, so `/OneSignalSDKWorker.js` answered 307 → /login to any browser
+  // without a session. A worker script that redirects does not register, so
+  // push could only ever install for an already-signed-in visitor, and the
+  // periodic update check — which the browser makes with no guarantee of
+  // credentials — could not see the script at all. Both files are static
+  // `public/` assets containing no user data.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|OneSignalSDKWorker\\.js|sw-core\\.js|offline\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
