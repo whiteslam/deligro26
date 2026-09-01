@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { InlineScript } from "@/components/shared/inline-script";
 import { PwaProvider } from "@/components/pwa/pwa-provider";
+import { ErrorReporter } from "@/components/providers/error-reporter";
 import { IS_INDEXABLE, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -103,9 +104,15 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >
         {children}
-        {/* Last child, and renders nothing until after hydration: the PWA layer
-            is additive, so it must never be in the way of the app painting. */}
+        {/* Last children, and both render nothing until after hydration: the
+            PWA layer is additive, so it must never be in the way of the app
+            painting, and neither must the error reporter. */}
         <PwaProvider />
+        {/* Global window.onerror / unhandledrejection listeners. Here rather
+            than per-surface so the vendor board and the rider board are covered
+            too — those run all day on cheap handsets and are where a silent
+            client crash costs somebody money. */}
+        <ErrorReporter />
       </body>
     </html>
   );

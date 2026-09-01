@@ -329,6 +329,64 @@ operator-account hygiene items in `docs/SECURITY_AUDIT.md` — unique addresses,
 shared logins, rotation on offboarding, and now control of the registered mobile
 — are the whole of the account-security story.
 
+## Observability (0046)
+
+The admin Observability centre records telemetry about the platform's own
+failures. That makes it a new store of operational data and a new public write
+endpoint, so it is worth reading as a security surface rather than as a feature.
+
+**Containment.** The nine `obs_*` tables follow the `rate_limits` (0027) and
+`vendor_login_credentials` (0039) pattern exactly: RLS enabled **and forced**,
+**zero policies**, every privilege revoked from `anon` and `authenticated`, and
+granted only to `service_role`. There is no PostgREST path to them and no
+authenticated path. Reads happen solely through the `server-only`
+`src/lib/obs/read.ts` and `src/lib/obs/metrics.ts`, each of which begins with
+`requireRole("admin")` before it touches `createAdminClient()` — the check sits
+above the RLS bypass in the same path, per the project rule. Every Server Action
+in `src/app/admin/observability/actions.ts` re-checks the role for the same
+reason: a layout gate protects a page, not an endpoint.
+
+**Access is admin-only, and that is a decision rather than an omission.**
+`profiles.role` is a five-value enum for the whole platform, so there is no
+admin sub-role to hang a read-only or support-scoped tier on. Adding one would be
+a security change of its own and would need its own audit. `manager` does not
+reach this section. Recorded as Q1 in `docs/OBSERVABILITY_PLAN.md` §12.
+
+**Redaction is enforced at write, never at display.** `src/lib/obs/redact.ts`
+runs inside `emit()` *before* the row is built, so no code path — including a
+future debug flag — can put an unredacted value in the table. `attrs` is an
+**allowlist**, not a deny-list: a field nobody thought about is invisible until
+someone adds it deliberately, the same default the `restaurants` column grant
+uses. Denied key names are matched after stripping separators, so `apiKey`,
+`API_KEY` and `x-api-key` collapse to one rule. Free text (messages, stack
+traces) is additionally scrubbed for Luhn-valid card numbers, JWTs, `rzp_*` /
+`sk_*` / Bearer credentials, emails and Indian mobile numbers.
+
+**What is deliberately never collected:** request bodies, response bodies, IP
+addresses, names, phone numbers, emails, and every header outside a four-key
+allowlist. `x-razorpay-signature` is specifically excluded — it is the entire
+authentication of the payment webhook, so logging it would put a replayable
+credential in a table an operator browses. Identity is a `profiles.id` UUID and
+nothing else; the console resolves it to a customer page, where access is
+already audited.
+
+**`POST /api/obs/client` is the one anonymous write endpoint.** It is
+rate-limited by IP (30 per 5 minutes), refuses anything but three known report
+shapes, and re-derives every field server-side — the caller cannot choose its
+own level, kind, severity, environment, actor or order id, so a script cannot
+write `critical` production issues into an operator's queue or attribute its
+noise to somebody else's account. The actor comes from the session cookie or is
+null. It answers 204 for everything it discards, so it is not a probing oracle.
+
+These rules are tested rather than asserted: `npm run test:obs`
+(`scripts/qa/obs-telemetry.ts`) emits synthetic events carrying a card number, a
+JWT, a password field and a signature header, and fails if any of them reaches
+the stored row.
+
+**Environments never merge.** `env` is part of the issue fingerprint, so a
+developer's deliberate test failures cannot inflate a production issue's count,
+and the console filters to production by default with a banner when it does not.
+
 ### CSP note
 The CSP in `next.config.ts` allows `'unsafe-inline'` for scripts because of the
 inline pre-paint theme bootstrap. To fully harden against XSS, generate a
@@ -360,6 +418,7 @@ replace `'unsafe-inline'` with `'nonce-…'` in `script-src`.
 QA_PASSWORD='…' npm run test:idor     # RLS + HTTP cross-account IDOR
 BASE_URL=http://localhost:3003 npm run test:e2e   # guest gates, headers, auth walls
 ZAP_TARGET_URL=https://your-staging.example npm run test:zap   # OWASP ZAP baseline
+npm run test:obs                      # telemetry redaction, grouping, severity (offline)
 
 # All three (ZAP only if ZAP_TARGET_URL / STAGING_URL is set):
 QA_PASSWORD='…' BASE_URL=http://localhost:3003 npm run test:qa
@@ -368,6 +427,12 @@ QA_PASSWORD='…' BASE_URL=http://localhost:3003 npm run test:qa
 Scripts live in `scripts/qa/`. The IDOR suite provisions two customers, plants an
 order + address for A, then asserts B gets **null / 404** (never a data leak),
 vendors/drivers cannot see unowned orders, and `lock_role` blocks escalation.
+
+`test:obs` needs no database and no server: it asserts that a card number, a
+JWT, a bearer token, a password field and the Razorpay signature header are all
+absent from a stored telemetry row, that identical bugs with different order ids
+group to one issue, that production and development never merge, and that the
+root-cause engine reports **Unknown** rather than inventing a cause.
 
 ### Manual spot-checks
 

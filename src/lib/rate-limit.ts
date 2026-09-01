@@ -8,6 +8,7 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/config";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recordDomain } from "@/lib/obs/emit";
 
 /**
  * Fixed-window rate limiter.
@@ -126,6 +127,38 @@ type PgRateLimitRow = {
   retry_after: number;
 };
 
+/**
+ * The shared store is gone and every serverless instance is now counting on its
+ * own.
+ *
+ * This is a security degradation, not a performance one: an OTP cap of 5 per
+ * hour becomes 5 per hour PER INSTANCE, so the actual ceiling is however many
+ * instances the platform happens to be running — unknowable from inside, and
+ * highest exactly when traffic is highest.
+ *
+ * It used to be a `console.error` guarded by `loggedPgFallback`, which meant it
+ * was said once into a serverless stdout nobody reads and then never again, for
+ * the life of the process. `loggedPgFallback` still throttles the console line
+ * to once per process; the telemetry is emitted every time, so the console can
+ * show how long the platform has been in this state rather than that it entered
+ * it once.
+ */
+function reportDegraded(detail: string): void {
+  if (!loggedPgFallback) {
+    loggedPgFallback = true;
+    console.error(
+      "[rate-limit] Postgres check_rate_limit unavailable — apply migration 0027_rate_limits.sql. Falling back to per-instance memory.",
+      detail
+    );
+  }
+  recordDomain(
+    "ratelimit.degraded",
+    "error",
+    "Rate limiter fell back to per-instance memory — caps are no longer shared across instances",
+    { attrs: { backend: "memory", reason: detail.slice(0, 200) } }
+  );
+}
+
 async function postgresRateLimit(
   key: string,
   limit: number,
@@ -144,13 +177,7 @@ async function postgresRateLimit(
     });
 
     if (error || !data || typeof data !== "object") {
-      if (!loggedPgFallback) {
-        loggedPgFallback = true;
-        console.error(
-          "[rate-limit] Postgres check_rate_limit failed — apply migration 0027_rate_limits.sql. Falling back to memory.",
-          error?.message ?? "empty response"
-        );
-      }
+      reportDegraded(error?.message ?? "empty response");
       return null;
     }
 
@@ -162,13 +189,7 @@ async function postgresRateLimit(
       retryAfter: Number(row.retry_after) || 0,
     };
   } catch (err) {
-    if (!loggedPgFallback) {
-      loggedPgFallback = true;
-      console.error(
-        "[rate-limit] Postgres rate limit threw — falling back to memory.",
-        err instanceof Error ? err.message : err
-      );
-    }
+    reportDegraded(err instanceof Error ? err.message : String(err));
     return null;
   }
 }

@@ -9,6 +9,8 @@ import {
   PaymentRefused,
   type CreateOrderInput,
 } from "@/lib/data-access/orders";
+import { recordDomain } from "@/lib/obs/emit";
+import { obsRequestContext } from "@/lib/obs/request";
 
 function mapCreateError(message: string) {
   // Coupon refusals are the customer's to act on — retry without the code, or
@@ -127,8 +129,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
+  // Correlation for everything this order touches from here on: the Razorpay
+  // order, the webhook that settles it, the dispatch that follows and the push
+  // that announces it. The webhook cannot carry this header, so it rejoins the
+  // trace through `payments.provider_order_id`.
+  const obs = { ...(await obsRequestContext()), actorId: user.id };
+
   try {
     const order = await createOrder(body);
+    // The series `volume_drop` alerts on. Its absence is the signal — an
+    // ordering platform that stops creating orders produces no errors at all,
+    // which is why "nothing is wrong" and "nothing is happening" have to be
+    // distinguishable, and why this is recorded on the SUCCESS path.
+    recordDomain("order.created", "info", "Order placed", {
+      ...obs,
+      orderId: order?.id,
+      attrs: {
+        itemCount: body.lines.length,
+        paymentMethod: body.paymentMethod,
+      },
+    });
     return NextResponse.json({ order }, { status: 201 });
   } catch (err) {
     // The cash ceiling is per vendor, so the sentence the customer needs
@@ -136,6 +156,15 @@ export async function POST(request: Request) {
     // rules that refused the order. Pass it through verbatim rather than
     // rebuilding it here from a code and a guess at the number.
     if (err instanceof PaymentRefused) {
+      // A refusal is the platform working, not failing — `info`, so it does not
+      // land in the issue list. It is still recorded, because a spike in
+      // refusals is a business problem worth seeing (a vendor's cash ceiling set
+      // too low will refuse every order they get) even though no single one is a
+      // bug.
+      recordDomain("order.refused", "info", `Order refused: ${err.reason}`, {
+        ...obs,
+        attrs: { reason: err.reason, refusal: "payment" },
+      });
       return NextResponse.json(
         { error: err.reason, message: err.customerMessage },
         { status: 400 }
@@ -146,6 +175,10 @@ export async function POST(request: Request) {
     // 503 (try later, nothing about the request was wrong); a basket under the
     // minimum or an address out of area is 400 (the request itself can't stand).
     if (err instanceof OrderRefused) {
+      recordDomain("order.refused", "info", `Order refused: ${err.reason}`, {
+        ...obs,
+        attrs: { reason: err.reason, refusal: "order" },
+      });
       return NextResponse.json(
         { error: err.reason, message: err.customerMessage },
         { status: err.reason === "orders_paused" ? 503 : 400 }
@@ -162,6 +195,16 @@ export async function POST(request: Request) {
     // admin was not on that list. 0040 put it there: an operator shops through
     // the same app as everyone else, with no second identity to switch to.
     if (isRlsRefusal(err)) {
+      // Not a fault, and not silent either: a run of these is a real support
+      // pattern ("I can't order from my own app"), and the answer — sign in
+      // with the customer account — is only obvious once someone can see that
+      // this is what is happening.
+      recordDomain(
+        "order.refused",
+        "warn",
+        "Order refused by row-level security — the account is not a customer",
+        { ...obs, attrs: { reason: "not_a_customer", code: "42501" } }
+      );
       return NextResponse.json(
         {
           error: "not_a_customer",
@@ -180,7 +223,18 @@ export async function POST(request: Request) {
     // `message`/`code`/`details` are the whole diagnosis; stringify it rather
     // than logging `err.message`, which is undefined for exactly those.
     if (mapped.error === "server_error") {
+      // This branch is the reason the whole system exists: the customer is told
+      // "could not place the order", which is true and useless, and until now
+      // the only trace of WHY was a console line in a serverless log that
+      // expires within the hour. The console.error stays for local development,
+      // where it is the fastest signal; the telemetry is what survives.
       console.error("[orders] order refused, unmapped:", JSON.stringify(err), err);
+      recordDomain(
+        "order.created",
+        "error",
+        "Order creation failed with an unmapped error",
+        { ...obs, attrs: { reason: "unmapped", itemCount: body.lines.length }, error: err }
+      );
     }
     return NextResponse.json({ error: mapped.error }, { status: mapped.status });
   }

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { TriangleAlert, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { reportClientError } from "@/lib/obs/client";
 
 /**
  * Error boundary for the admin section.
@@ -20,7 +21,9 @@ import { Button } from "@/components/ui/button";
  * `error.message` is not rendered. Next replaces it with a generic string for
  * anything thrown in a Server Component so that query text and row contents
  * cannot reach the browser; the digest is the safe half and is what ties this
- * screen to the server log.
+ * screen to the server log — searchable in the console at
+ * /admin/observability, which is where the matching `onRequestError` record
+ * carries the same digest and the real stack.
  */
 export default function AdminError({
   error,
@@ -35,6 +38,18 @@ export default function AdminError({
 }) {
   useEffect(() => {
     console.error(error);
+    // The digest is the whole point of reporting from here. Next replaces a
+    // Server Component's message with a generic string before it reaches the
+    // browser and hands the real one to `onRequestError`, which records it
+    // against the same digest — so this report is what joins the screen the
+    // operator is looking at to the stack trace that explains it. Until now the
+    // "Reference:" line below pointed at a server log that did not exist.
+    reportClientError({
+      kind: "boundary",
+      message: error.message || "Admin screen failed to render",
+      stack: error.stack,
+      digest: error.digest,
+    });
   }, [error]);
 
   return (

@@ -7,10 +7,16 @@ import {
   PORTAL_LIST,
   PORTAL_LOGIN_PATHS,
 } from "@/lib/auth/portals";
+import { newRequestId, newTraceId, parseCorrelationId } from "@/lib/obs/ids";
+import {
+  OBS_REQUEST_ID_HEADER,
+  OBS_TRACE_ID_HEADER,
+} from "@/lib/obs/types";
 
 // Next 16 "proxy" convention (formerly "middleware"). Runs before routes render.
 //
-// Two jobs, in order:
+// Three jobs, in order:
+//   0. Mint the correlation ids every telemetry row is keyed on (see below).
 //   1. Refresh the Supabase session cookie on every request (updateSession).
 //   2. Coarse access control — the single place the "app launch" routing lives:
 //        anon   → blocked from the app shell, redirected to /login
@@ -44,15 +50,45 @@ function matches(pathname: string, prefixes: readonly string[]): boolean {
 }
 
 export async function proxy(request: NextRequest) {
+  // ---------- correlation ids ----------
+  //
+  // Minted here because this is the one place every request passes through, so
+  // an id exists before any handler runs and every event from one request can
+  // be tied together. They are written onto the REQUEST headers (which
+  // `NextResponse.next({ request })` propagates to the handler, the same
+  // mechanism updateSession already relies on for refreshed cookies) and onto
+  // the RESPONSE, so a browser can quote the id of a call that failed.
+  //
+  // `requestId` is always ours. `traceId` is accepted from the caller when it
+  // is well-formed, which is what lets the checkout screen join its own
+  // sequence of API calls into one trace. That does mean a client could point
+  // many requests at one trace id; the blast radius is a noisy trace view for
+  // an admin, not access to anything, and the alternative — a new trace per
+  // request — makes multi-step operations untraceable, which is most of why
+  // traces are here.
+  const requestId = newRequestId();
+  const traceId =
+    parseCorrelationId(request.headers.get(OBS_TRACE_ID_HEADER), "trace") ??
+    newTraceId();
+
+  request.headers.set(OBS_REQUEST_ID_HEADER, requestId);
+  request.headers.set(OBS_TRACE_ID_HEADER, traceId);
+
+  const stamp = <T extends NextResponse>(res: T): T => {
+    res.headers.set(OBS_REQUEST_ID_HEADER, requestId);
+    res.headers.set(OBS_TRACE_ID_HEADER, traceId);
+    return res;
+  };
+
   // Demo mode: no Supabase keys yet -> don't block anything.
-  if (!isSupabaseConfigured) return NextResponse.next();
+  if (!isSupabaseConfigured) return stamp(NextResponse.next({ request }));
 
   const { response, user } = await updateSession(request);
   const path = request.nextUrl.pathname;
 
   // API routes self-guard and are needed pre-login (OTP request/verify). Refresh
   // the session but never gate them here — a redirect would break those calls.
-  if (path.startsWith("/api")) return response;
+  if (path.startsWith("/api")) return stamp(response);
 
   const guest = request.cookies.get(GUEST_COOKIE)?.value === "1";
 
@@ -62,9 +98,9 @@ export async function proxy(request: NextRequest) {
   if (matches(path, PUBLIC_PATHS)) {
     // A signed-in visitor never needs the customer entry page.
     if (user && matches(path, ENTRY_PATHS)) {
-      return NextResponse.redirect(new URL("/", request.url));
+      return stamp(NextResponse.redirect(new URL("/", request.url)));
     }
-    return response;
+    return stamp(response);
   }
 
   // Once signed in, any stale guest flag is meaningless — clear it.
@@ -79,7 +115,7 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = portal.login;
     url.searchParams.set("next", path);
-    return NextResponse.redirect(url);
+    return stamp(NextResponse.redirect(url));
   }
 
   // Gated customer routes: a guest is NOT enough — must be a real user.
@@ -88,16 +124,16 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = CUSTOMER_LOGIN;
     url.searchParams.set("next", path);
-    return NextResponse.redirect(url);
+    return stamp(NextResponse.redirect(url));
   }
 
   // Everything else in the app shell (main feed, search, restaurants) needs at
   // least an explicit guest. Pure anon → the customer entry screen.
   if (!user && !guest) {
-    return NextResponse.redirect(new URL(CUSTOMER_LOGIN, request.url));
+    return stamp(NextResponse.redirect(new URL(CUSTOMER_LOGIN, request.url)));
   }
 
-  return response;
+  return stamp(response);
 }
 
 export const config = {

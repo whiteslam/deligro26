@@ -1,4 +1,5 @@
 import "server-only";
+import { recordDomain } from "@/lib/obs/emit";
 
 /** PostgREST's "column does not exist". */
 export const UNDEFINED_COLUMN = "42703";
@@ -35,5 +36,24 @@ export function columnKnownPresent(key: string): boolean {
 }
 
 export function rememberColumn(key: string, present: boolean): void {
+  const first = !known.has(key);
   known.set(key, present);
+
+  // A missing column latches a feature into its degraded form for the life of
+  // the process, and every degradation here is a real loss an operator would
+  // want to know about: no tip on the order, no online payment, the settings
+  // group silently serving defaults. Nothing said so before, which is how
+  // migration 0044 shipped with an ungranted column that made every vendor hear
+  // the wrong alert sound and produced no signal at all.
+  //
+  // Reported once per column per process — the probe is cached, so a second
+  // report would only mean a new instance started, which is not news.
+  if (first && !present) {
+    recordDomain(
+      "schema.degraded",
+      "warn",
+      `Column "${key}" is missing or ungranted — the feature that reads it is serving a degraded answer`,
+      { attrs: { column: key, degraded: true } }
+    );
+  }
 }

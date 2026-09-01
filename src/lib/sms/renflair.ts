@@ -1,5 +1,6 @@
 import "server-only";
 import { toLocal10 } from "@/lib/auth/phone";
+import { recordProvider } from "@/lib/obs/emit";
 
 /**
  * Renflair SMS gateway — the same provider the legacy Deligro site used.
@@ -28,6 +29,15 @@ export async function sendOtpSms(e164: string, code: string): Promise<SmsResult>
     toLocal10(e164)
   )}&OTP=${encodeURIComponent(code)}`;
 
+  // A failure here is a customer who cannot sign in at all — the most severe
+  // outcome in the app that produces no error anywhere the caller can see. The
+  // OTP route already receives `detail` and does nothing durable with it, so
+  // this is where it becomes a record.
+  //
+  // Note what is NOT recorded: the URL. It carries RENFLAIR_API_KEY and the
+  // customer's phone number as query parameters, which is why the operation is
+  // named rather than described.
+  const started = Date.now();
   try {
     const res = await fetch(url, { method: "GET", cache: "no-store" });
     const text = await res.text();
@@ -39,8 +49,21 @@ export async function sendOtpSms(e164: string, code: string): Promise<SmsResult>
     } catch {
       /* non-JSON body — fall back to HTTP status */
     }
-    return { sent: ok, devMode: false, detail: ok ? undefined : text.slice(0, 200) };
+    const detail = ok ? undefined : text.slice(0, 200);
+    recordProvider("renflair", "send-otp", {
+      ok,
+      durationMs: Date.now() - started,
+      status: res.status,
+      detail,
+    });
+    return { sent: ok, devMode: false, detail };
   } catch (e) {
-    return { sent: false, devMode: false, detail: (e as Error).message };
+    const detail = (e as Error).message;
+    recordProvider("renflair", "send-otp", {
+      ok: false,
+      durationMs: Date.now() - started,
+      detail,
+    });
+    return { sent: false, devMode: false, detail };
   }
 }

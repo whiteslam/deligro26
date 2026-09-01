@@ -1,4 +1,5 @@
 import "server-only";
+import { recordProvider } from "@/lib/obs/emit";
 
 /**
  * OneSignal push — server-side sender.
@@ -55,6 +56,12 @@ export async function sendPush(
   if (opts.url) body.url = opts.url;
   if (opts.data) body.data = opts.data;
 
+  // Fire-and-forget still has to be observable. Before this, a push that
+  // OneSignal rejected and a push that was never attempted looked identical
+  // from outside — `false`, and nothing else — so "customers stopped being told
+  // their order was on its way" was not a question anyone could answer. The
+  // return value is unchanged; only the record is new.
+  const started = Date.now();
   try {
     const res = await fetch(ENDPOINT, {
       method: "POST",
@@ -66,9 +73,34 @@ export async function sendPush(
       // Don't let a slow provider hang the caller.
       signal: AbortSignal.timeout(8000),
     });
+    recordProvider(
+      "onesignal",
+      "notifications.create",
+      {
+        ok: res.ok,
+        durationMs: Date.now() - started,
+        status: res.status,
+        // The status line, not the body: OneSignal echoes the notification
+        // payload back on some errors, and that payload contains player ids.
+        detail: res.ok ? undefined : res.statusText,
+      },
+      { attrs: { itemCount: ids.length } }
+    );
     return res.ok;
-  } catch {
-    // Network error / timeout / abort — swallow. Push is fire-and-forget.
+  } catch (err) {
+    // Network error / timeout / abort — swallowed as before, but no longer
+    // silent. A timeout here is the 8s abort above, which is a different
+    // diagnosis to a 400 and needs to be told apart from one.
+    recordProvider(
+      "onesignal",
+      "notifications.create",
+      {
+        ok: false,
+        durationMs: Date.now() - started,
+        detail: err instanceof Error ? err.name : "network_error",
+      },
+      { attrs: { itemCount: ids.length } }
+    );
     return false;
   }
 }
