@@ -60,7 +60,10 @@ export function ManagerOrderBoard({
   }
 
   return (
-    <ul className="space-y-2.5">
+    // One card per order. A list in the phone frame; a grid once the column is
+    // wide enough that a single stack would be a 1000px-long ribbon of
+    // half-empty cards — which is what the board looked like at a desk.
+    <ul className="space-y-2.5 @3xl:grid @3xl:grid-cols-2 @3xl:gap-2.5 @3xl:space-y-0 @5xl:grid-cols-3">
       {orders.map((o) => (
         <OrderCard key={o.id} order={o} riders={riders} />
       ))}

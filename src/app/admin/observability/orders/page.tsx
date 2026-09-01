@@ -101,26 +101,31 @@ export default async function OrdersHealthPage({
         />
       </FigureStrip>
 
-      <StuckPanel
-        title="Awaiting acceptance"
-        subtitle="Placed, and the kitchen has not accepted. Threshold: 10 minutes."
-        why="The customer is watching a tracker that says nothing has happened. Either the vendor's board is not open, their alert sound is not working, or the shop is closed and still marked open."
-        orders={health.awaitingAcceptance}
-      />
+      {/* The three stuck queues, which during an incident are read together
+          rather than scrolled through one at a time. Three columns only once
+          the console is genuinely wide; the phone frame never sees this. */}
+      <div className="grid gap-4 @5xl:grid-cols-3">
+        <StuckPanel
+          title="Awaiting acceptance"
+          subtitle="Placed, and the kitchen has not accepted. Threshold: 10 minutes."
+          why="The customer is watching a tracker that says nothing has happened. Either the vendor's board is not open, their alert sound is not working, or the shop is closed and still marked open."
+          orders={health.awaitingAcceptance}
+        />
 
-      <StuckPanel
-        title="Stuck in the kitchen"
-        subtitle="Accepted, not yet marked ready. Threshold: 60 minutes."
-        why="Usually a vendor who forgot to press Ready rather than food still cooking. Worth a phone call before the customer makes one."
-        orders={health.stuckInKitchen}
-      />
+        <StuckPanel
+          title="Stuck in the kitchen"
+          subtitle="Accepted, not yet marked ready. Threshold: 60 minutes."
+          why="Usually a vendor who forgot to press Ready rather than food still cooking. Worth a phone call before the customer makes one."
+          orders={health.stuckInKitchen}
+        />
 
-      <StuckPanel
-        title="Ready, no rider"
-        subtitle="Packed and waiting. Threshold: 20 minutes."
-        why="Food going cold on the pass. Check the Delivery tab: if riders are online and nothing is assigned, dispatch is the problem, not the fleet."
-        orders={health.readyNoRider}
-      />
+        <StuckPanel
+          title="Ready, no rider"
+          subtitle="Packed and waiting. Threshold: 20 minutes."
+          why="Food going cold on the pass. Check the Delivery tab: if riders are online and nothing is assigned, dispatch is the problem, not the fleet."
+          orders={health.readyNoRider}
+        />
+      </div>
 
       <Panel
         title="Order checkpoints"

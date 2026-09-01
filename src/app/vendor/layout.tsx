@@ -6,6 +6,7 @@ import {
 } from "@/lib/data-access/vendor-restaurant";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { resolveShellMode } from "@/lib/shell-mode.server";
 
 async function ownerEmail(): Promise<string | null> {
   if (!isSupabaseConfigured) return null;
@@ -49,10 +50,15 @@ export default async function RestaurantLayout({
     }
   }
 
-  const email = await ownerEmail();
+  const [email, shellMode] = await Promise.all([
+    ownerEmail(),
+    // Server-resolved so the console never server-renders as the phone frame.
+    resolveShellMode("vendor"),
+  ]);
 
   return (
     <VendorShell
+      initialMode={shellMode}
       restaurantName={restaurantName || "No restaurant"}
       isOpen={isOpen}
       restaurants={restaurants}

@@ -52,7 +52,11 @@ export default async function ManagerHome() {
   ).length;
 
   return (
-    <div className="mx-auto w-full max-w-md">
+    // No `max-w-md`: the column this sits in is the phone frame's 370px in app
+    // mode and `.dashboard-main`'s ~1060px in web, so the width is already the
+    // right width. Everything below sizes against that container, not the
+    // window — the board is a list on a handset and a grid at a desk.
+    <div className="w-full">
       {isSupabaseConfigured && !failed ? <AutoRefresh interval={4000} /> : null}
 
       <header className="pt-2">
@@ -60,7 +64,7 @@ export default async function ManagerHome() {
         <h1 className="mt-1 text-[23px] font-extrabold tracking-tight">
           Hi, {name}
         </h1>
-        <p className="mt-1.5 text-sm text-muted">
+        <p className="mt-1.5 max-w-prose text-sm text-muted">
           Every order in flight, across every restaurant. Fees, settlements, and
           vendor management stay with the admin team.
         </p>
@@ -70,7 +74,7 @@ export default async function ManagerHome() {
           thing on this screen that cannot wait for the operator to go looking. */}
       <Link
         href="/manager/new-order"
-        className="press mt-4 flex items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 hover:bg-surface-2"
+        className="press mt-4 flex items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 hover:bg-surface-2 @3xl:max-w-md"
       >
         <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/12 text-accent">
           <PhoneIncoming className="size-5" />
@@ -97,7 +101,7 @@ export default async function ManagerHome() {
         </p>
       ) : (
         <>
-          <div className="mt-5 grid grid-cols-3 gap-2.5">
+          <div className="mt-5 grid grid-cols-3 gap-2.5 @3xl:max-w-2xl">
             <Tile label="In flight" value={orders.length} />
             <Tile label="Awaiting kitchen" value={waiting} alert={waiting > 0} />
             <Tile
@@ -113,10 +117,14 @@ export default async function ManagerHome() {
         </>
       )}
 
-      <form action="/auth/signout?next=/manager/login" method="post" className="mt-8">
+      <form
+        action="/auth/signout?next=/manager/login"
+        method="post"
+        className="mt-8 @3xl:max-w-xs"
+      >
         <button
           type="submit"
-          className="press block w-full text-center text-sm font-semibold text-muted hover:text-ink"
+          className="press block w-full text-center text-sm font-semibold text-muted hover:text-ink @3xl:text-left"
         >
           Sign out
         </button>

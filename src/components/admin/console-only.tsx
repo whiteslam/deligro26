@@ -11,17 +11,23 @@ import { useIsDesktop } from "@/hooks/use-is-desktop";
  * Tools that only work at console width, and an honest note where they aren't.
  *
  * The admin runs in two shells: the console, and a ~370px phone column that a
- * real handset is forced into (see AdminShell). A handful of screens are built
- * for the console and cannot be made to work in that column — a 960px vendor
- * table, an eight-step onboarding wizard, the platform fee form. Rather than
- * ship them broken or delete them silently, they are replaced on the phone with
- * a line saying where they went. Nobody should hunt for a feature they know
- * exists.
+ * real handset is forced into (resolved server-side — see
+ * `lib/shell-mode.server.ts`). A handful of screens are built for the console
+ * and cannot be made to work in that column — a 960px vendor table, an
+ * eight-step onboarding wizard, the platform fee form, the whole observability
+ * section. Rather than ship them broken or delete them silently, they are
+ * replaced on the phone with a line saying where they went. Nobody should hunt
+ * for a feature they know exists.
  *
  * THIS IS PRESENTATION, NOT AUTHORIZATION. Hiding a tool here changes nothing
  * about who may call it: every exported `"use server"` function starts with its
  * own role check (AGENTS.md rule 3), and that is the only thing keeping it safe.
  * Do not read a hidden button as a control.
+ *
+ * Paired with `reach: "console"` in `admin-nav.ts` it becomes the route contract
+ * described in AGENTS.md: the nav drops the entry *and* the route renders
+ * `variant="page"`, so a bookmark or a deep link gets this notice rather than a
+ * screen the phone cannot draw. One without the other is the bug that shipped.
  *
  * Note on what the gate actually stops: a *server* child passed as `children`
  * still renders on the server — the parent creates the element eagerly, so the
@@ -95,10 +101,11 @@ export function ConsoleOnlyNotice({
   //
   // On a desktop the operator is *previewing* the phone frame and the console
   // is one click away, so the note points at the Layout switcher. On a real
-  // handset it is not one click away — it is not reachable at all, because
-  // AdminShell forces the phone frame below 480px and `setMode("web")` would
-  // change nothing on screen. Telling that reader to "switch layout" would send
-  // them hunting for a control that isn't there.
+  // handset it is not one click away — it is not reachable at all, because the
+  // phone frame is forced below 480px (and for a phone-shaped user agent on the
+  // server), so `setPreference("web")` would change nothing on screen. Telling
+  // that reader to "switch layout" would send them hunting for a control that
+  // isn't there.
   const isDesktop = useIsDesktop();
 
   // Deliberately not "needs the width". Width is the reason for the vendor

@@ -164,49 +164,56 @@ export default async function PaymentsHealthPage({
         />
       </FigureStrip>
 
-      <Panel
-        title="Razorpay, as we saw it"
-        subtitle="Calls out to the provider. Their failures, not ours."
-      >
-        <MetricTable
-          rows={razorpay ? [razorpay] : []}
-          keyHeader="Provider"
-          hrefFor={() =>
-            `/admin/observability/logs?provider=razorpay&range=${range}&level=warn`
-          }
-          emptyNote={
-            isRazorpayConfigured
-              ? "No calls to Razorpay recorded in this window."
-              : "Razorpay is not configured on this deployment, so nothing is attempted."
-          }
-        />
-      </Panel>
+      {/* Their failures beside ours: the whole point of this screen is
+          telling the two apart, which is easier when they are adjacent. */}
+      <div className="flex flex-col gap-4 @6xl:flex-row">
+        <Panel
+          className="min-w-0 flex-1"
+          title="Razorpay, as we saw it"
+          subtitle="Calls out to the provider. Their failures, not ours."
+        >
+          <MetricTable
+            rows={razorpay ? [razorpay] : []}
+            keyHeader="Provider"
+            hrefFor={() =>
+              `/admin/observability/logs?provider=razorpay&range=${range}&level=warn`
+            }
+            emptyNote={
+              isRazorpayConfigured
+                ? "No calls to Razorpay recorded in this window."
+                : "Razorpay is not configured on this deployment, so nothing is attempted."
+            }
+          />
+        </Panel>
 
-      <Panel
-        title="Our payment path"
-        subtitle="The checkpoints inside Deligro. A failure here is ours whatever Razorpay is doing."
-      >
-        <MetricTable
-          rows={paymentEvents}
-          keyHeader="Checkpoint"
-          hrefFor={(key) =>
-            `/admin/observability/logs?kind=domain&range=${range}&q=${encodeURIComponent(key)}`
-          }
-          emptyNote="No payment checkpoints recorded in this window."
-        />
-        <p className="mt-3 text-[11px] italic text-muted">
-          <code className="text-data">payment.webhook</code> failures are usually a
-          rotated <code className="text-data">RAZORPAY_WEBHOOK_SECRET</code> rather
-          than forgery — but both mean real payments are being rejected, so treat
-          either as urgent.{" "}
-          <Link
-            href="/admin/refunds"
-            className="underline underline-offset-2"
-          >
-            Refund queue
-          </Link>
-        </p>
-      </Panel>
+        <Panel
+          className="min-w-0 flex-1"
+          title="Our payment path"
+          subtitle="The checkpoints inside Deligro. A failure here is ours whatever Razorpay is doing."
+        >
+          <MetricTable
+            rows={paymentEvents}
+            keyHeader="Checkpoint"
+            hrefFor={(key) =>
+              `/admin/observability/logs?kind=domain&range=${range}&q=${encodeURIComponent(key)}`
+            }
+            emptyNote="No payment checkpoints recorded in this window."
+          />
+          <p className="mt-3 text-[11px] italic text-muted">
+            <code className="text-data">payment.webhook</code> failures are usually a
+            rotated <code className="text-data">RAZORPAY_WEBHOOK_SECRET</code> rather
+            than forgery — but both mean real payments are being rejected, so treat
+            either as urgent.{" "}
+            <Link
+              href="/admin/refunds"
+              className="underline underline-offset-2"
+            >
+              Refund queue
+            </Link>
+          </p>
+        </Panel>
+      </div>
+
     </div>
   );
 }

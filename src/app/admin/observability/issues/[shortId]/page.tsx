@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminHero, Panel } from "@/components/admin/admin-ui";
 import {
-  Ago,
   AttrGrid,
   EventRow,
   Figure,

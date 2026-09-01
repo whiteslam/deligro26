@@ -97,43 +97,48 @@ export default async function NotificationsPage({
         </p>
       ) : null}
 
-      <Panel title="By provider">
-        <MetricTable
-          rows={notify}
-          keyHeader="Provider"
-          hrefFor={(key) =>
-            `/admin/observability/logs?provider=${key}&range=${range}&level=warn`
-          }
-          emptyNote={
-            providers.unavailable
-              ? "Observability is not installed on this database."
-              : "No notification attempts recorded in this window."
-          }
-        />
-      </Panel>
+      {/* What was attempted, next to what cannot be known. The caveats are
+          the reading instructions for the table, not a footnote. */}
+      <div className="flex flex-col gap-4 @6xl:flex-row">
+        <Panel className="min-w-0 flex-1" title="By provider">
+          <MetricTable
+            rows={notify}
+            keyHeader="Provider"
+            hrefFor={(key) =>
+              `/admin/observability/logs?provider=${key}&range=${range}&level=warn`
+            }
+            emptyNote={
+              providers.unavailable
+                ? "Observability is not installed on this database."
+                : "No notification attempts recorded in this window."
+            }
+          />
+        </Panel>
 
-      <Panel title="What this page cannot tell you">
-        <ul className="-mt-1">
-          <HealthLine
-            label="Handset delivery"
-            state="unknown"
-            detail="Not observable"
-            note="OneSignal accepting a notification is not a phone showing one. Confirming that would need a delivery webhook this platform does not receive."
-          />
-          <HealthLine
-            label="SMS delivery"
-            state="unknown"
-            detail="Not observable"
-            note="Renflair returns an accept/reject on the send. Whether the message arrived is between the operator and the network."
-          />
-          <HealthLine
-            label="Customers with no push subscription"
-            state="unknown"
-            detail="Counted as skipped, not failed"
-            note="A customer who never granted notification permission has no player id, so nothing is attempted — correctly, and invisibly."
-          />
-        </ul>
-      </Panel>
+        <Panel className="min-w-0 flex-1" title="What this page cannot tell you">
+          <ul className="-mt-1">
+            <HealthLine
+              label="Handset delivery"
+              state="unknown"
+              detail="Not observable"
+              note="OneSignal accepting a notification is not a phone showing one. Confirming that would need a delivery webhook this platform does not receive."
+            />
+            <HealthLine
+              label="SMS delivery"
+              state="unknown"
+              detail="Not observable"
+              note="Renflair returns an accept/reject on the send. Whether the message arrived is between the operator and the network."
+            />
+            <HealthLine
+              label="Customers with no push subscription"
+              state="unknown"
+              detail="Counted as skipped, not failed"
+              note="A customer who never granted notification permission has no player id, so nothing is attempted — correctly, and invisibly."
+            />
+          </ul>
+        </Panel>
+      </div>
+
     </div>
   );
 }

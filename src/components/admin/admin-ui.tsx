@@ -145,7 +145,12 @@ export function AdminHero({
               {tag ? <StatusTag>{tag}</StatusTag> : null}
             </div>
             {subtitle ? (
-              <p className="mt-1 text-sm text-muted @3xl:text-[13px]">
+              // Capped to a reading measure. The console runs to 1600px and
+              // every screen has one of these: uncapped, a one-line subtitle
+              // became a single 1500px-wide line of 13px grey, which is the
+              // "mobile card stretched across a desktop" look in miniature.
+              // No-op inside the phone frame, where the column is 370px.
+              <p className="mt-1 max-w-prose text-sm text-muted @3xl:text-[13px]">
                 {subtitle}
               </p>
             ) : null}

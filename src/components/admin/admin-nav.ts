@@ -36,9 +36,15 @@ import {
  * place they appear there.
  *
  * `reach: "console"` marks the rail entries a phone should never be offered at
- * all, because the screen behind them is console-only (see ConsoleOnly). They
- * stay in the rail and keep their page title; they just don't appear in the
- * phone's Settings menu, where tapping through would only find a notice.
+ * all, because the screen behind them is console-only. They stay in the rail
+ * and keep their page title; they just don't appear in the phone's Settings
+ * menu, where tapping through would only find a notice.
+ *
+ * It is a **route contract, not a nav filter** (AGENTS.md). Setting it here
+ * obliges the route itself to render `<ConsoleOnly variant="page">` — dropping
+ * the menu entry alone leaves the URL open, which is how a phone ended up
+ * rendering the ten-tab observability console in a 370px column.
+ * `npm run test:platform` fails if the two halves disagree.
  */
 export type BadgeKey = "pendingApprovals" | "pendingRefunds" | "liveOrders";
 

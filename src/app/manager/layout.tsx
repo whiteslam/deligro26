@@ -1,23 +1,28 @@
-import { StatusBar } from "@/components/layout/status-bar";
+import { ManagerShell } from "@/components/manager/manager-shell";
 import { requireRole } from "@/lib/auth";
+import { resolveShellMode } from "@/lib/shell-mode.server";
 
-// The Manager / Sub-Admin portal. Managers are primarily a mobile client, but
-// this web route exists so a manager who signs in on the web lands somewhere
-// real (roleHome → /manager) rather than 404-ing, and so the role is gated
-// server-side. Super-admins may also open it.
+/**
+ * The Manager / Sub-Admin portal.
+ *
+ * Managers work from a phone at a gate and from a desk in an ops room, so this
+ * carries the same app ↔ web switch as admin and vendor rather than forcing one
+ * of them. It used to be `.device` unconditionally: an admin (this layout
+ * admits them) or a manager on a laptop got a 402px iPhone mock with no way
+ * out. See `ManagerShell`.
+ *
+ * The shell is resolved server-side so the console is the console in the first
+ * byte of HTML — never a phone frame that swaps after hydration.
+ */
 export default async function ManagerLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requireRole(["manager", "admin"]);
+  const [, shellMode] = await Promise.all([
+    requireRole(["manager", "admin"]),
+    resolveShellMode("manager"),
+  ]);
 
-  return (
-    <div className="device">
-      <div className="app-shell">
-        <div className="app-scroll no-scrollbar px-4 pb-6 pt-4">{children}</div>
-        <StatusBar />
-      </div>
-    </div>
-  );
+  return <ManagerShell initialMode={shellMode}>{children}</ManagerShell>;
 }

@@ -57,44 +57,53 @@ export default async function ApiPage({
         hrefFor={(v) => `/admin/observability/api${v ? `?range=${v}` : ""}`}
       />
 
-      <Panel
-        title="Endpoints"
-        subtitle="Route templates, never concrete paths — an order id in this column would make per-endpoint aggregation impossible."
-      >
-        <MetricTable
-          rows={routes.rows}
-          keyHeader="Endpoint"
-          hrefFor={(key) =>
-            `/admin/observability/logs?route=${encodeURIComponent(key)}&range=${range}&level=warn`
-          }
-          emptyNote={
-            routes.unavailable
-              ? "Observability is not installed on this database."
-              : "No requests recorded in this window. If the platform is serving traffic, check that the rollup job is running — System Health reports its age."
-          }
-        />
-        <p className="mt-3 text-[11px] italic text-muted">
-          Successful requests under one second are sampled at{" "}
-          {Math.round(OBS_HTTP_SAMPLE_RATE * 100)}%; failures and slow requests are
-          never sampled. So error counts are exact and total call counts are a
-          tenth of reality — which makes the error <em>rate</em> here an
-          understatement, not an overstatement.
-        </p>
-      </Panel>
+      {/* Endpoints and business checkpoints answer the same question from
+          two sides, so on a wide console they are read side by side rather
+          than one scroll apart. Both carry a 560px table, so they only split
+          once each half clears that. */}
+      <div className="flex flex-col gap-4 @6xl:flex-row">
+        <Panel
+          className="min-w-0 flex-1"
+          title="Endpoints"
+          subtitle="Route templates, never concrete paths — an order id in this column would make per-endpoint aggregation impossible."
+        >
+          <MetricTable
+            rows={routes.rows}
+            keyHeader="Endpoint"
+            hrefFor={(key) =>
+              `/admin/observability/logs?route=${encodeURIComponent(key)}&range=${range}&level=warn`
+            }
+            emptyNote={
+              routes.unavailable
+                ? "Observability is not installed on this database."
+                : "No requests recorded in this window. If the platform is serving traffic, check that the rollup job is running — System Health reports its age."
+            }
+          />
+          <p className="mt-3 text-[11px] italic text-muted">
+            Successful requests under one second are sampled at{" "}
+            {Math.round(OBS_HTTP_SAMPLE_RATE * 100)}%; failures and slow requests are
+            never sampled. So error counts are exact and total call counts are a
+            tenth of reality — which makes the error <em>rate</em> here an
+            understatement, not an overstatement.
+          </p>
+        </Panel>
 
-      <Panel
-        title="Business checkpoints"
-        subtitle="Named events rather than endpoints: order.created, payment.settle, dispatch.assign. Never sampled."
-      >
-        <MetricTable
-          rows={domain.rows}
-          keyHeader="Checkpoint"
-          hrefFor={(key) =>
-            `/admin/observability/logs?kind=domain&range=${range}&q=${encodeURIComponent(key)}`
-          }
-          emptyNote="No business checkpoints recorded in this window."
-        />
-      </Panel>
+        <Panel
+          className="min-w-0 flex-1"
+          title="Business checkpoints"
+          subtitle="Named events rather than endpoints: order.created, payment.settle, dispatch.assign. Never sampled."
+        >
+          <MetricTable
+            rows={domain.rows}
+            keyHeader="Checkpoint"
+            hrefFor={(key) =>
+              `/admin/observability/logs?kind=domain&range=${range}&q=${encodeURIComponent(key)}`
+            }
+            emptyNote="No business checkpoints recorded in this window."
+          />
+        </Panel>
+      </div>
+
     </div>
   );
 }

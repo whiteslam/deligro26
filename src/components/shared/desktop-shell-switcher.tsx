@@ -2,8 +2,12 @@
 
 import { Monitor, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import type { ShellMode } from "@/lib/shell-mode";
 
-export type ShellMode = "app" | "web";
+// Re-exported for the shells and hooks that have always imported the type from
+// here. The definition itself lives with the concept, in `lib/shell-mode.ts`,
+// so the server resolver and this button cannot drift apart.
+export type { ShellMode };
 
 /**
  * The app ↔ web layout switch, in two placements.
@@ -71,7 +75,7 @@ export function DesktopShellSwitcher({
   hydrated: boolean;
 }) {
   return (
-    <div className="pointer-events-none fixed bottom-5 right-5 z-[100] hidden min-[480px]:block">
+    <div className="shell-switcher pointer-events-none fixed bottom-5 right-5 z-[100] hidden min-[480px]:block">
       <div className="pointer-events-auto rounded-2xl border border-line bg-surface/95 p-1 shadow-[var(--shadow-lg)] backdrop-blur-md">
         <ShellModeToggle
           mode={mode}

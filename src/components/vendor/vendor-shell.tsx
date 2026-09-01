@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { StatusBar } from "@/components/layout/status-bar";
 import { VendorHeader } from "@/components/vendor/vendor-header";
 import { VendorTabBar } from "@/components/vendor/vendor-tab-bar";
@@ -8,9 +8,9 @@ import { VendorSidebar } from "@/components/vendor/vendor-sidebar";
 import { VendorNavDrawer } from "@/components/vendor/vendor-nav-drawer";
 import { VendorTopBar } from "@/components/vendor/vendor-top-bar";
 import { DesktopShellSwitcher } from "@/components/shared/desktop-shell-switcher";
-import { useVendorShellMode } from "@/hooks/use-vendor-shell-mode";
-import { useVendorShell } from "@/stores/vendor-shell-store";
+import { ShellModeProvider, useShellModeState } from "@/components/shared/shell-mode-provider";
 import type { OwnedRestaurant } from "@/lib/data-access/vendor-restaurant";
+import type { ShellMode } from "@/lib/shell-mode";
 
 export type VendorShellProps = {
   restaurantName: string;
@@ -20,6 +20,8 @@ export type VendorShellProps = {
   showControls: boolean;
   name: string;
   email: string | null;
+  /** Resolved server-side, per request. See `resolveShellMode`. */
+  initialMode: ShellMode;
   children: React.ReactNode;
 };
 
@@ -31,13 +33,24 @@ export type VendorShellProps = {
  * - app: the phone frame, for checking how the portal reads on a handset
  *
  * On a real phone the switcher is hidden and the phone shell is forced.
+ *
+ * `initialMode` is resolved server-side (`lib/shell-mode.server.ts`), so the
+ * console is the console in the first byte of HTML rather than after hydration.
  * Both branches wrap page content in `@container` so pages size themselves
  * against the column they are in, not the browser window.
  *
  * `console-theme` is on the web branch only, so the phone frame keeps the
  * app's own look.
  */
-export function VendorShell({
+export function VendorShell({ initialMode, ...props }: VendorShellProps) {
+  return (
+    <ShellModeProvider portal="vendor" initialMode={initialMode}>
+      <VendorShellChrome {...props} />
+    </ShellModeProvider>
+  );
+}
+
+function VendorShellChrome({
   children,
   restaurantName,
   isOpen,
@@ -46,18 +59,16 @@ export function VendorShell({
   showControls,
   name,
   email,
-}: VendorShellProps) {
-  const hydrated = useVendorShell((s) => s.hydrated);
-  const setMode = useVendorShell((s) => s.setMode);
-  const init = useVendorShell((s) => s.init);
+}: Omit<VendorShellProps, "initialMode">) {
   const [navOpen, setNavOpen] = useState(false);
-
-  useEffect(() => {
-    init();
-  }, [init]);
-
   const closeNav = useCallback(() => setNavOpen(false), []);
-  const effective = useVendorShellMode();
+
+  const {
+    mode: effective,
+    preference,
+    setPreference: setMode,
+    hydrated,
+  } = useShellModeState();
 
   const shellProps = {
     restaurantName,
@@ -88,7 +99,7 @@ export function VendorShell({
           </div>
         </div>
         <DesktopShellSwitcher
-          mode="app"
+          mode={preference}
           onChange={setMode}
           hydrated={hydrated}
         />
@@ -107,7 +118,7 @@ export function VendorShell({
       </div>
       <VendorNavDrawer open={navOpen} onClose={closeNav} />
       <DesktopShellSwitcher
-        mode="web"
+        mode={preference}
         onChange={setMode}
         hydrated={hydrated}
       />

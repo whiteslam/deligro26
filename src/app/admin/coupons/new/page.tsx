@@ -13,7 +13,10 @@ export default async function NewCouponPage() {
   const restaurants = await listPromotableRestaurants();
 
   return (
-    <>
+    // Capped like every other form screen: a promo code's fields are a column
+    // of labelled inputs, and a 1500px-wide text field is a worse form, not a
+    // bigger one. (See `.admin-measure` in globals.css.)
+    <div className="admin-measure space-y-4">
       <BackLink href="/admin/coupons">Promo codes</BackLink>
       <AdminHero
         title="New promo code"
@@ -24,6 +27,6 @@ export default async function NewCouponPage() {
         restaurants={restaurants}
         cancelHref="/admin/coupons"
       />
-    </>
+    </div>
   );
 }

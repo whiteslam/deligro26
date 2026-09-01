@@ -25,7 +25,10 @@ export default async function EditCouponPage({
   if (!promotion) notFound();
 
   return (
-    <>
+    // Capped like every other form screen: a promo code's fields are a column
+    // of labelled inputs, and a 1500px-wide text field is a worse form, not a
+    // bigger one. (See `.admin-measure` in globals.css.)
+    <div className="admin-measure space-y-4">
       <BackLink href="/admin/coupons">Promo codes</BackLink>
       <AdminHero
         title={promotion.code}
@@ -40,6 +43,6 @@ export default async function EditCouponPage({
         restaurants={restaurants}
         cancelHref="/admin/coupons"
       />
-    </>
+    </div>
   );
 }

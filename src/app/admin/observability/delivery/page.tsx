@@ -126,41 +126,46 @@ export default async function DeliveryHealthPage({
         />
       </FigureStrip>
 
-      <Panel title="Dispatch checkpoints">
-        <MetricTable
-          rows={dispatchRows}
-          keyHeader="Checkpoint"
-          hrefFor={(key) =>
-            `/admin/observability/logs?kind=domain&range=${range}&q=${encodeURIComponent(key)}`
-          }
-          emptyNote="No dispatch events recorded in this window. Dispatch runs when a vendor accepts an order, so a quiet window can simply mean a quiet evening."
-        />
-      </Panel>
+      {/* Checkpoints beside their caveats, for the same reason as
+          Notifications: the second panel says how to read the first. */}
+      <div className="flex flex-col gap-4 @6xl:flex-row">
+        <Panel className="min-w-0 flex-1" title="Dispatch checkpoints">
+          <MetricTable
+            rows={dispatchRows}
+            keyHeader="Checkpoint"
+            hrefFor={(key) =>
+              `/admin/observability/logs?kind=domain&range=${range}&q=${encodeURIComponent(key)}`
+            }
+            emptyNote="No dispatch events recorded in this window. Dispatch runs when a vendor accepts an order, so a quiet window can simply mean a quiet evening."
+          />
+        </Panel>
 
-      <Panel title="What this page cannot tell you">
-        <ul className="-mt-1">
-          <HealthLine
-            label="Rider location accuracy"
-            state="unknown"
-            detail="Only the age of the last fix is known"
-            note="A fix older than the dispatch window is treated as no fix. Whether it was accurate when it was taken is not something the server can check."
-          />
-          <HealthLine
-            label="Why a rider declined"
-            state="unknown"
-            detail="Not recorded"
-            note="An offer that expires and one that was actively refused look the same from here."
-          />
-        </ul>
-        <p className="mt-3 text-[12px] text-muted">
-          The live board on the{" "}
-          <Link href="/admin" className="underline underline-offset-2">
-            dashboard
-          </Link>{" "}
-          shows the same fleet from the operations side — who is where, rather
-          than what failed.
-        </p>
-      </Panel>
+        <Panel className="min-w-0 flex-1" title="What this page cannot tell you">
+          <ul className="-mt-1">
+            <HealthLine
+              label="Rider location accuracy"
+              state="unknown"
+              detail="Only the age of the last fix is known"
+              note="A fix older than the dispatch window is treated as no fix. Whether it was accurate when it was taken is not something the server can check."
+            />
+            <HealthLine
+              label="Why a rider declined"
+              state="unknown"
+              detail="Not recorded"
+              note="An offer that expires and one that was actively refused look the same from here."
+            />
+          </ul>
+          <p className="mt-3 text-[12px] text-muted">
+            The live board on the{" "}
+            <Link href="/admin" className="underline underline-offset-2">
+              dashboard
+            </Link>{" "}
+            shows the same fleet from the operations side — who is where, rather
+            than what failed.
+          </p>
+        </Panel>
+      </div>
+
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import { AdminHero } from "@/components/admin/admin-ui";
+import { ConsoleOnly } from "@/components/admin/console-only";
+import { DataTable, type Column } from "@/components/admin/data-table";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   buildReport,
@@ -22,10 +24,31 @@ import { ReportExport } from "./report-export";
  * Every money figure is produced by the same arithmetic the settlement screen
  * uses (`@/lib/settlements/math`), so a report and a payout statement covering
  * the same orders agree to the rupee.
+ *
+ * ## What a phone gets
+ *
+ * The figures and the rows, not the exports. Reading last week's takings on the
+ * way to a shop is a real thing an operator does, so nothing read-only is taken
+ * away; the table goes through `DataTable`, which stacks into cards below the
+ * console breakpoint instead of scrolling a 640px slab sideways in a 370px
+ * column.
+ *
+ * The Excel and Save-as-PDF buttons are console-only. An .xlsx that lands in a
+ * phone's downloads folder is not a file anybody is going to do anything with,
+ * and "Save as PDF" is a desktop print dialogue. That is a presentation
+ * decision like every other `ConsoleOnly`: the report data is admin-gated
+ * server-side and none of that changes.
  */
 export const dynamic = "force-dynamic";
 
 const money = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
+
+/** A report's rows are shaped by its kind, so the columns are built per report. */
+type ReportRow = Record<string, string | number>;
+
+function cellValue(row: ReportRow, key: string, isMoney?: boolean) {
+  return isMoney ? money(Number(row[key]) || 0) : (row[key] ?? "—");
+}
 
 function isKind(v: string | undefined): v is ReportKind {
   return REPORT_KINDS.some((r) => r.value === v);
@@ -106,7 +129,9 @@ export default async function ReportsPage({
               </h2>
               <p className="mt-0.5 text-[13px] text-muted">{report.subtitle}</p>
             </div>
-            <ReportExport report={report} />
+            <ConsoleOnly tool="Exporting a report" notice={false}>
+              <ReportExport report={report} />
+            </ConsoleOnly>
           </div>
 
           {report.empty ? (
@@ -140,66 +165,43 @@ export default async function ReportsPage({
                 ))}
               </div>
 
-              <div className="overflow-x-auto rounded-xl border border-line">
-                <table className="w-full min-w-[640px] text-left text-sm">
-                  <caption className="sr-only">{report.title}</caption>
-                  <thead className="border-b border-line bg-surface-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                    <tr>
-                      {report.table.columns.map((c) => (
-                        <th
-                          key={c.key}
-                          className={`px-3 py-2.5 ${c.align === "right" ? "text-right" : ""}`}
-                        >
-                          {c.label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report.table.rows.map((row, i) => (
-                      <tr
-                        key={i}
-                        className="border-b border-line last:border-0"
-                      >
-                        {report.table.columns.map((c) => (
-                          <td
-                            key={c.key}
-                            className={`px-3 py-2.5 ${
-                              c.align === "right"
-                                ? "text-right tabular-nums"
-                                : ""
-                            }`}
-                          >
-                            {c.money
-                              ? money(Number(row[c.key]) || 0)
-                              : (row[c.key] ?? "—")}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                  {report.table.totals ? (
-                    <tfoot>
-                      <tr className="border-t-2 border-line bg-surface-2 font-semibold text-ink">
-                        {report.table.columns.map((c) => (
-                          <td
-                            key={c.key}
-                            className={`px-3 py-2.5 ${
-                              c.align === "right"
-                                ? "text-right tabular-nums"
-                                : ""
-                            }`}
-                          >
-                            {c.money
-                              ? money(Number(report.table.totals![c.key]) || 0)
-                              : (report.table.totals![c.key] ?? "")}
-                          </td>
-                        ))}
-                      </tr>
-                    </tfoot>
-                  ) : null}
-                </table>
-              </div>
+              <DataTable<ReportRow>
+                caption={report.title}
+                columns={report.table.columns.map((c, i): Column<ReportRow> => ({
+                  key: c.key,
+                  header: c.label,
+                  align: c.align,
+                  // The first column names the row; in a card it is the
+                  // headline, and every other column becomes a labelled line.
+                  role: i === 0 ? "title" : undefined,
+                  cell: (row) => cellValue(row, c.key, c.money),
+                }))}
+                // Keyed by position: a report's first column is a date, a shop
+                // name or an order code depending on the kind, and only some of
+                // those are unique.
+                rows={report.table.rows.map((row, i) => ({ ...row, __row: i }))}
+                rowKey={(row) => String(row.__row)}
+                minWidth={640}
+                totals={
+                  report.table.totals
+                    ? {
+                        // Only columns the report actually totals. A cell left
+                        // out lets DataTable put its "Total" label in the first
+                        // column, where an em-dash would otherwise sit.
+                        cells: Object.fromEntries(
+                          report.table.columns
+                            .filter(
+                              (c) => report.table.totals?.[c.key] !== undefined
+                            )
+                            .map((c) => [
+                              c.key,
+                              cellValue(report.table.totals!, c.key, c.money),
+                            ])
+                        ),
+                      }
+                    : undefined
+                }
+              />
             </>
           )}
         </div>

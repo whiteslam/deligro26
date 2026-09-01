@@ -74,6 +74,85 @@ the commit message — do not leave the other in place "just in case".
 If the better-integrated version is the less secure one, fix its security rather
 than swapping in the orphan. Keep the wiring, raise the floor.
 
+## Web and app are two shells, not two stylesheets
+
+Admin, vendor and manager each run **two top-level shells**: the ops console
+(sidebar or header + fluid column) and the phone frame (`.device` > `.app-shell`,
+402px, bezel and all). They are separate branches of the element tree, not one
+layout with breakpoints, and they share everything below the chrome — data
+access, business logic, roles, and the `admin-ui` / `console-ui` / `DataTable`
+primitives.
+
+1. **The shell is resolved on the server.** `resolveShellMode(portal)`
+   (`lib/shell-mode.server.ts`) reads a cookie, falls back to a phone-shaped
+   user agent, then to `"web"`. The layout passes the answer to the shell as
+   `initialMode`, and `ShellModeProvider` carries it down. Do not add a
+   client-only shell decision: that was the bug — SSR had no answer, resolved to
+   `"app"`, and every console page server-rendered inside a 402px iPhone mock
+   that swapped to the console after hydration.
+2. **Never put phone chrome in the console branch.** No `.device`, `.app-shell`,
+   `.app-scroll`, `StatusBar`, tab bar, phone header, `max-w-md`, or 80px bottom
+   padding below the `effective === "web"` return. `scripts/qa/platform-separation.ts`
+   asserts this structurally; run `npm run test:platform` after touching a shell.
+3. **Size against the container, not the window.** Both shells wrap content in
+   `@container`, so a page uses `@3xl:` / `@5xl:`, never `md:` / `lg:`. A
+   viewport breakpoint reports "wide" for a 390px phone frame previewed on a
+   1920px screen, which is precisely backwards. Viewport breakpoints are for
+   chrome that really is viewport-scale (the sidebar's `lg:hidden`).
+4. **Desktop is not mobile stretched.** A console screen uses the width it is
+   given: multi-column rows for panels that are read together, real tables via
+   `DataTable`, and `.admin-measure` for forms and prose so a text field is not
+   1500px wide.
+
+## `reach: "console"` is a route contract
+
+`admin-nav.ts` marks a nav entry `reach: "console"` when the screen behind it
+cannot work on a handset. That is **not** "hide it from the menu". It means:
+
+- the entry is dropped from `ADMIN_PHONE_MENU` (derived, so this cannot be
+  forgotten), **and**
+- the route itself renders `<ConsoleOnly variant="page">`, so a bookmark, a deep
+  link out of an alert, or the back button gets the notice rather than a broken
+  screen.
+
+Both halves, or neither. Observability had only the first for a release, and a
+phone reaching the URL got a ten-tab console with 560px tables inside a 370px
+column. `npm run test:platform` fails if a console-reach entry has no gate.
+
+## Platform is presentation; roles are the security boundary
+
+**Never use the shell mode, `navigator.userAgent`, or a viewport query as
+authorization.** `ConsoleOnly` hides a control; it does not stop anyone calling
+what the control called. What stops them is what has always stopped them:
+`requireRole()` at the top of every exported `"use server"` function and every
+API route (rule 3), above every `createAdminClient()` (rule 5), with RLS
+underneath.
+
+So a phone holding an admin session is still an admin. It is being told to open
+this at a desk, not being denied.
+
+Do not invent a per-platform permission model. `profiles.role` is a five-value
+platform enum; a capability dimension crossed with a device class is a security
+change of its own, and none of the screens gated so far needed one.
+
+## New admin features declare a platform
+
+Say which shells a feature is for, in the page's doc comment, and build to it:
+
+- **BOTH** — the default. One page, container queries, `DataTable` where there
+  is a table. Most screens.
+- **WEB** — `reach: "console"` on the nav entry *and* `<ConsoleOnly
+  variant="page">` on the route. For screens a handset genuinely cannot show:
+  the vendor onboarding wizard, the settlement builder, observability.
+- **WEB control on a BOTH page** — an inline `<ConsoleOnly>` around the control,
+  with a `why` that says what still works. Exports, chart panels, bulk editors.
+  Prefer this to gating a whole screen: read-only value is worth keeping on a
+  phone even when the editing is not.
+
+Write the `tool` and `why` strings as sentences an operator would say. The
+notice is the only thing they get, so "Exporting a report" plus what still works
+is the whole feature from their side.
+
 ## Documentation must match behaviour
 
 `SECURITY.md`, migration comments and doc comments are load-bearing — the audit

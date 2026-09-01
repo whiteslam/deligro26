@@ -28,6 +28,7 @@
     "test:app-version": "npx tsx scripts/qa/app-version.ts",
     "test:sw": "npx tsx scripts/qa/sw-cache-rules.ts",
     "test:obs": "npx tsx scripts/qa/obs-telemetry.ts",
+    "test:platform": "npx tsx scripts/qa/platform-separation.ts",
     "test:e2e": "npx tsx scripts/qa/e2e-smoke.ts",
     "test:zap": "bash scripts/qa/zap-baseline.sh",
     "test:qa": "bash scripts/qa/run-all.sh"

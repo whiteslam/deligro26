@@ -1,10 +1,29 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
+import { ConsoleOnly } from "@/components/admin/console-only";
 import { ObsNav } from "./obs-nav";
 import { classifySearch } from "@/lib/obs/read";
 
 /**
- * Observability shell: the role gate, the section tabs, and the search box.
+ * Observability shell: the role gate, the console gate, the section tabs, and
+ * the search box.
+ *
+ * ## The console gate
+ *
+ * Every screen under here is a dense table, a stack trace or a request
+ * waterfall — a phone can show none of them usefully. `admin-nav.ts` marks the
+ * section `reach: "console"`, but that only keeps it out of the phone's menu;
+ * the route stayed open, so a bookmark, a deep link out of an alert, or the
+ * back button dropped a ten-tab console with 560px-wide tables into a 370px
+ * column. `ConsoleOnly variant="page"` replaces the whole section with a line
+ * saying where it went, which is the same treatment the vendor wizard and the
+ * settlement builder already get.
+ *
+ * **This is presentation, not authorization.** It changes nothing about who may
+ * read this data: `requireRole("admin")` below, the same check in every action
+ * in `actions.ts`, and a third in the data layer where RLS is actually
+ * bypassed, are what keep it safe. A phone with an admin session is still an
+ * admin — it is just being told to open this at a desk.
  *
  * ## The gate
  *
@@ -67,26 +86,35 @@ export default async function ObservabilityLayout({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <ObsNav />
-        <form action={search} className="flex min-w-[240px] flex-1 items-center gap-2">
-          <input
-            type="search"
-            name="q"
-            placeholder="Issue, trace, request or order id…"
-            aria-label="Search observability"
-            className="text-data h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[12.5px] text-ink outline-none placeholder:text-muted"
-          />
-          <button
-            type="submit"
-            className="press h-9 shrink-0 rounded-lg bg-ink px-3.5 text-xs font-semibold text-[color:var(--surface)]"
+    <ConsoleOnly
+      variant="page"
+      tool="The observability console"
+      why="Issues, traces and logs are wide tables and stack traces that a phone cannot show usefully. Orders, refunds and the vendor list all work here."
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <ObsNav />
+          <form
+            action={search}
+            className="flex min-w-[240px] flex-1 items-center gap-2"
           >
-            Find
-          </button>
-        </form>
+            <input
+              type="search"
+              name="q"
+              placeholder="Issue, trace, request or order id…"
+              aria-label="Search observability"
+              className="text-data h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[12.5px] text-ink outline-none placeholder:text-muted"
+            />
+            <button
+              type="submit"
+              className="press h-9 shrink-0 rounded-lg bg-ink px-3.5 text-xs font-semibold text-[color:var(--surface)]"
+            >
+              Find
+            </button>
+          </form>
+        </div>
+        {children}
       </div>
-      {children}
-    </div>
+    </ConsoleOnly>
   );
 }

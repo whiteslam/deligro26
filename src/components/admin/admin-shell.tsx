@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { StatusBar } from "@/components/layout/status-bar";
 import { AdminHeader } from "@/components/admin/admin-header";
 import { AdminTabBar } from "@/components/admin/admin-tab-bar";
@@ -9,10 +9,10 @@ import { AdminNavDrawer } from "@/components/admin/admin-nav-drawer";
 import { AdminTopBar } from "@/components/admin/admin-top-bar";
 import { FoodUploadDock } from "@/components/admin/food-upload-dock";
 import { DesktopShellSwitcher } from "@/components/shared/desktop-shell-switcher";
-import { useAdminShellMode } from "@/hooks/use-admin-shell-mode";
-import { useAdminShell } from "@/stores/admin-shell-store";
+import { ShellModeProvider, useShellModeState } from "@/components/shared/shell-mode-provider";
 import type { AdminNavCounts } from "@/lib/data-access/admin-stats";
 import type { ConsoleHealth } from "@/lib/console-health";
+import type { ShellMode } from "@/lib/shell-mode";
 
 /**
  * Admin chrome with an app ↔ web switch (desktop/laptop only).
@@ -22,6 +22,12 @@ import type { ConsoleHealth } from "@/lib/console-health";
  *
  * On a real phone the switcher is hidden and the phone shell is forced, so the
  * console layout is never something a handset has to cope with.
+ *
+ * `initialMode` is resolved **on the server** (`lib/shell-mode.server.ts`) and
+ * is what this renders for the hydration pass, so the console is the console in
+ * the very first byte of HTML. Before that it was decided client-side only,
+ * which meant SSR always answered "app" and every console page shipped as a
+ * 402px iPhone mock that swapped to the console a paint later.
  *
  * Both branches wrap page content in `@container`. Pages therefore size
  * themselves against *the column they are in*, not the browser window — the
@@ -33,33 +39,42 @@ import type { ConsoleHealth } from "@/lib/console-health";
  * palette (see globals.css), so the phone frame keeps the app's own look —
  * which is the honest thing for a preview of a handset to do.
  */
-export function AdminShell({
-  children,
-  counts,
-  health,
-  name,
-  email,
-}: {
+interface AdminShellProps {
   children: React.ReactNode;
   counts: AdminNavCounts;
   health: ConsoleHealth;
   name: string;
   email: string | null;
-}) {
-  const hydrated = useAdminShell((s) => s.hydrated);
-  const setMode = useAdminShell((s) => s.setMode);
-  const init = useAdminShell((s) => s.init);
+  /** Resolved server-side, per request. See `resolveShellMode`. */
+  initialMode: ShellMode;
+}
+
+export function AdminShell({ initialMode, ...props }: AdminShellProps) {
+  return (
+    <ShellModeProvider portal="admin" initialMode={initialMode}>
+      <AdminShellChrome {...props} />
+    </ShellModeProvider>
+  );
+}
+
+function AdminShellChrome({
+  children,
+  counts,
+  health,
+  name,
+  email,
+}: Omit<AdminShellProps, "initialMode">) {
   const [navOpen, setNavOpen] = useState(false);
-
-  useEffect(() => {
-    init();
-  }, [init]);
-
   const closeNav = useCallback(() => setNavOpen(false), []);
 
   // Phones never get the console — the switcher is desktop-only. Page tools
-  // read the same hook, so a screen can never disagree with its own chrome.
-  const effective = useAdminShellMode();
+  // read the same context, so a screen can never disagree with its own chrome.
+  const {
+    mode: effective,
+    preference,
+    setPreference: setMode,
+    hydrated,
+  } = useShellModeState();
 
   if (effective === "app") {
     return (
@@ -80,7 +95,7 @@ export function AdminShell({
           </div>
         </div>
         <DesktopShellSwitcher
-          mode="app"
+          mode={preference}
           onChange={setMode}
           hydrated={hydrated}
         />
@@ -113,7 +128,7 @@ export function AdminShell({
           <AdminTopBar
             counts={counts}
             onMenu={() => setNavOpen(true)}
-            shellMode="web"
+            shellMode={preference}
             onShellModeChange={setMode}
             shellHydrated={hydrated}
           />

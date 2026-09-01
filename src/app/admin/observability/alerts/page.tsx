@@ -205,39 +205,46 @@ export default async function AlertsPage() {
         )}
       </Panel>
 
-      <Panel
-        title="The pipeline itself"
-        subtitle="If evaluation stops, nothing fires and everything looks fine. This is how you find out."
-      >
-        <ul className="-mt-1">
-          {pipeline.map((row) => (
-            <HealthLine key={row.label} {...row} />
-          ))}
-        </ul>
-      </Panel>
-
-      {firings.data.length > active.length ? (
-        <Panel title="Recently fired">
-          <ul className="flex flex-col">
-            {firings.data
-              .filter((f) => f.resolvedAt)
-              .map((f) => (
-                <li
-                  key={f.id}
-                  className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line/60 py-2 last:border-0"
-                >
-                  <span className="text-[13px] font-medium text-ink">
-                    {f.ruleName}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
-                    {f.message}
-                  </span>
-                  <Ago iso={f.firedAt} />
-                </li>
-              ))}
+      {/* Whether evaluation is even running, beside what it last did.
+          Both are short lists; stacked, they left a wide console mostly
+          empty. */}
+      <div className="flex flex-col gap-4 @5xl:flex-row">
+        <Panel
+          className="min-w-0 flex-1"
+          title="The pipeline itself"
+          subtitle="If evaluation stops, nothing fires and everything looks fine. This is how you find out."
+        >
+          <ul className="-mt-1">
+            {pipeline.map((row) => (
+              <HealthLine key={row.label} {...row} />
+            ))}
           </ul>
         </Panel>
-      ) : null}
+
+        {firings.data.length > active.length ? (
+          <Panel className="min-w-0 flex-1" title="Recently fired">
+            <ul className="flex flex-col">
+              {firings.data
+                .filter((f) => f.resolvedAt)
+                .map((f) => (
+                  <li
+                    key={f.id}
+                    className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line/60 py-2 last:border-0"
+                  >
+                    <span className="text-[13px] font-medium text-ink">
+                      {f.ruleName}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
+                      {f.message}
+                    </span>
+                    <Ago iso={f.firedAt} />
+                  </li>
+                ))}
+            </ul>
+          </Panel>
+        ) : null}
+      </div>
+
     </div>
   );
 }

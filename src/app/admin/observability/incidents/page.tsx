@@ -44,7 +44,9 @@ export default async function IncidentsPage({
         }
       />
 
-      <Panel title="Open an incident">
+      {/* A row of labelled inputs, capped at a reading measure like every other
+          console form — the title field was taking a thousand pixels. */}
+      <Panel className="admin-measure" title="Open an incident">
         <form action={openIncident} className="flex flex-wrap items-end gap-2">
           <label className="flex min-w-[220px] flex-1 flex-col gap-1">
             <span className="text-[11.5px] font-semibold text-muted">
