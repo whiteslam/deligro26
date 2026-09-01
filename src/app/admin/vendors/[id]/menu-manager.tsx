@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ImagePlus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ImagePlus, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, fieldCls, labelCls } from "@/components/ui/field";
 import {
@@ -91,6 +91,7 @@ export function MenuManager({
   const [error, setError] = useState<string | null>(null);
   /** Which row has its photo picker open. One at a time. */
   const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const pickImage = (item: AdminMenuItem, picked: PickedImage | null) =>
     start(async () => {
@@ -180,14 +181,54 @@ export function MenuManager({
 
   const editing = showAdd || editingId !== null;
 
+  const needle = query.trim().toLowerCase();
+  const filtered = needle
+    ? items.filter(
+        (it) =>
+          it.name.toLowerCase().includes(needle) ||
+          (it.category ?? "").toLowerCase().includes(needle)
+      )
+    : items;
+
+  // Grouped in the order each category first appears, not alphabetised — that
+  // mirrors how a vendor built their menu rather than imposing a new order.
+  const groups: { name: string; items: AdminMenuItem[] }[] = [];
+  for (const it of filtered) {
+    const name = it.category?.trim() || "Uncategorised";
+    const group = groups.find((g) => g.name === name);
+    if (group) group.items.push(it);
+    else groups.push({ name, items: [it] });
+  }
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-label">{items.length} items</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-label">
+          {items.length} items
+          {needle ? (
+            <span className="font-normal text-muted">
+              {" "}
+              · {filtered.length} shown
+            </span>
+          ) : null}
+        </p>
+        <div className="flex-1" />
         {!editing ? (
-          <Button size="sm" variant="secondary" onClick={openAdd}>
-            <Plus className="size-4" /> Add item
-          </Button>
+          <>
+            <div className="relative w-full @sm:w-[210px]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Filter menu…"
+                aria-label="Filter menu items"
+                className={`${fieldCls} py-1.5 pl-8 text-[13px]`}
+              />
+            </div>
+            <Button size="sm" variant="secondary" onClick={openAdd}>
+              <Plus className="size-4" /> Add item
+            </Button>
+          </>
         ) : null}
       </div>
 
@@ -297,97 +338,114 @@ export function MenuManager({
         <p className="rounded-xl border border-line bg-surface px-4 py-8 text-center text-sm text-muted">
           No menu items yet. Add them manually or import from Excel below.
         </p>
+      ) : items.length > 0 && filtered.length === 0 ? (
+        <p className="rounded-xl border border-line bg-surface px-4 py-8 text-center text-sm text-muted">
+          No items match &quot;{query.trim()}&quot;.
+        </p>
       ) : (
-        <ul className="space-y-2">
-          {items.map((item) => (
-            <li
-              key={item.id}
-              className="space-y-2 rounded-xl border border-line bg-surface p-3"
+        <div className="space-y-3">
+          {groups.map((group) => (
+            <div
+              key={group.name}
+              className="overflow-hidden rounded-xl border border-line bg-surface"
             >
-            <div className="flex items-center gap-3">
-              {/* The picture, and the way to change it. Tapping it opens the
-                  two options — upload from this device, or choose from shared
-                  storage — which is the only thing to do when an automatic
-                  match got it wrong. */}
-              <button
-                type="button"
-                onClick={() => setPickerFor(pickerFor === item.id ? null : item.id)}
-                aria-label={`Change the picture for ${item.name}`}
-                className="press relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-line bg-surface-2"
-              >
-                {item.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.imageUrl}
-                    alt=""
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  <ImagePlus className="size-4 text-muted" />
-                )}
-              </button>
-              <span
-                className={
-                  "size-2.5 shrink-0 rounded-full " +
-                  (item.veg ? "bg-green" : "bg-deal")
-                }
-                aria-hidden
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{item.name}</p>
-                <p className="truncate text-[11px] text-muted">
-                  ₹{item.price}
-                  {item.discountPrice != null ? ` · ₹${item.discountPrice} off-price` : ""}
-                  {item.category ? ` · ${item.category}` : ""}
-                  {item.imageLibraryId ? " · photo from storage" : ""}
-                </p>
+              <div className="flex items-center gap-2 border-b border-line bg-surface-2 px-3.5 py-2">
+                <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted">
+                  {group.name}
+                </span>
+                <span className="text-[11px] font-semibold text-[color:var(--c-faint)]">
+                  {group.items.length}
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => toggle(item)}
-                disabled={pending}
-                className={
-                  "press shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold " +
-                  (item.available ? "pill pill-green" : "pill pill-muted")
-                }
-              >
-                {item.available ? "On" : "Off"}
-              </button>
-              <button
-                type="button"
-                onClick={() => openEdit(item)}
-                className="press grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-muted hover:text-ink"
-                aria-label="Edit item"
-              >
-                <Pencil className="size-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => remove(item)}
-                disabled={pending}
-                className="press grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-muted hover:text-deal"
-                aria-label="Delete item"
-              >
-                <Trash2 className="size-4" />
-              </button>
-            </div>
+              <ul>
+                {group.items.map((item) => (
+                  <li key={item.id} className="space-y-2 border-b border-line p-3 last:border-b-0">
+                    <div className="flex items-center gap-3">
+                      {/* The picture, and the way to change it. Tapping it opens
+                          the two options — upload from this device, or choose
+                          from shared storage — which is the only thing to do
+                          when an automatic match got it wrong. */}
+                      <button
+                        type="button"
+                        onClick={() => setPickerFor(pickerFor === item.id ? null : item.id)}
+                        aria-label={`Change the picture for ${item.name}`}
+                        className="press relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-line bg-surface-2"
+                      >
+                        {item.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={item.imageUrl}
+                            alt=""
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          <ImagePlus className="size-4 text-muted" />
+                        )}
+                      </button>
+                      <span
+                        className={
+                          "size-2.5 shrink-0 rounded-full " +
+                          (item.veg ? "bg-green" : "bg-deal")
+                        }
+                        aria-hidden
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{item.name}</p>
+                        <p className="truncate text-[11px] text-muted">
+                          ₹{item.price}
+                          {item.discountPrice != null ? ` · ₹${item.discountPrice} off-price` : ""}
+                          {item.imageLibraryId ? " · photo from storage" : ""}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggle(item)}
+                        disabled={pending}
+                        className={
+                          "press shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold " +
+                          (item.available ? "pill pill-green" : "pill pill-muted")
+                        }
+                      >
+                        {item.available ? "On" : "Off"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openEdit(item)}
+                        className="press grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-muted hover:text-ink"
+                        aria-label="Edit item"
+                      >
+                        <Pencil className="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => remove(item)}
+                        disabled={pending}
+                        className="press grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-muted hover:text-deal"
+                        aria-label="Delete item"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
 
-            {pickerFor === item.id ? (
-              <FoodImagePicker
-                dishName={item.name}
-                current={
-                  item.imageUrl
-                    ? { imageUrl: item.imageUrl, libraryId: item.imageLibraryId }
-                    : null
-                }
-                source={LIBRARY}
-                onPick={(picked) => pickImage(item, picked)}
-                onClose={() => setPickerFor(null)}
-              />
-            ) : null}
-            </li>
+                    {pickerFor === item.id ? (
+                      <FoodImagePicker
+                        dishName={item.name}
+                        current={
+                          item.imageUrl
+                            ? { imageUrl: item.imageUrl, libraryId: item.imageLibraryId }
+                            : null
+                        }
+                        source={LIBRARY}
+                        onPick={(picked) => pickImage(item, picked)}
+                        onClose={() => setPickerFor(null)}
+                      />
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
 
       <div className="border-t border-line pt-3">
