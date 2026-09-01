@@ -28,24 +28,32 @@ import {
  * removed). Each action runs through a transition and refreshes.
  *
  * The vendor table passes `showPasswordReset={false}`, because its password
- * column already reveals, copies, regenerates and sets. The reset button here
- * is for the vendor detail page, which has no such column.
+ * column already reveals, copies, regenerates and sets. The vendor profile
+ * keeps password and delete in the Access section on the page, so it turns
+ * those header buttons off too — a row of five icons on a shop name is how
+ * the console started looking like the phone app.
  */
 export function VendorRowActions({
   id,
   name,
   status,
+  showView = true,
+  showEdit = true,
   showPasswordReset = true,
+  showDelete = true,
 }: {
   id: string;
   name: string;
   status: VendorStatus;
+  showView?: boolean;
+  showEdit?: boolean;
   /**
    * Off on the vendor table, where the password column already carries reveal,
    * copy, regenerate and set — a second key icon in the same row would be two
    * controls for one job, and the quieter one wins.
    */
   showPasswordReset?: boolean;
+  showDelete?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -78,8 +86,10 @@ export function VendorRowActions({
         window.alert(
           `${name} has order history, so it was disabled instead of permanently deleted.`
         );
+        router.refresh();
+        return;
       }
-      router.refresh();
+      router.push("/admin/vendors");
     });
 
   const onReset = () => {
@@ -111,11 +121,10 @@ export function VendorRowActions({
     }
   };
 
-  // Base chip + a per-action colour, shared with the other admin row controls:
-  // blue = edit, violet = view/secondary, green = enable, orange = disable,
-  // red = delete.
+  // Phone keeps the circular icon chip; the web table (@3xl) adds a label
+  // so View / Edit / Disable / Delete can be read without hovering.
   const base =
-    "press grid size-9 place-items-center rounded-full bg-surface-2 transition-colors disabled:opacity-50";
+    "press inline-flex size-9 items-center justify-center rounded-full bg-surface-2 transition-colors disabled:opacity-50 @3xl:h-7 @3xl:w-auto @3xl:gap-1 @3xl:rounded-md @3xl:px-2";
   const tone = {
     blue: "text-blue hover:bg-blue/15",
     violet: "text-violet-500 hover:bg-violet-500/15",
@@ -123,25 +132,33 @@ export function VendorRowActions({
     accent: "text-accent hover:bg-accent/15",
     deal: "text-deal hover:bg-deal/15",
   } as const;
+  const icon = "size-4 @3xl:size-3.5";
+  const labelCls = "hidden text-[11px] font-semibold leading-none @3xl:inline";
 
   return (
-    <div className="flex items-center gap-1.5">
-      <Link
-        href={`/admin/vendors/${id}`}
-        className={cn(base, tone.violet)}
-        title="View"
-        aria-label="View vendor"
-      >
-        <Eye className="size-4" />
-      </Link>
-      <Link
-        href={`/admin/vendors/${id}/edit`}
-        className={cn(base, tone.blue)}
-        title="Edit"
-        aria-label="Edit vendor"
-      >
-        <Pencil className="size-4" />
-      </Link>
+    <div className="flex items-center gap-1.5 whitespace-nowrap">
+      {showView ? (
+        <Link
+          href={`/admin/vendors/${id}`}
+          className={cn(base, tone.violet)}
+          title="View"
+          aria-label="View vendor"
+        >
+          <Eye className={icon} />
+          <span className={labelCls}>View</span>
+        </Link>
+      ) : null}
+      {showEdit ? (
+        <Link
+          href={`/admin/vendors/${id}/edit`}
+          className={cn(base, tone.blue)}
+          title="Edit"
+          aria-label="Edit vendor"
+        >
+          <Pencil className={icon} />
+          <span className={labelCls}>Edit</span>
+        </Link>
+      ) : null}
       <button
         type="button"
         className={cn(base, enabled ? tone.accent : tone.green)}
@@ -150,7 +167,8 @@ export function VendorRowActions({
         aria-label={enabled ? "Disable vendor" : "Enable vendor"}
         onClick={onToggle}
       >
-        {enabled ? <PowerOff className="size-4" /> : <Power className="size-4" />}
+        {enabled ? <PowerOff className={icon} /> : <Power className={icon} />}
+        <span className={labelCls}>{enabled ? "Disable" : "Enable"}</span>
       </button>
       {showPasswordReset ? (
         <button
@@ -161,19 +179,23 @@ export function VendorRowActions({
           aria-label="Reset vendor password"
           onClick={onReset}
         >
-          <KeyRound className="size-4" />
+          <KeyRound className={icon} />
+          <span className={labelCls}>Reset</span>
         </button>
       ) : null}
-      <button
-        type="button"
-        className={cn(base, tone.deal)}
-        disabled={pending}
-        title="Delete"
-        aria-label="Delete vendor"
-        onClick={() => setDeleteStep(1)}
-      >
-        <Trash2 className="size-4" />
-      </button>
+      {showDelete ? (
+        <button
+          type="button"
+          className={cn(base, tone.deal)}
+          disabled={pending}
+          title="Delete"
+          aria-label="Delete vendor"
+          onClick={() => setDeleteStep(1)}
+        >
+          <Trash2 className={icon} />
+          <span className={labelCls}>Delete</span>
+        </button>
+      ) : null}
 
       <ConfirmDialog
         open={deleteStep === 1}

@@ -2,7 +2,6 @@ import {
   Banknote,
   FileSpreadsheet,
   HandCoins,
-  ImageIcon,
   Images,
   LayoutDashboard,
   ListOrdered,
@@ -138,12 +137,15 @@ export const ADMIN_NAV: AdminNavItem[] = [
     match: (p) => p.startsWith("/admin/vendors/slots"),
   },
   {
-    href: "/admin/food-images",
-    label: "Photo storage",
-    icon: ImageIcon,
+    href: "/admin/storage",
+    label: "Storage",
+    icon: Images,
     group: "Catalogue",
     tone: "green",
-    match: (p) => p.startsWith("/admin/food-images"),
+    match: (p) =>
+      p.startsWith("/admin/storage") ||
+      p.startsWith("/admin/food-images") ||
+      p.startsWith("/admin/settings/categories"),
   },
   {
     href: "/admin/banners",
@@ -176,14 +178,6 @@ export const ADMIN_NAV: AdminNavItem[] = [
     group: "People",
     tone: "blue",
     match: (p) => p.startsWith("/admin/settings/employees"),
-  },
-  {
-    href: "/admin/settings/categories",
-    label: "Category pictures",
-    icon: Images,
-    group: "Catalogue",
-    tone: "pop",
-    match: (p) => p.startsWith("/admin/settings/categories"),
   },
   {
     href: "/admin/settings/platform",

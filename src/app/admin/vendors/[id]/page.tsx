@@ -15,6 +15,8 @@ import { VendorRowActions } from "../vendor-row-actions";
 import { ConsoleOnly } from "@/components/admin/console-only";
 import { MenuManager } from "./menu-manager";
 import { DocumentsManager } from "./documents-manager";
+import { VendorOverview } from "./vendor-overview";
+import { Card, Row, fmtDate, fmtTime, rupees } from "./vendor-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -36,39 +38,28 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-const dateFmt = new Intl.DateTimeFormat("en-IN", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
-
-function fmtDate(iso: string | null): string {
-  return iso ? dateFmt.format(new Date(iso)) : "—";
-}
-function fmtTime(t: string | null): string {
-  return t ? t.slice(0, 5) : "—";
-}
-function rupees(n: number): string {
-  return `₹${n.toLocaleString("en-IN")}`;
-}
+const DAY_VALUES = [7, 14, 30] as const;
 
 export default async function VendorDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; days?: string }>;
 }) {
   const { id } = await params;
-  const { tab } = await searchParams;
+  const { tab, days: daysRaw } = await searchParams;
   const active: TabId = TABS.some((t) => t.id === tab)
     ? (tab as TabId)
     : "overview";
+  const requested = Number(daysRaw);
+  const days = (DAY_VALUES as readonly number[]).includes(requested)
+    ? requested
+    : 30;
 
   const vendor = await getVendorDetail(id);
   if (!vendor) notFound();
 
-  // Only the active tab pays for its data.
   const [menuItems, menuCategories, documents] = await Promise.all([
     active === "menu" ? listMenuItems(id) : Promise.resolve([]),
     active === "menu"
@@ -76,6 +67,9 @@ export default async function VendorDetailPage({
       : Promise.resolve([] as string[]),
     active === "documents" ? listVendorDocuments(id) : Promise.resolve([]),
   ]);
+
+  const tabHref = (tabId: string) =>
+    `/admin/vendors/${id}?tab=${tabId}&days=${days}`;
 
   return (
     <div className="space-y-4">
@@ -101,10 +95,6 @@ export default async function VendorDetailPage({
         }
         action={
           <div className="flex items-center gap-2">
-            {/* The console copy of `badge`. A vendor's status is colour-coded
-                (live / suspended / pending), which StatusTag's outlined grey
-                can't carry, so it rides in the action slot the way the late
-                pill does on admin/orders/[id]. */}
             <span
               className={`${STATUS_PILL[vendor.status]} hidden shrink-0 @3xl:inline-flex`}
             >
@@ -119,13 +109,15 @@ export default async function VendorDetailPage({
               id={vendor.id}
               name={vendor.name}
               status={vendor.status}
+              showView={false}
+              showEdit={false}
+              showPasswordReset={false}
+              showDelete={false}
             />
           </div>
         }
       />
 
-      {/* Tabs — the same segmented control the dashboard uses for its range
-          picker, so "pick one of a set" looks like one thing across the console. */}
       <div
         className="no-scrollbar flex gap-0.5 overflow-x-auto rounded-lg border border-line bg-surface p-0.5 text-xs"
         role="tablist"
@@ -134,7 +126,7 @@ export default async function VendorDetailPage({
         {TABS.map((t) => (
           <Link
             key={t.id}
-            href={`/admin/vendors/${id}?tab=${t.id}`}
+            href={tabHref(t.id)}
             role="tab"
             aria-selected={t.id === active}
             className={
@@ -149,93 +141,41 @@ export default async function VendorDetailPage({
         ))}
       </div>
 
-      {active === "overview" ? <OverviewTab v={vendor} /> : null}
+      {active === "overview" ? (
+        <VendorOverview vendor={vendor} days={days} />
+      ) : null}
       {active === "business" ? <BusinessTab v={vendor} /> : null}
-      {/* Menu authoring is console work: inline CRUD across every dish plus an
-          xlsx template → upload → validate → bulk-insert import. */}
       {active === "menu" ? (
         <ConsoleOnly
           variant="page"
           tool="The menu editor"
           why="Every other tab on this shop — overview, business, payment, documents, activity — reads fine here."
         >
-          <MenuManager restaurantId={id} items={menuItems} categories={menuCategories} />
+          <MenuManager
+            restaurantId={id}
+            items={menuItems}
+            categories={menuCategories}
+          />
         </ConsoleOnly>
       ) : null}
       {active === "payment" ? <PaymentTab v={vendor} /> : null}
-      {active === "documents" ? <DocumentsTab v={vendor} documents={documents} /> : null}
+      {active === "documents" ? (
+        <DocumentsTab v={vendor} documents={documents} />
+      ) : null}
       {active === "activity" ? <ActivityTab v={vendor} /> : null}
-    </div>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-xl border border-line bg-surface px-4 py-3.5">
-      <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted">
-        {title}
-      </h2>
-      <dl className="mt-1">{children}</dl>
-    </section>
-  );
-}
-
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-3 border-t border-[color:var(--c-divider)] py-2 first:border-t-0">
-      <dt className="text-[12.5px] text-muted">{label}</dt>
-      <dd className="text-right text-[12.5px] font-medium text-ink">
-        {value || <span className="text-[color:var(--c-faint)]">—</span>}
-      </dd>
-    </div>
-  );
-}
-
-function OverviewTab({ v }: { v: VendorDetail }) {
-  return (
-    <div className="space-y-3">
-      <Card title="Owner">
-        <Row label="Owner name" value={v.ownerName} />
-        <Row label="Mobile" value={v.ownerMobile} />
-        <Row label="Alt. mobile" value={v.ownerAltMobile} />
-        <Row label="Email" value={v.ownerEmail} />
-      </Card>
-      <Card title="Shop">
-        <Row label="Category" value={v.category} />
-        <Row
-          label="Commission"
-          value={`${v.effectiveCommissionPct}%${
-            v.inheritsPlatformRate ? " · platform rate" : ""
-          }`}
-        />
-        <Row label="Min order" value={rupees(v.minOrder)} />
-        <Row label="Menu items" value={v.menuItemCount} />
-        <Row label="Registered" value={fmtDate(v.createdAt)} />
-      </Card>
-      <Card title="Location">
-        <Row label="Address" value={v.address} />
-        <Row label="Landmark" value={v.landmark} />
-        <Row label="Pincode" value={v.pincode} />
-        <Row
-          label="Pin"
-          value={
-            v.lat != null && v.lng != null
-              ? `${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}`
-              : "Not set"
-          }
-        />
-      </Card>
     </div>
   );
 }
 
 function BusinessTab({ v }: { v: VendorDetail }) {
   return (
-    <div className="space-y-3">
-      <Card title="Business details">
+    <div className="grid gap-3 @3xl:grid-cols-2">
+      <Card title="About">
         <Row label="Tagline" value={v.tagline} />
         <Row label="Description" value={v.description} />
         <Row label="Cuisines" value={v.cuisines.join(", ")} />
+      </Card>
+      <Card title="Hours & fulfilment">
         <Row label="Opening" value={fmtTime(v.openingTime)} />
         <Row label="Closing" value={fmtTime(v.closingTime)} />
         <Row label="Weekly off" value={v.weeklyOff.join(", ")} />
@@ -248,14 +188,31 @@ function BusinessTab({ v }: { v: VendorDetail }) {
 
 function PaymentTab({ v }: { v: VendorDetail }) {
   return (
-    <div className="space-y-3">
-      <Card title="Payout">
+    <div className="grid gap-3 @3xl:grid-cols-2">
+      <Card title="Commission & methods">
         <Row
           label="Commission"
           value={`${v.effectiveCommissionPct}%${
             v.inheritsPlatformRate ? " · platform rate" : ""
           }`}
         />
+        <Row label="Accepts COD" value={v.acceptCod ? "Yes" : "No"} />
+        <Row label="Accepts online" value={v.acceptOnline ? "Yes" : "No"} />
+        <Row
+          label="COD max"
+          value={v.codMaxOrder > 0 ? rupees(v.codMaxOrder) : "No limit"}
+        />
+        <Row
+          label="Other charges"
+          value={
+            v.otherChargesPerOrder > 0
+              ? `${rupees(v.otherChargesPerOrder)} / order`
+              : "None"
+          }
+        />
+        <Row label="Settlement" value={v.settlementCycle} />
+      </Card>
+      <Card title="Bank account">
         <Row label="UPI ID" value={v.upiId} />
         <Row label="Account name" value={v.bankAccountName} />
         <Row label="Bank" value={v.bankName} />
@@ -274,13 +231,15 @@ function DocumentsTab({
   documents: VendorDocument[];
 }) {
   return (
-    <div className="space-y-3">
+    <div className="grid gap-3 @3xl:grid-cols-2">
       <Card title="Legal identifiers">
         <Row label="FSSAI" value={v.fssaiNumber} />
         <Row label="GST" value={v.gstNumber} />
         <Row label="PAN" value={v.panNumber} />
       </Card>
-      <DocumentsManager restaurantId={v.id} documents={documents} />
+      <div className="@3xl:col-span-1">
+        <DocumentsManager restaurantId={v.id} documents={documents} />
+      </div>
     </div>
   );
 }

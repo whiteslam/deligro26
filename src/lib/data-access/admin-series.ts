@@ -102,7 +102,10 @@ const MAX_SERIES_DAYS = 180;
  * missing chart is recoverable, a dashboard that 500s because one aggregate
  * query failed is not.
  */
-export async function getAdminSeries(days = SERIES_DAYS): Promise<AdminSeries> {
+export async function getAdminSeries(
+  days = SERIES_DAYS,
+  restaurantId?: string
+): Promise<AdminSeries> {
   const span =
     days === ALL_TIME ? MAX_SERIES_DAYS : Math.max(1, Math.min(days, MAX_SERIES_DAYS));
 
@@ -125,11 +128,13 @@ export async function getAdminSeries(days = SERIES_DAYS): Promise<AdminSeries> {
 
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("orders")
       .select("total, created_at")
       .gte("created_at", since)
       .order("created_at");
+    if (restaurantId) query = query.eq("restaurant_id", restaurantId);
+    const { data, error } = await query;
 
     if (!error) {
       for (const row of (data ?? []) as {
@@ -148,10 +153,12 @@ export async function getAdminSeries(days = SERIES_DAYS): Promise<AdminSeries> {
     // Only worth asking for "All time": an explicit 7/14/30-day request was
     // never claiming to be complete, so there is nothing to disclose.
     if (days === ALL_TIME) {
-      const { count } = await supabase
+      let countQuery = supabase
         .from("orders")
         .select("id", { count: "exact", head: true })
         .lt("created_at", since);
+      if (restaurantId) countQuery = countQuery.eq("restaurant_id", restaurantId);
+      const { count } = await countQuery;
       olderOrders = count ?? 0;
     }
   } catch {
@@ -204,7 +211,10 @@ const STATUS_ORDER = [
  * count has no per-bucket rendering cost to protect — it's one column, summed
  * — so there is no cap to disclose here.
  */
-export async function getOrderStatusMix(days = 7): Promise<StatusSlice[]> {
+export async function getOrderStatusMix(
+  days = 7,
+  restaurantId?: string
+): Promise<StatusSlice[]> {
   const since =
     days === ALL_TIME
       ? null
@@ -215,6 +225,7 @@ export async function getOrderStatusMix(days = 7): Promise<StatusSlice[]> {
     const supabase = await createClient();
     let query = supabase.from("orders").select("status");
     if (since) query = query.gte("created_at", since);
+    if (restaurantId) query = query.eq("restaurant_id", restaurantId);
     const { data, error } = await query;
     if (error) return [];
     rows = (data ?? []) as { status: string | null }[];

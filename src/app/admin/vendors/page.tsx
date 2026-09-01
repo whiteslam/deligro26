@@ -30,8 +30,8 @@ import {
 } from "@/components/admin/data-table";
 import { formatWaited } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
-import { VendorSearchBar } from "./vendor-search-bar";
 import { PAGE_SIZES } from "./page-sizes";
+import { VendorSearchBar } from "./vendor-search-bar";
 import { VendorPositionSelect } from "./vendor-position-select";
 import { VendorPasswordCell } from "./vendor-password-cell";
 import { VendorRowActions } from "./vendor-row-actions";
@@ -183,34 +183,6 @@ export default async function AdminVendorsPage({
       ),
     },
     {
-      key: "email",
-      header: "Login email",
-      width: "w-[190px]",
-      cell: (v) =>
-        v.ownerEmail ? (
-          <span className="block truncate text-[12px]" title={v.ownerEmail}>
-            {v.ownerEmail}
-          </span>
-        ) : (
-          // Not a cosmetic gap: without an email there is no auth account to
-          // hang a password on, so this shop cannot be given a login at all.
-          <Link
-            href={`/admin/vendors/${v.id}/edit`}
-            className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-deal hover:underline"
-          >
-            <TriangleAlert className="size-3" /> Add an email
-          </Link>
-        ),
-    },
-    {
-      key: "password",
-      header: "Password",
-      width: "w-[210px]",
-      cell: (v) => (
-        <VendorPasswordCell id={v.id} name={v.name} password={v.loginPassword} />
-      ),
-    },
-    {
       key: "status",
       header: "Status",
       role: "trailing",
@@ -296,11 +268,39 @@ export default async function AdminVendorsPage({
           cell: (v) => <VendorPositionSelect id={v.id} position={v.sortPosition} />,
         },
     {
+      key: "email",
+      header: "Login email",
+      width: "w-[190px]",
+      cell: (v) =>
+        v.ownerEmail ? (
+          <span className="block truncate text-[12px]" title={v.ownerEmail}>
+            {v.ownerEmail}
+          </span>
+        ) : (
+          // Not a cosmetic gap: without an email there is no auth account to
+          // hang a password on, so this shop cannot be given a login at all.
+          <Link
+            href={`/admin/vendors/${v.id}/edit`}
+            className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-deal hover:underline"
+          >
+            <TriangleAlert className="size-3" /> Add an email
+          </Link>
+        ),
+    },
+    {
+      key: "password",
+      header: "Password",
+      width: "w-[210px]",
+      cell: (v) => (
+        <VendorPasswordCell id={v.id} name={v.name} password={v.loginPassword} />
+      ),
+    },
+    {
       key: "actions",
       header: "",
       role: "actions",
       align: "right",
-      width: "w-[176px]",
+      width: "w-[340px]",
       cell: (v) => (
         <div className="flex justify-end">
           <VendorRowActions
@@ -410,7 +410,7 @@ export default async function AdminVendorsPage({
           rowHref={(v) => `/admin/vendors/${v.id}?tab=overview`}
           caption="Vendors"
           dense
-          minWidth={1240}
+          minWidth={1420}
           // Tint the rows that are actually a problem — a signup nobody has
           // ruled on for four days, or a shop that cannot be given a login —
           // rather than every row of the Approvals tab, which would tint the

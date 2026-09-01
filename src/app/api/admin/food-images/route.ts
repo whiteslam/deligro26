@@ -68,6 +68,7 @@ export async function POST(request: Request) {
       veg,
       adminId: admin.id,
     });
+    revalidatePath("/admin/storage");
     revalidatePath("/admin/food-images");
     return NextResponse.json({ image }, { status: 201 });
   } catch (err) {
