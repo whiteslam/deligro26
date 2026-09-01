@@ -76,6 +76,12 @@ interface SettingsRow {
   feature_online_payment?: boolean;
   review_window_days?: number;
   review_edit_window_hours?: number;
+  vendor_alert_sound_preset?: string;
+  vendor_alert_sound_url?: string | null;
+  vendor_alert_sound_name?: string | null;
+  rider_alert_sound_preset?: string;
+  rider_alert_sound_url?: string | null;
+  rider_alert_sound_name?: string | null;
 }
 
 /**
@@ -102,6 +108,20 @@ const OPTIONAL_GROUPS = [
     write: (input: PlatformSettings): Record<string, unknown> => ({
       review_window_days: input.reviewWindowDays,
       review_edit_window_hours: input.reviewEditWindowHours,
+    }),
+  },
+  {
+    /** Migration 0044. */
+    key: "platform_settings.vendor_alert_sound_preset",
+    select:
+      "vendor_alert_sound_preset, vendor_alert_sound_url, vendor_alert_sound_name, rider_alert_sound_preset, rider_alert_sound_url, rider_alert_sound_name",
+    write: (input: PlatformSettings): Record<string, unknown> => ({
+      vendor_alert_sound_preset: input.vendorAlertSoundPreset,
+      vendor_alert_sound_url: input.vendorAlertSoundUrl,
+      vendor_alert_sound_name: input.vendorAlertSoundName,
+      rider_alert_sound_preset: input.riderAlertSoundPreset,
+      rider_alert_sound_url: input.riderAlertSoundUrl,
+      rider_alert_sound_name: input.riderAlertSoundName,
     }),
   },
 ] as const;
@@ -189,6 +209,17 @@ function mapSettings(row: SettingsRow): PlatformSettings {
     reviewEditWindowHours: Number(
       row.review_edit_window_hours ?? DEFAULT_SETTINGS.reviewEditWindowHours
     ),
+    // Absent columns (pre-0044) fall back to the shared defaults — the
+    // original hardcoded chime, unset custom sound — so nothing changes for
+    // an install that hasn't run the migration yet.
+    vendorAlertSoundPreset:
+      row.vendor_alert_sound_preset ?? DEFAULT_SETTINGS.vendorAlertSoundPreset,
+    vendorAlertSoundUrl: row.vendor_alert_sound_url ?? null,
+    vendorAlertSoundName: row.vendor_alert_sound_name ?? null,
+    riderAlertSoundPreset:
+      row.rider_alert_sound_preset ?? DEFAULT_SETTINGS.riderAlertSoundPreset,
+    riderAlertSoundUrl: row.rider_alert_sound_url ?? null,
+    riderAlertSoundName: row.rider_alert_sound_name ?? null,
   };
 }
 

@@ -326,6 +326,18 @@ export interface PlatformSettings {
   reviewWindowDays: number;
   /** Hours after posting that a customer may still edit or withdraw a review. */
   reviewEditWindowHours: number;
+
+  // ---- New-order alert sounds (0044) ----
+  // One setting per role, platform-wide — not per-shop or per-rider. A role
+  // plays its uploaded custom sound when `*Url` is set, otherwise its preset;
+  // see src/lib/alerts/tones.ts.
+  vendorAlertSoundPreset: string;
+  vendorAlertSoundUrl: string | null;
+  /** Original filename of the custom upload, for display only. */
+  vendorAlertSoundName: string | null;
+  riderAlertSoundPreset: string;
+  riderAlertSoundUrl: string | null;
+  riderAlertSoundName: string | null;
 }
 
 /** How the customer intends to pay. Mirrors the `payment_method` enum (0025). */

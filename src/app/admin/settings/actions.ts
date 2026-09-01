@@ -12,7 +12,16 @@ import {
   setCommissionGstPct,
   setVendorCommissionDefault,
 } from "@/lib/data-access/admin-commission";
+import { ALERT_PRESETS, type AlertPreset } from "@/lib/alerts/tones";
 import type { PlatformSettings } from "@/types";
+
+const PRESET_IDS = ALERT_PRESETS.map((p) => p.id);
+
+/** An unrecognised value (or none submitted) keeps whatever is already stored. */
+function preset(raw: FormDataEntryValue | null, fallback: string): AlertPreset {
+  const s = typeof raw === "string" ? raw : "";
+  return (PRESET_IDS as string[]).includes(s) ? (s as AlertPreset) : (fallback as AlertPreset);
+}
 
 export interface ActionResult {
   ok: boolean;
@@ -92,6 +101,31 @@ function parse(form: FormData, current: PlatformSettings): PlatformSettings {
         )
       )
     ),
+
+    vendorAlertSoundPreset: preset(
+      form.get("vendorAlertSoundPreset"),
+      current.vendorAlertSoundPreset
+    ),
+    // Written by the upload widget as hidden fields (mirrors the vendor-logo
+    // upload flow): rendered only while a custom sound is set, so a field's
+    // ABSENCE is how "Remove custom sound" clears it back to null — not an
+    // empty string, which `str()` would collapse the same way anyway.
+    vendorAlertSoundUrl: form.has("vendorAlertSoundUrl")
+      ? str(form.get("vendorAlertSoundUrl")) || null
+      : current.vendorAlertSoundUrl,
+    vendorAlertSoundName: form.has("vendorAlertSoundName")
+      ? str(form.get("vendorAlertSoundName")) || null
+      : current.vendorAlertSoundName,
+    riderAlertSoundPreset: preset(
+      form.get("riderAlertSoundPreset"),
+      current.riderAlertSoundPreset
+    ),
+    riderAlertSoundUrl: form.has("riderAlertSoundUrl")
+      ? str(form.get("riderAlertSoundUrl")) || null
+      : current.riderAlertSoundUrl,
+    riderAlertSoundName: form.has("riderAlertSoundName")
+      ? str(form.get("riderAlertSoundName")) || null
+      : current.riderAlertSoundName,
   };
 }
 

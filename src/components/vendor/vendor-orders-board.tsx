@@ -686,6 +686,8 @@ export function VendorOrdersBoard({
   live,
   restaurantName,
   pace,
+  alertSoundPreset = "chime",
+  alertSoundUrl = null,
 }: {
   initialIncoming: KitchenOrder[];
   initialPreparing: KitchenOrder[];
@@ -696,6 +698,9 @@ export function VendorOrdersBoard({
   restaurantName?: string;
   /** Absent in demo mode, unsupported before migration 0036. */
   pace?: VendorPace;
+  /** From platform_settings (0044) — same sound for every vendor. */
+  alertSoundPreset?: string;
+  alertSoundUrl?: string | null;
 }) {
   const [incoming, setIncoming] = useState(initialIncoming);
   const [preparing, setPreparing] = useState(initialPreparing);
@@ -857,6 +862,8 @@ export function VendorOrdersBoard({
         <KitchenAlert
           incomingIds={incoming.map((o) => o.id)}
           restaurantName={restaurantName}
+          soundPreset={alertSoundPreset}
+          soundUrl={alertSoundUrl}
         />
       ) : null}
 

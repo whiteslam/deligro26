@@ -12,7 +12,10 @@ import {
   type VendorPace,
 } from "@/lib/data-access/vendor-restaurant";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { getSettings } from "@/lib/settings";
+import { DEFAULT_SETTINGS } from "@/lib/settings-defaults";
 import type { KitchenOrder } from "@/lib/roles-data";
+import type { PlatformSettings } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +76,7 @@ export default async function VendorOrdersPage() {
   // Soft: an un-migrated database simply doesn't offer the busy control.
   let pace: VendorPace = { extraMinutes: 0, until: null, supported: false };
 
+  let settings: PlatformSettings = DEFAULT_SETTINGS;
   try {
     const board = await listKitchenOrders(restaurant.id);
     incoming = board.incoming;
@@ -82,6 +86,7 @@ export default async function VendorOrdersPage() {
     recent = history.completed;
     cancelled = history.cancelled;
     pace = await getVendorPace(restaurant.id).catch(() => pace);
+    settings = await getSettings();
   } catch {
     return (
       <div className="space-y-6">
@@ -103,6 +108,8 @@ export default async function VendorOrdersPage() {
       live
       restaurantName={restaurant.name}
       pace={pace}
+      alertSoundPreset={settings.vendorAlertSoundPreset}
+      alertSoundUrl={settings.vendorAlertSoundUrl}
     />
   );
 }

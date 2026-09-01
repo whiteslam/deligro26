@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef, useState } from "react";
+import { Play, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/field";
 import { cn } from "@/lib/utils/cn";
+import { ALERT_PRESETS, playAlertSound } from "@/lib/alerts/tones";
 import { saveSettingsAction, type ActionResult } from "./actions";
 import type { PlatformSettings } from "@/types";
 
@@ -141,6 +143,151 @@ function Num({
       onFocus={(e) => e.currentTarget.select()}
       className="c-field text-data tabular-nums"
     />
+  );
+}
+
+/**
+ * One role's alert sound: a preset picker plus an optional custom upload,
+ * with a Test button that plays whichever is currently active. Fields carry
+ * their state into the surrounding `<form>` as ordinary named/hidden inputs —
+ * `saveSettingsAction`'s `parse()` reads them the same way as everything
+ * else, and treats a MISSING `*Url`/`*Name` pair (not an empty one) as
+ * "remove the custom sound" (see actions.ts).
+ */
+function AlertSoundRow({
+  role,
+  presetName,
+  presetDefault,
+  urlName,
+  urlDefault,
+  nameName,
+  nameDefault,
+}: {
+  role: string;
+  presetName: string;
+  presetDefault: string;
+  urlName: string;
+  urlDefault: string | null;
+  nameName: string;
+  nameDefault: string | null;
+}) {
+  const [presetValue, setPresetValue] = useState(presetDefault);
+  const [custom, setCustom] = useState<{ url: string; name: string } | null>(
+    urlDefault ? { url: urlDefault, name: nameDefault ?? urlDefault } : null
+  );
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const ctxRef = useRef<AudioContext | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const test = () => {
+    try {
+      const ctx = ctxRef.current ?? new AudioContext();
+      ctxRef.current = ctx;
+      void ctx.resume().then(() => playAlertSound(ctx, presetValue, custom?.url));
+    } catch {
+      setError("This browser wouldn't play the sound.");
+    }
+  };
+
+  const upload = async (file: File) => {
+    setUploading(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/admin/alert-sounds", {
+        method: "POST",
+        body: form,
+      });
+      const body = (await res.json().catch(() => null)) as
+        | { ok: true; url: string; name: string }
+        | { error: string }
+        | null;
+      if (!res.ok || !body || "error" in body) {
+        setError(
+          body && "error" in body && body.error === "too_large"
+            ? "That file is too large — 3 MB max."
+            : body && "error" in body && body.error === "invalid_type"
+              ? "Use an MP3, WAV or OGG file."
+              : "Couldn't upload that file."
+        );
+        return;
+      }
+      setCustom({ url: body.url, name: body.name });
+    } catch {
+      setError("Couldn't upload that file.");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className={rowCls + " flex-col items-stretch gap-2"}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[12.5px] font-semibold text-ink">{role}</span>
+        <div className="flex items-center gap-1.5">
+          <select
+            name={presetName}
+            value={presetValue}
+            onChange={(e) => setPresetValue(e.target.value)}
+            disabled={Boolean(custom)}
+            className="c-field text-[12.5px] disabled:opacity-50"
+          >
+            {ALERT_PRESETS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <Button type="button" size="sm" variant="outline" onClick={test}>
+            <Play className="size-3.5" /> Test
+          </Button>
+        </div>
+      </div>
+
+      {custom ? (
+        <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-2 px-2.5 py-1.5">
+          <span className="min-w-0 flex-1 truncate text-[11.5px] text-muted">
+            Custom: {custom.name}
+          </span>
+          <input type="hidden" name={urlName} value={custom.url} />
+          <input type="hidden" name={nameName} value={custom.name} />
+          <button
+            type="button"
+            onClick={() => setCustom(null)}
+            className="press grid size-6 shrink-0 place-items-center rounded-full text-muted hover:text-deal"
+            aria-label={`Remove the custom ${role.toLowerCase()} sound`}
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      ) : (
+        <div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="audio/mpeg,audio/wav,audio/ogg"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void upload(file);
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="press inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-accent-ink disabled:opacity-50"
+          >
+            <Upload className="size-3.5" />
+            {uploading ? "Uploading…" : "Upload a custom sound"}
+          </button>
+        </div>
+      )}
+      {error ? <p className="text-[11.5px] text-deal">{error}</p> : null}
+    </div>
   );
 }
 
@@ -426,6 +573,35 @@ export function SettingsForm({
             />
           </Row>
           */}
+        </Card>
+
+        <Card
+          className="@3xl:order-7"
+          title="Alert sounds"
+          desc="What plays when a new order arrives — one sound per role, for every vendor and every rider."
+        >
+          <AlertSoundRow
+            role="Vendor kitchen board"
+            presetName="vendorAlertSoundPreset"
+            presetDefault={settings.vendorAlertSoundPreset}
+            urlName="vendorAlertSoundUrl"
+            urlDefault={settings.vendorAlertSoundUrl}
+            nameName="vendorAlertSoundName"
+            nameDefault={settings.vendorAlertSoundName}
+          />
+          <AlertSoundRow
+            role="Rider board"
+            presetName="riderAlertSoundPreset"
+            presetDefault={settings.riderAlertSoundPreset}
+            urlName="riderAlertSoundUrl"
+            urlDefault={settings.riderAlertSoundUrl}
+            nameName="riderAlertSoundName"
+            nameDefault={settings.riderAlertSoundName}
+          />
+          <Note>
+            Custom uploads take over from the preset for that role. Remove one
+            to fall back to the preset. MP3, WAV or OGG, 3 MB max.
+          </Note>
         </Card>
 
         <Card

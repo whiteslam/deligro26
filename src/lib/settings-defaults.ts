@@ -47,4 +47,11 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   // so changing one means changing all three.
   reviewWindowDays: 14,
   reviewEditWindowHours: 48,
+
+  vendorAlertSoundPreset: "chime",
+  vendorAlertSoundUrl: null,
+  vendorAlertSoundName: null,
+  riderAlertSoundPreset: "chime",
+  riderAlertSoundUrl: null,
+  riderAlertSoundName: null,
 };
