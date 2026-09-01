@@ -13,7 +13,14 @@ import "server-only";
  */
 
 /** The formats any Deligro upload path accepts. */
-export type SniffedType = "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
+export type SniffedType =
+  | "image/jpeg"
+  | "image/png"
+  | "image/webp"
+  | "application/pdf"
+  | "audio/mpeg"
+  | "audio/wav"
+  | "audio/ogg";
 
 function startsWith(bytes: Uint8Array, sig: number[], offset = 0): boolean {
   if (bytes.length < offset + sig.length) return false;
@@ -43,6 +50,24 @@ export function sniffType(bytes: Uint8Array): SniffedType | null {
 
   // PDF: "%PDF-"
   if (startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d])) return "application/pdf";
+
+  // WAV is a RIFF container too: "RIFF" <4-byte size> "WAVE".
+  if (
+    startsWith(bytes, [0x52, 0x49, 0x46, 0x46]) &&
+    startsWith(bytes, [0x57, 0x41, 0x56, 0x45], 8)
+  ) {
+    return "audio/wav";
+  }
+
+  // OGG: "OggS"
+  if (startsWith(bytes, [0x4f, 0x67, 0x67, 0x53])) return "audio/ogg";
+
+  // MP3: an ID3v2 tag ("ID3"), which almost every real-world file carries, or —
+  // failing that — a raw MPEG frame sync (11 set bits: 0xFF then top 3 bits set).
+  if (startsWith(bytes, [0x49, 0x44, 0x33])) return "audio/mpeg";
+  if (bytes.length >= 2 && bytes[0] === 0xff && (bytes[1]! & 0xe0) === 0xe0) {
+    return "audio/mpeg";
+  }
 
   return null;
 }

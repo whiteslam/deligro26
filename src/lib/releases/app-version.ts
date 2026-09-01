@@ -108,7 +108,7 @@ function trackFor(
 /**
  * What to tell an app running `versionCode`.
  *
- * `min` is clamped to `latest` here as well as by the 0043 CHECK constraint and
+ * `min` is clamped to `latest` here as well as by the 0045 CHECK constraint and
  * by the admin form. The constraint only guards rows written after 0043 was
  * applied; this guards the answer itself, and the failure it prevents is the
  * worst one available — a minimum above the latest build force-updates every

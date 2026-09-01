@@ -1,5 +1,5 @@
 -- ============================================================
--- 0043 — App release config: what version the rider and customer
+-- 0045 — App release config: what version the rider and customer
 --        Android apps should be on, and where to get it
 -- ------------------------------------------------------------
 -- The two Android apps are built outside this repo and distributed as a direct

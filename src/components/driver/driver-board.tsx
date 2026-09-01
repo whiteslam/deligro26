@@ -26,10 +26,12 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { formatINR } from "@/lib/utils/format";
 import { callablePhone, stopDirectionsUrl } from "@/lib/utils/phone";
+import { staticMapUrl } from "@/lib/maps/config";
 import type { DriverBoardData } from "@/lib/data-access/driver-orders";
 import type { DeliveryStop } from "@/lib/roles-data";
 import { cn } from "@/lib/utils/cn";
 import { acceptDeliveryAction, advanceDeliveryAction } from "@/app/driver/actions";
+import { RiderAlert } from "@/components/driver/rider-alert";
 
 /**
  * One position posted per this many milliseconds, however fast the device
@@ -250,16 +252,43 @@ function ActiveStop({
   name,
   stop,
   distanceKm,
+  navigationUrl,
 }: {
   heading: string;
   name: string;
   stop: DeliveryStop | null;
   distanceKm?: number;
+  navigationUrl: string | null;
 }) {
   if (!stop) return null;
+  // Only when the stop has an exact pin — an address string geocodes
+  // approximately, and a marker planted in the wrong place is worse than no
+  // marker (see mapsDirectionsUrl's reasoning for the same tradeoff).
+  const mapUrl = stop.point ? staticMapUrl(stop.point) : null;
   return (
-    <div className="rounded-2xl border border-line bg-surface-2 p-3.5">
-      <div className="flex items-start gap-3">
+    <div className="overflow-hidden rounded-2xl border border-line bg-surface-2">
+      {mapUrl ? (
+        navigationUrl ? (
+          <a href={navigationUrl} target="_blank" rel="noopener noreferrer">
+            <img
+              src={mapUrl}
+              alt={`Map of ${name}`}
+              width={400}
+              height={160}
+              className="h-32 w-full object-cover"
+            />
+          </a>
+        ) : (
+          <img
+            src={mapUrl}
+            alt={`Map of ${name}`}
+            width={400}
+            height={160}
+            className="h-32 w-full object-cover"
+          />
+        )
+      ) : null}
+      <div className="flex items-start gap-3 p-3.5">
         <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
           <MapPin className="size-4" />
         </span>
@@ -312,9 +341,14 @@ function JobStop({
 export function DriverBoard({
   initial,
   live,
+  alertSoundPreset = "chime",
+  alertSoundUrl = null,
 }: {
   initial: DriverBoardData;
   live: boolean;
+  /** From platform_settings (0044) — same sound for every rider. */
+  alertSoundPreset?: string;
+  alertSoundUrl?: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -438,6 +472,12 @@ export function DriverBoard({
           a screen cannot put it back by accident. "Online 5.5 h" and
           "Rating 4.8 ★" went earlier: constants, identical for every driver
           forever, standing in for two things we have never tracked. */}
+      <RiderAlert
+        incomingIds={active ? [] : available.map((j) => j.id)}
+        soundPreset={alertSoundPreset}
+        soundUrl={alertSoundUrl}
+      />
+
       <StatCard label="Trips today" value={String(today.trips)} tone="accent" />
 
       {/* Active delivery */}
@@ -543,6 +583,7 @@ export function DriverBoard({
                 }
                 stop={destination}
                 distanceKm={active.job.distanceKm}
+                navigationUrl={navigationUrl}
               />
 
               {/* Both of these were full-width outline buttons with no onClick,
@@ -556,24 +597,29 @@ export function DriverBoard({
                   holding a bag. It falls back to the written address when the
                   end has no pin (a vendor who skipped the map step in the
                   onboarding wizard used to leave the rider with a greyed-out
-                  button), and only greys out when there is neither. */}
-              <div className="flex gap-2">
+                  button), and only greys out when there is neither.
+
+                  Stacked rather than side-by-side with Call customer, and a
+                  size up from it — this comment already said Navigate should
+                  be unmissable, but a 50/50 split with a same-size button next
+                  to it was the opposite of that. */}
+              <div className="space-y-2">
                 {navigationUrl ? (
                   <a
                     href={navigationUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={buttonClasses({
-                      size: "md",
-                      className: "flex-1",
+                      size: "lg",
+                      className: "w-full",
                     })}
                   >
                     <Navigation className="size-4" /> Navigate
                   </a>
                 ) : (
                   <Button
-                    size="md"
-                    className="flex-1"
+                    size="lg"
+                    className="w-full"
                     disabled
                     title={
                       active.leg === "TO_PICKUP"
@@ -591,7 +637,7 @@ export function DriverBoard({
                     className={buttonClasses({
                       variant: "outline",
                       size: "md",
-                      className: "flex-1",
+                      className: "w-full",
                     })}
                   >
                     <Phone className="size-4" /> Call customer
@@ -600,7 +646,7 @@ export function DriverBoard({
                   <Button
                     variant="outline"
                     size="md"
-                    className="flex-1"
+                    className="w-full"
                     disabled
                     title="No phone number recorded for this customer"
                   >

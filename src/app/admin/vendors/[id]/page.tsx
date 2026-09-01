@@ -158,7 +158,7 @@ export default async function VendorDetailPage({
           />
         </ConsoleOnly>
       ) : null}
-      {active === "payment" ? <PaymentTab v={vendor} /> : null}
+      {active === "payment" ? <PaymentTab v={vendor} id={id} /> : null}
       {active === "documents" ? (
         <DocumentsTab v={vendor} documents={documents} />
       ) : null}
@@ -186,39 +186,92 @@ function BusinessTab({ v }: { v: VendorDetail }) {
   );
 }
 
-function PaymentTab({ v }: { v: VendorDetail }) {
+/** Same rule the settlements queue uses, so "incomplete" never disagrees between the two screens. */
+function hasPayoutDetails(v: VendorDetail): boolean {
+  return Boolean(
+    v.upiId?.trim() || (v.bankAccountNumber?.trim() && v.bankIfsc?.trim())
+  );
+}
+
+function YesNoPill({ value }: { value: boolean }) {
   return (
-    <div className="grid gap-3 @3xl:grid-cols-2">
-      <Card title="Commission & methods">
-        <Row
-          label="Commission"
-          value={`${v.effectiveCommissionPct}%${
-            v.inheritsPlatformRate ? " · platform rate" : ""
-          }`}
-        />
-        <Row label="Accepts COD" value={v.acceptCod ? "Yes" : "No"} />
-        <Row label="Accepts online" value={v.acceptOnline ? "Yes" : "No"} />
-        <Row
-          label="COD max"
-          value={v.codMaxOrder > 0 ? rupees(v.codMaxOrder) : "No limit"}
-        />
-        <Row
-          label="Other charges"
-          value={
-            v.otherChargesPerOrder > 0
-              ? `${rupees(v.otherChargesPerOrder)} / order`
-              : "None"
-          }
-        />
-        <Row label="Settlement" value={v.settlementCycle} />
-      </Card>
-      <Card title="Bank account">
-        <Row label="UPI ID" value={v.upiId} />
-        <Row label="Account name" value={v.bankAccountName} />
-        <Row label="Bank" value={v.bankName} />
-        <Row label="Account no." value={v.bankAccountNumber} />
-        <Row label="IFSC" value={v.bankIfsc} />
-      </Card>
+    <span className={value ? "pill pill-green" : "pill pill-muted"}>
+      {value ? "Yes" : "No"}
+    </span>
+  );
+}
+
+function PaymentTab({ v, id }: { v: VendorDetail; id: string }) {
+  const payoutReady = hasPayoutDetails(v);
+
+  return (
+    <div className="space-y-3">
+      {!payoutReady ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-deal/25 bg-deal/5 px-4 py-3 text-sm">
+          <span className="font-semibold text-deal">
+            Bank details incomplete.
+          </span>
+          <span className="text-muted">
+            Payouts settle to nothing until a UPI ID or bank account is added.
+          </span>
+          <Link
+            href={`/admin/vendors/${id}/edit`}
+            className="press ml-auto text-xs font-semibold text-accent-ink"
+          >
+            Add bank account
+          </Link>
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 @3xl:grid-cols-2">
+        <Card title="Commission & methods">
+          <Row
+            label="Commission"
+            value={`${v.effectiveCommissionPct}%${
+              v.inheritsPlatformRate ? " · platform rate" : ""
+            }`}
+          />
+          <Row label="Accepts COD" value={<YesNoPill value={v.acceptCod} />} />
+          <Row
+            label="Accepts online"
+            value={<YesNoPill value={v.acceptOnline} />}
+          />
+          <Row
+            label="COD max"
+            value={v.codMaxOrder > 0 ? rupees(v.codMaxOrder) : "No limit"}
+          />
+          <Row
+            label="Other charges"
+            value={
+              v.otherChargesPerOrder > 0
+                ? `${rupees(v.otherChargesPerOrder)} / order`
+                : "None"
+            }
+          />
+          <Row label="Settlement" value={v.settlementCycle} />
+        </Card>
+        <Card title="Payout destination">
+          {v.upiId ? (
+            <div className="mb-2 flex items-center gap-3 rounded-lg bg-surface-2 p-3">
+              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-sm font-bold text-accent">
+                ₹
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-data truncate text-[13.5px] font-bold">
+                  {v.upiId}
+                </p>
+                <p className="text-[11px] text-muted">
+                  UPI · primary payout method
+                </p>
+              </div>
+            </div>
+          ) : null}
+          <Row label="Account name" value={v.bankAccountName} />
+          <Row label="Bank" value={v.bankName} />
+          <Row label="Account no." value={v.bankAccountNumber} />
+          <Row label="IFSC" value={v.bankIfsc} />
+        </Card>
+      </div>
     </div>
   );
 }

@@ -52,11 +52,20 @@ const TINTS = [
   "linear-gradient(135deg,#8b5cf6,#6d28d9)",
 ];
 
-function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+function Labeled({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <label className="block space-y-1.5">
       <span className={labelCls}>{label}</span>
       {children}
+      {hint ? <span className="block text-xs text-muted">{hint}</span> : null}
     </label>
   );
 }
@@ -179,7 +188,10 @@ export function BannerForm({ banner }: { banner?: Banner }) {
 
         <section className="card space-y-4 p-5">
           <h2 className="text-heading text-[15px]">Artwork</h2>
-          <Labeled label="Desktop image URL">
+          <Labeled
+            label="Desktop image URL"
+            hint="Must be on images.unsplash.com or Supabase storage — the browser silently blocks images from other hosts, per the app's content security policy."
+          >
             <input
               name="imageUrl"
               value={imageUrl}

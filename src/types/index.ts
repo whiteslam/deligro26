@@ -327,7 +327,7 @@ export interface PlatformSettings {
   /** Hours after posting that a customer may still edit or withdraw a review. */
   reviewEditWindowHours: number;
 
-  // ---- Android app releases (0043) ----
+  // ---- Android app releases (0045) ----
   /**
    * What the rider and customer Android apps are told when they ask
    * `GET /api/app-version`. Both apps are distributed as a direct `.apk`, not
@@ -335,7 +335,7 @@ export interface PlatformSettings {
    * build — see `src/lib/releases/app-version.ts` for how the two version codes
    * become "update available" and "must update".
    *
-   * Every code defaults to 1 rather than 0, here and in the 0043 column
+   * Every code defaults to 1 rather than 0, here and in the 0045 column
    * defaults, so an un-migrated or unreadable backend answers "you are current"
    * for any real installed build instead of force-updating everyone.
    */
@@ -352,6 +352,18 @@ export interface PlatformSettings {
   customerApkMinVersionCode: number;
   customerApkUrl: string;
   customerApkNotes: string;
+
+  // ---- New-order alert sounds (0044) ----
+  // One setting per role, platform-wide — not per-shop or per-rider. A role
+  // plays its uploaded custom sound when `*Url` is set, otherwise its preset;
+  // see src/lib/alerts/tones.ts.
+  vendorAlertSoundPreset: string;
+  vendorAlertSoundUrl: string | null;
+  /** Original filename of the custom upload, for display only. */
+  vendorAlertSoundName: string | null;
+  riderAlertSoundPreset: string;
+  riderAlertSoundUrl: string | null;
+  riderAlertSoundName: string | null;
 }
 
 /** How the customer intends to pay. Mirrors the `payment_method` enum (0025). */

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { getProfile } from "@/lib/auth";
 import { getDriverBoard, type DriverBoardData } from "@/lib/data-access/driver-orders";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { getSettings } from "@/lib/settings";
 import { AVAILABLE_JOBS, DRIVER_TODAY } from "@/lib/roles-data";
 
 const DEMO_BOARD: DriverBoardData = {
@@ -54,6 +55,16 @@ export default async function DriverPage() {
     );
   }
 
-  const board = await getDriverBoard(profile.id);
-  return <DriverBoard initial={board} live />;
+  const [board, settings] = await Promise.all([
+    getDriverBoard(profile.id),
+    getSettings(),
+  ]);
+  return (
+    <DriverBoard
+      initial={board}
+      live
+      alertSoundPreset={settings.riderAlertSoundPreset}
+      alertSoundUrl={settings.riderAlertSoundUrl}
+    />
+  );
 }

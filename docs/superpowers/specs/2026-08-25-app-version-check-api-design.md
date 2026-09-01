@@ -1,6 +1,6 @@
 # App version check API — design
 
-Status: **implemented** 2026-08-26 — migration `0043_app_release_config.sql`,
+Status: **implemented** 2026-08-26 — migration `0045_app_release_config.sql`,
 `src/lib/releases/app-version.ts`, `src/app/api/app-version/route.ts`, the
 "App releases" card on `/admin/settings/platform`, and
 `scripts/qa/app-version.ts` (+ six route cases in `scripts/qa/e2e-smoke.ts`).
@@ -43,7 +43,8 @@ it before any login.
 
 ## Data model
 
-Migration `0043_app_release_config.sql`, following the style of `0033`
+Migration `0045_app_release_config.sql` (renumbered from 0043 on merge — the
+office branch had already published a 0043 and a 0044), following the style of `0033`
 section 7 (adding columns to `platform_settings` behind `if not exists`, with
 named check constraints added idempotently):
 
@@ -184,7 +185,7 @@ the design specified: the constraint, the admin action, and `appVersionAnswer`
 itself. A floor above the latest build is the only setting on that page with no
 way back — it force-updates every installed app to a release that does not
 exist, and hands them the APK they already have. The constraint does not exist
-on a pre-0043 database, and the answer is what actually reaches the fleet.
+on a pre-0045 database, and the answer is what actually reaches the fleet.
 
 **No unit-test framework was added.** The design's "unit test" is
 `scripts/qa/app-version.ts`, table-driven in the style of

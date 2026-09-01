@@ -13,7 +13,16 @@ import {
   setVendorCommissionDefault,
 } from "@/lib/data-access/admin-commission";
 import { safeApkUrl } from "@/lib/releases/app-version";
+import { ALERT_PRESETS, type AlertPreset } from "@/lib/alerts/tones";
 import type { PlatformSettings } from "@/types";
+
+const PRESET_IDS = ALERT_PRESETS.map((p) => p.id);
+
+/** An unrecognised value (or none submitted) keeps whatever is already stored. */
+function preset(raw: FormDataEntryValue | null, fallback: string): AlertPreset {
+  const s = typeof raw === "string" ? raw : "";
+  return (PRESET_IDS as string[]).includes(s) ? (s as AlertPreset) : (fallback as AlertPreset);
+}
 
 export interface ActionResult {
   ok: boolean;
@@ -44,9 +53,9 @@ function bool(form: FormData, name: string): boolean {
  * The minimum is clamped to the latest rather than rejected. A minimum above
  * the latest is the one setting on this page with no way back: it force-updates
  * every installed app to a build that does not exist, and the APK URL it hands
- * them is the release they are already on. The 0043 CHECK constraint would
+ * them is the release they are already on. The 0045 CHECK constraint would
  * refuse the row, but that throws away the rest of a saved form over a typo in
- * a spinner — and on a pre-0043 database there is no constraint at all.
+ * a spinner — and on a pre-0045 database there is no constraint at all.
  *
  * Floored at 1 to match the same constraint, and to keep the fallback identity
  * that `app-version.ts` relies on: every real build is >= 1.
@@ -142,6 +151,30 @@ function parse(form: FormData, current: PlatformSettings): PlatformSettings {
     customerApkMinVersionCode: customer.min,
     customerApkUrl: customer.url,
     customerApkNotes: customer.notes,
+    vendorAlertSoundPreset: preset(
+      form.get("vendorAlertSoundPreset"),
+      current.vendorAlertSoundPreset
+    ),
+    // Written by the upload widget as hidden fields (mirrors the vendor-logo
+    // upload flow): rendered only while a custom sound is set, so a field's
+    // ABSENCE is how "Remove custom sound" clears it back to null — not an
+    // empty string, which `str()` would collapse the same way anyway.
+    vendorAlertSoundUrl: form.has("vendorAlertSoundUrl")
+      ? str(form.get("vendorAlertSoundUrl")) || null
+      : current.vendorAlertSoundUrl,
+    vendorAlertSoundName: form.has("vendorAlertSoundName")
+      ? str(form.get("vendorAlertSoundName")) || null
+      : current.vendorAlertSoundName,
+    riderAlertSoundPreset: preset(
+      form.get("riderAlertSoundPreset"),
+      current.riderAlertSoundPreset
+    ),
+    riderAlertSoundUrl: form.has("riderAlertSoundUrl")
+      ? str(form.get("riderAlertSoundUrl")) || null
+      : current.riderAlertSoundUrl,
+    riderAlertSoundName: form.has("riderAlertSoundName")
+      ? str(form.get("riderAlertSoundName")) || null
+      : current.riderAlertSoundName,
   };
 }
 

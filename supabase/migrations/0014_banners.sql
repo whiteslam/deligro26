@@ -128,6 +128,10 @@ grant execute on function public.bump_banner_stat(uuid, text) to anon, authentic
 -- migration runs — the same courtesy 0006 does for coupons. Seeded only when the
 -- table is empty, so re-running never duplicates and never fights the operator's
 -- own campaigns. Delete or edit them from the Admin Panel any time.
+-- Images are on images.unsplash.com, not images.pexels.com: the CSP's img-src
+-- (next.config.ts) only trusts the former, matching every other seeded photo
+-- in this codebase (see scripts/lib/unsplash-images.ts) — a Pexels URL here
+-- would be a real, reachable photo that the browser silently refuses to paint.
 insert into public.banners
   (name, headline, description, cta_label, kind, status, target_type, target_value,
    placements, priority, display_order, auto_slide_ms, image_url, tint, glyph, sponsor_name)
@@ -136,25 +140,25 @@ select * from (values
    'Fresh produce, daily staples & kirana — delivered to your door.',
    'Shop Now', 'internal', 'active', 'grocery', null::text,
    '{home_hero}'::text[], 100, 1, 4500,
-   'https://images.pexels.com/photos/4198015/pexels-photo-4198015.jpeg?auto=compress&cs=tinysrgb&w=800',
+   'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&q=80&auto=format&fit=crop',
    'linear-gradient(135deg,#17b26a,#0e8f57)', '🛒', null::text),
   ('Pick & Drop', 'Pick & Drop, anywhere',
    'Forgot something? Send a rider to pick up and drop across town.',
    'Book Now', 'internal', 'active', 'pick_drop', null,
    '{home_hero}', 90, 2, 4500,
-   'https://images.pexels.com/photos/4391470/pexels-photo-4391470.jpeg?auto=compress&cs=tinysrgb&w=800',
+   'https://images.unsplash.com/photo-1572195577046-2f25894c06fc?w=800&q=80&auto=format&fit=crop',
    'linear-gradient(135deg,#f2a71b,#d98600)', '🛵', null),
   ('Pharmacy', 'Medicines at your door',
    'Upload a prescription and get medicines delivered discreetly.',
    'Explore', 'internal', 'active', 'pharmacy', null,
    '{home_hero}', 80, 3, 4500,
-   'https://images.pexels.com/photos/208512/pexels-photo-208512.jpeg?auto=compress&cs=tinysrgb&w=800',
+   'https://images.unsplash.com/photo-1577401132921-cb39bb0adcff?w=800&q=80&auto=format&fit=crop',
    'linear-gradient(135deg,#3b82f6,#1d4ed8)', '💊', null),
   ('Burger Republic (paid)', 'Burger Republic · 30% OFF today',
    'Flame-grilled smash burgers. Today only, free delivery over ₹299.',
    'Order Now', 'sponsored', 'active', 'restaurant', 'burger-republic',
    '{home_hero}', 60, 5, 4500,
-   'https://images.pexels.com/photos/1639557/pexels-photo-1639557.jpeg?auto=compress&cs=tinysrgb&w=800',
+   'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&q=80&auto=format&fit=crop',
    'linear-gradient(135deg,#e5352b,#b31217)', '🍔', 'Burger Republic')
 ) as seed
 where not exists (select 1 from public.banners);

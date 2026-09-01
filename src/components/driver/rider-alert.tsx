@@ -12,52 +12,23 @@ import { Button } from "@/components/ui/button";
 import { playAlertSound } from "@/lib/alerts/tones";
 
 /**
- * Tells the kitchen an order has arrived.
+ * Tells a rider a job has appeared in the available pool.
  *
- * The board had no alert of any kind: arrival was discovered by an 8-second
- * `router.refresh()` that only ran while the tab was visible. A tablet on
- * another tab, asleep, or simply not being watched accumulated orders in
- * silence — a 3-minute acceptance time turning into 30, and every downstream
- * ETA the customer was promised going with it. Server-side push exists
- * (`notifyVendorNewOrder`) but routes through OneSignal, whose credentials are
- * unset, so `sendPush` returns false and raises nothing.
+ * The rider board had no alert of any kind — a rider had to be looking at the
+ * screen, or refresh it, to notice a new pickup. Mirrors `kitchen-alert.tsx`
+ * exactly (same arm/disarm/localStorage pattern, same three channels: tone,
+ * vibration, system notification) rather than sharing code with it, so each
+ * stays a single self-contained unit — see that file for the full reasoning
+ * on why a button is required at all (a browser will not start audio or ask
+ * for notification permission without a user gesture).
  *
- * Three channels, because a kitchen defeats any one of them: a tone loud enough
- * to hear over extraction fans, a vibration for a tablet on a steel counter, and
- * a system notification for when the tab is in the background.
- *
- * ## Why this needs a button
- *
- * Neither audio nor notifications can be started by a page on its own — the
- * browser requires a user gesture to unlock an AudioContext, and a user gesture
- * to prompt for Notification permission. So the kitchen arms it once per device
- * and the choice is remembered in localStorage. Nothing here can be enabled
- * behind the operator's back, which is also why the disarmed state is visible
- * rather than silent: a board that looks armed and isn't is the failure this
- * component exists to fix.
+ * `incomingIds` is expected to already be empty while the rider has an active
+ * delivery — the pool is not something they can act on then, so the caller
+ * (driver-board.tsx) passes `[]` rather than this component special-casing it.
  */
 
-const STORAGE_KEY = "deligro-kitchen-alerts";
-
-/**
- * How often an unacknowledged order re-announces itself.
- *
- * One beep is for someone who is present. This is for a tablet on a shelf: the
- * alert repeats until the order leaves the New column, which is to say until a
- * human has actually dealt with it.
- */
+const STORAGE_KEY = "deligro-rider-alerts";
 const RENOTIFY_MS = 25_000;
-
-/* ------------------------------------------------------------------
- * The armed preference, and whether this device can alert at all, are both
- * external state — localStorage and a browser capability. They are read with
- * `useSyncExternalStore` rather than copied into React state by a mount effect,
- * which is what that hook is for and what keeps the server render (never armed,
- * assume capable) from mismatching the client's.
- *
- * The listener list exists because `storage` events do not fire in the tab that
- * wrote them, so the Mute button has to notify this tab itself.
- * ------------------------------------------------------------------ */
 
 const armedListeners = new Set<() => void>();
 
@@ -74,8 +45,6 @@ function armedSnapshot(): boolean {
   try {
     return window.localStorage.getItem(STORAGE_KEY) === "on";
   } catch {
-    // Private mode / storage disabled. Not armed, and the button still works
-    // for this session.
     return false;
   }
 }
@@ -93,7 +62,6 @@ function writeArmed(on: boolean): void {
   for (const cb of armedListeners) cb();
 }
 
-/** Capability never changes within a page's life, so nothing to subscribe to. */
 function subscribeNever(): () => void {
   return () => {};
 }
@@ -106,16 +74,14 @@ function audioSupportedOnServer(): boolean {
   return true;
 }
 
-export function KitchenAlert({
-  /** Ids currently in the New column. Membership is the alert condition. */
+export function RiderAlert({
+  /** Ids currently in the available pool. Empty while a delivery is active. */
   incomingIds,
-  restaurantName,
-  /** From platform_settings (0044), admin-configured — same for every vendor. */
+  /** From platform_settings (0044), admin-configured — same for every rider. */
   soundPreset = "chime",
   soundUrl = null,
 }: {
   incomingIds: string[];
-  restaurantName?: string;
   soundPreset?: string;
   soundUrl?: string | null;
 }) {
@@ -129,31 +95,18 @@ export function KitchenAlert({
     audioSupported,
     audioSupportedOnServer
   );
-  /** Set only from the arm handler, when the browser refuses to give us audio. */
   const [audioFailed, setAudioFailed] = useState(false);
   const on = armed && supported && !audioFailed;
 
   const audioRef = useRef<AudioContext | null>(null);
-  /**
-   * Ids we have already announced. Seeded on arm rather than starting empty, so
-   * switching alerts on does not immediately shout about the orders already
-   * sitting on the board.
-   */
   const announced = useRef<Set<string>>(new Set());
   const lastRepeat = useRef(0);
-  /**
-   * True until the first announcement pass has run against a board that was
-   * already armed on load — so restoring the preference does not immediately
-   * shout about orders that were sitting there before the page opened.
-   */
   const seeded = useRef(false);
 
   const fire = useCallback(
     (count: number) => {
       const ctx = audioRef.current;
       if (ctx) {
-        // A context can be suspended out from under us (tab backgrounded, OS
-        // audio focus lost). Resuming is a no-op when it is already running.
         void ctx
           .resume()
           .then(() => playAlertSound(ctx, soundPreset, soundUrl))
@@ -167,25 +120,18 @@ export function KitchenAlert({
         Notification.permission === "granted"
       ) {
         try {
-          new Notification(
-            count > 1 ? `${count} new orders` : "New order",
-            {
-              body: restaurantName
-                ? `Waiting to be accepted at ${restaurantName}.`
-                : "Waiting to be accepted.",
-              // Collapses repeats into one notification instead of stacking a
-              // wall of them over an unattended lunch rush.
-              tag: "deligro-new-order",
-              requireInteraction: true,
-            }
-          );
+          new Notification(count > 1 ? `${count} jobs available` : "New job available", {
+            body: "Open the app to accept it before someone else does.",
+            tag: "deligro-new-job",
+            requireInteraction: true,
+          });
         } catch {
           // Some browsers refuse constructor notifications outside a service
           // worker. The tone and the vibration still did their job.
         }
       }
     },
-    [restaurantName, soundPreset, soundUrl]
+    [soundPreset, soundUrl]
   );
 
   async function arm() {
@@ -193,8 +139,6 @@ export function KitchenAlert({
       const ctx = audioRef.current ?? new AudioContext();
       audioRef.current = ctx;
       await ctx.resume();
-      // Confirms out loud that alerts work — the only way the kitchen learns
-      // the volume is up before an order depends on it.
       playAlertSound(ctx, soundPreset, soundUrl);
     } catch {
       setAudioFailed(true);
@@ -202,7 +146,6 @@ export function KitchenAlert({
     }
 
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      // Best effort: a refused prompt still leaves sound and vibration.
       try {
         await Notification.requestPermission();
       } catch {
@@ -226,8 +169,6 @@ export function KitchenAlert({
     if (!on) return;
 
     if (!seeded.current) {
-      // Armed from a restored preference: adopt what is already on the board
-      // without announcing it, then alert on everything after.
       seeded.current = true;
       announced.current = new Set(incomingIds);
       lastRepeat.current = Date.now();
@@ -235,15 +176,13 @@ export function KitchenAlert({
     }
 
     const fresh = incomingIds.filter((id) => !announced.current.has(id));
-    // Drop ids that have left the column, so an order re-entering it (an undone
-    // rejection) announces itself again rather than being silently remembered.
     announced.current = new Set(incomingIds);
     if (fresh.length === 0) return;
     lastRepeat.current = Date.now();
     fire(incomingIds.length);
   }, [incomingIds, on, fire]);
 
-  // Still unaccepted.
+  // Still unclaimed.
   useEffect(() => {
     if (!on || incomingIds.length === 0) return;
     const id = setInterval(() => {
@@ -271,18 +210,18 @@ export function KitchenAlert({
       )}
       <p className="min-w-0 flex-1 font-medium">
         {on ? (
-          "Sound and vibration on for new orders."
+          "Sound and vibration on for new jobs."
         ) : audioFailed ? (
           <>
             <span className="font-bold">
               This browser wouldn&apos;t start the alert sound.
             </span>{" "}
-            New orders will arrive silently — try again, or use another device
-            for the kitchen display.
+            New jobs will arrive silently — try again, or check the app
+            manually.
           </>
         ) : (
           <>
-            <span className="font-bold">Alerts are off.</span> New orders will
+            <span className="font-bold">Alerts are off.</span> New jobs will
             arrive silently on this device.
           </>
         )}

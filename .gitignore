@@ -46,6 +46,9 @@ docs/LEGACY_DB_AUDIT.md
 docs/LEGACY_SEED_MAPPING.md
 supabase/seed/legacy_customers.sql
 
+# Supabase CLI's local cache — machine-specific, regenerates on its own.
+supabase/.temp
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
