@@ -15,6 +15,14 @@
      height. Screens read it rather than hard-coding 56px. */
   --status-h: env(safe-area-inset-top, 0px);
 
+  /* Height of the tab bar, home-indicator strip included. The bar is
+     content-height + env(safe-area-inset-bottom) (see tab-bar.tsx), so anything
+     floating above it — the basket bar — must clear both halves. This was a
+     hard-coded 68px, which is the content height alone: on an iPhone 13 the
+     34px inset put the tab bar at ~96px and the basket bar landed inside it.
+     The desktop frame overrides this to its own fixed strip. */
+  --tabbar-h: calc(64px + env(safe-area-inset-bottom, 0px));
+
   /* Light — bright, high-contrast, appetite-forward.
      ------------------------------------------------------------------
      Text colours here are held to WCAG AA (4.5:1 against the surface they
@@ -487,6 +495,9 @@ button.card:active {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* Unlayered on purpose, so it beats a Tailwind `bottom-*` utility on the same
+     element whatever the specificity — utilities live in @layer utilities. */
+  bottom: calc(var(--tabbar-h) + 10px);
   border-radius: 11px;
   background: var(--accent);
   padding: 11px 14px;
@@ -767,13 +778,15 @@ button.card:active {
     color: #ffffff;
   }
 
-  /* The tab bar reserves the home-indicator strip, as it does on iOS; the
-     floating basket bar clears the taller bar. */
+  /* The tab bar reserves the home-indicator strip, as it does on iOS. There is
+     no safe-area inset on a desktop browser, so the frame states the strip
+     itself — and --tabbar-h has to be restated to match, or everything floating
+     above the bar would clear an inset the mock doesn't have. */
   .tab-bar-shell {
     padding-bottom: 14px;
   }
-  .device .bolt-basket-bar {
-    bottom: 84px;
+  .device {
+    --tabbar-h: 78px;
   }
 }
 

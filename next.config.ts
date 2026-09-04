@@ -38,7 +38,13 @@ const csp = [
   "base-uri 'self'",
   "form-action 'self'",
   "object-src 'none'",
-  "upgrade-insecure-requests",
+  // Production only. This directive rewrites every http:// subresource to
+  // https://, and it does so same-origin too — browsers exempt localhost, but
+  // NOT a LAN IP. So `next dev -H 0.0.0.0` opened from a phone at
+  // http://192.168.x.x:3005 upgraded its own CSS and JS to a port that speaks
+  // no TLS, and the app rendered as unstyled HTML. It buys nothing in dev
+  // (there is no https dev server to upgrade to) and production still sends it.
+  ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
 const securityHeaders = [
@@ -63,6 +69,13 @@ const nextConfig: NextConfig = {
     root: projectRoot,
   },
   outputFileTracingRoot: projectRoot,
+  // Testing on a real handset means loading /_next/* from a LAN IP, which the
+  // dev server treats as cross-origin. Dev-only key: it is not read by
+  // `next build`, and these are private ranges that cannot be reached from
+  // outside the network the machine is already on.
+  // Matched as dot-separated globs, not CIDR (see csrf-protection.ts), so the
+  // private ranges are spelled as patterns.
+  allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.*.*.*"],
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

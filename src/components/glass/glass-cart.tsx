@@ -48,8 +48,11 @@ export function GlassCart() {
     <>
       {!cartOpen && (
         // A div, not a button: the dismiss control is a button of its own and
-        // nesting one inside another is invalid.
-        <div className="bolt-basket-bar animate-slide-up absolute inset-x-3 bottom-[68px] z-30">
+        // nesting one inside another is invalid. The bottom offset is not here
+        // but on `.bolt-basket-bar`, which reads --tabbar-h — the tab bar grows
+        // by the home-indicator inset on a real handset, and a utility class
+        // can't express that.
+        <div className="bolt-basket-bar animate-slide-up absolute inset-x-3 z-30">
           <button
             onClick={openCart}
             className="press flex min-w-0 flex-1 items-center gap-2.5 text-left"
