@@ -1,0 +1,684 @@
+<title>Deligro Financial Architecture Audit</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#f5f6f3; --paper-raised:#ffffff; --paper-sunk:#eef1ed;
+  --ink:#1a241f; --ink-muted:#57645c; --ink-faint:#8b978f;
+  --line:#d7dcd5; --line-strong:#b9c1b8;
+  --accent:#0f6d5c; --accent-strong:#0a4c40; --accent-soft:#e1efe9; --accent-ink:#083b32;
+  --fact:#0f6d5c; --fact-bg:#e1efe9;
+  --assume:#8a6d00; --assume-bg:#faf3d3;
+  --missing:#a3341f; --missing-bg:#fbe6e0;
+  --sev-critical:#a3231a; --sev-critical-bg:#fbe4e1; --sev-critical-line:#e3a89f;
+  --sev-high:#a2570a; --sev-high-bg:#fbead4; --sev-high-line:#e3bd8a;
+  --sev-medium:#7c6300; --sev-medium-bg:#f7f0cf; --sev-medium-line:#d9c778;
+  --sev-low:#375b6b; --sev-low-bg:#e5eef2; --sev-low-line:#a9c3cf;
+  --shadow: 0 1px 2px rgba(15,30,25,.06), 0 8px 24px -12px rgba(15,30,25,.18);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0f1613; --paper-raised:#161e1a; --paper-sunk:#0b100e;
+    --ink:#e7ece8; --ink-muted:#9fada4; --ink-faint:#6c7a72;
+    --line:#26312b; --line-strong:#374439;
+    --accent:#4bb89d; --accent-strong:#7dd4bb; --accent-soft:#17332b; --accent-ink:#a9e6d3;
+    --fact:#4bb89d; --fact-bg:#132a23;
+    --assume:#d9b64a; --assume-bg:#2c2610;
+    --missing:#e58a78; --missing-bg:#2e1712;
+    --sev-critical:#f0897a; --sev-critical-bg:#301613; --sev-critical-line:#6b342a;
+    --sev-high:#e8ab6b; --sev-high-bg:#2c2110; --sev-high-line:#6b4e21;
+    --sev-medium:#dfca6e; --sev-medium-bg:#292410; --sev-medium-line:#665a20;
+    --sev-low:#8fb8cc; --sev-low-bg:#12242c; --sev-low-line:#2d4c5a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0f1613; --paper-raised:#161e1a; --paper-sunk:#0b100e;
+  --ink:#e7ece8; --ink-muted:#9fada4; --ink-faint:#6c7a72;
+  --line:#26312b; --line-strong:#374439;
+  --accent:#4bb89d; --accent-strong:#7dd4bb; --accent-soft:#17332b; --accent-ink:#a9e6d3;
+  --fact:#4bb89d; --fact-bg:#132a23;
+  --assume:#d9b64a; --assume-bg:#2c2610;
+  --missing:#e58a78; --missing-bg:#2e1712;
+  --sev-critical:#f0897a; --sev-critical-bg:#301613; --sev-critical-line:#6b342a;
+  --sev-high:#e8ab6b; --sev-high-bg:#2c2110; --sev-high-line:#6b4e21;
+  --sev-medium:#dfca6e; --sev-medium-bg:#292410; --sev-medium-line:#665a20;
+  --sev-low:#8fb8cc; --sev-low-bg:#12242c; --sev-low-line:#2d4c5a;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+}
+
+*{box-sizing:border-box;}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+  font-size:16px; line-height:1.6;
+}
+::selection{ background:var(--accent-soft); color:var(--accent-ink); }
+h1,h2,h3,h4{ font-family:"Fraunces",Georgia,serif; text-wrap:balance; color:var(--ink); font-weight:600; margin:0; }
+code, .mono, .num, .cite{ font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace; }
+.num{ font-variant-numeric:tabular-nums; }
+a{ color:var(--accent-strong); }
+p{ margin:0 0 .9em; color:var(--ink); }
+p:last-child{ margin-bottom:0; }
+
+.layout{ display:flex; align-items:flex-start; max-width:1240px; margin:0 auto; }
+.toc{
+  position:sticky; top:0; align-self:flex-start; width:236px; flex:0 0 236px;
+  height:100vh; overflow-y:auto; padding:36px 18px 36px 28px;
+  border-right:1px solid var(--line);
+}
+.toc-brand{ display:flex; align-items:center; gap:9px; margin-bottom:22px; }
+.toc-mark{ width:22px; height:22px; border-radius:5px; background:var(--accent); flex:0 0 auto;
+  display:flex; align-items:center; justify-content:center; color:var(--paper-raised); font-family:"Fraunces",serif; font-weight:700; font-size:13px;}
+.toc-brand span{ font-family:"Fraunces",serif; font-weight:600; font-size:15px; letter-spacing:.01em; }
+.toc-nav{ display:flex; flex-direction:column; gap:1px; }
+.toc-nav a{
+  display:flex; gap:9px; padding:6px 8px; border-radius:6px; text-decoration:none;
+  color:var(--ink-muted); font-size:12.5px; line-height:1.35;
+}
+.toc-nav a:hover{ background:var(--paper-sunk); color:var(--ink); }
+.toc-nav a b{ font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--accent); flex:0 0 auto; }
+.toc-foot{ margin-top:20px; padding-top:14px; border-top:1px solid var(--line); font-size:11px; color:var(--ink-faint); }
+
+main{ flex:1 1 auto; min-width:0; padding:44px 56px 90px; max-width:1004px; }
+
+.doc-head{ margin-bottom:34px; }
+.eyebrow{ font-family:"IBM Plex Mono",monospace; font-size:11.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--accent); margin-bottom:10px; }
+h1.title{ font-size:38px; line-height:1.08; margin-bottom:10px; }
+.dek{ font-size:16.5px; color:var(--ink-muted); max-width:640px; margin-bottom:18px; }
+.meta-row{ display:flex; flex-wrap:wrap; gap:8px 10px; font-size:12px; color:var(--ink-muted); }
+.meta-chip{ border:1px solid var(--line); border-radius:100px; padding:4px 11px; background:var(--paper-raised); }
+
+.scope-note{
+  margin-top:20px; padding:13px 16px; border-radius:10px; background:var(--paper-sunk);
+  border:1px solid var(--line); font-size:13.5px; color:var(--ink-muted); display:flex; gap:10px;
+}
+.scope-note b{ color:var(--ink); }
+
+.verdicts{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:28px 0 8px; }
+.vtile{ background:var(--paper-raised); border:1px solid var(--line); border-radius:12px; padding:16px 16px 15px; box-shadow:var(--shadow); }
+.vtile .vlabel{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint); margin-bottom:8px; }
+.vtile .vval{ font-family:"Fraunces",serif; font-size:19px; font-weight:600; line-height:1.2; color:var(--ink); }
+.vtile.critical .vval{ color:var(--sev-critical); }
+.vtile.warn .vval{ color:var(--sev-high); }
+.vtile .vsub{ font-size:11.5px; color:var(--ink-muted); margin-top:5px; }
+
+section.block{ margin-top:56px; scroll-margin-top:24px; }
+.sec-head{ display:flex; align-items:baseline; gap:12px; margin-bottom:6px; padding-bottom:14px; border-bottom:2px solid var(--ink); }
+.sec-letter{ font-family:"Fraunces",serif; font-size:15px; color:var(--paper-raised); background:var(--ink); width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+.sec-head h2{ font-size:25px; }
+.sec-intro{ color:var(--ink-muted); font-size:14.5px; margin:12px 0 22px; max-width:680px; }
+
+h3.sub{ font-size:16px; margin:30px 0 12px; padding-top:2px; }
+h3.sub .n{ color:var(--accent); font-family:"IBM Plex Mono",monospace; font-size:13px; margin-right:8px; }
+h4.minor{ font-size:14px; margin:20px 0 8px; color:var(--ink); }
+
+.tag{ display:inline-flex; align-items:center; gap:5px; font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; padding:2px 7px; border-radius:5px; white-space:nowrap; }
+.tag.fact{ color:var(--fact); background:var(--fact-bg); }
+.tag.assume{ color:var(--assume); background:var(--assume-bg); }
+.tag.missing{ color:var(--missing); background:var(--missing-bg); }
+
+.sev{ display:inline-flex; align-items:center; font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; padding:3px 9px; border-radius:100px; white-space:nowrap; border:1px solid transparent; }
+.sev.critical{ color:var(--sev-critical); background:var(--sev-critical-bg); border-color:var(--sev-critical-line); }
+.sev.high{ color:var(--sev-high); background:var(--sev-high-bg); border-color:var(--sev-high-line); }
+.sev.medium{ color:var(--sev-medium); background:var(--sev-medium-bg); border-color:var(--sev-medium-line); }
+.sev.low{ color:var(--sev-low); background:var(--sev-low-bg); border-color:var(--sev-low-line); }
+
+.table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); background:var(--paper-raised); margin:16px 0 26px; }
+table{ border-collapse:collapse; width:100%; min-width:640px; font-size:13.5px; }
+thead th{ text-align:left; font-family:"IBM Plex Mono",monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint); background:var(--paper-sunk); padding:10px 14px; border-bottom:1px solid var(--line); white-space:nowrap; }
+tbody td{ padding:11px 14px; border-bottom:1px solid var(--line); vertical-align:top; color:var(--ink); }
+tbody tr:last-child td{ border-bottom:none; }
+tbody tr:hover{ background:var(--paper-sunk); }
+td.k{ font-weight:600; white-space:nowrap; }
+td .file{ color:var(--ink-muted); font-family:"IBM Plex Mono",monospace; font-size:12px; }
+.rupee{ font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; }
+
+.risk-title{ font-weight:600; color:var(--ink); margin-bottom:3px; }
+.risk-scenario{ color:var(--ink-muted); font-size:12.5px; }
+.risk-src{ font-size:11px; color:var(--ink-faint); margin-top:5px; font-family:"IBM Plex Mono",monospace; }
+
+.callout{ border-radius:12px; padding:18px 20px; margin:18px 0 26px; border:1px solid; }
+.callout.missing{ background:var(--missing-bg); border-color:var(--sev-critical-line); }
+.callout.missing h4{ color:var(--missing); font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.04em; text-transform:uppercase; margin-bottom:8px; }
+.callout p{ font-size:13.5px; color:var(--ink); }
+
+.flow-wrap{ overflow-x:auto; margin:22px 0 10px; padding:6px 2px 14px; }
+.flow{ display:flex; align-items:stretch; gap:0; min-width:900px; }
+.fstage{ flex:1 1 0; background:var(--paper-raised); border:1px solid var(--line); border-radius:12px; padding:14px 15px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:8px; }
+.fstage .flabel{ font-family:"IBM Plex Mono",monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--accent); }
+.fstage .fname{ font-family:"Fraunces",serif; font-weight:600; font-size:15px; }
+.fstage .fline{ display:flex; justify-content:space-between; gap:8px; font-size:12px; color:var(--ink-muted); border-top:1px dashed var(--line); padding-top:7px; }
+.fstage .fline b{ color:var(--ink); font-family:"IBM Plex Mono",monospace; font-weight:600; }
+.farrow{ flex:0 0 34px; display:flex; align-items:center; justify-content:center; color:var(--ink-faint); }
+.farrow svg{ width:100%; height:20px; overflow:visible; }
+
+.badge-list{ display:flex; flex-wrap:wrap; gap:7px; margin:10px 0 4px; }
+.badge{ font-size:12px; border:1px solid var(--line); background:var(--paper-raised); border-radius:100px; padding:4px 11px; color:var(--ink-muted); }
+
+.q-list{ display:flex; flex-direction:column; gap:14px; margin-top:16px; counter-reset:q; }
+.q-item{ display:flex; gap:14px; border:1px solid var(--line); background:var(--paper-raised); border-radius:12px; padding:15px 17px; box-shadow:var(--shadow); }
+.q-num{ font-family:"Fraunces",serif; font-weight:600; font-size:17px; color:var(--accent); flex:0 0 auto; width:24px; }
+.q-body b{ display:block; margin-bottom:4px; font-size:14px; }
+.q-body p{ font-size:13px; color:var(--ink-muted); margin:0; }
+
+.phase{ border:1px solid var(--line); background:var(--paper-raised); border-radius:12px; padding:18px 20px; margin:16px 0; box-shadow:var(--shadow); }
+.phase-head{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.phase-tag{ font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:600; padding:3px 10px; border-radius:100px; background:var(--accent-soft); color:var(--accent-strong); }
+.phase-head h4{ font-family:"Fraunces",serif; font-size:16px; }
+.phase ul{ margin:0; padding-left:19px; }
+.phase li{ font-size:13.5px; margin-bottom:6px; color:var(--ink); }
+.phase li:last-child{ margin-bottom:0; }
+.phase li .why{ color:var(--ink-muted); }
+
+.divider-note{ font-size:12px; color:var(--ink-faint); border-top:1px solid var(--line); margin-top:70px; padding-top:16px; }
+
+@media (max-width:880px){
+  .toc{ display:none; }
+  main{ padding:28px 20px 70px; }
+  .verdicts{ grid-template-columns:1fr 1fr; }
+  h1.title{ font-size:29px; }
+}
+</style>
+
+<div class="layout">
+  <nav class="toc">
+    <div class="toc-brand"><div class="toc-mark">D</div><span>Financial Audit</span></div>
+    <div class="toc-nav">
+      <a href="#a"><b>A</b>Current architecture</a>
+      <a href="#b"><b>B</b>Current money flow</a>
+      <a href="#c"><b>C</b>Missing pieces</a>
+      <a href="#d"><b>D</b>Financial risks</a>
+      <a href="#e"><b>E</b>Recommended architecture</a>
+      <a href="#f"><b>F</b>Questions for the founder</a>
+      <a href="#g"><b>G</b>Recommended next phase</a>
+    </div>
+    <div class="toc-foot">Read-only discovery.<br>No code, schema or UI changed.</div>
+  </nav>
+
+  <main>
+    <div class="doc-head">
+      <div class="eyebrow">Discovery &amp; Audit — Not Implementation</div>
+      <h1 class="title">Deligro Financial &amp; Business Model Audit</h1>
+      <p class="dek">Where every rupee comes from, where it's supposed to go, what the code actually does with it today, and what a CFO would need fixed before Deligro scales past a few hundred orders a day.</p>
+      <div class="meta-row">
+        <span class="meta-chip">Prepared as CFO · COO · Payments Architect · Revenue Strategist · Founder</span>
+        <span class="meta-chip">4 September 2026</span>
+        <span class="meta-chip">Repo: deligro (Next.js + Supabase)</span>
+        <span class="meta-chip">44 migrations reviewed, 0001–0044</span>
+      </div>
+      <div class="scope-note">
+        <span>▤</span>
+        <span><b>Every claim below is tagged.</b> <span class="tag fact" style="margin:0 3px;">confirmed</span> means the behaviour was read directly in code, with a file and line cited. <span class="tag assume" style="margin:0 3px;">assumption</span> means the codebase leaves it undetermined — treat the number as illustrative only. <span class="tag missing" style="margin:0 3px;">not found</span> means it was searched for and does not exist. Nothing here was invented to fill a gap.</span>
+      </div>
+    </div>
+
+    <div class="verdicts">
+      <div class="vtile critical">
+        <div class="vlabel">Rider subscription</div>
+        <div class="vval">Not implemented</div>
+        <div class="vsub">No table, no charge, no gate — riders are salaried off-platform</div>
+      </div>
+      <div class="vtile critical">
+        <div class="vlabel">Confirmed critical money bugs</div>
+        <div class="vval">2 open</div>
+        <div class="vsub">Cancelled orders can still be paid out; refunds don't claw back a settlement</div>
+      </div>
+      <div class="vtile warn">
+        <div class="vlabel">Vendor payouts</div>
+        <div class="vval">Ledger only</div>
+        <div class="vsub">No table moves money — an admin types a bank reference by hand</div>
+      </div>
+      <div class="vtile warn">
+        <div class="vlabel">Platform commission rate</div>
+        <div class="vval">Not on record</div>
+        <div class="vsub">Schema default is 0% — the real number lives only in live settings</div>
+      </div>
+    </div>
+
+    <!-- ============ A. CURRENT ARCHITECTURE ============ -->
+    <section class="block" id="a">
+      <div class="sec-head"><div class="sec-letter">A</div><h2>Current architecture</h2></div>
+      <p class="sec-intro">Deligro is a five-party marketplace sitting on Supabase/Postgres, with Razorpay wired in as the payment gateway but switched off by default. What follows is what exists, party by party, then table by table, then traced to its actual source of truth.</p>
+
+      <h3 class="sub"><span class="n">A.1</span>The five parties, and the money each one touches</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Party</th><th>Pays</th><th>Receives</th><th>When</th><th>Who bears the cost when it goes wrong</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="k">Customer</td>
+              <td>Food subtotal + delivery fee + tax + optional tip, minus any coupon discount</td>
+              <td>The order; a refund if cancelled/declined and it was prepaid</td>
+              <td>At checkout (COD: nothing changes hands yet; online: immediately via Razorpay)</td>
+              <td>Waits on a manual admin decision for any refund — no SLA in code</td>
+            </tr>
+            <tr>
+              <td class="k">Vendor / Restaurant</td>
+              <td>Platform commission + GST‑on‑commission + a flat per‑order charge, deducted from what they're owed</td>
+              <td>Food value only (not delivery fee, not tax, not tip) — remitted by manual bank transfer, recorded after the fact</td>
+              <td>Only when an admin builds and marks a settlement <code>paid</code> — no cron, no fixed date enforced by the system</td>
+              <td>Fully exposed: nothing claws back a paid settlement if a refund lands afterward <span class="tag missing">not found</span></td>
+            </tr>
+            <tr>
+              <td class="k">Rider / Driver</td>
+              <td>Nothing in-app <span class="tag missing">not found</span></td>
+              <td>Nothing in-app — compensation is a monthly salary paid entirely outside this system</td>
+              <td>Off-platform, on whatever cadence payroll runs</td>
+              <td>Entirely un-costed inside Deligro — no order can show what its own delivery actually cost</td>
+            </tr>
+            <tr>
+              <td class="k">Deligro (platform)</td>
+              <td>Razorpay's own transaction fee <span class="tag assume">assumption — never deducted anywhere in code</span>; any platform‑funded discount; approved refunds on prepaid orders</td>
+              <td>Commission + GST‑on‑commission + other charges, per settled order</td>
+              <td>Commission is only realised once a settlement is built — not at order time</td>
+              <td>Carries every unreconciled gap: refund/settlement mismatches, uncosted rider spend, ungated commission-rate changes</td>
+            </tr>
+            <tr>
+              <td class="k">Razorpay (gateway)</td>
+              <td>—</td>
+              <td>Its own processing fee on every online payment</td>
+              <td>At capture</td>
+              <td>Not Deligro's exposure directly, but the fee is invisible in every internal number</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:12.5px;color:var(--ink-faint);margin-top:-14px;">A phone-order operator (<code>manager</code> role) and an <code>admin</code> role also exist — both operational, neither a separate money party. The <code>manager</code> can place an order on a customer's behalf; only <code>admin</code> can move money-adjacent state.</p>
+
+      <h3 class="sub"><span class="n">A.2</span>What exists today, concept by concept</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Concept</th><th>Status</th><th>Where it lives</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Orders</td><td><span class="tag fact">confirmed</span></td><td class="file">orders table (0001+) · src/lib/data-access/orders.ts</td></tr>
+            <tr><td class="k">Payments</td><td><span class="tag fact">confirmed</span></td><td class="file">payments table, payment_method/status enums · 0025_payments_razorpay.sql · src/lib/payments/*</td></tr>
+            <tr><td class="k">Generic transaction ledger</td><td><span class="tag missing">not found</span></td><td class="file">No single table records every money movement across all four parties — payments, refunds and settlements are three separate, differently-shaped tables</td></tr>
+            <tr><td class="k">Refunds</td><td><span class="tag fact">confirmed</span></td><td class="file">refunds table · src/lib/data-access/refunds.ts</td></tr>
+            <tr><td class="k">Vendor settlements</td><td><span class="tag fact">confirmed</span> (ledger only, see B)</td><td class="file">vendor_settlements + vendor_settlement_orders · 0028, 0034 · src/lib/data-access/admin-settlements.ts (1,829 lines)</td></tr>
+            <tr><td class="k">Rider payments</td><td><span class="tag missing">not found</span></td><td class="file">No table, no ledger entry, no code path — salary is paid entirely outside this codebase</td></tr>
+            <tr><td class="k">Commissions</td><td><span class="tag fact">confirmed</span>, computed late</td><td class="file">platform_settings.vendor_commission_pct + restaurants.commission_pct override · 0032 · src/lib/settlements/math.ts</td></tr>
+            <tr><td class="k">Fees (delivery, tax, gateway, "other")</td><td>Delivery/tax <span class="tag fact">confirmed</span>; gateway fee <span class="tag missing">not found</span></td><td class="file">platform_settings · restaurants.other_charges_per_order (0034)</td></tr>
+            <tr><td class="k">Wallets</td><td>Schema exists, <span class="tag missing">zero writes found</span></td><td class="file">profiles.wallet_balance + wallet_transactions · 0006 — customer-scoped only, never actually written by any code path</td></tr>
+            <tr><td class="k">Rider subscriptions</td><td><span class="tag missing">not found</span></td><td class="file">No table, no schema, no admin screen, not even mentioned in the project's own internal docs</td></tr>
+            <tr><td class="k">Payouts (execution)</td><td><span class="tag missing">not found</span></td><td class="file">The settlement table's own migration comment: <em>"Money does NOT move through this table."</em> (0028_vendor_settlements.sql:9)</td></tr>
+            <tr><td class="k">Invoices / GST documents</td><td><span class="tag missing">not found</span></td><td class="file">No invoice generation, no tax-remittance record</td></tr>
+            <tr><td class="k">Taxes</td><td><span class="tag fact">confirmed</span>, flat rate only</td><td class="file">orders.tax_amount, platform_settings.tax_rate (default 5%, subtotal only) · src/lib/pricing.ts</td></tr>
+            <tr><td class="k">Coupons / discounts</td><td><span class="tag fact">confirmed</span>, most mature part of the system</td><td class="file">coupons, coupon_redemptions · 0031, 0041 · SQL function apply_coupon_to_order()</td></tr>
+            <tr><td class="k">Financial reports</td><td>Partial <span class="tag fact">confirmed</span></td><td class="file">Vendor earnings screen + admin settlement screens exist; no P&amp;L or contribution-margin view anywhere</td></tr>
+            <tr><td class="k">Transaction statuses</td><td><span class="tag fact">confirmed</span></td><td class="file">payment_status: pending → authorized → paid / failed / refunded · 0025</td></tr>
+            <tr><td class="k">Settlement statuses</td><td><span class="tag fact">confirmed</span></td><td class="file">vendor_settlement_status: draft → paid / void · 0028</td></tr>
+            <tr><td class="k">Audit trail of financial actions</td><td><span class="tag missing">not found</span></td><td class="file">No generic audit_log. Settlements/refunds record their own actor column (paid_by, decided_by) but nothing captures a before/after diff</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub"><span class="n">A.3</span>Source of truth — where each number is really decided</h3>
+      <p class="sec-intro" style="margin-top:-6px;">The question that matters most for trust: can the same rupee amount be computed two different ways in two different screens? Yes, twice — both instances below are deliberate and labelled, but they are exactly the shape of bug the business should watch for as more screens get added.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Value</th><th>Calculated where</th><th>Stored</th><th>Who can change it</th><th>Final when</th><th>Reconciled how</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="k">Order total</td>
+              <td class="file">DB function recompute_order_total() — mirrored by computeChargesWith() in pricing.ts for the pre-checkout preview</td>
+              <td class="file">orders.total</td>
+              <td>No one directly — locked column; only reachable via RPC/service role</td>
+              <td>At insert, then re-derived any time items/coupon change while status = placed</td>
+              <td>Single writer — low risk, except the INSERT-time gap noted in C</td>
+            </tr>
+            <tr>
+              <td class="k">Commission owed</td>
+              <td class="file">breakdownOrder() in src/lib/settlements/math.ts, reading live platform_settings + restaurants.commission_pct</td>
+              <td class="file">vendor_settlement_orders.commission (snapshot, whole rupees)</td>
+              <td>Admin, only by changing the rate before the next settlement is built</td>
+              <td>The instant an admin builds the settlement draft — not at order placement</td>
+              <td>Not reconciled against a later refund — see D</td>
+            </tr>
+            <tr>
+              <td class="k">Vendor payable</td>
+              <td class="file">breakdownOrder() / sumSettlementTotals()</td>
+              <td class="file">vendor_settlements.net_payable</td>
+              <td>Admin (void + rebuild a draft); nothing once status = paid</td>
+              <td>When an admin marks the settlement paid and types a bank reference</td>
+              <td>Not verified against an actual bank statement — trust-based</td>
+            </tr>
+            <tr>
+              <td class="k">Vendor "revenue" (dashboard)</td>
+              <td class="file"><b>A second, independent formula</b>: shopValue() in vendor-earnings.ts</td>
+              <td class="file">Not stored — computed on read</td>
+              <td>—</td>
+              <td>Live on every page load</td>
+              <td>Deliberately shown side-by-side with the payout estimate after this exact divergence caused a real over-forecasting bug, fixed by adding the second panel</td>
+            </tr>
+            <tr>
+              <td class="k">Payment status</td>
+              <td class="file">settlePayment(), called from the Razorpay webhook and from the browser verify callback — two independent entry points</td>
+              <td class="file">orders.payment_status + payments table</td>
+              <td>Service role only (webhook/verify routes); never walks backward once paid/refunded</td>
+              <td>On webhook or verified checkout callback, whichever arrives first</td>
+              <td>No periodic reconciliation against Razorpay's own settlement report <span class="tag missing">not found</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ B. CURRENT MONEY FLOW ============ -->
+    <section class="block" id="b">
+      <div class="sec-head"><div class="sec-letter">B</div><h2>Current money flow</h2></div>
+      <p class="sec-intro">Customer payment is <em>not</em> Deligro revenue. Only the commission slice is. Everything else in the customer's payment is either passed straight through (tax), held on the platform's behalf until settlement (food value), or has no defined destination in code at all (delivery fee, tip). Trace it stage by stage:</p>
+
+      <div class="flow-wrap">
+        <div class="flow">
+          <div class="fstage">
+            <div class="flabel">Stage 1</div>
+            <div class="fname">Customer</div>
+            <div class="fline"><span>Pays</span><b>Food + fee + tax + tip − discount</b></div>
+            <div class="fline"><span>Method</span><b>COD or Razorpay</b></div>
+          </div>
+          <div class="farrow"><svg viewBox="0 0 34 20" preserveAspectRatio="none"><line x1="0" y1="10" x2="26" y2="10" stroke="currentColor" stroke-width="1.5"/><polygon points="26,4 34,10 26,16" fill="currentColor"/></svg></div>
+          <div class="fstage">
+            <div class="flabel">Stage 2</div>
+            <div class="fname">Razorpay</div>
+            <div class="fline"><span>Holds</span><b>Full order total</b></div>
+            <div class="fline"><span>Takes</span><b>Gateway fee — uncosted</b></div>
+          </div>
+          <div class="farrow"><svg viewBox="0 0 34 20" preserveAspectRatio="none"><line x1="0" y1="10" x2="26" y2="10" stroke="currentColor" stroke-width="1.5"/><polygon points="26,4 34,10 26,16" fill="currentColor"/></svg></div>
+          <div class="fstage">
+            <div class="flabel">Stage 3</div>
+            <div class="fname">Deligro</div>
+            <div class="fline"><span>Keeps</span><b>Commission + GST + other charges</b></div>
+            <div class="fline"><span>Owes vendor</span><b>Food value, at settlement</b></div>
+          </div>
+          <div class="farrow"><svg viewBox="0 0 34 20" preserveAspectRatio="none"><line x1="0" y1="10" x2="26" y2="10" stroke="currentColor" stroke-width="1.5"/><polygon points="26,4 34,10 26,16" fill="currentColor"/></svg></div>
+          <div class="fstage">
+            <div class="flabel">Stage 4</div>
+            <div class="fname">Vendor</div>
+            <div class="fline"><span>Receives</span><b>Food value − commission − GST − charges</b></div>
+            <div class="fline"><span>Via</span><b>Manual bank transfer, recorded not moved</b></div>
+          </div>
+          <div class="farrow"><svg viewBox="0 0 34 20" preserveAspectRatio="none"><line x1="0" y1="10" x2="26" y2="10" stroke="currentColor" stroke-width="1.5"/><polygon points="26,4 34,10 26,16" fill="currentColor"/></svg></div>
+          <div class="fstage">
+            <div class="flabel">Stage 5</div>
+            <div class="fname">Rider</div>
+            <div class="fline"><span>Receives</span><b>Nothing per-order</b></div>
+            <div class="fline"><span>Instead</span><b>Fixed monthly salary, off-platform</b></div>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--ink-faint);">For a COD order, stages 1–2 don't happen — the vendor or rider collects cash directly at the door, and the code has no record that the cash actually changed hands (see C).</p>
+
+      <h3 class="sub"><span class="n">B.1</span>How <code>orders.total</code> is actually built</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>Rule</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Food subtotal</td><td>Sum of order_items (qty × price), snapshotted at order time so a later menu change never rewrites history</td><td><span class="tag fact">confirmed</span></td></tr>
+            <tr><td class="k">Delivery fee</td><td>Flat ₹29 by default, fully waived above a configurable free-delivery threshold — <b>not</b> distance-based despite riders travelling real distances in Bemetara</td><td><span class="tag fact">confirmed</span></td></tr>
+            <tr><td class="k">Tax</td><td>Flat 5% by default, applied to the food subtotal only — never to the delivery fee or tip</td><td><span class="tag fact">confirmed</span></td></tr>
+            <tr><td class="k">Tip</td><td>Added in full; the code's own comment calls it "paid out in full to the rider" — but no code path ever pays a rider anything (see C)</td><td><span class="tag fact">confirmed</span> math, <span class="tag missing">not found</span> disbursement</td></tr>
+            <tr><td class="k">Discount</td><td>Comes off the grand total, after tax; capped so it can never exceed the food subtotal — the delivery fee is deliberately never discountable</td><td><span class="tag fact">confirmed</span></td></tr>
+            <tr><td class="k">Total</td><td><code>GREATEST(0, subtotal + fee + tax + tip − discount)</code>, computed server-side twice (a TypeScript preview and the authoritative Postgres function) and locked against direct client writes</td><td><span class="tag fact">confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub"><span class="n">B.2</span>A ₹500 order, split as far as the code actually lets it be split</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Line</th><th class="num" style="text-align:right;">₹</th><th>Basis</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Customer pays</td><td class="rupee num" style="text-align:right;">500</td><td>Given</td></tr>
+            <tr><td>Delivery fee (in total)</td><td class="rupee num" style="text-align:right;">29</td><td><span class="tag fact">confirmed</span> default flat fee</td></tr>
+            <tr><td>Tax (5% of food subtotal)</td><td class="rupee num" style="text-align:right;">~22</td><td><span class="tag fact">confirmed</span> default rate, rounded to whole rupees</td></tr>
+            <tr><td class="k">→ Food subtotal (what the vendor cooked)</td><td class="rupee num" style="text-align:right;">~449</td><td>500 − 29 − 22</td></tr>
+            <tr><td>Platform commission on food value</td><td class="rupee num" style="text-align:right;">unknown</td><td><span class="tag assume">assumption</span> — schema default is literally 0%; the live rate is set per-restaurant or globally in settings and isn't visible from code alone</td></tr>
+            <tr><td>GST on that commission</td><td class="rupee num" style="text-align:right;">unknown</td><td><span class="tag assume">assumption</span> — same reason</td></tr>
+            <tr><td>Razorpay gateway fee</td><td class="rupee num" style="text-align:right;">not deducted anywhere</td><td><span class="tag missing">not found</span> in any ledger, order, or settlement calculation</td></tr>
+            <tr><td>Rider's real cost for this delivery</td><td class="rupee num" style="text-align:right;">not computable</td><td><span class="tag missing">not found</span> — riders are salaried monthly outside the app; no per-order allocation exists</td></tr>
+            <tr><td class="k">→ Deligro's net take on this order</td><td class="rupee num" style="text-align:right;">cannot be stated as fact</td><td>The only number the app actually keeps is gross commission + GST + other charges. Nobody nets out gateway fees or rider cost anywhere in this codebase.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout missing">
+        <h4>Do not treat "commission collected" as profit</h4>
+        <p>The system's only visible platform revenue figure is the commission line in a settlement. It has never had Razorpay's own fee, rider salary cost, or refund exposure subtracted from it anywhere in the code. Reported as-is, platform revenue is structurally overstated relative to true contribution margin — not because of a bug, but because the ledger that would net those costs out was never built.</p>
+      </div>
+    </section>
+
+    <!-- ============ C. MISSING PIECES ============ -->
+    <section class="block" id="c">
+      <div class="sec-head"><div class="sec-letter">C</div><h2>Missing pieces</h2></div>
+      <p class="sec-intro">Things a CFO would expect to find that are not in the codebase — confirmed absent by direct search, not inferred.</p>
+
+      <h3 class="sub"><span class="n">C.1</span>The rider subscription — the one this audit was specifically asked to check</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Question asked</th><th>Answer</th></tr></thead>
+          <tbody>
+            <tr><td class="k">What does the rider pay?</td><td><span class="tag missing">not found</span> — no charge, no gate, no eligibility check tied to any payment anywhere in dispatch</td></tr>
+            <tr><td class="k">Who receives the subscription money?</td><td><span class="tag missing">not found</span> — there is no subscription money in the code at all</td></tr>
+            <tr><td class="k">Subscription period / eligibility</td><td><span class="tag missing">not found</span></td></tr>
+            <tr><td class="k">What does the rider get in exchange?</td><td><span class="tag fact">confirmed</span> — dispatch eligibility today is purely operational: not mid-delivery, nearest the shop. No payment status is checked.</td></tr>
+            <tr><td class="k">Are delivery earnings separate?</td><td><span class="tag fact">confirmed</span> — there are no delivery earnings at all. A per-order payout function (<code>riderPayout()</code>, 8% commission, ₹30 minimum) exists in the code but is called nowhere — a deliberately shelved feature, per its own code comment: <em>"riders are salaried monthly, not paid a per-order commission… left defined, not deleted, in case a per-order model comes back."</em></td></tr>
+            <tr><td class="k">Does Deligro pay riders per order?</td><td><span class="tag fact">confirmed no</span> — confirmed by the same comment above, and by the admin settings screen, where the rider-commission input fields are commented out of the UI entirely</td></tr>
+            <tr><td class="k">Do vendors contribute to rider earnings?</td><td><span class="tag missing">not found</span> — no linkage anywhere between a vendor's settlement and a rider's compensation</td></tr>
+            <tr><td class="k">Subscription expiry / refund / cancellation</td><td><span class="tag missing">not found</span></td></tr>
+            <tr><td class="k">Incentives / penalties</td><td><span class="tag missing">not found</span> — the only rider-side timing mechanism in the code is a dispatch fairness window (an unanswered job offer reopens to the fleet), which is operational, not financial</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout missing">
+        <h4>Flagging the ambiguity, not inventing a rule</h4>
+        <p>The business premise ("riders are on a monthly subscription") and the code's own comments ("riders are salaried monthly") describe <b>opposite directions of money</b> — a subscription means the rider pays Deligro for access to jobs; a salary means Deligro pays the rider a wage. The codebase unambiguously implements neither as a live feature, but its own internal language assumes the salary direction. This needs the founder's own words, not a guess — see <a href="#f">F.3</a>. It is also not written in any of the project's internal <code>.md</code> docs; if a subscription model was ever specified, it most likely exists only in <code>Deligro Feature Proposal.docx</code>, <code>Deligro Build Plan.docx</code>, or <code>Deligro-Quotation.pdf</code> under <code>Resources/srcdocs/</code> — binary files this audit could not read.</p>
+      </div>
+
+      <h3 class="sub"><span class="n">C.2</span>Other gaps a scaling business will hit</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Missing piece</th><th>Why it matters</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Payment gateway fees</td><td>Razorpay's own cut is never deducted in any order, settlement, or report — every "revenue" figure the app shows is gross, not net, of what the gateway actually keeps.</td></tr>
+            <tr><td class="k">COD cash-collection confirmation</td><td>Nothing on the <code>deliveries</code> table records that a rider actually collected cash at the door. For a cash order, the settlement math simply assumes the vendor already holds the money — there is no proof step, and no way to catch a rider who under-reports.</td></tr>
+            <tr><td class="k">Rider cost allocation</td><td>Because riders are salaried entirely off-platform, no order — and no settlement — carries a rider cost line. True per-order contribution margin cannot be computed from this system today, for any order.</td></tr>
+            <tr><td class="k">Payout execution</td><td>Settlement "paid" means an admin typed a bank reference by hand. There is no RazorpayX/Route integration, no bank API — money physically moves entirely outside the application, and the app's record of it is only as trustworthy as that one manual entry.</td></tr>
+            <tr><td class="k">Refund ↔ settlement reconciliation</td><td>Detailed in D — a refund approved after its order has already been paid out is only <em>flagged</em>, never automatically corrected.</td></tr>
+            <tr><td class="k">Negative vendor balances</td><td>The settlement schema explicitly allows <code>net_payable</code> to go negative (vendor owes Deligro), but no code path collects it — there is no vendor-side debit, wallet, or invoice mechanism to actually recover that money.</td></tr>
+            <tr><td class="k">Tax / GST invoicing &amp; remittance</td><td>Tax is collected into <code>orders.tax_amount</code> but nothing generates an invoice, tracks what's owed to the government, or marks it remitted.</td></tr>
+            <tr><td class="k">Generic financial audit log</td><td>Settlement and refund actions record who acted (<code>paid_by</code>, <code>decided_by</code>) but there is no unified, append-only log of every financial mutation with a before/after value — the kind an accountant or an investor's diligence team would expect.</td></tr>
+            <tr><td class="k">Maker-checker / dual control</td><td>A single admin can build a settlement, mark it paid, and void it — with no second approval, at any amount. There is no threshold above which a second person must sign off.</td></tr>
+            <tr><td class="k">Bank/gateway reconciliation job</td><td>Nothing periodically pulls Razorpay's own settlement report and matches it against the internal <code>payments</code> table — the webhook is trusted once, and never checked again.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ D. FINANCIAL RISKS ============ -->
+    <section class="block" id="d">
+      <div class="sec-head"><div class="sec-letter">D</div><h2>Financial risks</h2></div>
+      <p class="sec-intro">Ranked by severity. Items marked <span class="tag fact" style="margin:0 2px;">prior audit</span> were already diagnosed with exact file/line citations in this repo's own <code>AUDIT_REPORT_3.md</code> (24 Aug 2026) and are still open as of this review — they don't need rediscovering, they need fixing. Items marked <span class="tag assume" style="margin:0 2px;">this audit</span> are new synthesis from the financial-architecture pass.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width:100px;">Severity</th><th>Risk</th><th>Concrete failure scenario</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="sev critical">Critical</span></td>
+              <td class="risk-title">A cancelled order can still be paid out to the vendor</td>
+              <td><div class="risk-scenario">The rider-completion write moves an order straight to <code>delivered</code> with no check on its current status, and most cancel paths never unwind the matching delivery row. Settlement and vendor-earnings queries select purely on <code>status = 'delivered'</code>, so a cancelled-and-refunded order can still be swept into the next payout.</div><div class="risk-src">Prior audit — AUDIT_REPORT_3.md, driver-orders.ts / admin-settlements.ts / vendor-earnings.ts</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev critical">Critical</span></td>
+              <td class="risk-title">A refund approved after its settlement is paid is never clawed back</td>
+              <td><div class="risk-scenario">Order settles and is paid out Monday; the customer's refund is approved Wednesday. Deligro is now out the refund <em>and</em> has already paid the vendor for it, and nothing in the system flags the loss — the void function explicitly refuses to reverse a paid settlement and no correction mechanism exists.</div><div class="risk-src">Prior audit — AUDIT_REPORT_3.md, admin-settlements.ts (voidSettlement)</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev high">High</span></td>
+              <td class="risk-title">Customer self-cancel has no optimistic lock</td>
+              <td><div class="risk-scenario">The cancel endpoint reads a status, checks it, then writes — with no <code>WHERE status = &lt;expected&gt;</code> guard, unlike every other status-writing path in the codebase. A vendor advancing the order in that same window gets silently overwritten, and the rider assignment is never unwound either.</div><div class="risk-src">Prior audit — AUDIT_REPORT_3.md, orders/[id]/cancel/route.ts</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev high">High</span></td>
+              <td class="risk-title">Rider acceptance never re-validates order status server-side</td>
+              <td><div class="risk-scenario"><code>acceptDelivery</code> only relies on the UI hiding the Accept button — the server never confirms <code>orders.status = 'ready'</code> before creating a delivery row, a second route into the same resurrected-order money bug above.</div><div class="risk-src">Prior audit — AUDIT_REPORT_3.md, driver-orders.ts</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev high">High</span></td>
+              <td class="risk-title">Delivery completion silently discards write errors</td>
+              <td><div class="risk-scenario"><code>advanceDelivery</code> drops the <code>{error}</code> from both its database writes and unconditionally reports success. If the order-status write fails after the delivery-status write succeeds, the rider is told the job is done while the customer's tracker, the vendor board and the admin board all stay stuck — and that order's money never enters settlement at all.</div><div class="risk-src">Prior audit — AUDIT_REPORT_3.md, driver-orders.ts</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev high">High</span></td>
+              <td class="risk-title">No true cost or profit figure exists anywhere</td>
+              <td><div class="risk-scenario">Every "revenue" number in the app is gross commission — never netted against the Razorpay gateway fee, the rider's real off-platform cost, or open refund exposure. A founder reading the settlement totals as profit will consistently overestimate margin.</div><div class="risk-src">This audit</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev high">High</span></td>
+              <td class="risk-title">COD cash has no collection record</td>
+              <td><div class="risk-scenario">A rider marks a cash order delivered with no field anywhere confirming cash was actually collected. The settlement math assumes the vendor already holds it. A rider or vendor under-reporting collected cash is undetectable from within the app.</div><div class="risk-src">This audit</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev medium">Medium</span></td>
+              <td class="risk-title">Draft settlements don't reflect refunds approved after the draft was built</td>
+              <td><div class="risk-scenario">A refund approved while an order is already sitting in a not-yet-paid draft settlement is silently absent from that draft's totals, with no on-screen indicator during refund approval that the order is already drafted.</div><div class="risk-src">Prior audit — AUDIT_REPORT_3.md</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev medium">Medium</span></td>
+              <td class="risk-title">Razorpay refunds carry no idempotency key</td>
+              <td><div class="risk-scenario">A retried refund call after a transient failure can trigger a second real refund at the gateway — the code deliberately surfaces the failure to a human instead of auto-retrying, but a human retrying by hand carries the same exposure.</div><div class="risk-src">This audit — src/lib/payments/refunds.ts</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev medium">Medium</span></td>
+              <td class="risk-title">Commission rate can drift between order placement and settlement</td>
+              <td><div class="risk-scenario">Commission is computed from whatever rate is <em>live</em> the moment an admin builds a settlement — not the rate in effect when the order was placed. If an admin changes the rate mid-month, orders placed under the old rate are still charged the new one at settlement. Not a bug — but there's no documented policy on which is intended.</div><div class="risk-src">This audit — src/lib/settlements/math.ts</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev medium">Medium</span></td>
+              <td class="risk-title">Pre-coupon-funding orders may still misattribute discount cost to vendors</td>
+              <td><div class="risk-scenario">Before the platform/vendor-funded coupon split existed, every discount silently came out of the vendor's payout. The fix (migration 0041) does not rewrite history automatically — a corrective backfill query exists in the migration's own comments but is left "for an operator to run or not." If it was never run, historical vendor payouts remain understated.</div><div class="risk-src">This audit — 0041_vendor_coupons.sql</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev medium">Medium</span></td>
+              <td class="risk-title">Settlement "paid" status is entirely trust-based</td>
+              <td><div class="risk-scenario">A single admin types a payment reference and flips a status; nothing verifies it against an actual bank transaction. There is no dual-control threshold, so a single compromised or careless admin account can misrecord — or fabricate — a payout at any size.</div><div class="risk-src">This audit</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev medium">Medium</span></td>
+              <td class="risk-title">Admin status overrides can leave delivery bookkeeping empty</td>
+              <td><div class="risk-scenario">An admin jumping an order straight to <code>on_the_way</code> or <code>delivered</code> never creates or updates the matching <code>deliveries</code> row — probably intentional for support use, but worth confirming operators know the driver-side record goes silently blank.</div><div class="risk-src">Prior audit — AUDIT_REPORT_3.md (noted "likely intentional")</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev low">Low</span></td>
+              <td class="risk-title">Direct-API order inserts can still zero the delivery fee and tax</td>
+              <td><div class="risk-scenario">A client bypassing the app's own checkout flow and posting straight to the database API can submit zero for <code>delivery_fee</code>/<code>tax_amount</code> at insert time — <code>total</code> itself can't be forged, but these two feed straight into it. Already accepted as an open, documented risk by the project's own security audit.</div><div class="risk-src">Prior audit — docs/SECURITY_AUDIT.md, accepted risk N-1</div></td>
+            </tr>
+            <tr>
+              <td><span class="sev low">Low</span></td>
+              <td class="risk-title">Two independent calendar implementations for settlement periods</td>
+              <td><div class="risk-scenario">Settlement cycle math and general IST-time utilities are hand-written twice in separate files. They currently agree, but nothing guarantees they stay in sync across a month-boundary edge case.</div><div class="risk-src">Prior audit — AUDIT_REPORT_3.md</div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4 class="minor">Checked and found solid — no need to re-audit these</h4>
+      <div class="badge-list">
+        <span class="badge">Checkout pricing always re-derived server-side, never trusted from the client</span>
+        <span class="badge">Coupon math: single SQL source of truth, ownership/funding pinned server-side</span>
+        <span class="badge">Refund requests: real unique constraint blocks duplicates</span>
+        <span class="badge">Webhook signature verified over raw bytes before anything is trusted</span>
+        <span class="badge">Payment status never regresses once paid or refunded</span>
+        <span class="badge">Settlement arithmetic: one formula, one rounding rule, correct IST period boundaries</span>
+        <span class="badge">Double-payout on the same order blocked by a real DB unique constraint</span>
+        <span class="badge">Rider double-claim on dispatch blocked by DB constraint + optimistic lock</span>
+      </div>
+    </section>
+
+    <!-- ============ E. RECOMMENDED ARCHITECTURE ============ -->
+    <section class="block" id="e">
+      <div class="sec-head"><div class="sec-letter">E</div><h2>Recommended architecture</h2></div>
+      <p class="sec-intro">The settlement engine already built is genuinely good — one formula, snapshotted rates, IST-correct periods. The gap is not arithmetic, it's that nothing closes the loop after money is recorded as moved. Five additions, in order of how directly they touch trust:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>What it adds over today</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Financial event log</td><td>One append-only table: every order-total change, coupon application, commission snapshot, refund decision, and settlement state change writes a row — actor, before value, after value, timestamp. Not a replacement for the existing tables, a spine underneath all of them.</td></tr>
+            <tr><td class="k">Refund → settlement correction</td><td>When a refund is approved against an order that's already in a paid settlement, generate a correction line automatically — net it against the vendor's <em>next</em> settlement rather than leaving it as a silent, human-only note.</td></tr>
+            <tr><td class="k">Rider cost ledger</td><td>Even before any per-order rider model exists, record a simple monthly-salary ÷ orders-delivered allocation per rider so contribution margin becomes computable. This does not require changing how riders are actually paid.</td></tr>
+            <tr><td class="k">Platform revenue view (net, not gross)</td><td>A single computed view: commission + GST-on-commission + other charges − gateway fees − platform-funded discounts − refund exposure − allocated rider cost. This is the number a CEO should actually be shown, not the raw commission line.</td></tr>
+            <tr><td class="k">Gateway &amp; bank reconciliation job</td><td>Pull Razorpay's own settlement report and match it line-by-line against the internal <code>payments</code> table; separately, allow a bank-statement import that gets matched against <code>vendor_settlements.payment_ref</code>. Anything unmatched surfaces as an exception, not a silent gap.</td></tr>
+            <tr><td class="k">Role-based finance permissions</td><td>Today it's binary — admin or not. Split "can view financial reports" from "can build a settlement" from "can mark one paid," and add a value threshold above which a second admin must approve.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:12.5px;color:var(--ink-muted);">None of this requires re-architecting what's there. <code>vendor_settlements</code>, <code>vendor_settlement_orders</code>, <code>refunds</code>, and <code>payments</code> stay exactly as they are — they become inputs to the event log and the reconciliation job, not replacements.</p>
+    </section>
+
+    <!-- ============ F. QUESTIONS FOR THE FOUNDER ============ -->
+    <section class="block" id="f">
+      <div class="sec-head"><div class="sec-letter">F</div><h2>Questions for the founder</h2></div>
+      <p class="sec-intro">Only what genuinely cannot be answered by reading the project — the code is silent or contradictory on each of these.</p>
+      <div class="q-list">
+        <div class="q-item"><div class="q-num">1</div><div class="q-body"><b>What commission rate is actually live today, per vendor?</b><p>The schema's own default is 0%. If a real rate is configured, it lives only in the production database's <code>platform_settings</code>/<code>restaurants</code> rows — not in any file this audit could read.</p></div></div>
+        <div class="q-item"><div class="q-num">2</div><div class="q-body"><b>Should a vendor be charged the commission rate live at order time, or the rate live at settlement time?</b><p>The system currently does the latter by construction. If that's not the intended policy, it needs an explicit decision before it's "fixed."</p></div></div>
+        <div class="q-item"><div class="q-num">3</div><div class="q-body"><b>Which direction does rider money actually flow — does the rider pay Deligro, or does Deligro pay the rider?</b><p>"Monthly subscription" (rider pays) and the code's own "riders are salaried" (Deligro pays) describe opposite things. Neither is implemented, so this is a clean-slate decision, not a bug to fix.</p></div></div>
+        <div class="q-item"><div class="q-num">4</div><div class="q-body"><b>If riders are salaried: what's the actual monthly figure, and does it vary by rider or route?</b><p>Needed to build even the simplest cost-allocation ledger in <a href="#e">E</a>.</p></div></div>
+        <div class="q-item"><div class="q-num">5</div><div class="q-body"><b>Who is the delivery fee revenue for?</b><p>It never reaches the vendor's payout calculation and never reaches a rider ledger — today it simply stays with Deligro by omission. Is that intentional, or is it meant to fund rider pay?</p></div></div>
+        <div class="q-item"><div class="q-num">6</div><div class="q-body"><b>What's supposed to happen to a tip on a prepaid (online) order?</b><p>The code's own comment says a tip is "paid out in full to the rider," but no code path ever pays anyone. On a COD order a tip is presumably handed over in cash at the door — on a prepaid order it currently has nowhere to go.</p></div></div>
+        <div class="q-item"><div class="q-num">7</div><div class="q-body"><b>How should a negative vendor balance (vendor owes Deligro) actually be recovered?</b><p>The schema allows it; nothing collects it.</p></div></div>
+        <div class="q-item"><div class="q-num">8</div><div class="q-body"><b>Who absorbs the Razorpay gateway fee — Deligro, the vendor, or the customer?</b><p>No code deducts it from anyone today.</p></div></div>
+        <div class="q-item"><div class="q-num">9</div><div class="q-body"><b>Is GST invoicing/remittance handled by a separate accounting tool, or expected to be built into this system?</b><p>Nothing in the codebase generates a tax invoice or tracks what's owed to the government.</p></div></div>
+        <div class="q-item"><div class="q-num">10</div><div class="q-body"><b>What's the real settlement cadence — is weekly/monthly actually operated on a schedule today, or ad hoc whenever someone gets to it?</b><p>The field exists as a label only; nothing in the system enforces or triggers on it.</p></div></div>
+        <div class="q-item"><div class="q-num">11</div><div class="q-body"><b>Should any settlement above a certain amount require a second person's approval before it can be marked paid?</b><p>Today one admin account can do the entire cycle alone.</p></div></div>
+      </div>
+    </section>
+
+    <!-- ============ G. RECOMMENDED NEXT PHASE ============ -->
+    <section class="block" id="g">
+      <div class="sec-head"><div class="sec-letter">G</div><h2>Recommended next phase</h2></div>
+      <p class="sec-intro">Ordered by how much money is actually at risk right now, not by build convenience.</p>
+
+      <div class="phase">
+        <div class="phase-head"><span class="phase-tag">Phase 0 — days</span><h4>Stop the active leaks</h4></div>
+        <ul>
+          <li>Fix the two confirmed critical bugs from <a href="#d">D</a>: guard every order-completion write against the status it expects, and unwind the delivery row on every cancel path — not just the vendor-reject one. <span class="why">These are live money-out-the-door risks today, not architecture work.</span></li>
+          <li>Add a refund-clawback correction to the next unpaid settlement whenever a refund is approved against an already-settled order. <span class="why">Currently silent — the fix is small relative to the exposure.</span></li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="phase-head"><span class="phase-tag">Phase 1 — weeks</span><h4>Make the numbers trustworthy</h4></div>
+        <ul>
+          <li>Add a COD cash-collection confirmation step to the delivery flow.</li>
+          <li>Add a gateway-fee line to the settlement math, even as a configurable percentage, so platform revenue stops being reported gross.</li>
+          <li>Build the minimal financial event log for settlement, refund, and commission-rate-change actions.</li>
+          <li>Decide and implement the commission-timing policy from <a href="#f">F.2</a>.</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="phase-head"><span class="phase-tag">Phase 2 — after the founder answers §F</span><h4>Build the rider ledger</h4></div>
+        <ul>
+          <li>Start with a manual monthly cost-allocation entry per rider — no product change to how riders are actually paid, just visibility.</li>
+          <li>Only after <a href="#f">F.3</a> is answered, decide whether to build a real subscription-to-work model, a per-order model, or keep salary — the shelved <code>riderPayout()</code> function is a usable starting point if per-order pay is chosen.</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="phase-head"><span class="phase-tag">Phase 3 — before real scale</span><h4>Reconciliation &amp; controls</h4></div>
+        <ul>
+          <li>Automated Razorpay settlement-report import, matched against internal payments.</li>
+          <li>Bank-statement import matched against settlement payment references.</li>
+          <li>Role-based finance permissions and a dual-control threshold on large payouts.</li>
+          <li>A real net-revenue / contribution-margin dashboard, separated from the operational and settlement views per the split in this report.</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="phase-head"><span class="phase-tag">Phase 4</span><h4>Compliance layer</h4></div>
+        <ul>
+          <li>GST invoicing and tax-remittance tracking, if not already handled by an external accounting tool.</li>
+        </ul>
+      </div>
+    </section>
+
+    <div class="divider-note">Discovery only — no code, schema, RLS policy, or UI was changed in the course of this audit. Every finding above traces to a specific file, migration, or the prior <code>AUDIT_REPORT_3.md</code>; every number without such a trace is explicitly marked as an assumption.</div>
+  </main>
+</div>

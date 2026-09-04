@@ -27,6 +27,7 @@ import {
 import {
   columnKnownMissing,
   isMissingColumn,
+  isMissingTable,
   rememberColumn,
 } from "@/lib/data-access/schema-probe";
 
@@ -143,7 +144,15 @@ export interface SettlementPreview {
   commissionGst: number;
   otherCharges: number;
   refundsRecovered: number;
+  /**
+   * This batch's own total, before any outstanding correction (0048). netPayable
+   * below is what will actually be created if this preview is confirmed — the
+   * two differ only when a refund landed on an order from an earlier, already
+   * PAID settlement for this same vendor.
+   */
   netPayable: number;
+  /** Outstanding corrections already netted into netPayable above. Rupees, >= 0. */
+  pendingCorrections: number;
   lines: SettlementLine[];
   payout: SettlementPayoutSnapshot;
 }
@@ -232,6 +241,8 @@ function asKind(v: unknown): SettlementKind {
  * ------------------------------------------------------------------ */
 const LINE_EXTRAS = "vendor_settlement_orders.commission_gst";
 const HEADER_EXTRAS = "vendor_settlements.kind";
+/** 0048. A missing relation (42P01), not a missing column — probed the same way. */
+const CORRECTIONS_TABLE = "settlement_corrections";
 
 const LINE_BASE =
   "order_id, food_gross, commission, vendor_net, contribution, refund_recovered, payment_method, payment_status";
@@ -606,6 +617,7 @@ export async function previewSettlement(input: {
   ]);
   const lines = eligible.map((o) => lineFor(o, terms, refunds, items));
   const totals = sumSettlementTotals(lines);
+  const corrections = await outstandingCorrectionsFor(input.restaurantId);
 
   const startIso = periodStart.toISOString();
   const endIso = periodEnd.toISOString();
@@ -619,6 +631,11 @@ export async function previewSettlement(input: {
     periodEnd: endIso,
     periodLabel: periodLabel(startIso, endIso),
     ...totals,
+    // Overrides the raw batch figure from `...totals` above with what will
+    // actually be created if this preview is confirmed — see the field's own
+    // comment on SettlementPreview.
+    netPayable: totals.netPayable - corrections.total,
+    pendingCorrections: corrections.total,
     lines,
     payout: payoutFrom(rest, terms),
   };
@@ -673,6 +690,11 @@ export async function settlementEstimateFor(input: {
   const refunds = await loadApprovedRefunds(eligible.map((o) => o.id));
   const lines = eligible.map((o) => lineFor(o, terms, refunds));
   const totals = sumSettlementTotals(lines);
+  // A vendor whose earlier, already-paid settlement has since had a refund
+  // land against one of its orders (0048) will see a smaller estimate here —
+  // the same number their actual next payout will land on, not a forecast
+  // that quietly ignores what has already been recovered against them.
+  const corrections = await outstandingCorrectionsFor(input.restaurantId);
 
   return {
     commissionPct: terms.commissionPct,
@@ -681,6 +703,7 @@ export async function settlementEstimateFor(input: {
     orderCount: eligible.length,
     grossRevenue: eligible.reduce((sum, o) => sum + (Number(o.total) || 0), 0),
     ...totals,
+    netPayable: totals.netPayable - corrections.total,
     settledCount: orders.length - eligible.length,
   };
 }
@@ -733,6 +756,15 @@ async function writeSettlement(
   const supabase = createAdminClient();
   const withExtras = !columnKnownMissing(HEADER_EXTRAS);
 
+  // Outstanding corrections (0048) — refunds recovered against orders whose
+  // ORIGINAL settlement was already paid — are netted into whichever
+  // settlement is written next for this vendor, batch or instant alike. Not
+  // stored as its own header column: net_payable already carries it, and the
+  // settlement_corrections rows themselves (applied_settlement_id) are the
+  // trace of why.
+  const corrections = await outstandingCorrectionsFor(input.restaurantId);
+  const netPayable = input.totals.netPayable - corrections.total;
+
   const headerBase: Record<string, unknown> = {
     restaurant_id: input.restaurantId,
     period_start: input.periodStart,
@@ -740,9 +772,14 @@ async function writeSettlement(
     food_gross: input.totals.foodGross,
     commission: input.totals.commission,
     refunds_recovered: input.totals.refundsRecovered,
-    net_payable: input.totals.netPayable,
+    net_payable: netPayable,
     created_by: input.adminId,
-    notes: input.notes?.trim() || null,
+    notes: corrections.total > 0
+      ? [
+          input.notes?.trim() || null,
+          `Includes ₹${corrections.total} recovered against ${corrections.ids.length} earlier refund correction${corrections.ids.length === 1 ? "" : "s"}.`,
+        ].filter(Boolean).join("\n")
+      : input.notes?.trim() || null,
   };
 
   // An instant payout is created in its final state. There is no useful draft
@@ -834,6 +871,11 @@ async function writeSettlement(
     if (lErr.code === "23505") return { error: RACE_MESSAGE };
     throw lErr;
   }
+
+  // Only now that both the header and its lines are actually written: a
+  // correction marked applied against a settlement that then failed to save
+  // would be recovered against nothing.
+  await applyCorrectionsTo(corrections.ids, settlementId);
 
   return { id: settlementId };
 }
@@ -1170,6 +1212,182 @@ export async function flagSettlementForRefund(
   }
 }
 
+/* ------------------------------------------------------------------
+ * Settlement corrections (0048) — recovering a refund from a vendor that
+ * has already been paid for the order it applies to.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Every outstanding correction for one vendor, and their total.
+ *
+ * Degrades to zero on a database without 0048 applied — the same shape as
+ * every other optional-schema read in this file: a missing feature, not a
+ * broken settlement run.
+ */
+async function outstandingCorrectionsFor(
+  restaurantId: string
+): Promise<{ total: number; ids: string[] }> {
+  if (columnKnownMissing(CORRECTIONS_TABLE)) return { total: 0, ids: [] };
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("settlement_corrections")
+    .select("id, amount")
+    .eq("restaurant_id", restaurantId)
+    .eq("status", "outstanding");
+
+  if (error) {
+    if (isMissingTable(error)) {
+      rememberColumn(CORRECTIONS_TABLE, false);
+      return { total: 0, ids: [] };
+    }
+    throw error;
+  }
+  rememberColumn(CORRECTIONS_TABLE, true);
+
+  const rows = data ?? [];
+  return {
+    total: rows.reduce((sum, r) => sum + Number(r.amount), 0),
+    ids: rows.map((r) => r.id as string),
+  };
+}
+
+/**
+ * Mark a batch of outstanding corrections as absorbed into the settlement
+ * that was just written. Called from writeSettlement() right after the
+ * header insert succeeds — never before, so a settlement that fails to write
+ * never marks a correction applied against nothing.
+ */
+async function applyCorrectionsTo(
+  correctionIds: string[],
+  settlementId: string
+): Promise<void> {
+  if (correctionIds.length === 0) return;
+  const supabase = createAdminClient();
+  await supabase
+    .from("settlement_corrections")
+    .update({
+      status: "applied",
+      applied_settlement_id: settlementId,
+      applied_at: new Date().toISOString(),
+    })
+    .in("id", correctionIds);
+}
+
+/**
+ * Reverse: put every correction a voided settlement had absorbed back to
+ * outstanding, so it is picked up again by whatever settlement comes next.
+ * Only reachable for a voided draft or a voided instant payout — a paid
+ * batch can never be voided (see voidSettlement), so a correction it
+ * absorbed is never at risk of this path running against real, sent money.
+ */
+async function releaseCorrectionsFrom(settlementId: string): Promise<void> {
+  if (columnKnownMissing(CORRECTIONS_TABLE)) return;
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("settlement_corrections")
+    .update({ status: "outstanding", applied_settlement_id: null, applied_at: null })
+    .eq("applied_settlement_id", settlementId);
+  if (error && isMissingTable(error)) rememberColumn(CORRECTIONS_TABLE, false);
+}
+
+/**
+ * Create an outstanding correction for a refund approved against an order
+ * whose payout is already booked into a settlement (draft or paid).
+ *
+ * Called from decideRefund() in refunds.ts, immediately after a refund is
+ * approved — never invents a rupee figure: it recomputes what this order's
+ * settlement line would be right now, with every approved refund on it
+ * (including the one that just landed) folded in, using the exact same
+ * lineFor() arithmetic that built the original line. The difference between
+ * that and what was actually written — minus anything already recovered by
+ * an earlier correction on this same order — is the amount to recover.
+ *
+ * Returns amount: 0 (not an error) when the refund does not change what the
+ * vendor is owed for this order — e.g. it was already fully netted at
+ * settlement time, or the whole refund is Deligro's own to absorb.
+ */
+export async function createSettlementCorrection(input: {
+  orderId: string;
+  refundId: string;
+  createdBy: string;
+}): Promise<{ ok: true; amount: number } | { ok: false; error: string }> {
+  const ref = await findSettlementForOrder(input.orderId);
+  if (!ref) return { ok: false, error: "not_settled" };
+  // A draft can simply be voided and rebuilt — see the migration header for
+  // why that path needs no correction row at all.
+  if (ref.status !== "paid") return { ok: true, amount: 0 };
+
+  const supabase = createAdminClient();
+
+  const { data: settlement, error: sErr } = await supabase
+    .from("vendor_settlements")
+    .select("restaurant_id")
+    .eq("id", ref.id)
+    .maybeSingle();
+  if (sErr) return { ok: false, error: "read_failed" };
+  if (!settlement) return { ok: false, error: "settlement_not_found" };
+  const restaurantId = settlement.restaurant_id as string;
+
+  const { data: line, error: lErr } = await supabase
+    .from("vendor_settlement_orders")
+    .select("contribution")
+    .eq("settlement_id", ref.id)
+    .eq("order_id", input.orderId)
+    .maybeSingle();
+  if (lErr) return { ok: false, error: "read_failed" };
+  if (!line) return { ok: false, error: "line_not_found" };
+  const originalContribution = Number(line.contribution) || 0;
+
+  const rest = await loadRestaurant({ column: "id", value: restaurantId });
+  if (!rest) return { ok: false, error: "restaurant_not_found" };
+  const terms = await termsFor(rest);
+
+  const orders = (await selectOrders((cols) =>
+    supabase.from("orders").select(cols).eq("id", input.orderId)
+  )) as unknown as OrderRow[];
+  const order = orders[0];
+  if (!order) return { ok: false, error: "order_not_found" };
+
+  const refunds = await loadApprovedRefunds([input.orderId]);
+  const freshLine = lineFor(order, terms, refunds);
+
+  // Prior corrections already created for this same order (an earlier,
+  // separate refund on it) are money already recovered or already queued to
+  // be — subtract them so a second refund on the same order only charges its
+  // own incremental effect, never the first refund's a second time.
+  const { data: prior, error: pErr } = await supabase
+    .from("settlement_corrections")
+    .select("amount")
+    .eq("order_id", input.orderId)
+    .neq("status", "voided");
+  if (pErr) return { ok: false, error: "read_failed" };
+  const priorTotal = (prior ?? []).reduce((sum, r) => sum + Number(r.amount), 0);
+
+  const delta = originalContribution - priorTotal - freshLine.contribution;
+  if (delta <= 0) return { ok: true, amount: 0 };
+
+  const { error: insErr } = await supabase.from("settlement_corrections").insert({
+    restaurant_id: restaurantId,
+    order_id: input.orderId,
+    refund_id: input.refundId,
+    original_settlement_id: ref.id,
+    amount: delta,
+    reason: `Refund ${input.refundId} reduced order ${shortOrderId(input.orderId)}'s food value after its settlement was already paid.`,
+    created_by: input.createdBy,
+  });
+  if (insErr) {
+    if (isMissingTable(insErr)) {
+      rememberColumn(CORRECTIONS_TABLE, false);
+      return { ok: true, amount: 0 };
+    }
+    return { ok: false, error: "write_failed" };
+  }
+  rememberColumn(CORRECTIONS_TABLE, true);
+
+  return { ok: true, amount: delta };
+}
+
 /**
  * Move an order back to Unpaid.
  *
@@ -1415,6 +1633,33 @@ export async function markSettlementPaid(input: {
   if (row.status !== "draft") {
     return { error: "Only a draft settlement can be marked paid." };
   }
+
+  // A refund approved for one of this draft's orders after it was built
+  // would leave the stored refund_recovered understating what is actually
+  // owed back — paying it out now would carry that gap forward with nothing
+  // left to catch it, since a paid batch can never be voided. Re-check
+  // against the live refunds table rather than trust the snapshot.
+  const { data: lines, error: linesErr } = await supabase
+    .from("vendor_settlement_orders")
+    .select("order_id, refund_recovered")
+    .eq("settlement_id", input.id);
+  if (linesErr) throw linesErr;
+  const orderIds = (lines ?? []).map((l) => l.order_id as string);
+  if (orderIds.length > 0) {
+    const freshRefunds = await loadApprovedRefunds(orderIds);
+    const stale = (lines ?? []).some(
+      (l) =>
+        (freshRefunds.get(l.order_id as string) ?? 0) !==
+        Number(l.refund_recovered ?? 0)
+    );
+    if (stale) {
+      return {
+        error:
+          "A refund was approved for an order in this draft after it was built. Void this settlement and create a new one covering the same period, so it reflects the refund.",
+      };
+    }
+  }
+
   if (Number(row.net_payable) < 0) {
     return {
       error:
@@ -1486,6 +1731,12 @@ export async function voidSettlement(input: {
     .eq("id", input.id)
     .neq("status", "void");
   if (error) throw error;
+
+  // Any correction this settlement had absorbed (0048) goes back to
+  // outstanding — the money it was recovering is not actually recovered just
+  // because the settlement that claimed to recover it got voided.
+  await releaseCorrectionsFrom(input.id);
+
   return { ok: true };
 }
 

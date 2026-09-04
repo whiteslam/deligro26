@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { RazorpayError, toPaise } from "@/lib/payments/razorpay";
 import { refundRazorpayPayment } from "@/lib/payments/refunds";
 import {
+  createSettlementCorrection,
   findSettlementForOrder,
   flagSettlementForRefund,
 } from "@/lib/data-access/admin-settlements";
@@ -734,21 +735,38 @@ export async function decideRefund(
 
   // An approved refund moves money back out. If this order's payout was
   // already booked into a settlement — draft or paid — that settlement's
-  // total now overstates what the vendor should actually receive/kept, and
-  // nothing recomputes it automatically. Flag it rather than let the mismatch
-  // surface later as an unexplained accounting discrepancy.
+  // total now overstates what the vendor should actually receive/kept.
+  //
+  //   * Paid: nothing about that settlement can change (money already sent),
+  //     so createSettlementCorrection (0048) records an outstanding debit
+  //     against this vendor's NEXT settlement — the actual clawback, not just
+  //     a note that one is owed.
+  //   * Draft: still recoverable natively by voiding and rebuilding it, which
+  //     prices the refund correctly through the normal per-line arithmetic —
+  //     no correction row needed there. flagSettlementForRefund's note is the
+  //     prompt to do that.
   let settlementWarning: string | null = null;
   if (decision === "approved") {
     try {
       const ref = await findSettlementForOrder(refund.orderId);
       if (ref && ref.status !== "void") {
-        settlementWarning =
-          ref.status === "paid"
-            ? `This order's payout was already settled and paid (settlement #${shortOrderId(ref.id)}). The refund does not adjust that settlement automatically — reconcile it by hand.`
-            : `This order is in an unpaid draft settlement (#${shortOrderId(ref.id)}). Void and rebuild that settlement so it reflects the refund before paying it.`;
+        if (ref.status === "paid") {
+          const correction = await createSettlementCorrection({
+            orderId: refund.orderId,
+            refundId: id,
+            createdBy: user.id,
+          });
+          settlementWarning = !correction.ok
+            ? `This order's payout was already settled and paid (settlement #${shortOrderId(ref.id)}). The automatic correction could not be recorded: see the note on that settlement and reconcile this one by hand.`
+            : correction.amount > 0
+              ? `This order's payout was already settled and paid (settlement #${shortOrderId(ref.id)}). ₹${correction.amount} has been recorded as an outstanding correction, recovered from this vendor's next settlement.`
+              : `This order's payout was already settled and paid (settlement #${shortOrderId(ref.id)}). No correction was needed: this order's vendor entitlement was unaffected by the refund.`;
+        } else {
+          settlementWarning = `This order is in an unpaid draft settlement (#${shortOrderId(ref.id)}). Void and rebuild that settlement so it reflects the refund before paying it.`;
+        }
         await flagSettlementForRefund(
           ref.id,
-          `Refund ${id} (₹${refund.amount}) approved for order ${refund.orderId} on ${new Date().toISOString()} — after this settlement was ${ref.status === "paid" ? "paid" : "drafted"}. Reconcile by hand.`
+          `Refund ${id} (₹${refund.amount}) approved for order ${refund.orderId} on ${new Date().toISOString()}, after this settlement was ${ref.status === "paid" ? "paid" : "drafted"}.`
         );
       }
     } catch (err) {

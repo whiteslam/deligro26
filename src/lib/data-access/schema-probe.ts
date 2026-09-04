@@ -9,6 +9,18 @@ export function isMissingColumn(error: { code?: string } | null): boolean {
 }
 
 /**
+ * A whole table/relation is missing, not just a column: PostgREST answers
+ * with its own PGRST205 ("Could not find the table... in the schema cache")
+ * rather than Postgres's 42P01, because it checks its introspected schema
+ * cache before issuing SQL at all. Used the same way as isMissingColumn — a
+ * query for a table whose migration hasn't landed yet should degrade, not
+ * 500 the feature it's optional to.
+ */
+export function isMissingTable(error: { code?: string } | null): boolean {
+  return error?.code === "PGRST205" || error?.code === "42P01";
+}
+
+/**
  * Remembers, per column, whether the database has actually been migrated.
  *
  * Asking PostgREST for a column that doesn't exist is a hard 400, not a null —

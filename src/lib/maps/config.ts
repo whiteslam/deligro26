@@ -29,6 +29,9 @@ export const DEFAULT_CENTER = PINNED_LOCATION.coords;
  * where a 1x raster is visibly soft. Only ever called with an exact pin — see
  * the call site in `driver-board.tsx` for why an approximate geocode is worse
  * than no thumbnail at all.
+ *
+ * Note the Maps Static API is enabled separately from the JS API in the Google
+ * Cloud console, even though it shares the same key.
  */
 export function staticMapUrl(
   point: { lat: number; lng: number },

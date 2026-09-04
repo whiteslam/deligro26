@@ -15,6 +15,7 @@ import {
   TicketPercent,
   UserCog,
   Users,
+  Wallet,
 } from "lucide-react";
 
 /**
@@ -121,6 +122,14 @@ export const ADMIN_NAV: AdminNavItem[] = [
     group: "Operations",
     tone: "violet",
     match: (p) => p.startsWith("/admin/reports"),
+  },
+  {
+    href: "/admin/cash-ledger",
+    label: "Cash & expenses",
+    icon: Wallet,
+    group: "Operations",
+    tone: "accent",
+    match: (p) => p.startsWith("/admin/cash-ledger"),
   },
   {
     href: "/admin/vendors",
