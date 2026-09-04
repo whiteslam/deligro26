@@ -284,6 +284,8 @@ async function selectJobs<T>(
 const PAYMENT_COLUMNS = "orders.payment_method";
 /** `deliveries.driver_location_source` arrives with 0026. */
 const LOCATION_SOURCE_COLUMN = "deliveries.driver_location_source";
+/** `deliveries.cod_collected_amount` / `cod_collected_at` arrive together with 0045. */
+const COD_COLLECTED_COLUMN = "deliveries.cod_collected_amount";
 
 interface ActiveOrderRow {
   pickup_otp?: string | null;
@@ -1024,6 +1026,49 @@ async function maybeAnnounceArrival(
   }
 }
 
+interface DeliveryOtpOrder {
+  delivery_otp: string | null;
+  total: number | null;
+  payment_method: PaymentMethod | null;
+}
+
+/**
+ * The order row `advanceDelivery`'s completion step needs: the handover code,
+ * the total (for the COD collection record), and how it was paid.
+ *
+ * `payment_method` is probed the same way `activeOrderDetail` probes it
+ * above — a database without 0025 simply has no such column, and asking for
+ * it unconditionally would 400 the whole query and, with it, every delivery
+ * completion. `delivery_otp` and `total` predate 0025 and are always safe to
+ * ask for.
+ */
+async function readDeliveryOtpOrder(
+  supabase: AdminClient,
+  orderId: string
+): Promise<DeliveryOtpOrder | null> {
+  const read = (columns: string) =>
+    supabase
+      .from("orders")
+      .select(columns)
+      .eq("id", orderId)
+      .maybeSingle()
+      .overrideTypes<DeliveryOtpOrder>();
+
+  if (!columnKnownMissing(PAYMENT_COLUMNS)) {
+    const { data, error } = await read("delivery_otp, total, payment_method");
+    if (!error) {
+      rememberColumn(PAYMENT_COLUMNS, true);
+      return data;
+    }
+    if (!isMissingColumn(error)) throw error;
+    rememberColumn(PAYMENT_COLUMNS, false);
+  }
+
+  const { data, error } = await read("delivery_otp, total");
+  if (error) throw error;
+  return data ? { ...data, payment_method: null } : null;
+}
+
 /**
  * Advance the driver's active delivery: pickup → on the way → delivered.
  * Completing the delivery requires the customer's handover OTP (proves the food
@@ -1102,11 +1147,7 @@ export async function advanceDelivery(
 
   if (delivery.status === "picked_up") {
     // Verify the customer's delivery code before completing.
-    const { data: order } = await supabase
-      .from("orders")
-      .select("delivery_otp")
-      .eq("id", orderId)
-      .maybeSingle();
+    const order = await readDeliveryOtpOrder(supabase, orderId);
     const expected = (order?.delivery_otp ?? "").replace(/\D/g, "");
     if (!expected || (otp ?? "").replace(/\D/g, "") !== expected) {
       return { ok: false, error: "bad_otp" };
@@ -1142,8 +1183,53 @@ export async function advanceDelivery(
     // does not exist. An online order still at 'pending' here is likewise left
     // alone; it is a real anomaly (delivered but never settled) and it stays
     // visible to operators precisely because nothing papers over it.
+    await recordCodCollection(supabase, delivery.id, order);
+
     return { ok: true };
   }
 
   return { ok: false, error: "bad_state" };
+}
+
+/**
+ * Digital record of cash collected at the door, for a cash-on-delivery order.
+ *
+ * The physical cash stays with the rider until the next handover (see
+ * cod-handovers.ts) — this write does not move money, it records that a
+ * collection happened, for how much, so the collection itself is never an
+ * untracked event. An online-paid order has nothing to collect and is left
+ * alone. Best-effort: a rider's delivery must complete whether or not this
+ * write succeeds, so failures here are swallowed rather than surfaced as a
+ * failed delivery.
+ */
+async function recordCodCollection(
+  supabase: AdminClient,
+  deliveryId: string,
+  order: { total: number | null; payment_method: PaymentMethod | null } | null
+): Promise<void> {
+  if (columnKnownMissing(COD_COLLECTED_COLUMN)) return;
+
+  // No payment columns at all (pre-0025) means every order was COD by
+  // construction, same reasoning as paymentInstruction() above. Otherwise,
+  // only an explicit 'cod' order has cash to collect.
+  const isCod = !order || order.payment_method == null || order.payment_method === "cod";
+  if (!isCod) return;
+
+  try {
+    const { error } = await supabase
+      .from("deliveries")
+      .update({
+        cod_collected_amount: order?.total ?? 0,
+        cod_collected_at: new Date().toISOString(),
+      })
+      .eq("id", deliveryId);
+
+    if (error) {
+      if (isMissingColumn(error)) rememberColumn(COD_COLLECTED_COLUMN, false);
+      return;
+    }
+    rememberColumn(COD_COLLECTED_COLUMN, true);
+  } catch {
+    // Never let a reporting write turn a completed delivery into a failed one.
+  }
 }

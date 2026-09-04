@@ -294,6 +294,8 @@ that asks "does this order have a rider?" must therefore test `driver_id` (or
 | `offered_driver_id` | `uuid` | null | FK → `profiles(id)` SET NULL. Who dispatch picked — a first refusal, **not** an assignment (`0042`) |
 | `offered_at` | `timestamptz` | null | Start of the exclusivity window (`EXCLUSIVE_OFFER_MS`, `0042`) |
 | `arrival_notified_at` | `timestamptz` | null | Once-only latch behind the 500 m "your rider is here" push (`0042`) |
+| `cod_collected_amount` | `integer` | null | Rupees the rider confirmed collecting at the door, for a cash-on-delivery order. Written once, when the order is marked delivered (`0045`) |
+| `cod_collected_at` | `timestamptz` | null | When the collection was recorded (`0045`) |
 
 **Index:** `driver_id`; partial index on `offered_driver_id` (`0042`)
 
@@ -321,6 +323,51 @@ position to another. The driver board reads this table service-role behind
 | `created_at` | `timestamptz` | `now()` | |
 
 **RLS:** Customer request + read own; admin approve/deny.
+
+---
+
+### `settlement_corrections`
+
+A debit against a vendor's future settlement, created when a refund is
+approved for an order whose payout was already paid out. Closes the gap the
+codebase's own comments used to name directly: `flagSettlementForRefund()`
+said "there is no automatic clawback", and `voidSettlement()` still refuses to
+reverse a paid batch with "record a correction instead" (`0046`).
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `id` | `uuid` PK | `gen_random_uuid()` | |
+| `restaurant_id` | `uuid` | — | FK → `restaurants(id)` |
+| `order_id` | `uuid` | — | FK → `orders(id)` |
+| `refund_id` | `uuid` | null | FK → `refunds(id)` SET NULL |
+| `original_settlement_id` | `uuid` | — | FK → `vendor_settlements(id)`. The settlement that paid the vendor for this order in the first place |
+| `applied_settlement_id` | `uuid` | null | FK → `vendor_settlements(id)` SET NULL. The settlement that actually recovered it, once one exists |
+| `amount` | `integer` | — | Whole rupees to recover, > 0. Computed from the drop in the order's settlement `contribution` once the refund is included, via the same `lineFor()` arithmetic every other settlement figure uses, never invented |
+| `reason` | `text` | null | |
+| `status` | `correction_status` | `outstanding` | `outstanding` \| `applied` \| `voided` |
+| `created_by` | `uuid` | — | FK → `profiles(id)`, the admin who approved the triggering refund |
+| `created_at` | `timestamptz` | `now()` | |
+| `applied_at` | `timestamptz` | null | |
+
+A draft (not yet paid) settlement never needs a row here: voiding and
+rebuilding it prices a late-landing refund correctly through the normal
+per-line arithmetic, since the order simply re-enters the next preview. This
+table exists only for money that has already left the building — a refund
+approved after a **paid** settlement.
+
+**Applied automatically:** every outstanding correction for a vendor is netted
+into `net_payable` the next time a settlement (draft or instant) is written
+for them, and marked `applied` with a trace to that settlement
+(`writeSettlement()` in `admin-settlements.ts`). Voiding a settlement that had
+absorbed a correction reverts it to `outstanding`.
+
+**RLS:** Admin read only — a manager has no role in vendor settlements
+anywhere else in this schema (`0023`), so this table does not extend that
+grant. No insert, update or delete policy for any authenticated role: every
+write goes through the service role, reached only behind
+`requireRole("admin")`, the same shape as `vendor_settlements` itself.
+
+**DAL:** [`admin-settlements.ts`](../src/lib/data-access/admin-settlements.ts) (`createSettlementCorrection`, `outstandingCorrectionsFor`), consumed from [`refunds.ts`](../src/lib/data-access/refunds.ts)
 
 ---
 
@@ -373,6 +420,76 @@ Saved customer delivery addresses.
 | `created_at` | `timestamptz` | `now()` | |
 
 **RLS:** User read own; writes are **service-role only** (client cannot credit self).
+
+---
+
+### `cod_handovers`
+
+Digital record of one leg of the cash-on-delivery handover chain: Customer to
+rider, rider to manager, manager to owner. The cash itself can move offline;
+this table is what makes that movement auditable, per the confirmed rule that
+offline execution must never mean an untracked transaction (`0045`).
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `id` | `uuid` PK | `gen_random_uuid()` | |
+| `leg` | `cash_handover_leg` | — | `rider_to_manager` \| `manager_to_owner` |
+| `from_user` | `uuid` | null | FK → `profiles(id)` SET NULL |
+| `to_user` | `uuid` | null | FK → `profiles(id)` SET NULL |
+| `amount` | `integer` | — | Whole rupees, >= 0 |
+| `handover_date` | `date` | `current_date` | Set from IST at write time by the app, not left to the server's own time zone |
+| `note` | `text` | null | |
+| `recorded_by` | `uuid` | — | FK → `profiles(id)`. Who entered the row, not always `from_user` or `to_user` |
+| `created_at` | `timestamptz` | `now()` | |
+
+Not tied to individual orders: a rider hands over a shift's cash in one
+amount, not order by order. Reconciling a handover total against
+`deliveries.cod_collected_amount` for the same period is shown side by side on
+`/admin/cash-ledger`, but is not enforced.
+
+**RLS:** Admin and manager read all rows. No insert, update or delete policy
+for any authenticated role: every write goes through the service role from
+[`cod-handovers.ts`](../src/lib/data-access/cod-handovers.ts), behind
+`requireRole(["manager", "admin"])`, the same shape as `vendor_settlements`
+(`0028`). Never updated after creation; a correction is a new row.
+
+**DAL:** [`cod-handovers.ts`](../src/lib/data-access/cod-handovers.ts)
+
+**UI:** `/manager/cash` (record), `/admin/cash-ledger` (owner's view)
+
+---
+
+### `operational_expenses`
+
+A Deligro cost recorded here, whatever the underlying payment channel. Not an
+accounts-payable system: no invoices, no approval workflow, no payment
+execution. Rider salary, EV bike maintenance and charging, and other small
+operational spend can be paid however is practical for a single tier-3 city;
+this table is only the digital record that the cost happened (`0045`).
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `id` | `uuid` PK | `gen_random_uuid()` | |
+| `category` | `expense_category` | — | `rider_salary` \| `ev_bike_maintenance` \| `ev_bike_charging` \| `rider_other` \| `small_expense` \| `other` |
+| `amount` | `integer` | — | Whole rupees, >= 0 |
+| `driver_id` | `uuid` | null | FK → `profiles(id)` SET NULL. Named to match `deliveries.driver_id`; the product calls this role "rider" everywhere above the schema. Set only when the expense is tied to one rider |
+| `payment_method` | `expense_payment_method` | `offline_cash` | `offline_cash` \| `offline_bank` \| `upi` \| `other` |
+| `expense_date` | `date` | `current_date` | Set from IST at write time by the app |
+| `note` | `text` | null | |
+| `recorded_by` | `uuid` | — | FK → `profiles(id)` |
+| `created_at` | `timestamptz` | `now()` | |
+
+Every amount here classifies as a **Deligro cost**, never revenue. EV bike
+allocation (which bike belongs to which rider) is deliberately not tracked
+here; it stays an offline register by design. Only the rupee amount, when one
+is financially material, gets a record.
+
+**RLS:** Same shape as `cod_handovers`: admin and manager read all rows,
+service-role-only writes behind `requireRole(["manager", "admin"])`.
+
+**DAL:** [`operational-expenses.ts`](../src/lib/data-access/operational-expenses.ts)
+
+**UI:** `/manager/cash` (record), `/admin/cash-ledger` (owner's view)
 
 ---
 
@@ -529,6 +646,8 @@ where r.slug = 'burger-republic';
 | Driver board | `src/lib/data-access/driver-orders.ts` | `src/app/driver/actions.ts` |
 | Admin orders | `src/lib/data-access/admin-orders.ts` | — |
 | Build page stats | `src/lib/data-access/build-stats.ts` | — |
+| Cash handovers (COD) | `src/lib/data-access/cod-handovers.ts` | `src/app/manager/cash/actions.ts` |
+| Operational expenses | `src/lib/data-access/operational-expenses.ts` | `src/app/manager/cash/actions.ts` |
 
 ---
 

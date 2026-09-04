@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PhoneIncoming } from "lucide-react";
+import { PhoneIncoming, Wallet } from "lucide-react";
 import { requireRole } from "@/lib/auth";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { ManagerOrderBoard } from "@/components/manager/manager-order-board";
@@ -81,6 +81,23 @@ export default async function ManagerHome() {
           </span>
           <span className="block text-xs text-muted">
             For a customer on the line — cash on delivery
+          </span>
+        </span>
+      </Link>
+
+      <Link
+        href="/manager/cash"
+        className="press mt-2.5 flex items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 hover:bg-surface-2"
+      >
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/12 text-accent">
+          <Wallet className="size-5" />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[15px] font-bold text-ink">
+            Cash &amp; expenses
+          </span>
+          <span className="block text-xs text-muted">
+            Record a COD handover or a small spend
           </span>
         </span>
       </Link>

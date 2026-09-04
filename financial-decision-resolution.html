@@ -1,0 +1,564 @@
+<title>Deligro Decision Resolution</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#f5f6f3; --paper-raised:#ffffff; --paper-sunk:#eef1ed;
+  --ink:#1a241f; --ink-muted:#57645c; --ink-faint:#8b978f;
+  --line:#d7dcd5; --line-strong:#b9c1b8;
+  --accent:#0f6d5c; --accent-strong:#0a4c40; --accent-soft:#e1efe9; --accent-ink:#083b32;
+  --preserved:#375b6b; --preserved-bg:#e5eef2; --preserved-line:#a9c3cf;
+  --proposed:#8a5a00; --proposed-bg:#fbedd2; --proposed-line:#e0b46b;
+  --needsnum:#a3341f; --needsnum-bg:#fbe6e0; --needsnum-line:#e3a89f;
+  --approved:#0f6d5c; --approved-bg:#e1efe9; --approved-line:#a9d4c6;
+  --shadow: 0 1px 2px rgba(15,30,25,.06), 0 8px 24px -12px rgba(15,30,25,.18);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0f1613; --paper-raised:#161e1a; --paper-sunk:#0b100e;
+    --ink:#e7ece8; --ink-muted:#9fada4; --ink-faint:#6c7a72;
+    --line:#26312b; --line-strong:#374439;
+    --accent:#4bb89d; --accent-strong:#7dd4bb; --accent-soft:#17332b; --accent-ink:#a9e6d3;
+    --preserved:#8fb8cc; --preserved-bg:#12242c; --preserved-line:#2d4c5a;
+    --proposed:#e0b562; --proposed-bg:#2c2210; --proposed-line:#6b5423;
+    --needsnum:#e58a78; --needsnum-bg:#2e1712; --needsnum-line:#6b342a;
+    --approved:#4bb89d; --approved-bg:#132a23; --approved-line:#255a4a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0f1613; --paper-raised:#161e1a; --paper-sunk:#0b100e;
+  --ink:#e7ece8; --ink-muted:#9fada4; --ink-faint:#6c7a72;
+  --line:#26312b; --line-strong:#374439;
+  --accent:#4bb89d; --accent-strong:#7dd4bb; --accent-soft:#17332b; --accent-ink:#a9e6d3;
+  --preserved:#8fb8cc; --preserved-bg:#12242c; --preserved-line:#2d4c5a;
+  --proposed:#e0b562; --proposed-bg:#2c2210; --proposed-line:#6b5423;
+  --needsnum:#e58a78; --needsnum-bg:#2e1712; --needsnum-line:#6b342a;
+  --approved:#4bb89d; --approved-bg:#132a23; --approved-line:#255a4a;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;}
+body{ background:var(--paper); color:var(--ink); font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:16px; line-height:1.6; }
+::selection{ background:var(--accent-soft); color:var(--accent-ink); }
+h1,h2,h3,h4{ font-family:"Fraunces",Georgia,serif; text-wrap:balance; color:var(--ink); font-weight:600; margin:0; }
+code,.mono,.num{ font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace; }
+.num{ font-variant-numeric:tabular-nums; }
+a{ color:var(--accent-strong); }
+p{ margin:0 0 .9em; color:var(--ink); }
+p:last-child{ margin-bottom:0; }
+
+.layout{ display:flex; align-items:flex-start; max-width:1240px; margin:0 auto; }
+.toc{ position:sticky; top:0; align-self:flex-start; width:236px; flex:0 0 236px; height:100vh; overflow-y:auto; padding:36px 18px 36px 28px; border-right:1px solid var(--line); }
+.toc-brand{ display:flex; align-items:center; gap:9px; margin-bottom:20px; }
+.toc-mark{ width:22px; height:22px; border-radius:5px; background:var(--accent); flex:0 0 auto; display:flex; align-items:center; justify-content:center; color:var(--paper-raised); font-family:"Fraunces",serif; font-weight:700; font-size:13px;}
+.toc-brand span{ font-family:"Fraunces",serif; font-weight:600; font-size:15px; }
+.toc-nav{ display:flex; flex-direction:column; gap:1px; }
+.toc-nav a{ display:flex; gap:9px; padding:6px 8px; border-radius:6px; text-decoration:none; color:var(--ink-muted); font-size:12.5px; line-height:1.35; }
+.toc-nav a:hover{ background:var(--paper-sunk); color:var(--ink); }
+.toc-nav a b{ font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--accent); flex:0 0 auto; }
+.toc-foot{ margin-top:20px; padding-top:14px; border-top:1px solid var(--line); font-size:11px; color:var(--ink-faint); }
+
+main{ flex:1 1 auto; min-width:0; padding:44px 56px 90px; max-width:1024px; }
+.doc-head{ margin-bottom:30px; }
+.eyebrow{ font-family:"IBM Plex Mono",monospace; font-size:11.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--accent); margin-bottom:10px; }
+h1.title{ font-size:37px; line-height:1.08; margin-bottom:10px; }
+.dek{ font-size:16.5px; color:var(--ink-muted); max-width:670px; margin-bottom:18px; }
+.meta-row{ display:flex; flex-wrap:wrap; gap:8px 10px; font-size:12px; color:var(--ink-muted); }
+.meta-chip{ border:1px solid var(--line); border-radius:100px; padding:4px 11px; background:var(--paper-raised); }
+
+.critical-box{ margin-top:22px; padding:18px 20px; border-radius:12px; background:var(--needsnum-bg); border:1px solid var(--needsnum-line); }
+.critical-box h4{ font-family:"IBM Plex Mono",monospace; font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--needsnum); margin-bottom:8px; }
+.critical-box p{ font-size:13.5px; color:var(--ink); }
+
+.status-key{ display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+.status-key .tag{ font-size:11px; }
+
+.tag{ display:inline-flex; align-items:center; gap:5px; font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; padding:3px 9px; border-radius:100px; white-space:nowrap; border:1px solid transparent; }
+.tag.preserved{ color:var(--preserved); background:var(--preserved-bg); border-color:var(--preserved-line); }
+.tag.proposed{ color:var(--proposed); background:var(--proposed-bg); border-color:var(--proposed-line); }
+.tag.needsnum{ color:var(--needsnum); background:var(--needsnum-bg); border-color:var(--needsnum-line); }
+.tag.approved{ color:var(--approved); background:var(--approved-bg); border-color:var(--approved-line); }
+
+section.block{ margin-top:54px; scroll-margin-top:24px; }
+.sec-head{ display:flex; align-items:baseline; gap:12px; margin-bottom:6px; padding-bottom:14px; border-bottom:2px solid var(--ink); }
+.sec-letter{ font-family:"Fraunces",serif; font-size:15px; color:var(--paper-raised); background:var(--ink); width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+.sec-head h2{ font-size:24px; }
+.sec-intro{ color:var(--ink-muted); font-size:14.5px; margin:12px 0 20px; max-width:680px; }
+h3.sub{ font-size:15.5px; margin:28px 0 12px; }
+h3.sub .n{ color:var(--accent); font-family:"IBM Plex Mono",monospace; font-size:13px; margin-right:8px; }
+h4.minor{ font-size:13.5px; margin:20px 0 8px; color:var(--ink); }
+
+.table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); background:var(--paper-raised); margin:14px 0 24px; }
+table{ border-collapse:collapse; width:100%; min-width:600px; font-size:13px; }
+thead th{ text-align:left; font-family:"IBM Plex Mono",monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint); background:var(--paper-sunk); padding:9px 13px; border-bottom:1px solid var(--line); white-space:nowrap; }
+tbody td{ padding:10px 13px; border-bottom:1px solid var(--line); vertical-align:top; color:var(--ink); }
+tbody tr:last-child td{ border-bottom:none; }
+tbody tr:hover{ background:var(--paper-sunk); }
+tbody tr.total td{ font-weight:700; background:var(--paper-sunk); border-top:2px solid var(--ink); }
+td.k{ font-weight:600; white-space:nowrap; }
+.rupee{ font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; }
+
+.flow-wrap{ overflow-x:auto; margin:20px 0 8px; padding:6px 2px 14px; }
+.flow{ display:flex; align-items:stretch; gap:0; min-width:900px; }
+.fstage{ flex:1 1 0; background:var(--paper-raised); border:1px solid var(--line); border-radius:12px; padding:13px 14px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:7px; }
+.fstage .flabel{ font-family:"IBM Plex Mono",monospace; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--accent); }
+.fstage .fname{ font-family:"Fraunces",serif; font-weight:600; font-size:14px; }
+.fstage .fline{ display:flex; justify-content:space-between; gap:8px; font-size:11.5px; color:var(--ink-muted); border-top:1px dashed var(--line); padding-top:6px; }
+.fstage .fline b{ color:var(--ink); font-family:"IBM Plex Mono",monospace; font-weight:600; }
+.farrow{ flex:0 0 30px; display:flex; align-items:center; justify-content:center; color:var(--ink-faint); }
+.farrow svg{ width:100%; height:18px; overflow:visible; }
+
+.decision-card{ border:1px solid var(--line); background:var(--paper-raised); border-radius:12px; padding:16px 18px; margin:12px 0; box-shadow:var(--shadow); }
+.decision-head{ display:flex; align-items:center; gap:10px; margin-bottom:9px; flex-wrap:wrap; }
+.decision-num{ font-family:"Fraunces",serif; font-weight:700; font-size:16px; color:var(--accent); width:22px; }
+.decision-head b{ font-size:14px; flex:1 1 auto; }
+.decision-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; margin-top:8px; }
+.decision-grid div{ font-size:12.5px; }
+.decision-grid b.lbl{ display:block; font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-faint); margin-bottom:3px; font-weight:600; }
+
+.status-note{ margin-top:22px; padding:14px 16px; border-radius:10px; background:var(--approved-bg); border:1px solid var(--approved-line); font-size:12.5px; color:var(--ink); }
+
+.divider-note{ font-size:12px; color:var(--ink-faint); border-top:1px solid var(--line); margin-top:70px; padding-top:16px; }
+
+@media (max-width:880px){
+  .toc{ display:none; }
+  main{ padding:26px 20px 70px; }
+  .decision-grid{ grid-template-columns:1fr; }
+  h1.title{ font-size:28px; }
+}
+</style>
+
+<div class="layout">
+  <nav class="toc">
+    <div class="toc-brand"><div class="toc-mark">D</div><span>Resolution</span></div>
+    <div class="toc-nav">
+      <a href="#a"><b>A</b>Decision extraction</a>
+      <a href="#b"><b>B</b>Final money-flow model</a>
+      <a href="#c"><b>C</b>Rider model</a>
+      <a href="#d"><b>D</b>Vendor economics</a>
+      <a href="#e"><b>E</b>Customer economics</a>
+      <a href="#f"><b>F</b>Payment economics</a>
+      <a href="#g"><b>G</b>COD — the one process</a>
+      <a href="#h"><b>H</b>Refund matrix</a>
+      <a href="#i"><b>I</b>Financial controls</a>
+      <a href="#j"><b>J</b>₹500 final example</a>
+      <a href="#k"><b>K</b>Founder decision sheet</a>
+    </div>
+    <div class="toc-foot">Governance document.<br>Zero rows are APPROVED until you say so.</div>
+  </nav>
+
+  <main>
+    <div class="doc-head">
+      <div class="eyebrow">Decision Resolution — Not Yet a Build Spec</div>
+      <h1 class="title">Deligro's Financial Rules, Resolved</h1>
+      <p class="dek">Every recommendation from the Financial Constitution, sorted into what's already true, what this council proposes, and what only you can actually decide. Nothing below is silently accepted.</p>
+      <div class="meta-row">
+        <span class="meta-chip">Founder · CFO · COO · Payments Architect · Revenue Strategist</span>
+        <span class="meta-chip">4 September 2026</span>
+        <span class="meta-chip">Builds on: Deligro's Money Rules (the Financial Constitution)</span>
+      </div>
+      <div class="critical-box">
+        <h4>Read this before anything else</h4>
+        <p>This document uses four statuses. <b>PRESERVED</b> = already true in the running system, unchanged by this document. <b>PROPOSED</b> = this council's recommendation, argued and ready, but not yet a decision. <b>NEEDS NUMBER</b> = cannot be decided at all without a real figure only Deligro's founder has. <b>APPROVED</b> = a decision explicitly confirmed by the founder. As published on 4 September 2026 zero rows carried APPROVED status. Confirm any row (e.g. "approved: B.4, D.2, G") and this document is updated to reflect it.</p>
+      </div>
+      <div class="status-note" style="margin-top:16px;">
+        <h4 style="font-family:'IBM Plex Mono',monospace; font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--approved); margin-bottom:8px;">Addendum, 4 September 2026: confirmed by the founder</h4>
+        <p style="margin-bottom:8px;">The following are now <span class="tag approved">Approved</span>, superseding the rows below wherever they disagree:</p>
+        <ul style="margin:0 0 8px 18px; padding:0; font-size:13px; line-height:1.7;">
+          <li><b>Rider model (C, K.1):</b> salaried, confirmed. Riders pay no subscription to Deligro and receive no per-order delivery commission.</li>
+          <li><b>EV bikes:</b> Deligro provides the rider's EV bike and bears its running costs (maintenance, charging, other operating support) as a Deligro cost, never rider-funded. Bike allocation itself stays an offline register by design; only the rupee cost is tracked, in <code>operational_expenses</code>.</li>
+          <li><b>Tip (B, section 5 of the founder's brief):</b> 100% to rider, confirmed. Never Deligro revenue.</li>
+          <li><b>COD custody chain (G): corrected, not the process this document originally proposed.</b> The confirmed flow is <b>Customer → Rider → Manager → Owner</b>, not rider-to-Deligro directly. Each leg (collection, rider-to-manager, manager-to-owner) is now digitally recorded (<code>deliveries.cod_collected_amount</code>/<code>cod_collected_at</code>, and the new <code>cod_handovers</code> table), while the physical cash movement stays offline.</li>
+          <li><b>Offline execution principle, new:</b> an offline process (payroll, bike maintenance paid in cash, a manager handing cash to the owner) is acceptable indefinitely for a single tier-3 city, but it must never mean an untracked financial transaction. Every financially material offline event gets a corresponding digital record; nothing about the physical movement itself is forced online.</li>
+        </ul>
+        <p style="font-size:12.5px; color:var(--ink-muted);">Still unresolved and unchanged by this addendum: the rider's actual monthly salary, headcount and working hours; the commission rate and structure; the actual gateway fee; dual-approval thresholds; and the remaining items in <a href="#k">K</a>. See <code>docs/DATABASE.md</code> and migration <code>0045_cod_handovers_and_expenses.sql</code> for what was built against the confirmed items above.</p>
+      </div>
+      <div class="status-key">
+        <span class="tag preserved">Preserved</span>
+        <span class="tag proposed">Proposed — not yet approved</span>
+        <span class="tag needsnum">Needs a real number</span>
+        <span class="tag approved">Approved (5 items, addendum above)</span>
+      </div>
+    </div>
+
+    <!-- A -->
+    <section class="block" id="a">
+      <div class="sec-head"><div class="sec-letter">A</div><h2>Decision extraction</h2></div>
+      <p class="sec-intro">Every rule, recommendation, decision-point, and placeholder number from the Financial Constitution, in one table.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Decision</th><th>Current proposal</th><th>Why it matters</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Rider model</td><td>Salaried, not subscription</td><td>Determines the entire rider cost structure and legal classification</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Commission lock point</td><td>Order-time snapshot, not settlement-time</td><td>Prevents a rate change from retroactively repricing fulfilled orders</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Commission % (actual rate)</td><td>No proposal — 15–25% is industry context only, not a recommendation</td><td>The single largest lever on platform revenue</td><td><span class="tag needsnum">Needs number</span></td></tr>
+            <tr><td class="k">Delivery fee ownership</td><td>Deligro revenue, earmarked against rider cost in reporting</td><td>So delivery pricing is honestly measured against what riders actually cost</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Tip treatment</td><td>100% to rider, booked as a liability, never revenue</td><td>Prevents a tip from ever becoming accidental platform revenue</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Gateway fee absorption</td><td>Deligro absorbs in full, no surcharge</td><td>A customer-facing surcharge would push a price-sensitive market back to cash</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Actual gateway fee %</td><td>No proposal — confirm from the live Razorpay agreement</td><td>Needed to turn any margin figure from illustrative to real</td><td><span class="tag needsnum">Needs number</span></td></tr>
+            <tr><td class="k">COD cash custody</td><td>Rider, not vendor — corrects today's settlement-math assumption</td><td>Today's code assumes the vendor holds COD cash, which usually isn't physically true</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">COD remittance path</td><td>Rider deposits to Deligro daily — one official process, chosen in G</td><td>Determines who carries cash-handling operational risk</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">COD refund mechanism</td><td>Wallet credit by default, using the existing unused wallet feature</td><td>Avoids manual bank payouts for a payment method with no card to reverse</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Refund fault attribution</td><td>Structured reason codes replacing free text</td><td>Refund cost currently can't be attributed correctly without one</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Cancellation-after-acceptance vendor compensation</td><td>Deligro compensates the vendor rather than leaving spoiled food fully on them</td><td>Protects vendor trust; without it, vendors bear a cost that isn't their fault</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Customer change-of-mind refund policy</td><td>Full refund, Deligro absorbs — a growth-stage, customer-first default</td><td>The one refund case with no operational fault to point to — a direct margin call</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Negative vendor balance</td><td>Auto-carried into the vendor's next settlement</td><td>Nothing currently collects it at all</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Coupon funding split (platform vs vendor)</td><td>Keep exactly as built</td><td>Already correct, already working</td><td><span class="tag preserved">Preserved</span></td></tr>
+            <tr><td class="k">Order total formula</td><td>Keep exactly as built</td><td>Already correct, already locked server-side</td><td><span class="tag preserved">Preserved</span></td></tr>
+            <tr><td class="k">Per-vendor commission override capability</td><td>Keep the mechanism; the rates themselves are separate decisions</td><td>Already built, architecturally sound</td><td><span class="tag preserved">Preserved</span></td></tr>
+            <tr><td class="k">Dual-approval mechanism</td><td>Introduce it; exact ₹ thresholds are separate</td><td>No single admin should move large sums alone at scale</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Dual-approval ₹ thresholds</td><td>No proposal — start conservative, tune with real cash-flow scale</td><td>Too low creates friction; too high defeats the control</td><td><span class="tag needsnum">Needs number</span></td></tr>
+            <tr><td class="k">Rider salary, headcount, hours</td><td>No proposal possible</td><td>Needed to compute a real, not illustrative, rider cost allocation</td><td><span class="tag needsnum">Needs number</span></td></tr>
+            <tr><td class="k">GST / tax statutory treatment</td><td>Ledger placement proposed (not revenue); legal correctness unconfirmed</td><td>A compliance risk, not a preference — needs a CA, not this council</td><td><span class="tag needsnum">Needs number</span></td></tr>
+            <tr><td class="k">Rider cash-shortfall salary deduction</td><td>No automatic deduction; requires a documented HR policy first</td><td>Legally sensitive — labour law, not finance</td><td><span class="tag proposed">Proposed (cautious default)</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- B -->
+    <section class="block" id="b">
+      <div class="sec-head"><div class="sec-letter">B</div><h2>Final money-flow model</h2></div>
+      <p class="sec-intro">Customer → Payment Gateway → Deligro → Vendor → Rider. Every component of a customer's payment, resolved so no rupee is left undefined.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>Owner</th><th>Temp. holder</th><th>Ultimate receiver</th><th>Rev / Liab / Exp</th><th>Recognised</th><th>Physically paid</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Food value</td><td>Vendor</td><td>Deligro (online) or Deligro-via-rider (COD, see G)</td><td>Vendor</td><td>Liability</td><td>At order placement</td><td>At settlement payout</td></tr>
+            <tr><td class="k">Delivery fee</td><td>Deligro</td><td>Deligro</td><td>Deligro</td><td>Revenue</td><td>At order placement</td><td>N/A — already held</td></tr>
+            <tr><td class="k">Tax (customer-facing)</td><td>Tax authority</td><td>Deligro</td><td>Government</td><td>Liability</td><td>At order placement</td><td>At periodic remittance <span class="tag needsnum">no ledger exists yet</span></td></tr>
+            <tr><td class="k">Tip</td><td>Rider</td><td>Deligro (online) / nobody (COD)</td><td>Rider</td><td>Liability</td><td>At capture</td><td>Next rider payout cycle / immediately (COD)</td></tr>
+            <tr><td class="k">Commission</td><td>Deligro</td><td>N/A — carved from food value</td><td>Deligro</td><td>Revenue</td><td>At order placement <span class="tag proposed">proposed</span></td><td>Net-settled, no separate transfer</td></tr>
+            <tr><td class="k">GST on commission</td><td>Tax authority</td><td>Deligro</td><td>Government</td><td>Liability</td><td>Alongside commission</td><td>At tax remittance</td></tr>
+            <tr><td class="k">Other per-order charges</td><td>Deligro</td><td>N/A</td><td>Deligro</td><td>Revenue</td><td>At order placement</td><td>Net-settled</td></tr>
+            <tr><td class="k">Platform-funded discount</td><td>Deligro (cost)</td><td>N/A</td><td>Customer (benefit)</td><td>Expense</td><td>At coupon application</td><td>Absorbed immediately, no separate movement</td></tr>
+            <tr><td class="k">Vendor-funded discount</td><td>Vendor (cost)</td><td>N/A</td><td>Customer (benefit)</td><td>Vendor's expense, not Deligro's</td><td>At coupon application</td><td>Reduces vendor payable directly</td></tr>
+            <tr><td class="k">Gateway fee</td><td>Deligro</td><td>N/A</td><td>Payment gateway</td><td>Expense</td><td>At capture</td><td>Netted out of the gateway's bank remittance</td></tr>
+            <tr><td class="k">Refund / contingent exposure</td><td>Contingent — fault-dependent</td><td>Deligro</td><td>Customer (+ vendor, if fault-recovered)</td><td>Contingent liability → expense if unrecovered</td><td>At refund approval</td><td>At refund processing</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:12px;color:var(--ink-faint);">"Recognised" marks when the amount enters the books as accrued; "physically paid" marks when cash actually moves. The gap between the two is exactly why a settlement, not a per-order transfer, is the right unit of vendor payment.</p>
+    </section>
+
+    <!-- C -->
+    <section class="block" id="c">
+      <div class="sec-head"><div class="sec-letter">C</div><h2>Rider model, resolved</h2></div>
+      <p class="sec-intro">The Constitution recommended salaried. Before that becomes final, every dependent variable is listed here — most cannot be filled in without you.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Variable</th><th>Resolution</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Model itself</td><td>Salaried, not subscription</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Monthly salary</td><td>Not stated in any document this council could read</td><td><span class="tag needsnum">Needs number</span></td></tr>
+            <tr><td class="k">Number of riders</td><td>Not stated</td><td><span class="tag needsnum">Needs number</span></td></tr>
+            <tr><td class="k">Working hours / coverage expectations</td><td>Not stated</td><td><span class="tag needsnum">Needs number</span></td></tr>
+            <tr><td class="k">Rider cost allocation method</td><td>Monthly salary ÷ orders delivered that period — reporting only, never changes actual pay</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Tip treatment</td><td>100% to rider, liability, per B</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Delivery-fee treatment</td><td>Deligro revenue, earmarked against the rider cost line in reporting</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Incentives</td><td>Attendance / on-time / rating bonuses, structure proposed, amounts not</td><td><span class="tag proposed">Structure proposed</span> <span class="tag needsnum">amounts needed</span></td></tr>
+            <tr><td class="k">Absence / leave</td><td>An HR policy matter — dispatch simply marks the rider inactive; the policy itself is not this council's call</td><td><span class="tag needsnum">Needs founder/HR policy</span></td></tr>
+            <tr><td class="k">Fixed or variable cost?</td><td>Fixed in the short run — salary doesn't flex with a slow day's order count. Headcount is the only variable long-run lever.</td><td><span class="tag proposed">Resolved by definition</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Nothing here invents a rupee figure. Every blank stays blank until you fill it in.</p>
+    </section>
+
+    <!-- D -->
+    <section class="block" id="d">
+      <div class="sec-head"><div class="sec-letter">D</div><h2>Vendor economics, final formula</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th colspan="2">Vendor Payable</th></tr></thead>
+          <tbody>
+            <tr><td class="k" style="width:230px;">Food Value</td><td>Subtotal, + platform-funded discount added back, − vendor-funded discount left subtracted</td></tr>
+            <tr><td class="k">− Commission</td><td>Food Value × commission %, locked at order time</td></tr>
+            <tr><td class="k">− GST on Commission</td><td>Commission × GST %, locked alongside it</td></tr>
+            <tr><td class="k">− Other Charges</td><td>Flat, per-vendor configurable operational fee</td></tr>
+            <tr><td class="k">− Refund Recovery</td><td>Any refund already processed before this settlement was built</td></tr>
+            <tr><td class="k">± Corrections</td><td>Clawback or credit from a refund that landed after a <i>previous</i> settlement was already paid</td></tr>
+            <tr class="total"><td>= Vendor Payable</td><td>Can be negative — auto-carried into the next settlement period</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Element</th><th>Resolution</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Commission %</td><td>No rate proposed — 15–25% is industry context, not a recommendation for Deligro specifically</td><td><span class="tag needsnum">Needs number</span></td></tr>
+            <tr><td class="k">Global or vendor-specific</td><td>Per-vendor override with a global default — the mechanism already exists and is kept</td><td><span class="tag preserved">Preserved</span></td></tr>
+            <tr><td class="k">Commission lock point</td><td>Order-time snapshot</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Coupon funding</td><td>Platform-funded absorbed by Deligro, vendor-funded absorbed by vendor — unchanged</td><td><span class="tag preserved">Preserved</span></td></tr>
+            <tr><td class="k">GST treatment</td><td>Sits in a tax-payable ledger, never counted as Deligro revenue</td><td><span class="tag proposed">Proposed ledger placement</span> <span class="tag needsnum">statutory correctness unconfirmed</span></td></tr>
+            <tr><td class="k">Other charges</td><td>Admin-configurable per vendor — mechanism already exists</td><td><span class="tag preserved">Preserved</span></td></tr>
+            <tr><td class="k">Refund responsibility</td><td>Fault-based, via the reason-code matrix in H</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Negative balances</td><td>Auto-carried forward; manual invoice only if a vendor is offboarded while still negative</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Settlement frequency</td><td>Per-vendor weekly/monthly label — unchanged, plus an automated reminder</td><td><span class="tag preserved">Preserved</span> + <span class="tag proposed">reminder proposed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>The commission rate, once locked at order time, never silently changes for that order again</b> — a later rate change only affects orders placed after the change, never before it. This is the enforceable version of the rule the brief asked for.</p>
+    </section>
+
+    <!-- E -->
+    <section class="block" id="e">
+      <div class="sec-head"><div class="sec-letter">E</div><h2>Customer economics</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>Resolution</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Food price</td><td>Vendor-set via menu, unchanged</td><td><span class="tag preserved">Preserved</span></td></tr>
+            <tr><td class="k">Delivery fee</td><td>Flat ₹29 default, waived above a configurable free-delivery threshold — mechanism unchanged; ownership assigned to Deligro per B</td><td><span class="tag preserved">Preserved mechanism</span></td></tr>
+            <tr><td class="k">Tax</td><td>5% default on food subtotal only — mechanism unchanged; statutory correctness needs CA confirmation</td><td><span class="tag preserved">Preserved</span> <span class="tag needsnum">CA check needed</span></td></tr>
+            <tr><td class="k">Tip</td><td>Customer-set amount, unchanged; treatment (100% to rider, liability) resolved in B</td><td><span class="tag preserved">Preserved</span></td></tr>
+            <tr><td class="k">Discounts</td><td>Platform/vendor-funded coupon mechanism, unchanged; specific campaigns are ongoing marketing decisions outside this document</td><td><span class="tag preserved">Preserved</span></td></tr>
+            <tr><td class="k">Platform fees ("other charges")</td><td>Vendor-facing only — deducted from vendor payable, never charged to the customer directly</td><td><span class="tag preserved">Preserved</span></td></tr>
+            <tr><td class="k">Cancellation charges</td><td>None today. Proposed: still free before vendor acceptance; a fee after acceptance only if abuse becomes a real pattern</td><td><span class="tag proposed">Proposed</span> <span class="tag needsnum">fee amount, if adopted</span></td></tr>
+            <tr><td class="k">Refunds</td><td>Full matrix in H</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>Customer payment ≠ Deligro revenue, stated exactly:</b> of a customer's ₹500, only the commission and the delivery fee (and any other per-order charge) are Deligro's. Food value belongs to the vendor. Tax belongs to the government. Tip belongs to the rider. See the full reconciliation in J.</p>
+    </section>
+
+    <!-- F -->
+    <section class="block" id="f">
+      <div class="sec-head"><div class="sec-letter">F</div><h2>Payment economics — three distinct events</h2></div>
+      <div class="flow-wrap">
+        <div class="flow">
+          <div class="fstage"><div class="flabel">Event 1</div><div class="fname">Payment captured</div><div class="fline"><span>Means</span><b>Gateway confirms; money has left the customer</b></div></div>
+          <div class="farrow"><svg viewBox="0 0 30 18" preserveAspectRatio="none"><line x1="0" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.5"/><polygon points="22,4 30,9 22,14" fill="currentColor"/></svg></div>
+          <div class="fstage"><div class="flabel">Event 2</div><div class="fname">Settled by gateway</div><div class="fline"><span>Means</span><b>Razorpay remits net-of-fee funds to Deligro's bank</b></div></div>
+          <div class="farrow"><svg viewBox="0 0 30 18" preserveAspectRatio="none"><line x1="0" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.5"/><polygon points="22,4 30,9 22,14" fill="currentColor"/></svg></div>
+          <div class="fstage"><div class="flabel">Event 3</div><div class="fname">Vendor payout</div><div class="fline"><span>Means</span><b>Deligro's own settlement cycle, executed manually</b></div></div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--ink-faint);">These three are independent timelines. A vendor can legitimately be paid out before Deligro's own gateway settlement lands, or well after — the two cycles are not meant to be synchronized.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Question</th><th>Resolution</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Who absorbs the gateway fee?</td><td>Deligro, in full — never the vendor, never the customer</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">When is it recorded?</td><td>An estimated fee at capture (accrual); reconciled against the exact fee once the gateway's settlement report lands, with any variance as a small adjustment</td><td><span class="tag proposed">Proposed</span></td></tr>
+            <tr><td class="k">Reconciliation process</td><td>Automated import of the gateway's settlement report, matched line-by-line against internal payments</td><td><span class="tag proposed">Proposed — not built</span></td></tr>
+            <tr><td class="k">Failed payments</td><td>No money moves; order stays actionable — unchanged</td><td><span class="tag preserved">Preserved</span></td></tr>
+            <tr><td class="k">Duplicate payments</td><td>Prevented today by unique provider-order/payment-id matching on capture — sound as built</td><td><span class="tag preserved">Preserved</span></td></tr>
+            <tr><td class="k">Refunds</td><td>A new outbound event, not a reversal of capture status — full matrix in H</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- G -->
+    <section class="block" id="g">
+      <div class="sec-head"><div class="sec-letter">G</div><h2>COD — the one official process</h2></div>
+      <p class="callout" style="background:var(--approved-bg); border:1px solid var(--approved-line); border-radius:10px; padding:12px 16px; font-size:13px;"><span class="tag approved">Approved, 4 September 2026</span> Superseded below: the confirmed process is <b>Customer → Rider → Manager → Owner</b>, not rider-to-Deligro directly. See the addendum at the top of this document.</p>
+      <p class="sec-intro">The process this section originally proposed (rider remits straight to Deligro) was <b>not</b> the one the founder confirmed. Kept below for its reasoning on cash custody, since that part still holds: <b>the rider is cash custodian, and remits onward, never to the vendor directly.</b> The vendor is still paid by bank transfer at settlement regardless of how the customer paid.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Step</th><th>Rule</th></tr></thead>
+          <tbody>
+            <tr><td class="k">1. Collection</td><td>Customer pays cash to the rider at delivery.</td></tr>
+            <tr><td class="k">2. Custody</td><td>The rider holds all COD cash collected that shift — a real, tracked liability the rider carries.</td></tr>
+            <tr><td class="k">3. Confirmation</td><td>The rider confirms each COD collection in-app immediately after collecting it — a required step, currently missing entirely.</td></tr>
+            <tr><td class="k">4. Remittance <span class="tag approved">confirmed flow</span></td><td>The rider hands the shift's accumulated cash to the manager; the manager hands the day's cash to the owner. Both legs are recorded (<code>cod_handovers</code>), receiving a digital record (amount, date, who handed it, who recorded it). The physical handover itself can happen offline.</td></tr>
+            <tr><td class="k">5. Reconciliation</td><td>Shown side by side on <code>/admin/cash-ledger</code>: cash collected today against cash handed to the manager against cash handed to the owner. Not enforced or blocked, an operator's own judgement call, same as every other manual step here.</td></tr>
+            <tr><td class="k">6. Shortfall</td><td>A COD discrepancy event is raised against that rider's record. Resolution is gated by the same cautious HR policy as any pay-affecting incident — no automatic deduction.</td></tr>
+            <tr><td class="k">7. Overpayment</td><td>Also raised as a discrepancy, never silently absorbed as a "gain" — investigated the same way as a shortfall.</td></tr>
+            <tr><td class="k">8. Cancelled order</td><td>No cash was ever collected — no financial impact, excluded entirely (Refund case 1 in H).</td></tr>
+            <tr><td class="k">9. Refund</td><td>Because Deligro now holds the cash within one day, a COD refund works exactly like an online refund — wallet credit to the customer, and a settlement correction against the vendor only if the vendor was at fault.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>Why this process over rider-to-vendor handover:</b> a rider serves many vendors across a shift and can't be relied on to revisit the same one promptly; centralizing cash at Deligro (realistic for a single-city operation) keeps the vendor payable formula identical for COD and online orders, and removes the "who actually holds it" ambiguity that today's settlement math gets wrong.</p>
+    </section>
+
+    <!-- H -->
+    <section class="block" id="h">
+      <div class="sec-head"><div class="sec-letter">H</div><h2>Refund matrix</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Case</th><th>Customer gets</th><th>Vendor loses</th><th>Rider impact</th><th>Deligro absorbs</th><th>Ledger action</th></tr></thead>
+          <tbody>
+            <tr><td class="k">1</td><td>Cancel before vendor acceptance</td><td>Full refund</td><td>Nothing</td><td>None</td><td>Gateway fee only, if online</td><td>order.cancelled → refund.processed</td></tr>
+            <tr><td class="k">2</td><td>Cancel after vendor acceptance</td><td>Full refund</td><td>Nothing — Deligro compensates instead <span class="tag proposed">proposed</span></td><td>None (wasted trip if en route)</td><td>Refund + vendor compensation + gateway fee</td><td>refund.processed → vendor_compensation.created</td></tr>
+            <tr><td class="k">3</td><td>Vendor rejection</td><td>Full refund</td><td>Nothing — never started</td><td>None</td><td>Gateway fee only</td><td>order.vendor_rejected → refund.processed</td></tr>
+            <tr><td class="k">4</td><td>Rider issue (lost, damaged, late)</td><td>Full refund</td><td>Nothing — vendor fulfilled correctly, paid in full as normal</td><td>Performance flag, not a pay deduction</td><td>Refund + vendor's food value + gateway fee</td><td>refund.processed → rider.performance_flag</td></tr>
+            <tr><td class="k">5</td><td>Deligro issue (dispatch/outage)</td><td>Full refund</td><td>Nothing, or compensated if food was started</td><td>None</td><td>Everything — refund + possible compensation + fee</td><td>Same as case 2, tagged platform-caused</td></tr>
+            <tr><td class="k">6</td><td>Customer change of mind</td><td>Full refund <span class="tag proposed">proposed, margin-significant</span></td><td>Nothing — Deligro absorbs</td><td>None</td><td>Full cost, no fault to recover from</td><td>refund.processed, no correction anywhere</td></tr>
+            <tr><td class="k">7</td><td>Refund before vendor payout</td><td>Full refund</td><td>Order excluded from the still-open draft</td><td>Per reason case above</td><td>Per reason case; no clawback ever needed</td><td>settlement.draft_invalidated → rebuilt</td></tr>
+            <tr><td class="k">8</td><td>Refund after vendor payout</td><td>Full refund, fronted immediately</td><td>Clawed back only if vendor-fault; otherwise keeps the payout</td><td>Per reason case</td><td>The refund, and the vendor's payout too if fault wasn't the vendor's</td><td>refund.processed → correction_created (vendor-fault only) → correction_applied</td></tr>
+            <tr><td class="k">9</td><td>COD refund</td><td>Wallet credit, from Deligro's daily-reconciled cash</td><td>Only if vendor-fault, via correction</td><td>Per reason case</td><td>The wallet credit, until/unless recovered</td><td>refund.approved → wallet.credited → correction (if vendor-fault)</td></tr>
+            <tr><td class="k">10</td><td>Online refund</td><td>Gateway refund to original payment method</td><td>Per reason case above</td><td>Per reason case</td><td>Gateway refund fee</td><td>refund.approved → gateway.refund_processed</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:12px;color:var(--ink-faint);">Cases 1–6 are <i>why</i>; 7–8 are <i>when</i>; 9–10 are <i>how</i> — they compose, they don't replace each other. The invariant from the Constitution still holds: no refund is approved without either excluding the order from an open draft, or creating a correction against a paid one.</p>
+    </section>
+
+    <!-- I -->
+    <section class="block" id="i">
+      <div class="sec-head"><div class="sec-letter">I</div><h2>Financial controls, for a multi-person finance team</h2></div>
+      <p class="sec-intro">Today it's binary — admin or not. Proposed roles, so this holds once Deligro isn't a single admin account.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Role (proposed, new)</th><th>Can do</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Finance Viewer</td><td>Read every financial report and dashboard. Cannot act on anything.</td></tr>
+            <tr><td class="k">Settlement Operator</td><td>Build and draft settlements. Cannot mark one paid.</td></tr>
+            <tr><td class="k">Finance Approver</td><td>Mark settlements paid, approve refunds, create manual adjustments — always reason-coded and logged.</td></tr>
+            <tr><td class="k">Commission Admin</td><td>The only role permitted to change a commission rate. Every change logged, never retroactive.</td></tr>
+            <tr><td class="k">Founder / Super Admin</td><td>Everything above, plus override authority — but every override is logged exactly like anyone else's action.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Action</th><th>Who</th><th>Control</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Change commission</td><td>Commission Admin</td><td>Logged, order-time-locked orders unaffected</td></tr>
+            <tr><td class="k">Approve refunds</td><td>Finance Approver</td><td>A second, different Finance Approver required above a threshold <span class="tag needsnum">₹ amount TBD</span></td></tr>
+            <tr><td class="k">Create settlements</td><td>Settlement Operator or above</td><td>Draft only — cannot self-approve</td></tr>
+            <tr><td class="k">Approve settlements</td><td>Finance Approver</td><td>A separate step, ideally a separate person, from whoever drafted it</td></tr>
+            <tr><td class="k">Mark settlements paid</td><td>Finance Approver</td><td>Dual approval above a batch-value threshold <span class="tag needsnum">₹ amount TBD</span></td></tr>
+            <tr><td class="k">Manual adjustments</td><td>Finance Approver</td><td>Reason-coded from a fixed list, never free text alone; immutable once created</td></tr>
+            <tr><td class="k">Every action above</td><td>System</td><td>Written to the append-only financial event log — actor, before/after, timestamp; nothing editable after the fact</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- J -->
+    <section class="block" id="j">
+      <div class="sec-head"><div class="sec-letter">J</div><h2>₹500 order, final example</h2></div>
+      <p class="sec-intro">Built on the resolved rules above. Commission (18%), its GST (18%), and the gateway fee (2%) are <b>placeholder rates only</b> — explicitly not founder-approved — used purely so the example reconciles. Substitute the real figures the moment they're set.</p>
+      <div class="flow-wrap">
+        <div class="flow">
+          <div class="fstage"><div class="flabel">Customer pays</div><div class="fname">₹500</div></div>
+          <div class="farrow"><svg viewBox="0 0 30 18" preserveAspectRatio="none"><line x1="0" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.5"/><polygon points="22,4 30,9 22,14" fill="currentColor"/></svg></div>
+          <div class="fstage"><div class="flabel">Vendor</div><div class="fname">₹339</div></div>
+          <div class="farrow"><svg viewBox="0 0 30 18" preserveAspectRatio="none"><line x1="0" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.5"/><polygon points="22,4 30,9 22,14" fill="currentColor"/></svg></div>
+          <div class="fstage"><div class="flabel">Deligro</div><div class="fname">₹106 gross</div></div>
+          <div class="farrow"><svg viewBox="0 0 30 18" preserveAspectRatio="none"><line x1="0" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.5"/><polygon points="22,4 30,9 22,14" fill="currentColor"/></svg></div>
+          <div class="fstage"><div class="flabel">Tax authority</div><div class="fname">₹35</div></div>
+          <div class="farrow"><svg viewBox="0 0 30 18" preserveAspectRatio="none"><line x1="0" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.5"/><polygon points="22,4 30,9 22,14" fill="currentColor"/></svg></div>
+          <div class="fstage"><div class="flabel">Rider</div><div class="fname">₹20 tip</div></div>
+          <div class="farrow"><svg viewBox="0 0 30 18" preserveAspectRatio="none"><line x1="0" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.5"/><polygon points="22,4 30,9 22,14" fill="currentColor"/></svg></div>
+          <div class="fstage"><div class="flabel">Gateway</div><div class="fname">₹10 fee</div></div>
+        </div>
+      </div>
+
+      <h4 class="minor">Table 1 — where the ₹500 is contractually owed</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th style="text-align:right;">Amount</th><th>Destination</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Food value</td><td class="rupee num" style="text-align:right;">₹430</td><td>Vendor (gross, before commission)</td></tr>
+            <tr><td class="k">Delivery fee</td><td class="rupee num" style="text-align:right;">₹29</td><td>Deligro</td></tr>
+            <tr><td class="k">Tax</td><td class="rupee num" style="text-align:right;">₹21</td><td>Tax authority</td></tr>
+            <tr><td class="k">Tip</td><td class="rupee num" style="text-align:right;">₹20</td><td>Rider</td></tr>
+            <tr class="total"><td>Customer pays</td><td class="rupee num" style="text-align:right;">₹500</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4 class="minor">Table 2 — food value splits vendor / Deligro / tax authority</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th style="text-align:right;">Amount</th><th>Destination</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Food value</td><td class="rupee num" style="text-align:right;">₹430</td><td>—</td></tr>
+            <tr><td>− Commission <span class="tag needsnum">18% placeholder</span></td><td class="rupee num" style="text-align:right;">−₹77</td><td>Deligro</td></tr>
+            <tr><td>− GST on commission <span class="tag needsnum">18% placeholder</span></td><td class="rupee num" style="text-align:right;">−₹14</td><td>Tax authority</td></tr>
+            <tr class="total"><td>Vendor payable</td><td class="rupee num" style="text-align:right;">₹339</td><td>Vendor, at settlement</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4 class="minor">Table 3 — Deligro's revenue, costs, and contribution margin on this order</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Line</th><th style="text-align:right;">Amount</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Deligro revenue</td><td class="rupee num" style="text-align:right;">₹106</td></tr>
+            <tr><td class="k">Deligro costs <span class="tag needsnum">gateway 2% + rider cost, both placeholder</span></td><td class="rupee num" style="text-align:right;">₹30</td></tr>
+            <tr class="total"><td>Contribution margin</td><td class="rupee num" style="text-align:right;">₹76</td></tr>
+            <tr class="total"><td>Contribution margin %</td><td class="rupee num" style="text-align:right;">15.2%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:12px;color:var(--ink-faint);">Reconciliation check: ₹339 + ₹77 + ₹14 + ₹29 + ₹21 + ₹20 = ₹500. Every rupee accounted for. The 15.2% contribution margin will move the moment real commission, gateway, and rider-cost figures replace the placeholders — treat it as a shape, not a forecast.</p>
+    </section>
+
+    <!-- K -->
+    <section class="block" id="k">
+      <div class="sec-head"><div class="sec-letter">K</div><h2>Founder decision sheet</h2></div>
+      <p class="sec-intro">Only what genuinely requires your input. Ten items.</p>
+
+      <div class="decision-card"><div class="decision-head"><span class="decision-num">1</span><b>Rider model: salaried vs. subscription</b><span class="tag proposed">Proposed: salaried</span></div>
+        <div class="decision-grid">
+          <div><b class="lbl">Why</b>Determines rider cost structure and legal classification</div>
+          <div><b class="lbl">If you choose the alternative</b>Subscription flips Deligro from cost-bearer to fee-recipient on the rider side, but risks shrinking rider supply in a single tier-3 city and needs the entire subscription system built from nothing</div>
+        </div>
+      </div>
+      <div class="decision-card"><div class="decision-head"><span class="decision-num">2</span><b>Commission rate</b><span class="tag needsnum">No default proposed</span></div>
+        <div class="decision-grid">
+          <div><b class="lbl">Why</b>The single largest lever on platform revenue</div>
+          <div><b class="lbl">If you choose the alternative</b>N/A — a lower rate aids vendor acquisition now, a higher rate improves margin once vendors are loyal; the tradeoff is yours to make, not this council's</div>
+        </div>
+      </div>
+      <div class="decision-card"><div class="decision-head"><span class="decision-num">3</span><b>Commission lock point</b><span class="tag proposed">Proposed: order-time</span></div>
+        <div class="decision-grid">
+          <div><b class="lbl">Why</b>Determines whether vendor economics can be changed after the fact</div>
+          <div><b class="lbl">If you choose the alternative</b>Settlement-time (today's behaviour) is simpler to leave as-is, but breaks vendor trust and accounting matching if a rate ever changes</div>
+        </div>
+      </div>
+      <div class="decision-card"><div class="decision-head"><span class="decision-num">4</span><b>Actual payment gateway fee</b><span class="tag needsnum">Needs number</span></div>
+        <div class="decision-grid">
+          <div><b class="lbl">Why</b>Needed to turn contribution margin from illustrative to real</div>
+          <div><b class="lbl">If you choose the alternative</b>N/A — just confirm the figure from the live Razorpay merchant agreement</div>
+        </div>
+      </div>
+      <div class="decision-card"><div class="decision-head"><span class="decision-num">5</span><b>COD cash flow: rider-to-Deligro vs. rider-to-vendor</b><span class="tag proposed">Proposed: rider-to-Deligro (chosen in G)</span></div>
+        <div class="decision-grid">
+          <div><b class="lbl">Why</b>Determines who carries cash-handling operational risk</div>
+          <div><b class="lbl">If you choose the alternative</b>Rider-to-vendor reduces Deligro's own cash handling, but reintroduces the "who actually holds it" ambiguity the original audit flagged, and depends on a rider revisiting the same vendor promptly</div>
+        </div>
+      </div>
+      <div class="decision-card"><div class="decision-head"><span class="decision-num">6</span><b>Vendor compensation for a Deligro/customer-caused post-acceptance cancellation</b><span class="tag proposed">Proposed: compensate</span></div>
+        <div class="decision-grid">
+          <div><b class="lbl">Why</b>Protects vendor trust when a cancellation isn't their fault</div>
+          <div><b class="lbl">If you choose the alternative</b>No compensation is cheaper short-term but likely erodes vendor retention over time</div>
+        </div>
+      </div>
+      <div class="decision-card"><div class="decision-head"><span class="decision-num">7</span><b>Customer change-of-mind refund policy</b><span class="tag proposed">Proposed: full refund, Deligro absorbs</span></div>
+        <div class="decision-grid">
+          <div><b class="lbl">Why</b>The one refund case with no operational fault to point to — a direct, ongoing margin cost</div>
+          <div><b class="lbl">If you choose the alternative</b>A partial refund or post-acceptance cancellation fee protects margin but risks a worse first impression while the brand is still new</div>
+        </div>
+      </div>
+      <div class="decision-card"><div class="decision-head"><span class="decision-num">8</span><b>Rider cash-shortfall / incident pay-deduction policy</b><span class="tag needsnum">Needs founder + HR policy</span></div>
+        <div class="decision-grid">
+          <div><b class="lbl">Why</b>Legally sensitive — labour law, not a finance call</div>
+          <div><b class="lbl">If you choose the alternative</b>Automatic deduction is operationally simpler but carries real legal exposure without a documented process and the rider's consent</div>
+        </div>
+      </div>
+      <div class="decision-card"><div class="decision-head"><span class="decision-num">9</span><b>Dual-approval ₹ thresholds</b><span class="tag needsnum">Needs number</span></div>
+        <div class="decision-grid">
+          <div><b class="lbl">Why</b>Sets the cost/control tradeoff for fraud and error prevention</div>
+          <div><b class="lbl">If you choose the alternative</b>No threshold (single-approver) is faster today but leaves no check on one person's mistake or misconduct as volume grows</div>
+        </div>
+      </div>
+      <div class="decision-card"><div class="decision-head"><span class="decision-num">10</span><b>GST / tax statutory treatment</b><span class="tag needsnum">Needs a CA, not this council</span></div>
+        <div class="decision-grid">
+          <div><b class="lbl">Why</b>A legal compliance risk, not a business preference</div>
+          <div><b class="lbl">If you choose the alternative</b>None — this isn't optional. Treat it as a blocking item before scale, not a nice-to-have</div>
+        </div>
+      </div>
+
+      <div class="status-note">This document becomes Deligro's single source of truth for financial behaviour once these ten are resolved and the relevant rows above are marked <b>APPROVED</b>. The technical build specification should not start before that.</div>
+    </section>
+
+    <div class="divider-note">Governance document — no code, schema, or UI was touched. Every PRESERVED claim traces to the technical audit; every PROPOSED item traces to reasoning in the Financial Constitution; every NEEDS NUMBER item was checked and confirmed absent from the codebase and its documentation before being listed here.</div>
+  </main>
+</div>

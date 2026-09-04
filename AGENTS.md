@@ -74,6 +74,20 @@ the commit message — do not leave the other in place "just in case".
 If the better-integrated version is the less secure one, fix its security rather
 than swapping in the orphan. Keep the wiring, raise the floor.
 
+## Reports and audits go in the project as standalone HTML
+
+When Claude produces a report-shaped deliverable for this project — a financial
+audit, a business-model document, a security/performance audit, or similar —
+write it as a standalone `.html` file committed to the repo, not only as a
+Claude Artifact or a scratch/temp file. This repo already does this
+(`audit-report.html`, `audit-report-2.html`); follow that pattern: a
+self-contained file at the repo root, named for its content
+(`financial-audit-report.html`, `financial-constitution.html`, etc.), openable
+directly in a browser with no build step. Markdown reports (`AUDIT_REPORT*.md`,
+`docs/*_AUDIT.md`) remain fine for engineering-facing findings meant to be read
+in an editor or diffed; use HTML when the deliverable is meant to be read as a
+finished document (tables, sections, a founder/stakeholder audience).
+
 ## Documentation must match behaviour
 
 `SECURITY.md`, migration comments and doc comments are load-bearing — the audit
