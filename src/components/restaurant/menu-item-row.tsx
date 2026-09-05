@@ -7,7 +7,7 @@ import { useCartSwitch } from "@/stores/cart-switch-store";
 import { useItemSheet } from "@/stores/item-sheet-store";
 import { VegMark } from "@/components/shared/veg-mark";
 import { PhotoTile } from "@/components/shared/photo-tile";
-import { formatINR } from "@/lib/utils/format";
+import { ItemPrice } from "@/components/shared/item-price";
 import { cn } from "@/lib/utils/cn";
 
 export function MenuItemRow({
@@ -57,7 +57,7 @@ export function MenuItemRow({
           {item.description}
         </p>
         <p className="mt-1.5 text-[14px] font-extrabold tracking-tight">
-          {formatINR(item.price)}
+          <ItemPrice item={item} />
         </p>
       </button>
 
@@ -67,6 +67,7 @@ export function MenuItemRow({
           src={item.image}
           alt={item.name}
           className="size-24 rounded-lg"
+          sizes="96px"
         />
 
         {item.soldOut ? (

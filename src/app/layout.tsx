@@ -60,10 +60,15 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f1215" },
-  ],
+  // Static, not a `prefers-color-scheme` pair: Deligro's theme is an in-app
+  // toggle (see `deligro-theme` below), independent of the phone's OS setting.
+  // Keying this off the OS scheme meant a phone in system dark mode painted
+  // the status bar/Dynamic Island strip near-black while the app itself was
+  // still rendering its light-default theme underneath — a dark band sitting
+  // directly on top of the light UI instead of blending into it. The
+  // bootstrap script below and `applyTheme` in ui-store.ts now keep the real
+  // meta tag's content in sync with whichever theme is actually on screen.
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
   // Required for `env(safe-area-inset-*)` to resolve to anything but 0. This
@@ -81,13 +86,18 @@ export const viewport: Viewport = {
 };
 
 /* Light by default; set before paint to avoid a flash. Only an explicit saved
-   choice ('light' or 'dark') overrides it — anything else falls back to light. */
+   choice ('light' or 'dark') overrides it — anything else falls back to light.
+   Also repaints the theme-color meta tag the <head> above renders statically,
+   so a saved 'dark' choice recolors the status bar before first paint instead
+   of leaving it on the light default until React hydrates. */
 const themeBootstrap = `
 (function () {
   try {
     var saved = localStorage.getItem('deligro-theme');
     var theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
     document.documentElement.setAttribute('data-theme', theme);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0f1215' : '#ffffff');
   } catch (e) {}
 })();
 `;

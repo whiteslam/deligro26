@@ -1,12 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { RotateCcw, ChevronRight } from "lucide-react";
+import { RotateCcw, ChevronRight, Loader2 } from "lucide-react";
 import type { Order } from "@/types";
 import { useCart } from "@/stores/cart-store";
 import { useUI } from "@/stores/ui-store";
+import { useReorderReview } from "@/stores/reorder-review-store";
 import { STATUS_META, isOrderInFlight } from "@/lib/utils/order-status";
-import { orderLinesToCartLines } from "@/lib/utils/cart";
+import {
+  orderLinesToCartLines,
+  reconcileReorder,
+  type CurrentMenuItem,
+} from "@/lib/utils/cart";
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
@@ -16,6 +22,8 @@ export function OrderCard({ order }: { order: Order }) {
   const router = useRouter();
   const reorder = useCart((s) => s.reorder);
   const openCart = useUI((s) => s.openCart);
+  const showReorderReview = useReorderReview((s) => s.show);
+  const [reordering, setReordering] = useState(false);
 
   const meta = STATUS_META[order.status];
   // Every stage that hasn't finished, from one shared definition. The old
@@ -30,12 +38,37 @@ export function OrderCard({ order }: { order: Order }) {
     "linear-gradient(135deg,#34e39a,#17b26a)";
   const image = order.restaurantImage;
 
-  const handleReorder = () => {
-    reorder(
-      { slug: order.restaurantSlug, name: order.restaurantName },
-      orderLinesToCartLines(order)
-    );
-    openCart();
+  const handleReorder = async () => {
+    const restaurant = { slug: order.restaurantSlug, name: order.restaurantName };
+    const lines = orderLinesToCartLines(order);
+    setReordering(true);
+    try {
+      const res = await fetch(
+        `/api/restaurants/${encodeURIComponent(restaurant.slug)}/menu-prices`
+      );
+      const data = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        items?: CurrentMenuItem[];
+      } | null;
+
+      // A failed price check must not silently ship stale prices — fall back
+      // to the plain reorder rather than pretend nothing could have changed.
+      if (!data?.ok || !data.items) {
+        reorder(restaurant, lines);
+        openCart();
+        return;
+      }
+
+      const diff = reconcileReorder(lines, data.items);
+      if (diff.removed.length === 0 && diff.repriced.length === 0) {
+        reorder(restaurant, diff.lines);
+        openCart();
+      } else {
+        showReorderReview({ restaurant, ...diff });
+      }
+    } finally {
+      setReordering(false);
+    }
   };
 
   return (
@@ -49,6 +82,7 @@ export function OrderCard({ order }: { order: Order }) {
           src={image}
           alt={order.restaurantName}
           className="size-12 shrink-0 rounded-xl"
+          sizes="48px"
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
@@ -89,10 +123,15 @@ export function OrderCard({ order }: { order: Order }) {
       ) : (
         <button
           onClick={handleReorder}
+          disabled={reordering}
           aria-label="Order again"
-          className="press grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
+          className="press grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink disabled:opacity-60"
         >
-          <RotateCcw className="size-5" />
+          {reordering ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            <RotateCcw className="size-5" />
+          )}
         </button>
       )}
     </div>

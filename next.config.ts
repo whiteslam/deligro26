@@ -69,6 +69,16 @@ const nextConfig: NextConfig = {
     root: projectRoot,
   },
   outputFileTracingRoot: projectRoot,
+  // Lets next/image actually optimize (resize + AVIF/WebP negotiate) real
+  // restaurant/menu photos instead of only working for local /public assets.
+  // Mirrors the CSP's img-src allowlist above: Supabase storage for real
+  // vendor uploads, Unsplash for the demo-mode/mock catalog.
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "*.supabase.co" },
+      { protocol: "https", hostname: "images.unsplash.com" },
+    ],
+  },
   // Testing on a real handset means loading /_next/* from a LAN IP, which the
   // dev server treats as cross-origin. Dev-only key: it is not read by
   // `next build`, and these are private ranges that cannot be reached from
@@ -85,11 +95,23 @@ const nextConfig: NextConfig = {
         // loud — and a CDN or reverse proxy added later would happily serve one
         // customer's /api/me or /api/orders to the next visitor. Make it
         // explicit at the edge rather than relying on a framework default.
-        source: "/api/:path*",
+        //
+        // Excludes app-version via a negative-lookahead segment rather than
+        // matching "everything", so there is exactly one matching rule per
+        // path — no ambiguity about which Cache-Control value a client sees.
+        source: "/api/:path((?!app-version).*)",
         headers: [
           { key: "Cache-Control", value: "no-store, max-age=0, must-revalidate" },
           { key: "Pragma", value: "no-cache" },
         ],
+      },
+      {
+        // The one genuine exception: a version-check answer with no user scope
+        // and the same answer for every caller (see its own doc comment). Both
+        // Android apps poll this on every cold start; a short public cache cuts
+        // that down to one DB read per window instead of one per launch.
+        source: "/api/app-version",
+        headers: [{ key: "Cache-Control", value: "public, max-age=120" }],
       },
     ];
   },

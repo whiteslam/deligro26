@@ -23,6 +23,7 @@ export function ActiveOrderStrip({ order }: { order: Order | null }) {
         src={image}
         alt={order.restaurantName}
         className="size-12 shrink-0 rounded-xl"
+        sizes="48px"
       />
       <div className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 text-[13px] font-bold text-green">

@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -15,8 +16,15 @@ export interface Profile {
   phone: string | null;
 }
 
-/** Current user's profile, or null if signed out / not configured. */
-export async function getProfile(): Promise<Profile | null> {
+/**
+ * Current user's profile, or null if signed out / not configured.
+ *
+ * `cache()` dedupes this within a single request: the layout, a page's own
+ * `requireUser`/`requireRole`, and any component further down all call this,
+ * and used to each pay for two sequential Supabase round trips (auth.getUser
+ * then a profiles select) for the same answer.
+ */
+export const getProfile = cache(async (): Promise<Profile | null> => {
   if (!isSupabaseConfigured) return null;
   const supabase = await createClient();
   const {
@@ -31,7 +39,7 @@ export async function getProfile(): Promise<Profile | null> {
     .single();
 
   return (data as Profile) ?? null;
-}
+});
 
 /** True when this visitor chose "Explore as guest" (cookie set, no session). */
 export async function isGuest(): Promise<boolean> {

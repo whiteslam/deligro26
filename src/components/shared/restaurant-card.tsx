@@ -49,6 +49,7 @@ export function RestaurantCard({
           src={r.image}
           alt={r.name}
           className={carousel ? "h-32 w-full" : "h-40 w-full"}
+          sizes={carousel ? "240px" : "(max-width: 480px) 100vw, 400px"}
         />
         {/* Temporarily hidden — offer banner not needed right now
         {r.offer ? (

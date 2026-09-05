@@ -9,24 +9,23 @@ import { listAddresses } from "@/lib/data-access/addresses";
 import { ADDRESSES } from "@/lib/data";
 
 export default async function HomePage() {
-  const [catalog, orders, banners, categories] = await Promise.all([
-    listRestaurantsResult(),
+  // All independent — none of these depend on another's result — so they run
+  // as one parallel batch instead of `listAddresses()` waiting behind it as a
+  // separate round trip.
+  const [catalog, orders, banners, categories, addrs] = await Promise.all([
+    // RestaurantCard (the only thing this page renders restaurants through)
+    // never reads menu data — see listRestaurantsFromDb's doc comment.
+    listRestaurantsResult({ withMenu: false }),
     getOrdersPageData(),
     // The home carousel: whatever campaigns the Admin Panel has running here.
     listActiveBanners("home_hero"),
     // Cuisine strip. Curated pictures, with any an operator has replaced.
     getHomeCategories(),
+    isSupabaseConfigured ? listAddresses().catch(() => []) : Promise.resolve(ADDRESSES),
   ]);
 
-  let savedAddress: { label: string; line: string } | null = null;
-  if (isSupabaseConfigured) {
-    const addrs = await listAddresses().catch(() => []);
-    const def = addrs.find((a) => a.isDefault) ?? addrs[0];
-    savedAddress = def ? { label: def.label, line: def.line } : null;
-  } else {
-    const def = ADDRESSES.find((a) => a.isDefault) ?? ADDRESSES[0];
-    savedAddress = def ? { label: def.label, line: def.line } : null;
-  }
+  const def = addrs.find((a) => a.isDefault) ?? addrs[0];
+  const savedAddress = def ? { label: def.label, line: def.line } : null;
 
   const { restaurants } = catalog;
   const popular = [...restaurants]

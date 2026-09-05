@@ -80,15 +80,15 @@ export default async function RestaurantPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const r = await getRestaurant(slug);
-  if (!r) notFound();
-
-  // Who's looking, and have they already hearted this place? Both are cheap and
-  // guests short-circuit to (null, false) — see data-access/favorites.
-  const [profile, favorite] = await Promise.all([
+  // None of these three depend on each other's result, so they run as one
+  // parallel batch rather than waiting for `getRestaurant` before starting
+  // the other two.
+  const [r, profile, favorite] = await Promise.all([
+    getRestaurant(slug),
     getProfile(),
     isSupabaseConfigured ? isFavorite(slug) : Promise.resolve(false),
   ]);
+  if (!r) notFound();
 
   // What checkout will actually charge — see lib/pricing.
   // Temporarily unused while the info card is hidden below.
@@ -137,6 +137,8 @@ export default async function RestaurantPage({
           src={r.image}
           alt={r.name}
           className="h-[calc(13rem+var(--status-h))] w-full"
+          sizes="100vw"
+          priority
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/25" />
 

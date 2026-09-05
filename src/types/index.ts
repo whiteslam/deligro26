@@ -17,6 +17,8 @@ export interface MenuItem {
   name: string;
   description: string;
   price: number;
+  /** Sale price, in whole rupees — shown struck-through against `price` and charged instead of it, when set and actually lower. See `effectivePrice`. */
+  discountPrice?: number | null;
   category: string;
   veg: boolean;
   image?: string;

@@ -135,10 +135,13 @@ export function PromoBannerCarousel({
           className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto scroll-smooth rounded-2xl"
           style={{ scrollbarWidth: "none" }}
         >
-          {banners.map((b) => (
+          {banners.map((b, i) => (
             <BannerSlide
               key={b.id}
               banner={b}
+              // Only the first slide is guaranteed to be in the initial
+              // viewport — later ones are lazy, same as everything else.
+              priority={i === 0}
               onCta={() => {
                 if (analytics) track(b.id, "click", placement);
               }}
@@ -170,9 +173,11 @@ export function PromoBannerCarousel({
 function BannerSlide({
   banner,
   onCta,
+  priority = false,
 }: {
   banner: Banner;
   onCta: () => void;
+  priority?: boolean;
 }) {
   const href = bannerHref(banner);
   const external = bannerIsExternal(banner);
@@ -192,6 +197,8 @@ function BannerSlide({
           src={banner.mobileImageUrl ?? banner.imageUrl}
           alt={banner.headline}
           className="absolute inset-0 h-full w-full"
+          sizes="100vw"
+          priority={priority}
         />
         {/* Scrim so text stays legible over any photo. */}
         <div

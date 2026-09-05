@@ -19,10 +19,13 @@ export default async function StoresPage({
 }: {
   searchParams: Promise<{ category?: string }>;
 }) {
-  const [{ category }, catalog, settings] = await Promise.all([
+  const [{ category }, catalog, settings, addrs] = await Promise.all([
     searchParams,
-    listRestaurantsResult(),
+    // RestaurantCard (the only thing this page renders restaurants through)
+    // never reads menu data — see listRestaurantsFromDb's doc comment.
+    listRestaurantsResult({ withMenu: false }),
     getSettings(),
+    isSupabaseConfigured ? listAddresses().catch(() => []) : Promise.resolve(ADDRESSES),
   ]);
   const { restaurants } = catalog;
 
@@ -33,15 +36,8 @@ export default async function StoresPage({
   // the save.
   const categories = enabledStoreCategories(settings);
 
-  let savedAddress: { label: string; line: string } | null = null;
-  if (isSupabaseConfigured) {
-    const addrs = await listAddresses().catch(() => []);
-    const def = addrs.find((a) => a.isDefault) ?? addrs[0];
-    savedAddress = def ? { label: def.label, line: def.line } : null;
-  } else {
-    const def = ADDRESSES.find((a) => a.isDefault) ?? ADDRESSES[0];
-    savedAddress = def ? { label: def.label, line: def.line } : null;
-  }
+  const def = addrs.find((a) => a.isDefault) ?? addrs[0];
+  const savedAddress = def ? { label: def.label, line: def.line } : null;
 
   // An unknown ?category= reads as "no filter" rather than "nothing matches" —
   // a stale link shouldn't land the user on an empty tab. A switched-off
@@ -129,6 +125,7 @@ export default async function StoresPage({
                         src={r.image}
                         alt={r.name}
                         className="size-[72px] rounded-2xl"
+                        sizes="72px"
                       />
                       <span className="w-full truncate text-center text-[12px] font-semibold text-ink">
                         {r.name}

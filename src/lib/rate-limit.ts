@@ -69,21 +69,36 @@ export function tooManyRequests(result: RateLimitResult): Response {
   );
 }
 
+/**
+ * Every serverless instance counts on its own once the shared store is gone
+ * (see `reportDegraded`), so a caller's intended cap is really "cap per
+ * instance" — the actual ceiling is unknowably higher, worst exactly when
+ * traffic (and instance count) is highest. Rule 2 in AGENTS.md: a failed
+ * config check must reduce access, never widen it. Dividing the limit down
+ * before falling back doesn't restore the shared cap (nothing inside one
+ * instance can), but it stops the fallback from silently being MORE
+ * permissive than the limit the caller actually asked for. 8 is a
+ * conservative guess at concurrent instances under load — tune down if
+ * observed scaling runs higher.
+ */
+const MEMORY_FALLBACK_DIVISOR = 8;
+
 function memoryRateLimit(
   key: string,
   limit: number,
   windowMs: number
 ): RateLimitResult {
+  const effectiveLimit = Math.max(1, Math.ceil(limit / MEMORY_FALLBACK_DIVISOR));
   const now = Date.now();
   const bucket = memoryStore.get(key);
 
   if (!bucket || bucket.resetAt <= now) {
     const resetAt = now + windowMs;
     memoryStore.set(key, { count: 1, resetAt });
-    return { ok: true, remaining: limit - 1, resetAt, retryAfter: 0 };
+    return { ok: true, remaining: effectiveLimit - 1, resetAt, retryAfter: 0 };
   }
 
-  if (bucket.count >= limit) {
+  if (bucket.count >= effectiveLimit) {
     return {
       ok: false,
       remaining: 0,
@@ -95,7 +110,7 @@ function memoryRateLimit(
   bucket.count += 1;
   return {
     ok: true,
-    remaining: limit - bucket.count,
+    remaining: effectiveLimit - bucket.count,
     resetAt: bucket.resetAt,
     retryAfter: 0,
   };

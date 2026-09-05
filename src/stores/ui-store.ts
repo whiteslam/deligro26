@@ -18,6 +18,11 @@ interface UIState {
 function applyTheme(theme: Theme) {
   if (typeof document !== "undefined") {
     document.documentElement.setAttribute("data-theme", theme);
+    // Keeps the status bar/Dynamic Island strip the same color as the theme
+    // the user just switched to — see the bootstrap script in layout.tsx,
+    // which sets this same tag before first paint.
+    const meta = document.querySelector('meta[name="theme-color"]');
+    meta?.setAttribute("content", theme === "dark" ? "#0f1215" : "#ffffff");
   }
 }
 

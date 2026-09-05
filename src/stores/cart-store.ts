@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CartLine, MenuItem } from "@/types";
+import { effectivePrice } from "@/lib/utils/cart";
 
 /**
  * The basket's contents — and nothing about what they cost beyond the line
@@ -55,7 +56,7 @@ export const useCart = create<CartState>()(
                 {
                   itemId: item.id,
                   name: item.name,
-                  price: item.price,
+                  price: effectivePrice(item.price, item.discountPrice),
                   qty: 1,
                   veg: item.veg,
                 },

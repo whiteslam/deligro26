@@ -4,6 +4,7 @@ import { GlassCart } from "@/components/glass/glass-cart";
 import { CartHydrator } from "@/components/glass/cart-hydrator";
 import { ItemSheet } from "@/components/restaurant/item-sheet";
 import { CartSwitchDialog } from "@/components/shared/cart-switch-dialog";
+import { ReorderReviewDialog } from "@/components/shared/reorder-review-dialog";
 import { SplashScreen } from "@/components/shared/splash-screen";
 import { OneSignalInit } from "@/components/notifications/onesignal-init";
 import { ChargesConfigProvider } from "@/components/providers/charges-config-provider";
@@ -51,6 +52,7 @@ export default async function CustomerLayout({
           <StatusBar />
           <ItemSheet />
           <CartSwitchDialog />
+          <ReorderReviewDialog />
           <GlassCart />
           <CartHydrator />
           <TabBar />

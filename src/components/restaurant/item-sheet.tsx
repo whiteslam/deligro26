@@ -7,7 +7,7 @@ import { useCartSwitch } from "@/stores/cart-switch-store";
 import { useItemSheet } from "@/stores/item-sheet-store";
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { VegMark } from "@/components/shared/veg-mark";
-import { formatINR } from "@/lib/utils/format";
+import { ItemPrice } from "@/components/shared/item-price";
 
 /**
  * Bolt-style product detail popup. Mounted once at app-shell level so it
@@ -65,6 +65,7 @@ function ItemSheetInner() {
               src={item.image}
               alt={item.name}
               className="h-56 w-full"
+              sizes="100vw"
             />
             <button
               onClick={onClose}
@@ -89,7 +90,7 @@ function ItemSheetInner() {
               </h2>
             </div>
             <p className="mt-1 text-[17px] font-extrabold tracking-tight">
-              {formatINR(item.price)}
+              <ItemPrice item={item} />
             </p>
             <p className="mt-3 text-sm leading-relaxed text-muted">
               {item.description}
@@ -125,7 +126,11 @@ function ItemSheetInner() {
             className="press flex h-12 flex-1 items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:opacity-50"
           >
             <span>{item.soldOut ? "Sold out" : "Add"}</span>
-            {!item.soldOut ? <span>{formatINR(item.price * qty)}</span> : null}
+            {!item.soldOut ? (
+              <span>
+                <ItemPrice item={item} qty={qty} />
+              </span>
+            ) : null}
           </button>
         </div>
       </div>

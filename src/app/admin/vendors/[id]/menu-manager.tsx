@@ -145,6 +145,22 @@ export function MenuManager({
       setError("Item name is required.");
       return;
     }
+    const price = Number(form.price);
+    if (!Number.isFinite(price) || price < 0) {
+      setError("Enter a valid price in rupees.");
+      return;
+    }
+    if (form.discountPrice.trim()) {
+      const discountPrice = Number(form.discountPrice);
+      if (!Number.isFinite(discountPrice) || discountPrice < 0) {
+        setError("Enter a valid discount price in rupees.");
+        return;
+      }
+      if (discountPrice >= price) {
+        setError("Discount price must be lower than the price.");
+        return;
+      }
+    }
     start(async () => {
       const input = toInput(form);
       const res = editingId

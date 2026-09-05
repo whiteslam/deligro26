@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, X, UtensilsCrossed, Store } from "lucide-react";
+import { Search, X, UtensilsCrossed, Store, TriangleAlert } from "lucide-react";
 import type { Restaurant } from "@/types";
 import {
   buildDishIndex,
@@ -61,12 +61,15 @@ export function SearchView({
   initialCategory,
   initialQuery,
   restaurants,
+  catalogFailed = false,
   rotationSeed,
 }: {
   initialCategory?: string;
   /** Carried over from the home field, so "See all results" keeps the words. */
   initialQuery?: string;
   restaurants: Restaurant[];
+  /** True when the catalog read failed — an empty `restaurants` is then meaningless, not a real zero-result answer. */
+  catalogFailed?: boolean;
   /**
    * Today's date, from the server — see `lib/search/rotation.ts`. Passed in
    * rather than read from the clock here so the server and client renders can
@@ -197,6 +200,16 @@ export function SearchView({
       </div>
 
       <div className="px-4 pt-3">
+        {catalogFailed ? (
+          <div className="mb-3 flex items-start gap-2.5 rounded-2xl border border-deal/30 bg-deal-soft px-3 py-2.5 text-sm font-medium text-deal">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+            <span>
+              We couldn&apos;t load the catalog just now. This is a problem on
+              our side — try again in a moment.
+            </span>
+          </div>
+        ) : null}
+
         <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1">
           {QUICK_FILTERS.map((f) => (
             <Chip key={f.id} on={chips.has(f.id)} onClick={() => toggleChip(f.id)}>

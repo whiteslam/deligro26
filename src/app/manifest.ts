@@ -36,7 +36,12 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     orientation: "portrait",
     background_color: "#ffffff",
-    theme_color: "#0f1215",
+    // Matches the light theme, which is the default (see `deligro-theme` in
+    // layout.tsx) — this manifest value is static and can't follow the
+    // in-app toggle, but it's only what paints the splash/status bar before
+    // the page's own theme-color meta tag takes over, so it should match
+    // whatever most launches actually render first.
+    theme_color: "#ffffff",
     categories: ["food", "shopping"],
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

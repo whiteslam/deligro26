@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -66,6 +66,22 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   const restaurantName = useCart((s) => s.restaurantName);
   const subtotal = lines.reduce((sum, l) => sum + l.price * l.qty, 0);
   const clear = useCart((s) => s.clear);
+
+  // One id for this whole checkout visit, minted lazily on the first submit
+  // attempt and reused on every retry of it — a slow network the customer
+  // re-taps through, or a request the browser retries after a timeout — so
+  // the server can tell "this is the same submit again" from "a new order".
+  // See createOrder's idempotencyKey handling.
+  const idempotencyKeyRef = useRef<string | null>(null);
+  const getIdempotencyKey = () => {
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+    return idempotencyKeyRef.current;
+  };
 
   const {
     addresses,
@@ -446,6 +462,7 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
           body: JSON.stringify({
             restaurantSlug,
             lines: lines.map((l) => ({ itemId: l.itemId, qty: l.qty })),
+            idempotencyKey: getIdempotencyKey(),
             // The tip is money: the server re-derives the total including it,
             // rather than us telling it what to charge.
             tip,

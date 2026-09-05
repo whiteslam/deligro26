@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { SearchView } from "@/components/search/search-view";
-import { listRestaurants } from "@/lib/catalog";
+import { listRestaurantsResult } from "@/lib/catalog";
 import { dailyRotationSeed } from "@/lib/search/rotation";
 
 export default async function SearchPage({
@@ -8,9 +8,9 @@ export default async function SearchPage({
 }: {
   searchParams: Promise<{ category?: string; q?: string }>;
 }) {
-  const [{ category, q }, restaurants] = await Promise.all([
+  const [{ category, q }, catalog] = await Promise.all([
     searchParams,
-    listRestaurants(),
+    listRestaurantsResult(),
   ]);
 
   return (
@@ -18,7 +18,10 @@ export default async function SearchPage({
       <SearchView
         initialCategory={category}
         initialQuery={q}
-        restaurants={restaurants}
+        restaurants={catalog.restaurants}
+        // A failed catalog read must not render as "nothing matches your
+        // search" — see HomePage/StoresPage, which already say which one it is.
+        catalogFailed={!catalog.ok}
         rotationSeed={dailyRotationSeed()}
       />
     </Suspense>

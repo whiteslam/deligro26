@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { computeChargesWith } from "@/lib/pricing";
 import { getSettings } from "@/lib/settings";
 import { formatINR } from "@/lib/utils/format";
+import { effectivePrice } from "@/lib/utils/cart";
 import { checkServiceArea, outOfRangeMessage } from "@/lib/geo/service-area";
 import { evaluateCoupon } from "@/lib/data-access/coupons";
 import { onlinePaymentsEnabled } from "@/lib/payments/availability";
@@ -70,6 +71,10 @@ const TIP_COLUMN = "orders.tip";
 const PAYMENT_COLUMNS = "orders.payment_method";
 /** `discount` / `coupon_code` arrive together in 0031. */
 const COUPON_COLUMNS = "orders.discount";
+/** `idempotency_key` arrives in 0049. */
+const IDEMPOTENCY_COLUMN = "orders.idempotency_key";
+/** Postgres's "duplicate key value violates unique constraint". */
+const UNIQUE_VIOLATION = "23505";
 
 interface SelectFlags {
   /** `tip` only exists once migration 0013 has been applied. */
@@ -173,6 +178,15 @@ export interface CreateOrderInput {
    * over what they are charged.
    */
   couponCode?: string;
+  /**
+   * One UUID per checkout attempt, sent unchanged on every retry of that same
+   * attempt (a timed-out request the client retries, a double-tap that slips
+   * past the disabled button). Lets `createOrder` recognize a replay and hand
+   * back the order already placed instead of placing a second one. Optional,
+   * and degrades to no dedup on a database that predates 0049 — see
+   * `IDEMPOTENCY_COLUMN`.
+   */
+  idempotencyKey?: string;
 }
 
 /** Why a coupon didn't apply. Mirrors the RPC's vocabulary 1:1. */
@@ -257,6 +271,31 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("unauthorized");
 
+  // A replay of an already-placed order — same customer, same key — hands
+  // back the order that already exists instead of placing a second one. This
+  // is the fast path; the unique index from 0049 is what makes it correct
+  // under a race between two concurrent requests carrying the same key (see
+  // the insert's UNIQUE_VIOLATION handling below).
+  if (input.idempotencyKey && !columnKnownMissing(IDEMPOTENCY_COLUMN)) {
+    const { data: existing, error: existingError } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("customer_id", user.id)
+      .eq("idempotency_key", input.idempotencyKey)
+      .maybeSingle();
+
+    if (existingError) {
+      if (!isMissingColumn(existingError)) throw existingError;
+      rememberColumn(IDEMPOTENCY_COLUMN, false);
+    } else {
+      rememberColumn(IDEMPOTENCY_COLUMN, true);
+      if (existing) {
+        const already = await getOrderById(existing.id);
+        if (already) return already;
+      }
+    }
+  }
+
   // The platform-level gates, re-decided here.
   //
   // The checkout screen has its own copies of these — `checkoutBlocked` — and
@@ -303,7 +342,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const externalIds = [...new Set(input.lines.map((l) => l.itemId))];
   const { data: menuItems, error: menuError } = await supabase
     .from("menu_items")
-    .select("id, external_id, name, price, available")
+    .select("id, external_id, name, price, discount_price, available")
     .eq("restaurant_id", restaurant.id)
     .in("external_id", externalIds);
 
@@ -315,7 +354,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     if (!item || !item.available || line.qty < 1) {
       throw new Error("invalid_items");
     }
-    return sum + item.price * line.qty;
+    return sum + effectivePrice(item.price, item.discount_price) * line.qty;
   }, 0);
 
   // The minimum order, against the subtotal the SERVER just derived from its
@@ -395,21 +434,37 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
 
   // `payment_status` is deliberately not sent: the 0025 insert trigger pins it
   // to 'pending' for anything holding a user JWT, so sending it would be theatre.
-  const insertOrder = (withTip: boolean, withPayment: boolean) =>
+  const insertOrder = (withTip: boolean, withPayment: boolean, withIdempotency: boolean) =>
     supabase
       .from("orders")
       .insert({
         ...base,
         ...(withTip ? { tip: charges.tip } : {}),
         ...(withPayment ? { payment_method: paymentMethod } : {}),
+        ...(withIdempotency && input.idempotencyKey
+          ? { idempotency_key: input.idempotencyKey }
+          : {}),
       })
       .select("id")
       .single();
 
   let withTip = !columnKnownMissing(TIP_COLUMN);
   let withPayment = !columnKnownMissing(PAYMENT_COLUMNS);
+  let withIdempotency = !columnKnownMissing(IDEMPOTENCY_COLUMN);
 
-  let { data: order, error: orderError } = await insertOrder(withTip, withPayment);
+  let { data: order, error: orderError } = await insertOrder(
+    withTip,
+    withPayment,
+    withIdempotency
+  );
+
+  if (orderError && isMissingColumn(orderError) && withIdempotency) {
+    // Migration 0049 hasn't been applied. Proceed without a key rather than
+    // refuse the order over a dedup guarantee this database can't yet keep.
+    rememberColumn(IDEMPOTENCY_COLUMN, false);
+    withIdempotency = false;
+    ({ data: order, error: orderError } = await insertOrder(withTip, withPayment, false));
+  }
 
   if (orderError && isMissingColumn(orderError) && withPayment) {
     // Migration 0025 hasn't been applied. COD is what this database can record,
@@ -417,7 +472,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     rememberColumn(PAYMENT_COLUMNS, false);
     if (paymentMethod === "online") throw new Error("online_payments_unavailable");
     withPayment = false;
-    ({ data: order, error: orderError } = await insertOrder(withTip, false));
+    ({ data: order, error: orderError } = await insertOrder(withTip, false, withIdempotency));
   }
 
   if (orderError && isMissingColumn(orderError) && withTip) {
@@ -428,7 +483,23 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     rememberColumn(TIP_COLUMN, false);
     if (charges.tip > 0) throw new Error("tip_unsupported");
     withTip = false;
-    ({ data: order, error: orderError } = await insertOrder(false, withPayment));
+    ({ data: order, error: orderError } = await insertOrder(false, withPayment, withIdempotency));
+  }
+
+  if (orderError?.code === UNIQUE_VIOLATION && input.idempotencyKey) {
+    // Lost a race against another request carrying the same key — that other
+    // request is the one that actually placed the order. Hand back what it
+    // created rather than telling this customer their order failed.
+    const { data: existing, error: raceError } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("customer_id", user.id)
+      .eq("idempotency_key", input.idempotencyKey)
+      .maybeSingle();
+    if (!raceError && existing) {
+      const already = await getOrderById(existing.id);
+      if (already) return already;
+    }
   }
 
   if (orderError) throw orderError;
@@ -441,7 +512,10 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
       menu_item_id: item.id,
       name: item.name,
       qty: line.qty,
-      price: item.price,
+      // What was actually charged, discount honored — this is the price a
+      // later reorder/order-history view snapshots, and it must match what
+      // itemSubtotal above billed.
+      price: effectivePrice(item.price, item.discount_price),
     };
   });
 
@@ -568,6 +642,12 @@ export async function listMyOrders(): Promise<Order[]> {
       .select(columns)
       .eq("customer_id", user.id)
       .order("created_at", { ascending: false })
+      // The Orders tab shows recent history, not a permanent archive — without
+      // a cap this fetches every order a long-tenured customer has ever placed,
+      // in full (items, restaurant), on every visit. An active order is always
+      // recent by definition, so this cannot hide the Active card. 100 is well
+      // past what anyone scrolls to on this screen today.
+      .limit(100)
       .overrideTypes<Record<string, unknown>[]>()
   );
 

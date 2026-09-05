@@ -10,6 +10,7 @@ import type { OrderEta } from "@/lib/orders/eta";
 import type { RiderPositionSource } from "@/lib/data-access/order-tracking";
 import { DEFAULT_CENTER } from "@/lib/maps/config";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { isOrderInFlight } from "@/lib/utils/order-status";
 
 export interface LiveTrackingState {
   status: OrderStatus;
@@ -161,6 +162,12 @@ export function useLiveTracking(
 
   useEffect(() => {
     if (!isSupabaseConfigured || !isUuid) return;
+    // Nothing left to track once the order is delivered or cancelled — polling
+    // past that point just hammers the endpoint forever for as long as the
+    // customer leaves this tab open. Re-evaluated on every status change
+    // (rather than checked once) so the poll that reports the terminal status
+    // is also the one that stops scheduling the next one.
+    if (!isOrderInFlight(tracking.status)) return;
 
     // The first read is scheduled rather than called inline. poll() only touches
     // state after awaiting the fetch, but an effect body calling it directly
@@ -180,7 +187,7 @@ export function useLiveTracking(
       document.removeEventListener("visibilitychange", onFocus);
       window.removeEventListener("focus", onFocus);
     };
-  }, [poll, isUuid]);
+  }, [poll, isUuid, tracking.status]);
 
   // Recompute the pin on the same 3s cadence as the poll that feeds it.
   //
@@ -197,12 +204,12 @@ export function useLiveTracking(
   // courier toward the customer's door regardless. If we don't know anything
   // new, the pin doesn't move.
   useEffect(() => {
-    if (!interp || health.stale) return;
+    if (!interp || health.stale || !isOrderInFlight(tracking.status)) return;
     const id = setInterval(() => {
       if (!document.hidden) setTick(Date.now());
     }, 3000);
     return () => clearInterval(id);
-  }, [interp, health.stale]);
+  }, [interp, health.stale, tracking.status]);
 
   const animatedRider =
     interp && tracking.restaurant && tracking.destination

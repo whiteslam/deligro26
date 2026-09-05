@@ -14,6 +14,7 @@ interface DbMenuItem {
   name: string;
   description: string | null;
   price: number;
+  discount_price: number | null;
   veg: boolean;
   available: boolean;
   category: string | null;
@@ -50,7 +51,9 @@ interface DbRestaurantRow {
   prep_minutes?: number | null;
   busy_until?: string | null;
   busy_extra_minutes?: number | null;
-  menu_items: DbMenuItem[];
+  // Absent entirely when the query was run with `withMenu: false` (list
+  // surfaces that never render menu data — see `mapRestaurant`'s `?? []`).
+  menu_items?: DbMenuItem[];
 }
 
 /**
@@ -63,7 +66,8 @@ interface DbRestaurantRow {
 function restaurantSelect(
   withLocation: boolean,
   withPace: boolean,
-  withOfferWindow: boolean
+  withOfferWindow: boolean,
+  withMenu: boolean
 ): string {
   return `
     id, slug, name, tagline, is_open,
@@ -72,11 +76,15 @@ function restaurantSelect(
     ${withLocation ? "lat, lng, address," : ""}
     ${withPace ? "prep_minutes, busy_until, busy_extra_minutes," : ""}
     ${withOfferWindow ? "offer_expires_at," : ""}
-    offer, promoted,
-    menu_items (
-      id, external_id, name, description, price, veg, available,
+    offer, promoted
+    ${
+      withMenu
+        ? `, menu_items (
+      id, external_id, name, description, price, discount_price, veg, available,
       category, image_url, popular, bestseller
-    )
+    )`
+        : ""
+    }
   `;
 }
 
@@ -100,7 +108,8 @@ interface QueryResult<T> {
  * the database predates migration 0009.
  */
 async function selectRestaurants<T>(
-  run: (select: string) => PromiseLike<QueryResult<T>>
+  run: (select: string) => PromiseLike<QueryResult<T>>,
+  withMenu = true
 ): Promise<T | null> {
   // Dropped newest-migration-first: `isMissingColumn` doesn't say WHICH column
   // is absent, so a database with 0009 but not 0036 must not lose its shop pins
@@ -117,7 +126,8 @@ async function selectRestaurants<T>(
       restaurantSelect(
         hasShopLocation !== false,
         hasKitchenPace !== false,
-        hasOfferWindow !== false
+        hasOfferWindow !== false,
+        withMenu
       )
     );
     if (!error) {
@@ -130,7 +140,7 @@ async function selectRestaurants<T>(
     latch(false);
   }
 
-  const { data, error } = await run(restaurantSelect(false, false, false));
+  const { data, error } = await run(restaurantSelect(false, false, false, withMenu));
   if (error) throw error;
   return data;
 }
@@ -159,6 +169,7 @@ function mapMenuItem(row: DbMenuItem, popularity?: Popularity): MenuItem {
     name: row.name,
     description: row.description ?? "",
     price: row.price,
+    discountPrice: row.discount_price,
     category: row.category ?? "Popular",
     veg: row.veg,
     image: row.image_url ?? undefined,
@@ -233,17 +244,29 @@ function mapRestaurant(row: DbRestaurantRow, popularity?: Popularity): Restauran
   };
 }
 
-/** Approved restaurants with menu — readable by anon (RLS). */
-export async function listRestaurantsFromDb(): Promise<Restaurant[]> {
+/**
+ * Approved restaurants, readable by anon (RLS).
+ *
+ * `withMenu` defaults to true (every field the type promises, unchanged
+ * behavior for any caller that doesn't opt out). Pass false for a listing
+ * surface that never renders menu data — the card it feeds (`RestaurantCard`)
+ * only reads slug/name/cuisines/image/open/busy/eta/distance, so joining and
+ * transferring every menu item for every restaurant on every Home/Stores load
+ * was pure waste. Search still needs the full menu (dish-first ranking), so
+ * it keeps the default.
+ */
+export async function listRestaurantsFromDb(withMenu = true): Promise<Restaurant[]> {
   const supabase = await createClient();
-  const rows = await selectRestaurants<DbRestaurantRow[]>((select) =>
-    supabase
-      .from("restaurants")
-      .select(select)
-      .eq("approved", true)
-      .order("promoted", { ascending: false })
-      .order("name")
-      .overrideTypes<DbRestaurantRow[]>()
+  const rows = await selectRestaurants<DbRestaurantRow[]>(
+    (select) =>
+      supabase
+        .from("restaurants")
+        .select(select)
+        .eq("approved", true)
+        .order("promoted", { ascending: false })
+        .order("name")
+        .overrideTypes<DbRestaurantRow[]>(),
+    withMenu
   );
 
   const list = (rows ?? []).map((row) => mapRestaurant(row));

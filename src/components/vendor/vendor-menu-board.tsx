@@ -64,6 +64,7 @@ export function VendorMenuBoard({
   const router = useRouter();
   const shellMode = useVendorShellMode();
   const [items, setItems] = useState(initialItems);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -162,8 +163,13 @@ export function VendorMenuBoard({
     );
 
     startTransition(async () => {
-      await reorderMenuItemsAction(ids);
-      router.refresh();
+      try {
+        await reorderMenuItemsAction(ids);
+        router.refresh();
+      } catch {
+        setActionError("Couldn't save the new order. Reloading the menu.");
+        router.refresh();
+      }
     });
   }
 
@@ -237,11 +243,14 @@ export function VendorMenuBoard({
       return;
     }
     setDeletingId(item.dbId);
+    setActionError(null);
     startTransition(async () => {
       try {
         await deleteMenuItemAction(item.dbId);
         setItems((prev) => prev.filter((i) => i.dbId !== item.dbId));
         router.refresh();
+      } catch {
+        setActionError(`Couldn't delete "${item.name}". Try again.`);
       } finally {
         setDeletingId(null);
       }
@@ -249,45 +258,60 @@ export function VendorMenuBoard({
   }
 
   function handleDuplicate(item: MenuRow) {
+    setActionError(null);
     startTransition(async () => {
-      await duplicateMenuItemAction(item.dbId);
-      router.refresh();
+      try {
+        await duplicateMenuItemAction(item.dbId);
+        router.refresh();
+      } catch {
+        setActionError(`Couldn't duplicate "${item.name}". Try again.`);
+      }
     });
   }
 
   function handleBulkAvailable(available: boolean) {
     const ids = [...selected];
     if (ids.length === 0) return;
+    setActionError(null);
     startTransition(async () => {
-      await bulkSetAvailableAction(ids, available);
-      setItems((prev) =>
-        prev.map((i) =>
-          selected.has(i.dbId) ? { ...i, soldOut: !available } : i
-        )
-      );
-      exitBulk();
-      router.refresh();
+      try {
+        await bulkSetAvailableAction(ids, available);
+        setItems((prev) =>
+          prev.map((i) =>
+            selected.has(i.dbId) ? { ...i, soldOut: !available } : i
+          )
+        );
+        exitBulk();
+        router.refresh();
+      } catch {
+        setActionError("Couldn't update those items. Try again.");
+      }
     });
   }
 
   function handleBulkFlags(flags: { popular?: boolean; bestseller?: boolean }) {
     const ids = [...selected];
     if (ids.length === 0) return;
+    setActionError(null);
     startTransition(async () => {
-      await bulkSetFlagsAction(ids, flags);
-      setItems((prev) =>
-        prev.map((i) =>
-          selected.has(i.dbId)
-            ? {
-                ...i,
-                popular: flags.popular ?? i.popular,
-                bestseller: flags.bestseller ?? i.bestseller,
-              }
-            : i
-        )
-      );
-      exitBulk();
-      router.refresh();
+      try {
+        await bulkSetFlagsAction(ids, flags);
+        setItems((prev) =>
+          prev.map((i) =>
+            selected.has(i.dbId)
+              ? {
+                  ...i,
+                  popular: flags.popular ?? i.popular,
+                  bestseller: flags.bestseller ?? i.bestseller,
+                }
+              : i
+          )
+        );
+        exitBulk();
+        router.refresh();
+      } catch {
+        setActionError("Couldn't update those items. Try again.");
+      }
     });
   }
 
@@ -301,11 +325,16 @@ export function VendorMenuBoard({
     ) {
       return;
     }
+    setActionError(null);
     startTransition(async () => {
-      await deleteMenuItemsAction(ids);
-      setItems((prev) => prev.filter((i) => !selected.has(i.dbId)));
-      exitBulk();
-      router.refresh();
+      try {
+        await deleteMenuItemsAction(ids);
+        setItems((prev) => prev.filter((i) => !selected.has(i.dbId)));
+        exitBulk();
+        router.refresh();
+      } catch {
+        setActionError("Couldn't delete those items. Try again.");
+      }
     });
   }
 
@@ -375,6 +404,12 @@ export function VendorMenuBoard({
           ) : null
         }
       />
+
+      {actionError ? (
+        <p className="rounded-xl border border-deal/30 bg-deal/10 px-3 py-2 text-sm font-medium text-deal">
+          {actionError}
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3 @3xl:grid-cols-4">
         <VendorMetricCard

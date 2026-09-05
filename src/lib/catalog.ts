@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import {
   RESTAURANTS,
   getRestaurant as getMockRestaurant,
@@ -30,11 +31,13 @@ export interface CatalogResult {
   ok: boolean;
 }
 
-export async function listRestaurantsResult(): Promise<CatalogResult> {
+export async function listRestaurantsResult(
+  opts: { withMenu?: boolean } = {}
+): Promise<CatalogResult> {
   if (!isSupabaseConfigured) return { restaurants: RESTAURANTS, ok: true };
 
   try {
-    return { restaurants: await listRestaurantsFromDb(), ok: true };
+    return { restaurants: await listRestaurantsFromDb(opts.withMenu), ok: true };
   } catch (err) {
     console.error("[catalog] listRestaurants failed", err);
     return { restaurants: [], ok: false };
@@ -50,18 +53,40 @@ export async function listRestaurants(): Promise<Restaurant[]> {
   return (await listRestaurantsResult()).restaurants;
 }
 
-export async function getRestaurant(slug: string): Promise<Restaurant | undefined> {
-  if (!isSupabaseConfigured) return getMockRestaurant(slug);
-
-  try {
-    const live = await getRestaurantFromDb(slug);
-    if (live) return live;
-  } catch {
-    // no mock fallback when backend is configured
+/**
+ * A failed read of one restaurant.
+ *
+ * Thrown rather than returned as undefined, because the restaurant page maps
+ * undefined to `notFound()` — so a backend fault used to 404 a real, live
+ * restaurant. Mirrors `OrderReadFailed` in `lib/orders-ui.ts` for the same
+ * reason: "this restaurant doesn't exist" and "we couldn't reach the
+ * database" are different sentences, and the customer deserves the right one.
+ */
+export class RestaurantReadFailed extends Error {
+  constructor(readonly cause?: unknown) {
+    super("restaurant_read_failed");
+    this.name = "RestaurantReadFailed";
   }
-
-  return undefined;
 }
+
+/**
+ * `cache()` dedupes this within a single request — the restaurant page calls
+ * it once for `generateMetadata` and once for the page body, and used to pay
+ * for the DB read twice for the same row on every view.
+ */
+export const getRestaurant = cache(
+  async (slug: string): Promise<Restaurant | undefined> => {
+    if (!isSupabaseConfigured) return getMockRestaurant(slug);
+
+    try {
+      const live = await getRestaurantFromDb(slug);
+      return live ?? undefined;
+    } catch (err) {
+      console.error("[catalog] getRestaurant failed", err);
+      throw new RestaurantReadFailed(err);
+    }
+  }
+);
 
 export async function listRestaurantSlugs(): Promise<string[]> {
   const restaurants = await listRestaurants();
