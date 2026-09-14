@@ -2327,6 +2327,32 @@ a.c-metric:hover {
     display: none !important;
   }
 
+  /* The customer shell, for the one page in it that is meant to leave the
+     screen: the order receipt. `.app-shell` is a 402px box of fixed height with
+     `overflow: hidden` and a transform on it, so printing it unchanged gives
+     one phone-shaped screenshot with the rest of the receipt clipped away.
+     Undo the frame; the tab bar and status bar are navigation and cost only
+     ink. */
+  .device,
+  .app-shell,
+  .app-scroll {
+    position: static !important;
+    height: auto !important;
+    max-height: none !important;
+    max-width: none !important;
+    overflow: visible !important;
+    transform: none !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .status-bar,
+  .tab-bar-shell,
+  .bolt-basket-bar {
+    display: none !important;
+  }
+
   .admin-shell {
     display: block !important;
     min-height: 0 !important;

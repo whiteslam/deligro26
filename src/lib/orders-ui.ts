@@ -1,9 +1,6 @@
 import "server-only";
 import { ACTIVE_ORDER, PAST_ORDERS } from "@/lib/data";
-import {
-  getOrderById,
-  listMyOrders,
-} from "@/lib/data-access/orders";
+import { getOrderById, listMyOrders } from "@/lib/data-access/orders";
 import { getProfile } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
@@ -33,7 +30,21 @@ export interface OrdersPageData {
    * now says the read failed instead of asserting the absence.
    */
   ok: boolean;
+  /**
+   * There is at least one order older than the last one in `past`.
+   *
+   * The list has always been capped (`listMyOrders`) and has never said so, so
+   * a customer scrolling for an order from last year hit a wall that looked
+   * like the end of their history. `pageOrdersBefore` is how the rest arrives.
+   */
+  hasMore: boolean;
 }
+
+/**
+ * How many orders one page carries. The first page is served with the screen;
+ * every page after it comes from `pageOrdersBefore`.
+ */
+export const PAGE_SIZE = 100;
 
 function demoOrders(): OrdersPageData {
   return {
@@ -41,6 +52,7 @@ function demoOrders(): OrdersPageData {
     past: PAST_ORDERS,
     isDemo: true,
     ok: true,
+    hasMore: false,
   };
 }
 
@@ -55,7 +67,7 @@ export async function getOrdersPageData(): Promise<OrdersPageData> {
   const profile = await getProfile();
   if (!profile) {
     // A genuine, known "no orders": nobody is signed in.
-    return { active: null, past: [], isDemo: false, ok: true };
+    return { active: null, past: [], isDemo: false, ok: true, hasMore: false };
   }
 
   try {
@@ -63,15 +75,26 @@ export async function getOrdersPageData(): Promise<OrdersPageData> {
     // and must mean it. An admin — the owner's own phone is one — is allowed by
     // RLS to read every order on the platform, so the visible list would fill
     // /orders with strangers' deliveries and put one of them in the Active card.
-    const rows = await listMyOrders();
+    // One more than the page, so "is there another page" is answered by the
+    // same query rather than by a second round trip that counts.
+    const rows = await listMyOrders({ limit: PAGE_SIZE + 1 });
     if (!rows.length) {
-      return { active: null, past: [], isDemo: false, ok: true };
+      return {
+        active: null,
+        past: [],
+        isDemo: false,
+        ok: true,
+        hasMore: false,
+      };
     }
 
-    const activeRow = rows.find((r) => isActiveDbStatus(r.status)) ?? null;
+    const hasMore = rows.length > PAGE_SIZE;
+    const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+
+    const activeRow = page.find((r) => isActiveDbStatus(r.status)) ?? null;
     const active = activeRow ? mapDbOrderRow(activeRow) : null;
 
-    const past = rows
+    const past = page
       .filter((r) => r.id !== activeRow?.id)
       .filter((r) => {
         const ui = dbStatusToUi(r.status);
@@ -79,10 +102,10 @@ export async function getOrdersPageData(): Promise<OrdersPageData> {
       })
       .map(mapDbOrderRow);
 
-    return { active, past, isDemo: false, ok: true };
+    return { active, past, isDemo: false, ok: true, hasMore };
   } catch (err) {
     console.error("[orders-ui] getOrdersPageData failed", err);
-    return { active: null, past: [], isDemo: false, ok: false };
+    return { active: null, past: [], isDemo: false, ok: false, hasMore: false };
   }
 }
 
@@ -116,6 +139,32 @@ export async function getOrderForTracking(id: string): Promise<UiOrder | null> {
 
   const mock = [ACTIVE_ORDER, ...PAST_ORDERS].find((o) => o.id === id);
   return mock ?? null;
+}
+
+/**
+ * One page of finished orders older than `before`.
+ *
+ * Only finished ones: an in-flight order is by definition recent and is
+ * already on the first page as the live card, so letting one through here
+ * would put a second copy of it at the bottom of the history.
+ */
+export async function pageOrdersBefore(
+  before: string
+): Promise<{ orders: UiOrder[]; hasMore: boolean }> {
+  if (!isSupabaseConfigured) return { orders: [], hasMore: false };
+
+  const rows = await listMyOrders({ before, limit: PAGE_SIZE + 1 });
+  const hasMore = rows.length > PAGE_SIZE;
+  const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+
+  const orders = page
+    .filter((r) => {
+      const ui = dbStatusToUi(r.status);
+      return ui === "DELIVERED" || ui === "CANCELLED";
+    })
+    .map(mapDbOrderRow);
+
+  return { orders, hasMore };
 }
 
 /** Active order strip on home — null when none. */

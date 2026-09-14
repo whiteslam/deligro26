@@ -6,6 +6,7 @@ import { loadGoogleMaps } from "@/lib/maps/loader";
 import { isMapsConfigured, DEFAULT_CENTER } from "@/lib/maps/config";
 import type { TrackPoint } from "@/lib/tracking/rider-position";
 import { pointAlongPath, progressAlongLine } from "@/lib/tracking/route-path";
+import { cn } from "@/lib/utils/cn";
 
 /** What one Directions lookup told us about the trip. */
 export interface RoadRoute {
@@ -37,6 +38,8 @@ export function TrackingMap({
   showRider,
   snapRiderToRoute = false,
   onRoute,
+  className,
+  bottomInset = 0,
 }: {
   /**
    * The shop's pin, or null when the vendor has never set one. Null draws no
@@ -57,6 +60,16 @@ export function TrackingMap({
   snapRiderToRoute?: boolean;
   /** Called once per route lookup, so the screen can use Google's drive time. */
   onRoute?: (route: RoadRoute | null) => void;
+  /** Sizing for the map box. Defaults to the strip this used to be fixed at. */
+  className?: string;
+  /**
+   * How much of the map's bottom edge is covered by something in front of it —
+   * the tracking screen's drag sheet, in practice. The map is still that tall,
+   * so everything that decides what the customer can see subtracts it: the
+   * bounds fit, the pan that follows the courier, and the captions that have to
+   * be read to mean anything.
+   */
+  bottomInset?: number;
 }) {
   const mapEl = useRef<HTMLDivElement>(null);
   const mapObj = useRef<google.maps.Map | null>(null);
@@ -72,6 +85,8 @@ export function TrackingMap({
   useEffect(() => {
     onRouteRef.current = onRoute;
   }, [onRoute]);
+  /** The courier pan is idempotent: same fix, same inset, no second pan. */
+  const panKey = useRef<string | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
     isMapsConfigured ? "loading" : "error"
   );
@@ -100,6 +115,11 @@ export function TrackingMap({
           zoom: 15,
           disableDefaultUI: true,
           zoomControl: true,
+          // Default is the bottom-right, which on the tracking screen is behind
+          // the sheet.
+          zoomControlOptions: {
+            position: google.maps.ControlPosition.RIGHT_TOP,
+          },
           clickableIcons: false,
           gestureHandling: "greedy",
         });
@@ -145,7 +165,7 @@ export function TrackingMap({
           });
         }
 
-        fitBounds(map, restaurant, destination, rider);
+        fitBounds(map, restaurant, destination, rider, null, bottomInset);
         setStatus("ready");
       })
       .catch(() => {
@@ -277,21 +297,52 @@ export function TrackingMap({
         riderMarker.current.setPosition(riderPoint);
         riderMarker.current.setMap(mapObj.current);
       }
-      mapObj.current.panTo(riderPoint);
+      // Centring puts the courier halfway down a map whose bottom half is
+      // behind the sheet. Pan the covered strip back out, and only when the fix
+      // actually moved — panning to the same point every three seconds, then
+      // shifting it again, is a map that twitches for the whole delivery.
+      const key = `${riderPoint.lat},${riderPoint.lng},${bottomInset}`;
+      if (panKey.current !== key) {
+        panKey.current = key;
+        mapObj.current.panTo(riderPoint);
+        if (bottomInset > 0)
+          mapObj.current.panBy(0, Math.round(bottomInset / 2));
+      }
     } else {
+      panKey.current = null;
       riderMarker.current?.setMap(null);
     }
-  }, [restaurant, destination, riderPoint, showRider, status, routePath]);
+  }, [
+    restaurant,
+    destination,
+    riderPoint,
+    showRider,
+    status,
+    routePath,
+    bottomInset,
+  ]);
 
   /**
-   * Refit once the road geometry lands. The initial fit spans the two endpoints
-   * and the map opens at zoom 15 — fine for a doorstep, useless for a 75 km
-   * route whose middle is entirely off screen.
+   * Refit when the road geometry lands — the initial fit spans the two
+   * endpoints and the map opens at zoom 15, fine for a doorstep and useless for
+   * a 75 km route whose middle is entirely off screen — and when the sheet
+   * comes to rest somewhere new, which changes how much map there is to fit
+   * into. The first fit is always made with no inset, because the sheet's
+   * resting position isn't known until the client has measured the screen.
+   *
+   * Keyed on those two inputs alone: the 3-second poll hands this component
+   * fresh object identities for the same two pins, and refitting on those would
+   * yank the customer's zoom back every time it answered.
    */
+  const lastFit = useRef<string | null>(null);
   useEffect(() => {
-    if (!mapObj.current || status !== "ready" || !routePath) return;
-    fitBounds(mapObj.current, restaurant, destination, null, routePath);
-  }, [routePath, status, restaurant, destination]);
+    const map = mapObj.current;
+    if (!map || status !== "ready") return;
+    const key = `${routePath?.length ?? 0}:${bottomInset}`;
+    if (lastFit.current === key) return;
+    lastFit.current = key;
+    fitBounds(map, restaurant, destination, null, routePath, bottomInset);
+  }, [routePath, status, restaurant, destination, bottomInset]);
 
   if (status === "error") {
     return (
@@ -300,12 +351,19 @@ export function TrackingMap({
         destination={destination}
         rider={rider}
         showRider={showRider}
+        className={className}
+        bottomInset={bottomInset}
       />
     );
   }
 
   return (
-    <div className="relative h-56 w-full overflow-hidden bg-surface-2">
+    <div
+      className={cn(
+        "relative w-full overflow-hidden bg-surface-2",
+        className ?? "h-56"
+      )}
+    >
       <div ref={mapEl} className="h-full w-full" />
       {status === "loading" ? (
         <div className="absolute inset-0 grid place-items-center bg-surface-2/70">
@@ -318,7 +376,10 @@ export function TrackingMap({
           route, and a customer measuring their delivery off it would be
           measuring a line no vehicle can drive. */}
       {routeFailed ? (
-        <p className="absolute inset-x-0 bottom-0 bg-surface/85 px-3 py-1.5 text-[10px] font-medium leading-snug text-muted">
+        <p
+          style={{ bottom: bottomInset }}
+          className="absolute inset-x-0 bg-surface/85 px-3 py-1.5 text-[10px] font-medium leading-snug text-muted"
+        >
           Road route unavailable — the line is direct, not along roads.
         </p>
       ) : null}
@@ -331,7 +392,8 @@ function fitBounds(
   restaurant: TrackPoint | null,
   destination: TrackPoint,
   rider: TrackPoint | null,
-  routePath?: TrackPoint[] | null
+  routePath?: TrackPoint[] | null,
+  bottomInset = 0
 ) {
   const bounds = new google.maps.LatLngBounds();
   // An unpinned shop contributes nothing to the box — the destination and any
@@ -341,7 +403,14 @@ function fitBounds(
   if (rider) bounds.extend(rider);
   // A road route can bulge well outside the box its two ends describe.
   if (routePath) for (const p of routePath) bounds.extend(p);
-  map.fitBounds(bounds, 48);
+  // Per-edge, so the box is fitted into the part of the map that is not behind
+  // the sheet. A uniform inset centres a 70 km route on a covered midpoint.
+  map.fitBounds(bounds, {
+    top: 48,
+    right: 48,
+    left: 48,
+    bottom: 48 + bottomInset,
+  });
 }
 
 /** Where a point sits inside the padded bounding box, as CSS percentages. */
@@ -400,11 +469,15 @@ function TrackingMapFallback({
   destination,
   rider,
   showRider,
+  className,
+  bottomInset = 0,
 }: {
   restaurant: TrackPoint | null;
   destination: TrackPoint;
   rider: TrackPoint | null;
   showRider: boolean;
+  className?: string;
+  bottomInset?: number;
 }) {
   const courier = showRider && rider ? rider : null;
   const place = placer([
@@ -419,53 +492,67 @@ function TrackingMapFallback({
   const bike = courier ? place(courier) : null;
 
   return (
-    <div className="relative h-56 overflow-hidden bg-[linear-gradient(135deg,#e6f4ec,#eef1f2)]">
-      <svg
-        className="absolute inset-0 h-full w-full"
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        {/* Stroked via `style`, not a `stroke` attribute: a CSS variable is
+    <div
+      className={cn(
+        "relative overflow-hidden bg-[linear-gradient(135deg,#e6f4ec,#eef1f2)]",
+        className ?? "h-56"
+      )}
+    >
+      {/* The schematic is laid out in percentages, so it is confined to the
+          strip that is actually on screen rather than to the box — half of
+          which can be behind the tracking sheet. Without this the courier and
+          the door are projected into a band nobody can see. */}
+      <div className="absolute inset-x-0 top-0" style={{ bottom: bottomInset }}>
+        <svg
+          className="absolute inset-0 h-full w-full"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          {/* Stroked via `style`, not a `stroke` attribute: a CSS variable is
             only valid in a style declaration, and `stroke="var(--line)"` as a
             presentation attribute simply doesn't paint. */}
+          {shop ? (
+            <line
+              x1={parseFloat(shop.left)}
+              y1={parseFloat(shop.top)}
+              x2={parseFloat(home.left)}
+              y2={parseFloat(home.top)}
+              style={{ stroke: "var(--line)" }}
+              strokeWidth="0.6"
+              strokeDasharray="2 2"
+              vectorEffect="non-scaling-stroke"
+            />
+          ) : null}
+        </svg>
+
         {shop ? (
-          <line
-            x1={parseFloat(shop.left)}
-            y1={parseFloat(shop.top)}
-            x2={parseFloat(home.left)}
-            y2={parseFloat(home.top)}
-            style={{ stroke: "var(--line)" }}
-            strokeWidth="0.6"
-            strokeDasharray="2 2"
-            vectorEffect="non-scaling-stroke"
-          />
+          <Marker at={shop} label="Restaurant">
+            <span className="grid size-7 place-items-center rounded-full bg-surface text-ink ring-4 ring-white/70">
+              <Store className="size-3.5" />
+            </span>
+          </Marker>
         ) : null}
-      </svg>
 
-      {shop ? (
-        <Marker at={shop} label="Restaurant">
-          <span className="grid size-7 place-items-center rounded-full bg-surface text-ink ring-4 ring-white/70">
-            <Store className="size-3.5" />
+        <Marker at={home} label="Your location">
+          <span className="grid size-7 place-items-center rounded-full bg-ink text-bg ring-4 ring-white/70">
+            <span className="size-2 rounded-full bg-bg" />
           </span>
         </Marker>
-      ) : null}
 
-      <Marker at={home} label="Your location">
-        <span className="grid size-7 place-items-center rounded-full bg-ink text-bg ring-4 ring-white/70">
-          <span className="size-2 rounded-full bg-bg" />
-        </span>
-      </Marker>
+        {bike ? (
+          <Marker at={bike} label="Courier">
+            <span className="grid size-8 place-items-center rounded-full bg-accent text-[var(--on-accent)] ring-4 ring-white/70">
+              <Bike className="size-4" />
+            </span>
+          </Marker>
+        ) : null}
+      </div>
 
-      {bike ? (
-        <Marker at={bike} label="Courier">
-          <span className="grid size-8 place-items-center rounded-full bg-accent text-[var(--on-accent)] ring-4 ring-white/70">
-            <Bike className="size-4" />
-          </span>
-        </Marker>
-      ) : null}
-
-      <p className="absolute inset-x-0 bottom-0 bg-surface/85 px-3 py-1.5 text-[10px] font-medium leading-snug text-muted">
+      <p
+        style={{ bottom: bottomInset }}
+        className="absolute inset-x-0 bg-surface/85 px-3 py-1.5 text-[10px] font-medium leading-snug text-muted"
+      >
         No map available — positions shown in a straight line, not along roads.
       </p>
     </div>

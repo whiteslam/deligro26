@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { VendorSegmentedTabs } from "@/components/vendor/vendor-page-header";
 import { VendorOrderHistoryDialog } from "@/components/vendor/vendor-order-history-dialog";
+import { RejectOrderDialog } from "@/components/vendor/reject-order-dialog";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { KitchenAlert } from "@/components/vendor/kitchen-alert";
 import { KitchenBusyControl } from "@/components/vendor/kitchen-busy-control";
@@ -254,7 +255,9 @@ function OrderCard({
           <p className="mt-0.5 line-clamp-1 text-sm font-bold leading-snug">
             {title}
           </p>
-          <p className="mt-0.5 line-clamp-2 text-xs text-muted">{description}</p>
+          <p className="mt-0.5 line-clamp-2 text-xs text-muted">
+            {description}
+          </p>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
             <span className="inline-flex items-center gap-1">
               <Clock className="size-3.5 shrink-0" />
@@ -536,7 +539,9 @@ function HistoryOrderCard({
           <p className="mt-1 line-clamp-1 text-sm font-bold leading-snug">
             {title}
           </p>
-          <p className="mt-0.5 line-clamp-2 text-xs text-muted">{description}</p>
+          <p className="mt-0.5 line-clamp-2 text-xs text-muted">
+            {description}
+          </p>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1 text-xs text-muted">
               <Clock className="size-3.5 shrink-0" />
@@ -630,10 +635,7 @@ function HistoryList({
   if (orders.length === 0) {
     return (
       <div className="space-y-3">
-        <VendorEmptyState
-          title="Nothing here yet"
-          description={empty}
-        />
+        <VendorEmptyState title="Nothing here yet" description={empty} />
         {onViewAll ? (
           <Button
             type="button"
@@ -706,6 +708,8 @@ export function VendorOrdersBoard({
   const [historyDialog, setHistoryDialog] = useState<
     null | "cancelled" | "completed"
   >(null);
+  /** The order the reason dialog is open for, if any. */
+  const [rejecting, setRejecting] = useState<KitchenOrder | null>(null);
 
   // When auto-refresh pulls fresh server data, adopt it as the source of truth
   // (new orders appear, accepted ones move) while keeping the local ready tally.
@@ -738,19 +742,28 @@ export function VendorOrdersBoard({
     setCancelled(initialCancelled);
   }
 
-  async function patchStatus(
+  /**
+   * Accept and Ready go straight through. Rejecting opens the reason dialog
+   * instead of a `window.confirm`, because the confirm asked a question whose
+   * answer nobody kept — and the customer is the one who then has to guess why
+   * their order disappeared.
+   */
+  function patchStatus(
     order: KitchenOrder,
     status: "kitchen" | "ready" | "cancelled"
   ) {
     if (status === "cancelled") {
-      const label =
-        order.status === "placed" || !order.status ? "Reject" : "Cancel";
-      const ok = window.confirm(
-        `${label} order ${order.code}? This cannot be undone from the board.`
-      );
-      if (!ok) return;
+      setRejecting(order);
+      return;
     }
+    void applyStatus(order, status);
+  }
 
+  async function applyStatus(
+    order: KitchenOrder,
+    status: "kitchen" | "ready" | "cancelled",
+    reason?: string
+  ) {
     if (!live) {
       if (status === "kitchen") acceptLocal(order);
       else if (status === "cancelled") rejectLocal(order);
@@ -764,7 +777,7 @@ export function VendorOrdersBoard({
       const res = await fetch(`/api/orders/${order.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(reason ? { status, reason } : { status }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as {
@@ -876,22 +889,10 @@ export function VendorOrdersBoard({
       ) : null}
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3 @3xl:grid-cols-4">
-        <VendorMetricCard
-          label="New"
-          value={String(incoming.length)}
-        />
-        <VendorMetricCard
-          label="Preparing"
-          value={String(preparing.length)}
-        />
-        <VendorMetricCard
-          label="Ready"
-          value={String(ready.length)}
-        />
-        <VendorMetricCard
-          label="Cancelled"
-          value={String(cancelled.length)}
-        />
+        <VendorMetricCard label="New" value={String(incoming.length)} />
+        <VendorMetricCard label="Preparing" value={String(preparing.length)} />
+        <VendorMetricCard label="Ready" value={String(ready.length)} />
+        <VendorMetricCard label="Cancelled" value={String(cancelled.length)} />
       </div>
 
       <div className="space-y-4 @3xl:hidden">
@@ -928,10 +929,18 @@ export function VendorOrdersBoard({
       </div>
 
       <div className="hidden gap-4 @3xl:grid @3xl:grid-cols-3">
-        <VendorKanbanColumn title="New orders" count={incoming.length} tone="accent">
+        <VendorKanbanColumn
+          title="New orders"
+          count={incoming.length}
+          tone="accent"
+        >
           <IncomingList orders={incoming} busy={busy} onPatch={patchStatus} />
         </VendorKanbanColumn>
-        <VendorKanbanColumn title="Preparing" count={preparing.length} tone="blue">
+        <VendorKanbanColumn
+          title="Preparing"
+          count={preparing.length}
+          tone="blue"
+        >
           <PreparingList orders={preparing} busy={busy} onPatch={patchStatus} />
         </VendorKanbanColumn>
         <VendorKanbanColumn title="Ready" count={ready.length} tone="green">
@@ -982,6 +991,20 @@ export function VendorOrdersBoard({
             />
           </VendorPanel>
         </div>
+      ) : null}
+
+      {rejecting ? (
+        <RejectOrderDialog
+          code={rejecting.code}
+          isReject={rejecting.status === "placed" || !rejecting.status}
+          busy={busy === rejecting.id}
+          onCancel={() => setRejecting(null)}
+          onConfirm={async (reason) => {
+            const order = rejecting;
+            await applyStatus(order, "cancelled", reason);
+            setRejecting(null);
+          }}
+        />
       ) : null}
 
       {historyDialog ? (

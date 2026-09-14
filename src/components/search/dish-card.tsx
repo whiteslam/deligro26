@@ -10,7 +10,7 @@ import { VegMark } from "@/components/shared/veg-mark";
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { ShopDistance } from "@/components/shared/shop-distance";
 import { ItemPrice } from "@/components/shared/item-price";
-import { formatEta, formatRating } from "@/lib/utils/format";
+import { formatEta, formatRating, isRated } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -68,10 +68,19 @@ export function DishCard({ hit }: { hit: DishHit }) {
         >
           <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold text-ink">
             <span className="truncate">{restaurant.name}</span>
-            <span className="inline-flex shrink-0 items-center gap-0.5 text-muted">
-              <Star className="size-3 fill-pop text-pop" />
-              {formatRating(restaurant.rating)}
-            </span>
+            {/* A kitchen nobody has reviewed is new, not bad. Both columns
+                default to 0, so this used to render "★ 0.0" beside every shop
+                that had not been rated yet. */}
+            {isRated(restaurant.rating, restaurant.ratingCount) ? (
+              <span className="inline-flex shrink-0 items-center gap-0.5 text-muted">
+                <Star className="size-3 fill-pop text-pop" />
+                {formatRating(restaurant.rating)}
+              </span>
+            ) : (
+              <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-muted">
+                New
+              </span>
+            )}
           </span>
           <span className="mt-0.5 flex items-center gap-2 text-[12px] font-medium text-muted">
             <span className="inline-flex items-center gap-1">

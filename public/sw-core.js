@@ -91,7 +91,14 @@ function isRscRequest(request, url) {
 }
 
 /* Hashed build output. The filename changes whenever the bytes do, so a hit is
- * always correct and never needs revalidating. */
+ * always correct and never needs revalidating.
+ *
+ * That holds for a production build and ONLY for a production build. `next dev`
+ * serves this same prefix from stable, unhashed paths and changes the bytes
+ * underneath them, so cache-first here would pin the first stylesheet the
+ * browser ever saw. The worker is therefore not registered outside production —
+ * see the guard in `lib/pwa/service-worker.ts`, which is load-bearing for this
+ * function rather than a convenience. */
 function isImmutableAsset(url) {
   return url.pathname.startsWith("/_next/static/");
 }

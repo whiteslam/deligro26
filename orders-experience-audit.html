@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Orders experience audit — Deligro</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: #14181b;
+        --muted: #6b7580;
+        --bg: #f7f6f3;
+        --surface: #ffffff;
+        --line: #e2e0da;
+        --green: #17b26a;
+        --red: #d9534f;
+        --amber: #d98c22;
+        --accent: #f0731e;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #e9edf0;
+          --muted: #99a4ae;
+          --bg: #14181b;
+          --surface: #1b2126;
+          --line: #2a3036;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 16px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      main { max-width: 860px; margin: 0 auto; padding: 48px 20px 96px; }
+      header.top { border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 40px; }
+      h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+      h2 {
+        font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--muted); margin: 48px 0 12px;
+      }
+      h3 { font-size: 18px; margin: 28px 0 6px; letter-spacing: -0.01em; }
+      p, li { color: var(--ink); }
+      .lede { color: var(--muted); margin: 0; }
+      .scenario {
+        border-left: 3px solid var(--line);
+        padding: 2px 0 2px 16px;
+        margin: 22px 0;
+      }
+      .scenario .said {
+        font-style: italic; color: var(--muted); margin: 0 0 8px;
+      }
+      .scenario p:last-child { margin-bottom: 0; }
+      table { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; }
+      th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+      td code, p code, li code {
+        font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: var(--surface); border: 1px solid var(--line);
+        border-radius: 4px; padding: 1px 5px;
+      }
+      .tag {
+        display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+        text-transform: uppercase; padding: 2px 8px; border-radius: 99px; white-space: nowrap;
+      }
+      .tag.fixed { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
+      .tag.open { background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }
+      .wrap { overflow-x: auto; }
+      ul { padding-left: 20px; }
+      .foot { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="top">
+        <h1>Orders experience audit</h1>
+        <p class="lede">
+          The customer Orders tab (<code>/orders</code>) and the order tracking
+          screen (<code>/orders/[id]</code>), read as a customer rather than as
+          a diff. 13 September 2026 — second pass, findings 10–13 closed.
+        </p>
+      </header>
+
+      <h2>How this was read</h2>
+      <p>
+        Both screens were walked through as a person with a phone in their hand
+        and a specific question, not as a component tree. Every finding below
+        starts from a sentence a customer would actually say. Where the fix was
+        free — the data was already fetched and on the row, unused — it is
+        marked as shipped in this pass.
+      </p>
+
+      <h2>Scenarios</h2>
+
+      <div class="scenario">
+        <p class="said">“Where is my food, is it close?”</p>
+        <p>
+          The live order was the same row as the seven finished ones under it,
+          separated by an orange chevron. Its one line of 13px grey text said
+          <em>when the order was placed</em> — “Tue, 10:39 pm · Preparing” —
+          which is the one fact nobody opens this tab to learn. The arrival time
+          existed, computed by <code>lib/orders/eta.ts</code>, one tap away.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“Which one of these was the biryani?”</p>
+        <p>
+          Eight rows reading <em>Saffron Kitchen · ₹302 · Delivered</em>. The
+          items were fetched with every row
+          (<code>order_items(name, qty, price…)</code> is in the list query) and
+          shown nowhere. For a customer with one regular restaurant, the history
+          was an undifferentiated column — and “order again” was a coin flip.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“The one from last month, with the naans.”</p>
+        <p>
+          <code>formatOrderPlacedAt</code> dropped the date entirely past
+          yesterday: every older order rendered as a weekday and a time, so last
+          Wednesday and Wednesday five months ago were the same four characters.
+          There was no search, no filter and no grouping over a list capped at
+          100 rows.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“Half of these never even arrived.”</p>
+        <p>
+          Five of eight rows in the reference screenshot were cancellations,
+          visually identical to deliveries but for the colour of one word.
+          Nothing let a customer ask for only the orders that actually happened.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“I paid online and it was cancelled — where’s my money?”</p>
+        <p>
+          The list said “Cancelled” and stopped. <code>payment_status</code> was
+          already on the row and knows the difference between money we returned
+          and money we are still holding.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“What is this grey band under the buttons?”</p>
+        <p>
+          On the tracking screen the sheet ended with its content and the shell’s
+          reserved 80px tab-bar strip showed through beneath it, with the
+          sheet’s own drop shadow smeared across the seam. The sheet also drew a
+          grab handle for a gesture that did not exist: it was an ordinary block
+          in a scrolling page.
+        </p>
+      </div>
+
+      <h2>Findings</h2>
+      <div class="wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Finding</th><th>Where</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>The active order gets no arrival time, no progress and no visual priority over finished ones.</td>
+              <td><code>orders/page.tsx</code></td>
+              <td><span class="tag fixed">Fixed</span></td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>Order items are fetched and never rendered, so history rows are indistinguishable.</td>
+              <td><code>order-card.tsx</code></td>
+              <td><span class="tag fixed">Fixed</span></td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td>Orders older than a week lose their date and render as a bare weekday.</td>
+              <td><code>order-map.ts</code></td>
+              <td><span class="tag fixed">Fixed</span></td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td>No filter, no search and no grouping over a list of up to 100 rows.</td>
+              <td><code>order-history.tsx</code></td>
+              <td><span class="tag fixed">Fixed</span></td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td>A cancelled order we were still holding money for looked like any other cancellation.</td>
+              <td><code>order-card.tsx</code></td>
+              <td><span class="tag fixed">Fixed</span></td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td>Reorder — the most repeated action here, and one that replaces the basket — was an unlabelled circle.</td>
+              <td><code>order-card.tsx</code></td>
+              <td><span class="tag fixed">Fixed</span></td>
+            </tr>
+            <tr>
+              <td>7</td>
+              <td>Tracking sheet stopped at its content, exposing the reserved tab-bar strip and its own shadow.</td>
+              <td><code>tracking-view.tsx</code></td>
+              <td><span class="tag fixed">Fixed</span></td>
+            </tr>
+            <tr>
+              <td>8</td>
+              <td>The sheet drew a drag handle and could not be dragged.</td>
+              <td><code>tracking-sheet.tsx</code></td>
+              <td><span class="tag fixed">Fixed</span></td>
+            </tr>
+            <tr>
+              <td>9</td>
+              <td>Map pins and captions were framed against the whole map box, half of which sits behind the sheet.</td>
+              <td><code>tracking-map.tsx</code></td>
+              <td><span class="tag fixed">Fixed</span></td>
+            </tr>
+            <tr>
+              <td>10</td>
+              <td>No invoice or receipt anywhere in the customer app — a delivered order cannot be expensed.</td>
+              <td><code>orders/[id]/receipt</code></td>
+              <td><span class="tag fixed">Fixed</span></td>
+            </tr>
+            <tr>
+              <td>11</td>
+              <td>Cancellations don’t say <em>who</em> cancelled or why. Five in a row with no reason reads as the app failing.</td>
+              <td>migration <code>0051</code></td>
+              <td><span class="tag fixed">Fixed</span></td>
+            </tr>
+            <tr>
+              <td>12</td>
+              <td>History stops at 100 rows with no paging and no indication that it was cut.</td>
+              <td><code>api/orders/history</code></td>
+              <td><span class="tag fixed">Fixed</span></td>
+            </tr>
+            <tr>
+              <td>13</td>
+              <td>No pull-to-refresh; the 10s poll runs only while an order is in flight.</td>
+              <td><code>pull-to-refresh.tsx</code></td>
+              <td><span class="tag fixed">Fixed</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>What changed</h2>
+
+      <h3>The Orders tab</h3>
+      <ul>
+        <li>
+          <strong>A live order card</strong> under a “Happening now” heading:
+          restaurant, order code, total, the arrival estimate as the headline, a
+          four-notch progress bar, the current stage in words, and a “running N
+          minutes late” chip when the ETA says so. The estimate is the same
+          <code>OrderEta</code> the tracking screen headlines, fetched
+          server-side and refreshed on the existing 10s cadence, so the two
+          screens can never disagree. An unpinned shop yields “On its way”
+          rather than a kitchen’s advertised band dressed up as an arrival time.
+        </li>
+        <li>
+          <strong>History rows say what was in the order</strong> — “Paneer
+          Butter Masala +2 more” — and carry a real date past the first week.
+        </li>
+        <li>
+          <strong>Filter chips with counts</strong> (All / Delivered /
+          Cancelled), a <strong>search box</strong> over restaurant and dish
+          names once there are six or more orders, and <strong>month
+          headings</strong> so scrolling has landmarks. Filtering is client-side
+          because the whole list is already on the page.
+        </li>
+        <li>
+          <strong>“Refund not issued”</strong> on a cancelled order whose
+          payment is still <code>paid</code>. Worded as the ledger state, not as
+          a promise — a request may already be in flight.
+        </li>
+        <li>
+          <strong>Reorder is labelled “Again”</strong>, and a filter that
+          matches nothing gets its own notice with a way back, distinct from
+          having no history at all.
+        </li>
+      </ul>
+
+      <h3>The tracking screen</h3>
+      <ul>
+        <li>
+          <strong>The sheet drags.</strong> Three stops — 8%, 34% and 66% of the
+          area under the header. The handle drags with a finger, a mouse or the
+          arrow keys and toggles on tap; a finger anywhere in the content also
+          moves it, but only when the pull cannot mean anything else (the list
+          is at its top and the finger is going down, or the sheet is not fully
+          open and the finger is going up), so an ordinary scroll is never
+          stolen.
+        </li>
+        <li>
+          <strong>No more grey band.</strong> The screen fills the frame and
+          scrolls nothing at the page level; the sheet runs to the bottom edge
+          with the tab bar floating over it, and the content clears the bar.
+        </li>
+        <li>
+          <strong>The map is sized to the sheet’s lowest stop</strong>, so
+          dragging down runs out of travel exactly at the bottom of the map and
+          can never expose the page behind it.
+        </li>
+        <li>
+          <strong>The map knows it is partly covered.</strong> The bounds fit,
+          the pan that follows the courier, the “road route unavailable”
+          captions and the no-SDK schematic all subtract the covered strip, and
+          the zoom control moved out of the corner the sheet sits on. A finished
+          order opens with the sheet up, since there is nothing left to watch.
+        </li>
+      </ul>
+
+      <h2>Findings 10–13, in the second pass</h2>
+
+      <h3>Cancellations now say who and why (11)</h3>
+      <p>
+        Migration <code>0051</code> adds <code>cancelled_by</code> and
+        <code>cancellation_reason</code> to <code>orders</code>, on two
+        different footings. <code>cancelled_by</code> is evidence: it is on
+        <code>guard_order_update()</code>’s locked list and derived by the
+        lifecycle trigger from whoever is actually making the write, so a vendor
+        cannot pre-write “customer” onto an order they are about to reject.
+        <code>cancellation_reason</code> is a sentence, and is deliberately left
+        writable — the kitchen rejecting an order is who should be typing it —
+        but only on the update that performs the cancellation itself.
+      </p>
+      <p>
+        Above it, the kitchen board’s <code>window.confirm</code> (“Reject order
+        X?”, answer discarded) becomes a dialog with four one-tap reasons
+        written from the customer’s side of the conversation, plus free text.
+        The reason is optional on purpose: a kitchen mid-rush must still be able
+        to reject in one tap, and a required field would be answered with “.”
+        inside a week. The admin console already collected a reason and filed it
+        against the <em>refund</em>, where the customer never saw it; it now goes
+        on the order too. Both customer screens render it, and render
+        <em>nothing</em> when the row cannot be attributed — a pre-0051
+        cancellation — because the guess everyone reaches for is the accusation.
+      </p>
+
+      <h3>Receipts (10)</h3>
+      <p>
+        <code>/orders/[id]/receipt</code>: line items, subtotal, discount and
+        coupon code, delivery, taxes, tip, total, how it was paid and where it
+        went. Every one of those was already fetched with the order and thrown
+        away during mapping. Delivered orders only — a receipt for a cancelled
+        order is a document asserting a sale that did not happen, and it is the
+        kind of document people forward to an accountant. Printing rather than a
+        bundled PDF renderer, with the <code>@media print</code> block extended
+        to unwind the phone frame: without that, printing gives one
+        phone-shaped screenshot with the rest clipped off.
+      </p>
+
+      <h3>Paging (12)</h3>
+      <p>
+        <code>GET /api/orders/history?before=&lt;iso&gt;</code> pages past the
+        100-row cap, keyed on <code>created_at</code> rather than an offset so an
+        order arriving mid-scroll cannot shift a page boundary and show somebody
+        the same row twice. The cap is now visible — a “Load older orders”
+        control instead of a wall that looked like the end of your history — and
+        while a search is active the list says plainly that it is searching only
+        what has been loaded.
+      </p>
+
+      <h3>The delivery code, pinned (follow-up)</h3>
+      <p>
+        It was a tinted card four blocks into a scrolling sheet — present, but
+        something you had to go and find while a courier waited at the door. It
+        now lives in the sheet’s header, above the scroller, so it is on screen
+        at every stop including the one where the sheet is pushed down to show
+        the map. A hairline and two words of label; the digits carry it.
+      </p>
+
+      <h3>Pull to refresh (13)</h3>
+      <p>
+        The timer was right to only run while an order was in flight; what was
+        missing was any way to ask. Pulling did nothing, and not by omission:
+        <code>.app-scroll</code> sets <code>overscroll-behavior: contain</code>,
+        which suppresses even the browser’s own gesture. The new component drives
+        that scroller directly so the page follows the finger, and
+        <code>AutoRefresh</code> gained an <code>interval={0}</code> mode that
+        keeps the catch-up-on-focus without polling a page of finished orders.
+      </p>
+
+      <div class="foot">
+        Verified by <code>npx tsc --noEmit</code>, <code>npx eslint</code>,
+        <code>npm run build</code>, and fourteen offline QA suites
+        (<code>platform</code>, <code>layering</code>, <code>switch</code>,
+        <code>tracking-origin</code>, <code>eta</code>, <code>sw</code>,
+        <code>app-version</code>, <code>obs</code>, <code>service-area</code>,
+        <code>driver-app</code>, <code>vendor-readiness</code>,
+        <code>ranking</code>, <code>theme-color</code>,
+        <code>payments</code>) — all green. <code>test:idor</code> needs live QA
+        credentials this environment does not hold. The 0051 change review is
+        logged in <code>docs/SECURITY_AUDIT.md</code>.
+        <br /><br />
+        <strong>Two things are not verified.</strong> This environment has no
+        headless browser, so the drag gesture, the pull gesture and the new
+        layouts have not been seen running. And migration <code>0051</code> has
+        not been applied to a database — the app is written to work either way
+        (the read probes for the columns, the write retries without them), but
+        until it is applied every cancellation stays anonymous.
+      </div>
+    </main>
+  </body>
+</html>

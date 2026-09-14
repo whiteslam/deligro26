@@ -1,8 +1,18 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, X, UtensilsCrossed, Store, TriangleAlert } from "lucide-react";
+import {
+  Search,
+  X,
+  UtensilsCrossed,
+  Store,
+  TriangleAlert,
+  SlidersHorizontal,
+  ArrowUpDown,
+  ChevronDown,
+  Clock,
+} from "lucide-react";
 import type { Restaurant } from "@/types";
 import {
   buildDishIndex,
@@ -14,13 +24,20 @@ import {
   type RankContext,
   type SearchFilters,
 } from "@/lib/search/dishes";
+import {
+  SearchFilterSheet,
+  SearchSortSheet,
+  BUDGET_PRICE,
+  filterLabel,
+  sortLabel,
+} from "@/components/search/search-sheets";
 import { useLocation } from "@/stores/location-store";
+import { useSearchHistory } from "@/stores/search-history-store";
 import { PINNED_LOCATION } from "@/lib/location/pinned";
 import { DishCard } from "@/components/search/dish-card";
 import { RestaurantCard } from "@/components/shared/restaurant-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
-import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
 type Tab = "dishes" | "shops";
@@ -28,26 +45,13 @@ type Tab = "dishes" | "shops";
 /** Ceiling on the dish list. Long enough to scroll, short enough to render. */
 const DISH_LIMIT = 60;
 
-/** The cap behind the "Under ₹200" chip, in whole rupees. */
-const BUDGET_PRICE = 200;
-
-const SUGGESTIONS = ["Paneer", "Biryani", "Pizza", "Cold coffee", "Dosa"] as const;
-
-const QUICK_FILTERS = [
-  { id: "veg", label: "Pure Veg" },
-  { id: "popular", label: "Bestsellers" },
-  { id: "cheap", label: `Under ${formatINR(BUDGET_PRICE)}` },
-  { id: "fast", label: "Under 25 min" },
-  { id: "rating", label: "Rating 4.5+" },
-  { id: "offers", label: "Offers" },
+const SUGGESTIONS = [
+  "Paneer",
+  "Biryani",
+  "Pizza",
+  "Cold coffee",
+  "Dosa",
 ] as const;
-
-const SORTS: { id: DishSort; label: string }[] = [
-  { id: "relevance", label: "Best match" },
-  { id: "price", label: "Price" },
-  { id: "eta", label: "Fastest" },
-  { id: "rating", label: "Top rated" },
-];
 
 /**
  * Food-first search.
@@ -84,6 +88,7 @@ export function SearchView({
   const [category, setCategory] = useState<string | null>(
     initialCategory ?? null
   );
+  const [sheet, setSheet] = useState<null | "filters" | "sort">(null);
 
   // Keeps the field responsive while the ranking catches up on a big catalog.
   const deferredQuery = useDeferredValue(query);
@@ -130,13 +135,43 @@ export function SearchView({
       return next;
     });
 
-  const clearAll = () => {
+  /**
+   * Clears the filters and leaves the words alone.
+   *
+   * It used to clear the query too, which is the opposite of what "Clear
+   * filters" says and threw away the one thing the customer typed themselves.
+   */
+  const clearFilters = () => {
     setChips(new Set());
     setCategory(null);
-    setQuery("");
   };
 
   const typed = deferredQuery.trim();
+
+  /*
+   * Remember what was searched for, once it has stopped moving.
+   *
+   * There is no submit on this screen — the list updates on every keystroke —
+   * so "they meant this one" has to be inferred. Two conditions do it: the
+   * words have been still for a beat, and they actually found something.
+   * A query that returned nothing is not worth offering back to somebody
+   * later, and the store collapses the prefixes typed on the way in.
+   */
+  const recordSearch = useSearchHistory((s) => s.record);
+  const hydrateHistory = useSearchHistory((s) => s.hydrate);
+  const history = useSearchHistory((s) => s.history);
+  const removeSearch = useSearchHistory((s) => s.remove);
+  const clearHistory = useSearchHistory((s) => s.clear);
+
+  useEffect(() => hydrateHistory(), [hydrateHistory]);
+
+  const foundSomething = dishes.length > 0;
+  useEffect(() => {
+    if (!typed || !foundSomething) return;
+    const t = window.setTimeout(() => recordSearch(typed), 900);
+    return () => window.clearTimeout(t);
+  }, [typed, foundSomething, recordSearch]);
+
   const activeCount = chips.size + (category ? 1 : 0);
   const showSuggestions = !typed && !category && chips.size === 0;
   const shown = dishes.slice(0, DISH_LIMIT);
@@ -153,9 +188,23 @@ export function SearchView({
   // common path does no extra work.
   const withoutCategory = useMemo(() => {
     if (dishes.length || !category || !typed) return 0;
-    return searchDishes(index, deferredQuery, { ...filters, category: null }, sort, ctx)
-      .length;
-  }, [dishes.length, category, typed, index, deferredQuery, filters, sort, ctx]);
+    return searchDishes(
+      index,
+      deferredQuery,
+      { ...filters, category: null },
+      sort,
+      ctx
+    ).length;
+  }, [
+    dishes.length,
+    category,
+    typed,
+    index,
+    deferredQuery,
+    filters,
+    sort,
+    ctx,
+  ]);
 
   return (
     <div>
@@ -186,20 +235,46 @@ export function SearchView({
           ) : null}
         </div>
 
-        <div className="mt-2.5 flex items-center gap-1 rounded-full bg-surface-2 p-0.5 text-[13px] font-bold">
+        {/* A segmented control, not two buttons that happen to touch.
+            
+            The selected half is carried by a thumb that SLIDES rather than a
+            pill that teleports, which is the difference between "a button lit
+            up" and "a control moved" — and it makes the relationship legible:
+            one object with one indicator.
+
+            Geometry is exact rather than tuned. The track pads 4px, the thumb
+            is `50% - 4px`, and it travels exactly its own width — so in
+            position two its right edge lands on the track's inner right edge
+            to the pixel, at any width, with nothing to re-tune when the labels
+            change length. */}
+        <div className="relative mt-2.5 flex rounded-full bg-surface-2 p-1 text-[13px] font-bold shadow-[inset_0_1px_2px_rgb(0_0_0/0.07)]">
+          <span
+            aria-hidden
+            style={{
+              transform: tab === "shops" ? "translateX(100%)" : "translateX(0)",
+            }}
+            /* Recessed track, raised thumb: the thing that moves has to read as
+               sitting on top of the thing it moves along, or the motion is just
+               a coloured rectangle sliding about. The easing overshoots a shade
+               and settles — linear over the same duration reads as a slide,
+               this reads as a snap. */
+            className="absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-accent shadow-[var(--glow-accent)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+          />
           <TabBtn
             on={tab === "dishes"}
             onClick={() => setTab("dishes")}
             icon={<UtensilsCrossed className="size-4" />}
+            count={dishes.length}
           >
-            Dishes ({dishes.length})
+            Dishes
           </TabBtn>
           <TabBtn
             on={tab === "shops"}
             onClick={() => setTab("shops")}
             icon={<Store className="size-4" />}
+            count={shops.length}
           >
-            Restaurants ({shops.length})
+            Restaurants
           </TabBtn>
         </div>
       </div>
@@ -215,39 +290,71 @@ export function SearchView({
           </div>
         ) : null}
 
-        <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1">
-          {QUICK_FILTERS.map((f) => (
-            <Chip key={f.id} on={chips.has(f.id)} onClick={() => toggleChip(f.id)}>
-              {f.label}
-            </Chip>
-          ))}
-        </div>
+        {/* What this device searched for before, which beats a fixed guess at
+            what a market wants. Only on the untouched screen: once somebody is
+            typing, their own words are the subject and their old ones are in
+            the way. */}
+        {showSuggestions && history.length ? (
+          <div>
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
+                Recent
+              </p>
+              <button
+                type="button"
+                onClick={clearHistory}
+                className="press text-[13px] font-bold text-muted underline"
+              >
+                Clear
+              </button>
+            </div>
+            <ul className="mt-1 divide-y divide-line">
+              {history.map((term) => (
+                <li key={term} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setQuery(term)}
+                    className="press flex min-w-0 flex-1 items-center gap-2.5 py-2.5 text-left"
+                  >
+                    <Clock className="size-4 shrink-0 text-muted" />
+                    <span className="truncate text-[15px] font-semibold">
+                      {term}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeSearch(term)}
+                    aria-label={`Forget ${term}`}
+                    className="press grid size-8 shrink-0 place-items-center rounded-full text-muted"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
-        <div className="no-scrollbar -mx-4 mt-2 flex items-center gap-2 overflow-x-auto px-4">
-          {FOOD_CATEGORIES.map((c) => (
-            <Chip
-              key={c.id}
-              on={category === c.id}
-              onClick={() => setCategory(category === c.id ? null : c.id)}
-            >
-              {c.label}
-            </Chip>
-          ))}
-        </div>
-
+        {/* These type a word into the field, which is why they sit against it
+            rather than down among the controls that narrow results. They used
+            to be capsules two rows below the filters, and two of them
+            ("Biryani", "Pizza") were also category chips — the same word,
+            identical, doing two different things. A magnifier on each says
+            which one this is. */}
         {showSuggestions ? (
-          <div className="mt-4">
+          <div className={history.length ? "mt-4" : ""}>
             <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
               Try searching
             </p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1">
               {SUGGESTIONS.map((term) => (
                 <button
                   key={term}
                   type="button"
                   onClick={() => setQuery(term)}
-                  className="press rounded-full bg-surface-2 px-3.5 py-2 text-sm font-semibold text-ink"
+                  className="press flex items-center gap-1.5 py-1.5 text-[15px] font-semibold text-ink"
                 >
+                  <Search className="size-3.5 shrink-0 text-muted" />
                   {term}
                 </button>
               ))}
@@ -255,12 +362,86 @@ export function SearchView({
           </div>
         ) : null}
 
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <p className="min-w-0 truncate text-sm font-medium text-muted">
+        {/* One row of two labelled controls, where four scrolling rows of
+            identical capsules used to be. A bordered button with a chevron
+            reads as "this opens something"; a filled capsule reads as "this is
+            on" — and the old screen used the second shape for both, plus for
+            switching tabs and for typing a word. */}
+        <div
+          className={cn("flex items-center gap-2", showSuggestions && "mt-5")}
+        >
+          <button
+            type="button"
+            onClick={() => setSheet("filters")}
+            aria-haspopup="dialog"
+            className={cn(
+              "press flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-bold",
+              activeCount
+                ? "border-ink bg-ink text-bg"
+                : "border-line bg-surface text-ink"
+            )}
+          >
+            <SlidersHorizontal className="size-4" />
+            Filters
+            {activeCount ? (
+              <span className="grid size-5 place-items-center rounded-full bg-bg text-[11px] text-ink">
+                {activeCount}
+              </span>
+            ) : null}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSheet("sort")}
+            aria-haspopup="dialog"
+            className="press flex min-w-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 py-2 text-[13px] font-bold text-ink"
+          >
+            <ArrowUpDown className="size-4 shrink-0" />
+            <span className="truncate">{sortLabel(sort)}</span>
+            <ChevronDown className="size-4 shrink-0 text-muted" />
+          </button>
+        </div>
+
+        {/* The only capsules left on this screen, and now they mean exactly one
+            thing: this is on, tap the × to take it off. Nothing was on screen
+            before to say which filters were active — the two strips scrolled
+            sideways and clipped mid-word, so a chip you turned on could simply
+            be out of view. */}
+        {activeCount ? (
+          <div className="no-scrollbar -mx-4 mt-2 flex items-center gap-2 overflow-x-auto px-4">
+            {[...chips].map((id) => (
+              <Token key={id} onRemove={() => toggleChip(id)}>
+                {filterLabel(id)}
+              </Token>
+            ))}
+            {activeCategory ? (
+              <Token onRemove={() => setCategory(null)}>
+                {activeCategory.label}
+              </Token>
+            ) : null}
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="press shrink-0 whitespace-nowrap px-1 text-[13px] font-bold text-muted underline"
+            >
+              Clear all
+            </button>
+          </div>
+        ) : null}
+
+        {/* Only once the customer has actually narrowed something. "3157
+            dishes" above an unfiltered list is a number nobody asked for — and
+            it used to be truncated to "3157 dish…" anyway, because a four-way
+            sort control was sharing the line with it. */}
+        {typed || activeCount ? (
+          <p className="mt-4 text-sm font-medium text-muted">
             {tab === "dishes" ? (
               <>
-                {dishes.length} {dishes.length === 1 ? "dish" : "dishes"}
-                {dishes.length > DISH_LIMIT ? ` · top ${DISH_LIMIT}` : ""}
+                {dishes.length.toLocaleString("en-IN")}{" "}
+                {dishes.length === 1 ? "dish" : "dishes"}
+                {dishes.length > DISH_LIMIT
+                  ? ` · showing top ${DISH_LIMIT}`
+                  : ""}
               </>
             ) : (
               <>
@@ -268,16 +449,8 @@ export function SearchView({
                 {shops.length === 1 ? "restaurant" : "restaurants"}
               </>
             )}
-            {activeCount ? ` · ${activeCount} filters` : ""}
           </p>
-          <div className="no-scrollbar flex shrink-0 items-center gap-1 overflow-x-auto rounded-full bg-surface-2 p-0.5 text-xs font-bold">
-            {SORTS.map((s) => (
-              <SortBtn key={s.id} on={sort === s.id} onClick={() => setSort(s.id)}>
-                {s.label}
-              </SortBtn>
-            ))}
-          </div>
-        </div>
+        ) : null}
 
         {!typed && tab === "dishes" && shown.length ? (
           <h2 className="mt-4 text-[17px] font-extrabold tracking-tight">
@@ -309,7 +482,7 @@ export function SearchView({
           ) : (
             <NoResults
               query={typed}
-              onClear={clearAll}
+              onClear={clearFilters}
               kind="dish"
               categoryLabel={activeCategory?.label ?? null}
               elsewhere={withoutCategory}
@@ -343,9 +516,30 @@ export function SearchView({
             ))}
           </div>
         ) : (
-          <NoResults query={typed} onClear={clearAll} kind="restaurant" />
+          <NoResults query={typed} onClear={clearFilters} kind="restaurant" />
         )}
       </div>
+
+      {sheet === "filters" ? (
+        <SearchFilterSheet
+          chips={chips}
+          category={category}
+          resultCount={tab === "dishes" ? dishes.length : shops.length}
+          resultNoun={tab === "dishes" ? "dish" : "restaurant"}
+          onToggleChip={toggleChip}
+          onSetCategory={setCategory}
+          onClearAll={clearFilters}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
+
+      {sheet === "sort" ? (
+        <SearchSortSheet
+          sort={sort}
+          onPick={setSort}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -411,36 +605,18 @@ function NoResults({
   );
 }
 
-function Chip({
-  on,
-  onClick,
-  children,
-}: {
-  on: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      className={cn("press bolt-chip", on && "bolt-chip-on")}
-    >
-      {children}
-    </button>
-  );
-}
-
 function TabBtn({
   on,
   onClick,
   icon,
+  count,
   children,
 }: {
   on: boolean;
   onClick: () => void;
   icon: React.ReactNode;
+  /** Shown beside the label, quieter than it — it is context, not the name. */
+  count: number;
   children: React.ReactNode;
 }) {
   return (
@@ -449,36 +625,50 @@ function TabBtn({
       onClick={onClick}
       aria-pressed={on}
       className={cn(
-        "press flex flex-1 items-center justify-center gap-1.5 rounded-full py-2",
-        on ? "bg-surface text-ink shadow-[var(--shadow-sm)]" : "text-muted"
+        // `relative z-10` is load-bearing, not decoration: the thumb is
+        // absolutely positioned and therefore paints above static siblings, so
+        // without this the label and icon sit *behind* the orange pill.
+        // Colour changes slower than the thumb moves, so the label settles just
+        // after it arrives rather than racing ahead of it.
+        "press relative z-10 flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 transition-colors duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+        on ? "text-[var(--on-accent)]" : "text-muted"
       )}
     >
       {icon}
       {children}
+      {/* Was "Dishes (3,157)" — the count in parentheses at the label's own
+          weight, so a four-digit number shouted as loudly as the word it
+          qualifies. Same information, one step down in emphasis. */}
+      <span className={cn("font-semibold", on ? "opacity-75" : "opacity-70")}>
+        {count.toLocaleString("en-IN")}
+      </span>
     </button>
   );
 }
 
-function SortBtn({
-  on,
-  onClick,
+function Token({
   children,
+  onRemove,
 }: {
-  on: boolean;
-  onClick: () => void;
   children: React.ReactNode;
+  onRemove: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      className={cn(
-        "press shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5",
-        on ? "bg-surface text-ink shadow-[var(--shadow-sm)]" : "text-muted"
-      )}
-    >
+    /* Written out rather than built on `.bolt-chip`: that class is unlayered
+       CSS with a `padding` shorthand, so a Tailwind utility in @layer
+       utilities cannot trim the right side for the × without an important
+       modifier. A token is its own thing anyway — a chip you remove, not a
+       chip you toggle. */
+    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-ink bg-ink py-1 pl-3 pr-1 text-[13px] font-semibold text-bg">
       {children}
-    </button>
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${String(children)} filter`}
+        className="press grid size-5 place-items-center rounded-full bg-bg/25"
+      >
+        <X className="size-3.5" strokeWidth={3} />
+      </button>
+    </span>
   );
 }

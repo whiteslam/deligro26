@@ -8,6 +8,27 @@ export function formatRating(rating: number): string {
   return rating.toFixed(1);
 }
 
+/**
+ * Has anybody actually rated this?
+ *
+ * `restaurants.rating` and `rating_count` both default to 0, so a kitchen
+ * nobody has reviewed arrives as a real, comparable zero — and every surface
+ * that formatted it printed "★ 0.0", which is not an absence of a rating, it
+ * is the worst one there is. On the search results that put a damning number
+ * beside every new shop on the platform.
+ *
+ * The same rule the tracking screen already applies to riders ("we don't rate
+ * riders yet — undefined is unknown, never a flattering guess"): unknown is its
+ * own answer and gets its own word, never a number we did not measure.
+ *
+ * `rating > 0` as well as `count > 0`, because the two columns are written
+ * independently and a count without a score is as unusable as a score without a
+ * count.
+ */
+export function isRated(rating: number, count: number): boolean {
+  return count > 0 && rating > 0;
+}
+
 export function formatCount(n: number): string {
   if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
   return String(n);

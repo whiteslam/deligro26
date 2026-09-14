@@ -4,6 +4,7 @@ import { getProfile } from "@/lib/auth";
 import { hasVendorAccess } from "@/lib/auth/vendor-access";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { updateKitchenOrderStatus } from "@/lib/data-access/vendor-orders";
+import { normalizeCancellationReason } from "@/lib/data-access/order-cancellation";
 
 const ALLOWED = new Set(["kitchen", "ready", "cancelled"]);
 
@@ -51,7 +52,7 @@ export async function PATCH(
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  let body: { status?: string };
+  let body: { status?: string; reason?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -62,10 +63,20 @@ export async function PATCH(
     return NextResponse.json({ error: "invalid_status" }, { status: 400 });
   }
 
+  // Trimmed and capped here as well as in the database: the column's check
+  // constraint would reject an over-long reason by failing the whole
+  // cancellation, and a kitchen that pasted too much text should still be able
+  // to reject the order.
+  const reason =
+    typeof body.reason === "string"
+      ? normalizeCancellationReason(body.reason)
+      : undefined;
+
   try {
     const ok = await updateKitchenOrderStatus(
       id,
-      body.status as "kitchen" | "ready" | "cancelled"
+      body.status as "kitchen" | "ready" | "cancelled",
+      reason
     );
     if (!ok) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });

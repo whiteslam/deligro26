@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Profile experience audit — Deligro</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: #14181b; --muted: #6b7580; --bg: #f7f6f3;
+        --surface: #ffffff; --line: #e2e0da;
+        --green: #17b26a; --amber: #d98c22; --red: #d9534f;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --ink: #e9edf0; --muted: #99a4ae; --bg: #14181b; --surface: #1b2126; --line: #2a3036; }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink);
+        font: 16px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      main { max-width: 860px; margin: 0 auto; padding: 48px 20px 96px; }
+      header.top { border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 40px; }
+      h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--muted); margin: 48px 0 12px; }
+      h3 { font-size: 18px; margin: 28px 0 6px; letter-spacing: -0.01em; }
+      .lede { color: var(--muted); margin: 0; }
+      .scenario { border-left: 3px solid var(--line); padding: 2px 0 2px 16px; margin: 22px 0; }
+      .scenario .said { font-style: italic; color: var(--muted); margin: 0 0 8px; }
+      .scenario p:last-child { margin-bottom: 0; }
+      table { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; }
+      th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+      td code, p code, li code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+      .tag { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+        text-transform: uppercase; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+      .tag.fixed { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
+      .tag.open { background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }
+      .wrap { overflow-x: auto; }
+      ul { padding-left: 20px; }
+      .foot { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line);
+        color: var(--muted); font-size: 14px; }
+      .callout { border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--line));
+        background: color-mix(in srgb, var(--amber) 8%, transparent);
+        border-radius: 10px; padding: 14px 18px; margin: 20px 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="top">
+        <h1>Profile experience audit</h1>
+        <p class="lede">
+          The customer Account tab and every screen under it — saved addresses,
+          notifications, help &amp; support, privacy &amp; security, favourites,
+          about. 14 September 2026.
+        </p>
+      </header>
+
+      <h2>Scenarios</h2>
+
+      <div class="scenario">
+        <p class="said">“Something happened to my order — let me check the bell.”</p>
+        <p>
+          The bell in the header opened a <em>settings</em> screen: a permission
+          switch and two rows of text describing categories nobody could change.
+          Tapping a bell and getting preferences is the app answering a question
+          you did not ask. And there was nothing else for it to open — push goes
+          to OneSignal and <strong>nothing about it is stored</strong>: no table,
+          no history, no read state. A customer who missed the “your rider is on
+          the way” banner had no way to see it again, ever.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“What do they know about me?”</p>
+        <p>
+          The account screen offers <strong>Privacy &amp; security</strong> with
+          a shield icon. It pointed at <code>/profile/help</code> — the same
+          destination as the <strong>Help &amp; support</strong> row directly
+          above it. Two labels, two icons, one screen, and the screen that
+          arrived was a delivery FAQ that mentions neither privacy nor security.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“I’ve moved. Delete the old address.”</p>
+        <p>
+          If it was your default, you were left with <strong>no default at
+          all</strong> — nothing promoted another. No error appeared, because
+          every screen that wants a default is written as
+          <code>find(isDefault) ?? list[0]</code>. So it failed quietly instead:
+          the Default badge vanished, “Set default” appeared on every row, and
+          checkout silently began preferring whichever address happened to sort
+          first.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“Why won’t it let me remove this one?”</p>
+        <p>
+          It would. The Remove button on a default address was rendered at 50%
+          opacity — the universal sign for “you cannot do this” — and was never
+          disabled, so it worked anyway. The worst of both: it discouraged a
+          legitimate action without preventing it, and the thing it was
+          discouraging was the bug above.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“Wait — what am I agreeing to?”</p>
+        <p>
+          The sign-in screen states: <em>“By continuing you agree to Deligro’s
+          Terms &amp; Conditions and Privacy Policy.”</em> That is plain text.
+          Not a link, because <strong>neither document exists anywhere in the
+          app</strong> — there is nothing to read and nothing to point at.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“Is this the same app?”</p>
+        <p>
+          Every profile screen uses <code>ProfileSubpage</code> — a 22px title
+          beside a round back button, scrolling with the page. Saved addresses
+          rolls its own: a 17px title in a sticky glass bar with a second action
+          on the right. It is the one screen under Account that does not look
+          like the others.
+        </p>
+      </div>
+
+      <h2>Findings</h2>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>#</th><th>Finding</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>The bell opens notification <em>settings</em>; there is no notification history anywhere.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>2</td><td>“Privacy &amp; security” and “Help &amp; support” point at the same page.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>3</td><td>Deleting a default address leaves the account with no default.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>4</td><td>Remove button styled as disabled on a default address, but fully functional.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>5</td><td>Address deletion confirmed with <code>window.confirm</code>, which cannot name the address.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>6</td><td>Sign-in asserts agreement to a Terms and a Privacy Policy that do not exist.</td><td><span class="tag open">Open — yours</span></td></tr>
+            <tr><td>7</td><td>Addresses cannot be edited, only added and removed — fixing a house number means losing the row and its default flag.</td><td><span class="tag open">Open</span></td></tr>
+            <tr><td>8</td><td>Saved addresses uses different page chrome from every other profile screen.</td><td><span class="tag open">Open</span></td></tr>
+            <tr><td>9</td><td>Notification categories are listed but cannot be changed — there is nowhere to store a preference.</td><td><span class="tag open">Open</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>What changed</h2>
+
+      <h3>The bell now means what a bell means</h3>
+      <p>
+        <code>/profile/notifications</code> opens with <strong>what actually
+        happened</strong> — order sent, kitchen started cooking, packed, on the
+        way, delivered, cancelled — newest first, each entry linking back to the
+        order it is about, and a cancellation carrying the reason the kitchen
+        gave. Settings move below it, where settings belong.
+      </p>
+      <p>
+        No new table. The events a customer was pushed about are the same events
+        the order lifecycle already timestamps — <code>created_at</code>,
+        <code>accepted_at</code>, <code>ready_at</code>,
+        <code>cancelled_at</code> (migration 0026) — so the feed is derived from
+        facts the database already holds rather than from a log nobody is
+        writing. That makes it honest by construction: nothing can appear that
+        did not happen, and nothing goes missing because a push failed. The cost
+        is no read state, and no entry for anything that was not a lifecycle
+        change. Worth it until there is a reason to write rows.
+      </p>
+
+      <h3>Privacy &amp; security is a real screen</h3>
+      <p>
+        It describes what the app actually holds, field by field — your phone
+        number and why, addresses and when they are saved, order history and why
+        it is kept rather than cleared, the push device token and what turning
+        notifications off does to it — plus how sign-in works (a code, never a
+        password) and what you can do about each. Every claim on it is checkable
+        against the schema.
+      </p>
+
+      <h3>Addresses stop lying in two directions</h3>
+      <p>
+        <code>deleteAddress</code> now hands the default flag to the oldest
+        remaining address when it removes the one carrying it — server-side, so
+        every caller gets it, and best-effort, because the deletion is what the
+        customer asked for and has already happened. With the underlying problem
+        fixed, the Remove button drops its decorative dimming. Confirmation moved
+        from <code>window.confirm</code> to the app’s own dialog, which can name
+        the address and say that the default will move on.
+      </p>
+
+      <div class="callout">
+        <p style="margin:0">
+          <strong>One thing deliberately not done.</strong> Finding 6 is a
+          privacy policy and terms of service. I did not write them. Inventing
+          legal text to fill a screen would be worse than the broken row it
+          replaced — the new Privacy &amp; security page describes real
+          behaviour and says nothing it cannot back up. When a real policy
+          exists it belongs at the bottom of that page and behind the two words
+          on the sign-in screen that currently link nowhere.
+        </p>
+      </div>
+
+      <h2>Not done, and worth deciding on</h2>
+      <ul>
+        <li>
+          <strong>Editing an address (7).</strong> The API supports an update;
+          the screen offers add and remove only. A customer correcting a house
+          number has to delete and re-add, which until today also cost them
+          their default.
+        </li>
+        <li>
+          <strong>Page chrome (8).</strong> Saved addresses could adopt
+          <code>ProfileSubpage</code> with a right-hand action slot, so all six
+          screens under Account share one header.
+        </li>
+        <li>
+          <strong>Per-category notification preferences (9).</strong> The page is
+          honest that they do not exist. Making them real needs somewhere to
+          store them and a check at send time.
+        </li>
+      </ul>
+
+      <div class="foot">
+        Verified by <code>npx tsc --noEmit</code>, <code>npx eslint</code>,
+        <code>npm run build</code> and the <code>platform</code>,
+        <code>layering</code> and <code>switch</code> suites — all green.
+        <code>test:idor</code> needs live QA credentials this environment does
+        not hold. Not verified in a browser: this environment has no headless
+        browser, so the activity feed, the privacy screen and the new
+        confirmation dialog have not been seen rendering.
+      </div>
+    </main>
+  </body>
+</html>

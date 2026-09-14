@@ -40,10 +40,52 @@ function waitingWorker(
   return registration.waiting;
 }
 
+/**
+ * Tear down a worker that should not be running here, and take its caches with
+ * it. Without the second half, unregistering leaves the caches on disk and the
+ * next registration adopts them.
+ */
+async function unregisterAndPurge(): Promise<void> {
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    registration?.active?.postMessage({ type: "CLEAR_CACHES" });
+    await registration?.unregister();
+  } catch {
+    // Best effort. A browser that will not let us clean up is one where the
+    // worker was probably never installed either.
+  }
+}
+
 export async function registerServiceWorker(
   onUpdateReady: UpdateListener
 ): Promise<ServiceWorkerRegistration | null> {
   if (!isServiceWorkerSupported()) return null;
+
+  /*
+   * Not in development, and this is not tidiness — it is a correctness bug.
+   *
+   * `sw-core.js` serves everything under `/_next/static/` cache-first, on the
+   * stated grounds that the filenames are content-hashed so a hit is always
+   * correct. That is true of a production build and false of `next dev`, which
+   * serves the stylesheet from a stable unhashed path
+   * (`[root-of-the-server]__*.css`) and simply changes its bytes on every edit.
+   *
+   * So in development the worker pins the first stylesheet it ever sees, for
+   * good. Javascript still updates — HMR pushes that over its own socket,
+   * past the fetch handler — which produces the worst version of the symptom:
+   * new markup rendered against old CSS, surviving reloads, hard reloads and
+   * dev-server restarts, and looking exactly like a layout the developer just
+   * broke. It cost this project a round of "it's still broken" before anyone
+   * suspected the worker.
+   *
+   * Anything already installed from before this guard is torn down here, so a
+   * browser that has one recovers on its next load rather than needing
+   * DevTools.
+   */
+  if (process.env.NODE_ENV !== "production") {
+    await unregisterAndPurge();
+    return null;
+  }
 
   let registration: ServiceWorkerRegistration;
   try {

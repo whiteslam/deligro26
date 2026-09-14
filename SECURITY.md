@@ -52,8 +52,9 @@ service role, re-checked role, stamped attribution.
 `manager` (migrations **0022**/**0023**) reads every order, advances its status,
 and manages `deliveries` to dispatch riders. It has no write on
 `platform_settings`, no refund decision, and no vendor management. It is not
-`is_admin()`, so `guard_order_update()` holds it to `status` and nothing else,
-exactly as it holds a vendor or a driver.
+`is_admin()`, so `guard_order_update()` holds it to `status` — and, since
+migration **0051**, to `cancellation_reason` on the one update that actually
+cancels an order (see below) — exactly as it holds a vendor or a driver.
 
 **Phone orders are the one exception, and it is a code path rather than a
 privilege.** A manager has no INSERT policy on `orders` — deliberately, and
@@ -76,6 +77,37 @@ the only way to create one:
 - Payment is always COD. There is no path by which this role can mark money
   received; `payment_status` still only leaves `pending` through the service
   role after a verified signature.
+
+### Who cancelled an order, and why (0051)
+
+`orders.cancelled_at` (0026) recorded *when* a cancellation happened and nothing
+recorded *who* or *why*, so a customer looking at a run of cancelled orders had
+no way to tell a restaurant rejection from their own tap. Two columns close it,
+on two different footings:
+
+- **`cancelled_by` is evidence and is never accepted from a client.** It is on
+  `guard_order_update()`'s locked list and is derived by
+  `stamp_order_lifecycle()` from `cancelling_party()`, which tests the caller
+  against the order's customer, then `owns_restaurant()`, then `is_admin()`,
+  then `is_manager()`. The customer test is first on purpose: 0040 lets an
+  operator shop, and cancelling your own dinner is a customer act whatever else
+  the account can do. **One exception** — a service-role writer may state it,
+  because the customer cancel route holds no UPDATE on `orders` under RLS and
+  writes through `createAdminClient()`, so the trigger would otherwise read the
+  platform as the cancelling party on the most common cancellation there is.
+- **`cancellation_reason` is deliberately not locked**, because the kitchen
+  rejecting an order is exactly who should be typing it. It is bounded to 200
+  characters by a CHECK, and the trigger accepts it **only on the update that
+  performs the transition to `cancelled`** — every other update carries the
+  stored value through untouched. Freezing it merely "once set" was not enough:
+  a vendor holds UPDATE on their own orders, so on an order cancelled by support
+  with no reason recorded they could have attached a sentence afterwards and had
+  it render to the customer under "Cancelled by Deligro support".
+
+A `BEFORE INSERT` trigger clears both columns, because RLS constrains rows and
+not columns and an order is always created `placed`. Rows cancelled before 0051
+carry null, which the customer app renders as nothing at all rather than as a
+guess about whose fault it was.
 
 Placing a phone order can create a customer account for a number that has none.
 It goes through `resolveAccountByPhone()` — the same resolver OTP login uses, so

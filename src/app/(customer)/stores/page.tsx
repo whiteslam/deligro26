@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Store, TriangleAlert } from "lucide-react";
 import { HomeHeader } from "@/components/home/home-header";
 import { RestaurantCard } from "@/components/shared/restaurant-card";
-import { PhotoTile } from "@/components/shared/photo-tile";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StoreCategoryStrip } from "@/components/stores/store-category-strip";
 import { PickDropHero } from "@/components/stores/pick-drop-hero";
@@ -25,7 +24,9 @@ export default async function StoresPage({
     // never reads menu data — see listRestaurantsFromDb's doc comment.
     listRestaurantsResult({ withMenu: false }),
     getSettings(),
-    isSupabaseConfigured ? listAddresses().catch(() => []) : Promise.resolve(ADDRESSES),
+    isSupabaseConfigured
+      ? listAddresses().catch(() => [])
+      : Promise.resolve(ADDRESSES),
   ]);
   const { restaurants } = catalog;
 
@@ -45,18 +46,59 @@ export default async function StoresPage({
   // groceries link stops working the moment an admin turns it off, rather than
   // reaching a hero the platform is no longer serving.
   const active = categories.find((c) => c.id === category) ?? null;
-  const inCategory = active
-    ? restaurants.filter((r) =>
-        r.cuisines.some((c) =>
-          active.tags.some((t) => t.toLowerCase() === c.toLowerCase())
-        )
-      )
-    : restaurants;
 
-  const featured = [...inCategory]
-    .filter((r) => r.open)
-    .sort((a, b) => b.rating - a.rating);
-  const all = [...inCategory].sort((a, b) => a.etaMin - b.etaMin);
+  /** Shops matching one category, by the rule the filter below uses. */
+  const matching = (c: (typeof categories)[number]) =>
+    restaurants.filter((r) =>
+      r.cuisines.some((x) =>
+        c.tags.some((t) => t.toLowerCase() === x.toLowerCase())
+      )
+    );
+
+  /*
+   * What is actually behind each tile.
+   *
+   * The taxonomy was written ahead of supply and it shows: of the six
+   * storefront types, Dairy, Raw Meat and Chowpaty match no shop at all, so a
+   * third of the strip is a tap into "we haven't onboarded one near you". The
+   * counts let the strip mute those and let this page sort them last, rather
+   * than leaving a customer to discover the dead ends one at a time.
+   *
+   * Groceries and Pick & Drop legitimately match nothing — they open their own
+   * screens instead of a filtered list — so they are exempt.
+   */
+  const OWN_SCREEN = new Set(["groceries", "pick-drop"]);
+  const counts = new Map(
+    categories.map((c) => [
+      c.id,
+      { shops: matching(c).length, hasOwnScreen: OWN_SCREEN.has(c.id) },
+    ])
+  );
+  const ordered = [...categories].sort((a, b) => {
+    const dead = (c: (typeof categories)[number]) =>
+      counts.get(c.id)!.shops === 0 && !OWN_SCREEN.has(c.id) ? 1 : 0;
+    return dead(a) - dead(b);
+  });
+
+  const inCategory = active ? matching(active) : restaurants;
+
+  /*
+   * Ordering, twice over, and neither is what it used to be.
+   *
+   * The shelf was sorted by `rating` descending. One shop out of fifty has ever
+   * been rated, so for the other forty-nine that expression compares 0 to 0 and
+   * the "top rated, open now" shelf was whatever order the database happened to
+   * return. Soonest-arriving is a number we actually hold for every shop.
+   *
+   * The full list was sorted by `etaMin` alone, which interleaves shut kitchens
+   * among open ones — and a closed shop's delivery estimate is a claim about a
+   * kitchen that is not cooking. Open first, then soonest within each half.
+   */
+  const bySoonest = (a: { etaMin: number }, b: { etaMin: number }) =>
+    a.etaMin - b.etaMin;
+  const openNow = inCategory.filter((r) => r.open).sort(bySoonest);
+  const closed = inCategory.filter((r) => !r.open).sort(bySoonest);
+  const all = [...openNow, ...closed];
 
   return (
     <>
@@ -65,7 +107,11 @@ export default async function StoresPage({
       <div className="space-y-7 pt-3">
         <section className="space-y-3">
           <h2 className="px-4 text-heading">Categories</h2>
-          <StoreCategoryStrip active={active?.id} categories={categories} />
+          <StoreCategoryStrip
+            active={active?.id}
+            categories={ordered}
+            counts={counts}
+          />
         </section>
 
         {!catalog.ok ? (
@@ -107,45 +153,58 @@ export default async function StoresPage({
             }
           />
         ) : (
+          /*
+           * One list, split by the only question that decides whether a shop is
+           * useful right now.
+           *
+           * This used to be a shelf of 72px avatars ("Open now", sorted by a
+           * rating nobody has) followed by every shop again as a full card. Now
+           * that the list itself leads with the open ones, the shelf was the
+           * same eleven shops twice in a row — once as truncated names under
+           * thumbnails, once as cards carrying the fee, the ETA and the
+           * distance. The cards win; the shelf was costing a screenful to say
+           * less.
+           */
           <>
-            {featured.length ? (
+            {openNow.length ? (
               <section className="space-y-3">
-                <h2 className="px-4 text-heading">
+                <h2 className="flex items-baseline gap-2 px-4 text-heading">
                   {active ? active.label : "Open now"}
+                  <span className="text-[13px] font-semibold text-muted">
+                    {openNow.length}
+                  </span>
                 </h2>
-                <div className="no-scrollbar flex gap-3 overflow-x-auto px-4">
-                  {featured.map((r) => (
-                    <Link
-                      key={r.slug}
-                      href={`/restaurant/${r.slug}`}
-                      className="press flex w-[88px] shrink-0 flex-col items-center gap-2"
-                    >
-                      <PhotoTile
-                        tint={r.accentTint}
-                        src={r.image}
-                        alt={r.name}
-                        className="size-[72px] rounded-2xl"
-                        sizes="72px"
-                      />
-                      <span className="w-full truncate text-center text-[12px] font-semibold text-ink">
-                        {r.name}
-                      </span>
-                    </Link>
+                <div className="space-y-5 px-4">
+                  {openNow.map((r) => (
+                    <RestaurantCard key={r.slug} restaurant={r} />
+                  ))}
+                </div>
+              </section>
+            ) : (
+              /* Every shop in view is shut. Said once, at the top, rather than
+                 left for somebody to infer from a column of grey badges. */
+              <p className="mx-4 rounded-2xl bg-surface-2 px-4 py-3 text-[13px] leading-snug text-muted">
+                Nothing {active ? `in ${active.label.toLowerCase()} ` : ""}is
+                open right now. The kitchens below are closed — you can still
+                look at their menus.
+              </p>
+            )}
+
+            {closed.length ? (
+              <section className="space-y-3">
+                <h2 className="flex items-baseline gap-2 px-4 text-heading text-muted">
+                  Closed right now
+                  <span className="text-[13px] font-semibold">
+                    {closed.length}
+                  </span>
+                </h2>
+                <div className="space-y-5 px-4">
+                  {closed.map((r) => (
+                    <RestaurantCard key={r.slug} restaurant={r} />
                   ))}
                 </div>
               </section>
             ) : null}
-
-            <section className="space-y-3">
-              <h2 className="px-4 text-heading">
-                {active ? `All ${active.label.toLowerCase()}` : "All stores"}
-              </h2>
-              <div className="space-y-5 px-4">
-                {all.map((r) => (
-                  <RestaurantCard key={r.slug} restaurant={r} />
-                ))}
-              </div>
-            </section>
           </>
         )}
       </div>

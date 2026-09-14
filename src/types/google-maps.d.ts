@@ -20,11 +20,26 @@ declare namespace google.maps {
   interface MapsEventListener {
     remove(): void;
   }
+  /** Where a control sits on the map. Only the corners we actually ask for. */
+  enum ControlPosition {
+    RIGHT_TOP,
+  }
+  interface ZoomControlOptions {
+    position?: ControlPosition;
+  }
+  /** Per-edge inset for `fitBounds`, in pixels. */
+  interface Padding {
+    top?: number;
+    right?: number;
+    bottom?: number;
+    left?: number;
+  }
   interface MapOptions {
     center?: LatLngLiteral | LatLng;
     zoom?: number;
     disableDefaultUI?: boolean;
     zoomControl?: boolean;
+    zoomControlOptions?: ZoomControlOptions;
     clickableIcons?: boolean;
     gestureHandling?: string;
     mapTypeControl?: boolean;
@@ -75,8 +90,9 @@ declare namespace google.maps {
   class Map {
     constructor(el: HTMLElement, opts?: MapOptions);
     panTo(pos: LatLngLiteral | LatLng): void;
+    panBy(x: number, y: number): void;
     setZoom(zoom: number): void;
-    fitBounds(bounds: LatLngBounds, padding?: number): void;
+    fitBounds(bounds: LatLngBounds, padding?: number | Padding): void;
     addListener(event: string, handler: (e: MapMouseEvent) => void): MapsEventListener;
   }
   interface GeocoderRequest {

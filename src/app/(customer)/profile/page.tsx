@@ -15,7 +15,10 @@ import {
 import { USER, ADDRESSES } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { requireUser } from "@/lib/auth";
-import { getProfileSummary, type ProfileSummary } from "@/lib/data-access/profile";
+import {
+  getProfileSummary,
+  type ProfileSummary,
+} from "@/lib/data-access/profile";
 import { AppearanceRow } from "@/components/profile/appearance-row";
 import { ProfileAccountRows } from "@/components/profile/profile-account-rows";
 import { ProfileAvatar } from "@/components/profile/profile-avatar";
@@ -42,10 +45,33 @@ const OTHER: {
   href: string;
   tone: IconTone;
 }[] = [
-  { icon: MapPin, label: "Saved addresses", href: "/profile/addresses", tone: "blue" },
-  { icon: Bell, label: "Notifications", href: "/profile/notifications", tone: "accent" },
-  { icon: CircleHelp, label: "Help & support", href: "/profile/help", tone: "green" },
-  { icon: ShieldCheck, label: "Privacy & security", href: "/profile/help", tone: "violet" },
+  {
+    icon: MapPin,
+    label: "Saved addresses",
+    href: "/profile/addresses",
+    tone: "blue",
+  },
+  {
+    icon: Bell,
+    label: "Notifications",
+    href: "/profile/notifications",
+    tone: "accent",
+  },
+  {
+    icon: CircleHelp,
+    label: "Help & support",
+    href: "/profile/help",
+    tone: "green",
+  },
+  // Pointed at /profile/help until now — the same destination as the row above
+  // it. Two labels, two icons, one screen, and the one that arrived was the
+  // support FAQ, which says nothing about either privacy or security.
+  {
+    icon: ShieldCheck,
+    label: "Privacy & security",
+    href: "/profile/privacy",
+    tone: "violet",
+  },
   { icon: Info, label: "About Deligro", href: "/profile/about", tone: "blue" },
 ];
 
@@ -82,7 +108,9 @@ export default async function ProfilePage() {
             <LogIn className="size-7" />
           </span>
           <div>
-            <h2 className="text-lg font-extrabold">You&apos;re not signed in</h2>
+            <h2 className="text-lg font-extrabold">
+              You&apos;re not signed in
+            </h2>
             <p className="mt-1 text-sm text-muted">
               Sign in to see your orders, saved addresses, and profile.
             </p>
@@ -219,7 +247,9 @@ export default async function ProfilePage() {
               >
                 <Icon className="size-[18px]" />
               </span>
-              <span className="flex-1 text-[15px] font-medium">{item.label}</span>
+              <span className="flex-1 text-[15px] font-medium">
+                {item.label}
+              </span>
               <ChevronRight className="size-5 shrink-0 text-muted" />
             </Link>
           );

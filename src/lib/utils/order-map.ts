@@ -1,9 +1,4 @@
-import type {
-  Order,
-  OrderStatus,
-  PaymentMethod,
-  PaymentStatus,
-} from "@/types";
+import type { Order, OrderStatus, PaymentMethod, PaymentStatus } from "@/types";
 import type { Order as DbOrder } from "@/lib/data-access/orders";
 
 /**
@@ -52,11 +47,35 @@ export function formatOrderPlacedAt(iso: string): string {
     return `Yesterday, ${time}`;
   }
 
-  return date.toLocaleDateString("en-IN", {
-    weekday: "short",
-    hour: "numeric",
-    minute: "2-digit",
+  // Inside the week a weekday is the fastest thing to read.
+  if (daysAgo(date, now) < 7) {
+    return date.toLocaleDateString("en-IN", {
+      weekday: "short",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  // Past that it stops being information. Every older order rendered as
+  // "Wed, 6:55 pm", so last week and last spring were the same four characters
+  // and a history of one regular restaurant became a wall of rows nobody could
+  // tell apart or date. Older rows get a real date, and the year once it is not
+  // this one.
+  const day = date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
   });
+  return `${day}, ${time}`;
+}
+
+/** Whole calendar days between two instants — not 24-hour blocks. */
+function daysAgo(date: Date, now: Date): number {
+  const a = new Date(date);
+  const b = new Date(now);
+  a.setHours(0, 0, 0, 0);
+  b.setHours(0, 0, 0, 0);
+  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
 }
 
 interface DbMenuItemRef {
@@ -88,6 +107,77 @@ export interface UiOrder extends Order {
   paymentStatus?: PaymentStatus;
   /** Raw `created_at`. `placedAt` is a human label and can't be computed from. */
   createdAt?: string;
+  /**
+   * From migration 0051. Undefined on a database that predates it; null on a
+   * row that was cancelled before it was applied. Both mean the same thing to
+   * the screen — we do not know — and neither may be dressed up as an answer.
+   */
+  cancelledBy?: CancelledBy | null;
+  cancellationReason?: string | null;
+  /**
+   * The money breakdown, for the receipt. Absent on a mock order, and each
+   * field absent on a database that predates the migration that added it
+   * (0013 tip, 0031 discount).
+   */
+  charges?: OrderCharges;
+  /** Where it went. `address` is nullable on the table and on old rows. */
+  address?: { label?: string; line?: string } | null;
+}
+
+/** Who cancelled it — see `orders.cancelled_by` (0051). */
+export type CancelledBy =
+  "customer" | "vendor" | "manager" | "admin" | "system";
+
+export interface OrderCharges {
+  /** Sum of the line items, before anything is added or taken off. */
+  subtotal: number;
+  deliveryFee: number;
+  tax: number;
+  tip: number;
+  discount: number;
+  couponCode?: string | null;
+}
+
+const CANCELLED_BY = new Set<string>([
+  "customer",
+  "vendor",
+  "manager",
+  "admin",
+  "system",
+]);
+
+function asCancelledBy(v: string | null | undefined): CancelledBy | null {
+  return v && CANCELLED_BY.has(v) ? (v as CancelledBy) : null;
+}
+
+/**
+ * What to tell the customer about a cancellation.
+ *
+ * Returns null when we genuinely do not know — a row cancelled before 0051, or
+ * a database that has not had it applied. The caller must render nothing in
+ * that case rather than guess, because the guess people reach for ("cancelled
+ * by the restaurant") is the accusation.
+ */
+export function cancellationNote(order: {
+  cancelledBy?: CancelledBy | null;
+  cancellationReason?: string | null;
+}): { who: string; reason?: string } | null {
+  const reason = order.cancellationReason?.trim() || undefined;
+  switch (order.cancelledBy) {
+    case "customer":
+      return { who: "You cancelled this order", reason };
+    case "vendor":
+      return { who: "The restaurant could not take this order", reason };
+    case "manager":
+    case "admin":
+      return { who: "Cancelled by Deligro support", reason };
+    case "system":
+      return { who: "Cancelled automatically", reason };
+    default:
+      // A reason with no party is still worth showing — it is the sentence
+      // somebody actually wrote — but it cannot be attributed to anyone.
+      return reason ? { who: "This order was cancelled", reason } : null;
+  }
 }
 
 /**
@@ -97,9 +187,7 @@ export interface UiOrder extends Order {
  * neither is something to offer a refund against. Getting this wrong in the
  * generous direction means inviting a customer to claim money we never took.
  */
-export function isOrderPaid(order: {
-  paymentStatus?: PaymentStatus;
-}): boolean {
+export function isOrderPaid(order: { paymentStatus?: PaymentStatus }): boolean {
   return order.paymentStatus === "paid";
 }
 
@@ -112,8 +200,8 @@ export function mapDbOrderRow(row: DbOrder): UiOrder {
     restaurantSlug: restaurant?.slug ?? "",
     restaurantName: restaurant?.name ?? "Restaurant",
     restaurantImage: (restaurant as { image_url?: string } | null)?.image_url,
-    restaurantAccent:
-      (restaurant as { accent_tint?: string } | null)?.accent_tint,
+    restaurantAccent: (restaurant as { accent_tint?: string } | null)
+      ?.accent_tint,
     status: dbStatusToUi(row.status),
     placedAt: formatOrderPlacedAt(row.created_at),
     createdAt: row.created_at,
@@ -123,6 +211,17 @@ export function mapDbOrderRow(row: DbOrder): UiOrder {
       (restaurant as { eta_min?: number } | null)?.eta_min ?? undefined,
     paymentMethod: row.payment_method,
     paymentStatus: row.payment_status,
+    cancelledBy: asCancelledBy(row.cancelled_by),
+    cancellationReason: row.cancellation_reason ?? null,
+    address: row.address,
+    charges: {
+      subtotal: items.reduce((sum, i) => sum + i.price * i.qty, 0),
+      deliveryFee: row.delivery_fee ?? 0,
+      tax: row.tax_amount ?? 0,
+      tip: row.tip ?? 0,
+      discount: row.discount ?? 0,
+      couponCode: row.coupon_code ?? null,
+    },
     total: row.total,
     lines: items.map((item) => {
       const menu = item.menu_items;

@@ -125,6 +125,36 @@ check(
   false
 );
 
+console.log("\n═══ The worker does not run outside production ═══");
+
+{
+  /*
+   * `isImmutableAsset` serves everything under `/_next/static/` cache-first
+   * because production filenames are content-hashed. `next dev` uses that same
+   * prefix with stable, unhashed names and mutates the bytes, so a worker
+   * registered in development pins the first stylesheet forever — new markup
+   * against old CSS, surviving reloads and dev-server restarts.
+   *
+   * The registration guard is what keeps that from happening, so it is pinned
+   * here: the rule it protects lives in this file's subject and a future
+   * "simplify the PWA setup" must trip over this rather than the symptom.
+   */
+  const source = readFileSync(
+    join(root, "src/lib/pwa/service-worker.ts"),
+    "utf8"
+  );
+  check(
+    "registerServiceWorker bails out when NODE_ENV is not production",
+    /process\.env\.NODE_ENV\s*!==\s*"production"/.test(source),
+    true
+  );
+  check(
+    "and tears down anything already installed rather than leaving it",
+    /unregisterAndPurge\(\)/.test(source) && /\.unregister\(\)/.test(source),
+    true
+  );
+}
+
 console.log("\n═══ Asset classification ═══");
 
 check(

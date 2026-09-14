@@ -25,6 +25,7 @@ import {
   searchDishes,
   type RankContext,
 } from "../../src/lib/search/dishes";
+import { fuzzyVariants, withinEdits } from "../../src/lib/search/semantic";
 import type { MenuItem, Restaurant } from "../../src/types";
 
 let passed = 0;
@@ -392,6 +393,59 @@ console.log("\n═══ Existing behaviour preserved ═══");
   check("category filter still applies", searchDishes(index, "", { category: "biryani" }).length, 1);
   check("veg filter still applies", searchDishes(index, "", { veg: true }).length, 2);
   check("maxPrice filter still applies", searchDishes(index, "", { maxPrice: 100 }).length, 0);
+}
+
+/* ------------------------------------------------------------------ *
+ * Typo tolerance
+ * ------------------------------------------------------------------ *
+ * `maxEdits` in semantic.ts trades two failure modes against each other: too
+ * tight and "panner" finds nothing, too loose and "rice" finds "nice". Its
+ * doc comment was the only statement of where that line sits, and both
+ * examples it gave were wrong — one was a one-edit pair presented as proof of
+ * the two-edit tier, the other a genuine two-edit pair that the function
+ * rejects because the word is a character too short. Comments cannot fail;
+ * these can.
+ * ------------------------------------------------------------------ */
+
+console.log("\n═══ Typo tolerance ═══");
+
+{
+  const vocab = new Set([
+    "biryani", "paneer", "chicken", "coffee", "vanilla", "cappuccino",
+    "milkshake", "noodles", "rice", "roti", "dal", "dosa",
+  ]);
+  const finds = (typed: string, target: string) =>
+    fuzzyVariants(typed, vocab).includes(target);
+
+  // The budget tiers, one case each. These are the numbers `maxEdits` sets.
+  check("4 characters and under get no budget at all", withinEdits("rice", "nice", 0), false);
+  check("...so a short word cannot reach a different food", finds("rice", "roti"), false);
+  check("5–7 characters tolerate one edit", finds("panner", "paneer"), true);
+  check("...including a transposition, which is the common typo", finds("chiken", "chicken"), true);
+  check("but not two, at that length", finds("noddels", "noodles"), false);
+  check("8 characters and over tolerate two", finds("capucino", "cappuccino"), true);
+  check("...and two is the ceiling, not a slope", finds("milkshek", "milkshake"), true);
+
+  // The spellings this market actually types. Every one of these was cited as
+  // a gap in the search audit; every one of them already worked.
+  check("\"biriyani\" finds biryani", finds("biriyani", "biryani"), true);
+  check("\"briyani\" finds biryani", finds("briyani", "biryani"), true);
+  check("\"coffe\" finds coffee", finds("coffe", "coffee"), true);
+  check("\"vanila\" finds vanilla", finds("vanila", "vanilla"), true);
+
+  // A correctly spelled word is scored by the literal tier and must not also
+  // appear as a guess about itself.
+  check("an exact word is not its own fuzzy variant", finds("biryani", "biryani"), false);
+
+  // End to end, through the ranker rather than the matcher.
+  const s = shop({ slug: "s", menu: [dish({ id: "1", name: "Chicken Biryani" })] });
+  const index = buildDishIndex([s]);
+  check("a misspelled query still finds the dish", searchDishes(index, "briyani").length, 1);
+  check(
+    "and ranks below the same query spelled right",
+    searchDishes(index, "briyani")[0].score < searchDishes(index, "biryani")[0].score,
+    true
+  );
 }
 
 /* ------------------------------------------------------------------ *

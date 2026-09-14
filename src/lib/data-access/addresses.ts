@@ -26,7 +26,14 @@ interface Row {
 }
 
 function map(r: Row): Address {
-  return { id: r.id, label: r.label, line: r.line, lat: r.lat, lng: r.lng, isDefault: r.is_default };
+  return {
+    id: r.id,
+    label: r.label,
+    line: r.line,
+    lat: r.lat,
+    lng: r.lng,
+    isDefault: r.is_default,
+  };
 }
 
 export async function listAddresses(): Promise<Address[]> {
@@ -48,7 +55,9 @@ export interface AddressInput {
   isDefault?: boolean;
 }
 
-export async function createAddress(input: AddressInput): Promise<Address | null> {
+export async function createAddress(
+  input: AddressInput
+): Promise<Address | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -76,7 +85,10 @@ export async function createAddress(input: AddressInput): Promise<Address | null
   return map(data as Row);
 }
 
-export async function updateAddress(id: string, input: Partial<AddressInput>): Promise<boolean> {
+export async function updateAddress(
+  id: string,
+  input: Partial<AddressInput>
+): Promise<boolean> {
   const supabase = await createClient();
   const patch: Record<string, unknown> = {};
   if (input.label !== undefined) patch.label = input.label.slice(0, 40);
@@ -95,14 +107,54 @@ export async function updateAddress(id: string, input: Partial<AddressInput>): P
   return Boolean(data?.id);
 }
 
+/**
+ * Delete an address, and hand the default flag on if it was carrying it.
+ *
+ * Deleting simply removed the row, so removing your default left the account
+ * with no default at all. Every screen that wants one is written as
+ * `find(isDefault) ?? list[0]`, which is why this never produced a visible
+ * error — it produced something quieter: the Default badge disappeared from the
+ * list, "Set default" appeared on every row, and checkout silently began
+ * preferring whichever address happened to sort first. The addresses page even
+ * dimmed the Remove button on a default to discourage this, without disabling
+ * it, so the discouragement was decorative.
+ *
+ * The promotion is a second statement rather than a trigger because `addresses`
+ * has no trigger infrastructure and this is the only writer. Best-effort: the
+ * delete is what the customer asked for and has already happened, so a failure
+ * to promote is logged and swallowed rather than reported as a failed delete.
+ */
 export async function deleteAddress(id: string): Promise<boolean> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("addresses")
     .delete()
     .eq("id", id)
-    .select("id")
+    .select("id, is_default")
     .maybeSingle();
   if (error) throw error;
-  return Boolean(data?.id);
+  if (!data?.id) return false;
+
+  if (data.is_default) {
+    try {
+      // RLS scopes this to the caller's own rows, so "the oldest one left" is
+      // the oldest of THEIR addresses, not of the table.
+      const { data: next } = await supabase
+        .from("addresses")
+        .select("id")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (next?.id) {
+        await supabase
+          .from("addresses")
+          .update({ is_default: true })
+          .eq("id", next.id);
+      }
+    } catch (err) {
+      console.error("[addresses] could not promote a new default", err);
+    }
+  }
+
+  return true;
 }

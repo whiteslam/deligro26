@@ -229,8 +229,17 @@ export function aliasesFor(token: string): string[] {
  * "dal"→"dahi", "roti"→"roll". Those are different foods, and a wrong result is
  * worse than no result, so short tokens get exact matching only and lean on the
  * concept lexicon instead. Length 5+ is where the real misspellings live
- * ("coffe", "vanila", "panner"), and 8+ tolerates two ("hydrabadi" →
- * "hyderabadi", "noddels" → "noodles").
+ * ("coffe", "vanila", "panner", "chiken"), and 8+ tolerates two ("capucino" →
+ * "cappuccino", "milkshek" → "milkshake").
+ *
+ * Both of the examples this comment used to give were wrong, which matters
+ * because they are the only description of what the budget buys. "hydrabadi" →
+ * "hyderabadi" is one edit, not two, so it was already covered at 5+ and proved
+ * nothing about the 8+ tier. "noddels" → "noodles" genuinely needs two — but
+ * "noddels" is seven characters, so this function gives it a budget of one and
+ * the pair does NOT match. Measured, not reasoned: see `scripts/qa/dish-ranking.ts`,
+ * which now pins all four tiers so the next edit to these numbers has to argue
+ * with a test rather than with a comment.
  */
 function maxEdits(len: number): number {
   if (len <= 4) return 0;

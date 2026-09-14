@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Search experience audit — Deligro</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: #14181b;
+        --muted: #6b7580;
+        --bg: #f7f6f3;
+        --surface: #ffffff;
+        --line: #e2e0da;
+        --green: #17b26a;
+        --amber: #d98c22;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #e9edf0;
+          --muted: #99a4ae;
+          --bg: #14181b;
+          --surface: #1b2126;
+          --line: #2a3036;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 16px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      main { max-width: 860px; margin: 0 auto; padding: 48px 20px 96px; }
+      header.top { border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 40px; }
+      h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+      h2 {
+        font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--muted); margin: 48px 0 12px;
+      }
+      h3 { font-size: 18px; margin: 28px 0 6px; letter-spacing: -0.01em; }
+      .lede { color: var(--muted); margin: 0; }
+      .scenario { border-left: 3px solid var(--line); padding: 2px 0 2px 16px; margin: 22px 0; }
+      .scenario .said { font-style: italic; color: var(--muted); margin: 0 0 8px; }
+      .scenario p:last-child { margin-bottom: 0; }
+      table { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; }
+      th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+      td code, p code, li code {
+        font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: var(--surface); border: 1px solid var(--line);
+        border-radius: 4px; padding: 1px 5px;
+      }
+      .tag {
+        display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+        text-transform: uppercase; padding: 2px 8px; border-radius: 99px; white-space: nowrap;
+      }
+      .tag.fixed { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
+      .tag.open { background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }
+      .tag.void { background: color-mix(in srgb, var(--muted) 18%, transparent); color: var(--muted); }
+      s { color: var(--muted); }
+      .wrap { overflow-x: auto; }
+      .tally {
+        border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px;
+        background: var(--surface); margin: 18px 0;
+      }
+      .tally table { margin: 0; font-size: 14px; }
+      .tally td { border: none; padding: 3px 0; }
+      .tally td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+      .tally tr.sum td { border-top: 1px solid var(--line); padding-top: 8px; font-weight: 800; }
+      ul { padding-left: 20px; }
+      .foot { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="top">
+        <h1>Search experience audit</h1>
+        <p class="lede">
+          The customer Search tab (<code>/search</code>), read as a customer
+          rather than as a diff. 13 September 2026 — second pass, findings
+          10–12 closed (one of them withdrawn as incorrect).
+        </p>
+      </header>
+
+      <h2>The count that started it</h2>
+      <p>
+        Before the first dish on the Search tab, a customer met this:
+      </p>
+      <div class="tally">
+        <table>
+          <tr><td>Tab switches (Dishes / Restaurants)</td><td>2</td></tr>
+          <tr><td>Quick filters (Pure Veg → Offers)</td><td>6</td></tr>
+          <tr><td>Food categories (Thali → Beverages)</td><td>16</td></tr>
+          <tr><td>Search suggestions (“Try searching”)</td><td>5</td></tr>
+          <tr><td>Sort options (Best match → Top rated)</td><td>4</td></tr>
+          <tr class="sum"><td>Capsule-shaped controls, all identical</td><td>33</td></tr>
+        </table>
+      </div>
+      <p>
+        Thirty-three controls in one shape, doing five different jobs: switching
+        a view, toggling a filter, choosing from a set, typing a word, and
+        ordering a list. Shape is the first thing a person reads on a screen,
+        and here it said all five things at once.
+      </p>
+
+      <h2>Scenarios</h2>
+
+      <div class="scenario">
+        <p class="said">“I want biryani.”</p>
+        <p>
+          There were three ways to say so and two of them were the word
+          <em>Biryani</em> in an identical capsule, two rows apart. The one in
+          the category strip filtered the results; the one under “Try searching”
+          typed the word into the field. Same word, same shape, different
+          behaviour, nothing on screen distinguishing them. <em>Pizza</em>
+          appeared twice for the same reason.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“I just want to see the food.”</p>
+        <p>
+          On a 390px phone the first dish sat below all thirty-three controls.
+          The screen a hungry person opens to look at food opened as a control
+          panel with a dish and a half visible underneath.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“How many results is that?”</p>
+        <p>
+          The count read <strong>“3157 dish…”</strong> — truncated, in the
+          product, because a four-option sort control was sharing its row and
+          won the space. The one line whose entire job was to report a number
+          could not finish the word.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“Which filters do I have on?”</p>
+        <p>
+          Both filter strips scrolled sideways and clipped mid-word (“Under 25
+          min”, “Pizz”). Turn on <em>Rating 4.5+</em> — the sixth chip, off the
+          right edge — and scroll back, and nothing on screen said it was on.
+          The only signal was “· 1 filters” in grey, next to the truncated
+          count. A filter you cannot see is a filter you cannot turn off, and
+          the screen looks broken instead of filtered.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“Is there more to the right?”</p>
+        <p>
+          Two stacked strips, both cut off mid-word, with no fade, no arrow and
+          no peeking second row. Horizontal scrolling is discoverable when
+          something suggests it; here the only cue was a word sliced in half,
+          which reads as a layout bug rather than an invitation.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“Cheapest first.”</p>
+        <p>
+          Sort lived in four capsules, the same shape as the twenty-two filter
+          capsules above them. Narrowing a list and reordering a list are
+          different operations with different consequences, and the screen drew
+          them identically.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“Clear the filters.”</p>
+        <p>
+          The button labelled <em>Clear filters</em> in the empty state also
+          wiped the search box. The one thing the customer had typed themselves
+          was thrown away by a control that did not say it would.
+        </p>
+      </div>
+
+      <h2>Findings</h2>
+      <div class="wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Finding</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>33 identical capsules serve five different jobs; shape carries no meaning.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>2</td><td>“Biryani” and “Pizza” each appear twice, identically, doing different things.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>3</td><td>Result count truncated to “3157 dish…” by the sort control sharing its row.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>4</td><td>Active filters are invisible — the strips scroll and clip, and nothing summarises them.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>5</td><td>Filter groups are unlabelled: a diet filter and a delivery-time filter look the same.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>6</td><td>The category strip is single-select and looks exactly like the multi-select strip above it.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>7</td><td>“Clear filters” also cleared the query.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>8</td><td>Counts render unformatted (“3157”).</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>9</td><td>The loading skeleton drew a chip row the real screen no longer has.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>10</td><td>No search history — every session starts from the same five fixed suggestions.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>11</td><td><s>No typo tolerance on the query itself.</s> <strong>Withdrawn — this finding was wrong</strong>, see below.</td><td><span class="tag void">Withdrawn</span></td></tr>
+            <tr><td>11b</td><td>The one statement of what the fuzzy-match budget buys — its doc comment — gave two examples and both were false.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>12</td><td>Dish ratings render “★ 0.0” where a kitchen has no reviews — a zero we never measured.</td><td><span class="tag fixed">Fixed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>What changed</h2>
+
+      <h3>One row of two controls, not four rows of capsules</h3>
+      <p>
+        The filter strips and the sort strip collapse into
+        <code>[⚙ Filters · 2]</code> and <code>[↕ Best match ▾]</code>. Both are
+        bordered with a chevron, which reads as “this opens something”, where a
+        filled capsule reads as “this is on”. The old screen used the second
+        shape for both — and also for switching tabs and for typing a word.
+      </p>
+
+      <h3>The filters are grouped, and that is the actual fix</h3>
+      <p>
+        Hiding twenty-two chips behind a button would only move the problem.
+        Inside the sheet they sit under headings — <strong>Dietary</strong>,
+        <strong>Price &amp; speed</strong>, <strong>Worth a look</strong>,
+        <strong>Category</strong> — because the thing that was missing was never
+        space, it was labels. “Pure Veg” and “Under 25 min” sat side by side
+        looking identical while measuring completely different things. Category
+        is additionally marked <em>pick one</em> in words, since its shape does
+        not say that it is a choice rather than a toggle.
+      </p>
+      <p>
+        Edits apply live to the list behind the sheet, so there is no draft
+        state and no Apply button to wonder about; the primary action reads
+        <em>Show 124 dishes</em> and simply closes, answering “will this leave me
+        anything?” before you commit to looking.
+      </p>
+
+      <h3>Active filters are the only capsules left</h3>
+      <p>
+        And now the shape means exactly one thing: this is on, tap the × to take
+        it off. Each is removable individually, with “Clear all” beside them —
+        which no longer wipes what you typed.
+      </p>
+
+      <h3>Suggestions stop impersonating filters</h3>
+      <p>
+        “Try searching” terms became text with a magnifier on each, not
+        capsules. That is what separates the <em>Biryani</em> that searches from
+        the <em>Biryani</em> that filters, and it costs no extra height.
+      </p>
+
+      <h3>The count gets its own line, and only when it means something</h3>
+      <p>
+        Nothing is competing for that row now, so nothing truncates. It appears
+        once the customer has actually narrowed something — “3,157 dishes” above
+        an untouched list is a number nobody asked for, and it was the number
+        that could not fit.
+      </p>
+
+      <h2>Findings 10–12, in the second pass</h2>
+
+      <h3>Search history (10)</h3>
+      <p>
+        The tab opened on the same five hard-coded suggestions for everybody,
+        every time — a reasonable guess about a market and a poor one about a
+        person. It now offers what this device searched for before, above the
+        suggestions, each entry removable and the lot clearable.
+      </p>
+      <p>
+        There is no submit on this screen — the list updates on every keystroke
+        — so “they meant this one” has to be inferred. Two conditions do it: the
+        words have been still for a beat, and they actually found something. A
+        query that returned nothing is not worth handing back to somebody later.
+        And because live search passes through “bi”, “bir”, “biry” on the way to
+        “biryani”, the store collapses entries by prefix in both directions, so
+        one word’s keystrokes cannot fill the whole list. It is one device’s
+        memory of its own typing; nothing is sent anywhere.
+      </p>
+
+      <h3>Typo tolerance — the finding was wrong (11)</h3>
+      <p>
+        <strong>I reported this as missing and it is not.</strong>
+        <code>lib/search/semantic.ts</code> already implements Damerau-Levenshtein
+        matching — optimal string alignment with adjacent transposition, which is
+        the shape most food typos take — against the catalog’s own vocabulary,
+        with a budget tuned by word length and memoised per catalog. Probing it
+        directly, every spelling I listed as a gap already resolved:
+        <code>biriyani</code>, <code>briyani</code>, <code>panner</code>,
+        <code>chiken</code>, <code>coffe</code>, <code>vanila</code>,
+        <code>hydrabadi</code>. The finding should not have been filed, and no
+        code needed changing.
+      </p>
+      <p>
+        The probe did turn up something real, though, one level up. The budget
+        function’s doc comment is the only place the trade-off is written down —
+        too tight and “panner” finds nothing, too loose and “rice” finds “nice” —
+        and <strong>both examples it gave were false</strong>. “hydrabadi” →
+        “hyderabadi” is one edit, not two, so it demonstrated nothing about the
+        two-edit tier it was offered as proof of. “noddels” → “noodles” does need
+        two, but “noddels” is seven characters, so the function budgets it one
+        and the pair does not match — the comment’s own example fails against the
+        comment’s own rule.
+      </p>
+      <p>
+        Corrected, with truthful examples, and the tiers are now pinned by
+        fourteen cases in <code>scripts/qa/dish-ranking.ts</code> (46 → 60
+        tests): each budget boundary, the transposition case, the four real
+        spellings above, and an end-to-end check that a misspelled query finds
+        the dish but ranks below the same query spelled right. Comments cannot
+        fail; tests can.
+      </p>
+
+      <h3>“★ 0.0” (12)</h3>
+      <p>
+        <code>restaurants.rating</code> and <code>rating_count</code> both
+        default to 0, so a kitchen nobody has reviewed arrived as a real,
+        comparable zero — and every surface that formatted it printed
+        <em>★ 0.0</em>, which is not the absence of a rating, it is the worst one
+        there is. On search results that put a damning number beside every new
+        shop on the platform.
+      </p>
+      <p>
+        One predicate, <code>isRated()</code>, at the point a rating becomes
+        text, and unreviewed now reads <strong>New</strong>. It is the rule the
+        tracking screen already applies to riders — unknown is its own answer and
+        gets its own word, never a number nobody measured. Applied to the dish
+        card and to <code>RatingPill</code>, which had the same bug waiting for
+        whenever its callers are uncommented.
+      </p>
+
+      <div class="foot">
+        Verified by <code>npx tsc --noEmit</code>, <code>npx eslint</code>,
+        <code>npm run build</code> and the <code>ranking</code> (60),
+        <code>platform</code>, <code>layering</code>, <code>switch</code>,
+        <code>service-area</code> and <code>sw</code> suites — all green. The
+        ranking and matching logic in <code>lib/search/dishes.ts</code> and
+        <code>semantic.ts</code> is behaviourally untouched: both passes changed
+        how controls are presented and what the code says about itself, not what
+        it selects or how results are ordered. Not verified in a browser — this
+        environment has no headless browser, so the two sheets, the recent list
+        and the “New” badge have not been seen rendering.
+      </div>
+    </main>
+  </body>
+</html>

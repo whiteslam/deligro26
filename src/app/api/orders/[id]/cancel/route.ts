@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { queueRefundForOrder } from "@/lib/data-access/refunds";
+import { cancelOrderRow } from "@/lib/data-access/order-cancellation";
 import { cancelDeliveryForOrder } from "@/lib/dispatch/rider-dispatch";
 import {
   notifyOrderCancelled,
@@ -23,19 +24,29 @@ import {
  * that polls every four seconds.
  *
  * `cancelled_at` is deliberately not written here: a trigger stamps it (0026),
- * so the timestamp is the same whichever path moved the order.
+ * so the timestamp is the same whichever path moved the order. `cancelled_by`
+ * is written, because this is the one path the trigger cannot work it out for
+ * itself — see the note at the update.
  */
 const CANCELLABLE = new Set(["placed", "kitchen"]);
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!isSupabaseConfigured) return NextResponse.json({ error: "backend_not_configured" }, { status: 503 });
+export async function POST(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!isSupabaseConfigured)
+    return NextResponse.json(
+      { error: "backend_not_configured" },
+      { status: 503 }
+    );
   const { id } = await params;
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   // The lookup below runs on the service-role client, so it sees every order
   // regardless of RLS. Ownership is checked immediately after — but cap the
@@ -62,13 +73,22 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   // lands in the gap between that read and this write (the vendor accepting or
   // rejecting it) would be silently overwritten by a cancel decided against
   // stale state.
-  const { data: cancelled, error } = await admin
-    .from("orders")
-    .update({ status: "cancelled" })
-    .eq("id", id)
-    .eq("status", order.status)
-    .select("id");
-  if (error) return NextResponse.json({ error: "server_error" }, { status: 500 });
+  // `cancelled_by: "customer"` is stated rather than derived: the customer
+  // cannot update orders under RLS at all, so this write goes out as
+  // service_role and the trigger would otherwise have no way to tell whose
+  // decision it was recording (0051).
+  const { data: cancelled, error } = await cancelOrderRow(
+    (patch) =>
+      admin
+        .from("orders")
+        .update(patch)
+        .eq("id", id)
+        .eq("status", order.status)
+        .select("id"),
+    { actor: "customer" }
+  );
+  if (error)
+    return NextResponse.json({ error: "server_error" }, { status: 500 });
   if (!cancelled || cancelled.length === 0) {
     return NextResponse.json({ error: "too_late" }, { status: 409 });
   }

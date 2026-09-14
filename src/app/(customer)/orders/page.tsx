@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { ReceiptText, TriangleAlert } from "lucide-react";
-import { OrderCard } from "@/components/orders/order-card";
+import { LiveOrderCard } from "@/components/orders/live-order-card";
+import { OrderHistory } from "@/components/orders/order-history";
 import { EmptyState } from "@/components/shared/empty-state";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
+import { PullToRefresh } from "@/components/shared/pull-to-refresh";
 import { Button } from "@/components/ui/button";
 import { getOrdersPageData } from "@/lib/orders-ui";
+import { getOrderEta } from "@/lib/data-access/order-tracking";
 import { requireUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { cn } from "@/lib/utils/cn";
 
 /**
  * Slower than the 3s poll on /orders/[id]. That screen is someone watching their
@@ -22,48 +24,50 @@ export default async function OrdersPage() {
   // Order history is per-account — guests are bounced to /login by the proxy;
   // this backstops it server-side.
   await requireUser();
-  const { active, past, ok } = await getOrdersPageData();
+  const { active, past, ok, hasMore } = await getOrdersPageData();
   const hasOrders = Boolean(active) || past.length > 0;
+
+  /**
+   * The live card headlines an arrival time, so it needs the same estimate the
+   * tracking screen does. One extra read, only when something is in flight, on
+   * the screen whose entire reason to exist at that moment is that order — and
+   * never fatal: a failed ETA drops the number, not the card.
+   */
+  const eta =
+    active && isSupabaseConfigured
+      ? await getOrderEta(active.id).catch(() => null)
+      : null;
 
   return (
     <>
-      {/* Only while something is actually in flight. A page of delivered orders
-          has nothing to refresh, and polling it would be pure cost. */}
-      {active && isSupabaseConfigured ? <AutoRefresh interval={REFRESH_MS} /> : null}
+      {/* The timer only runs while something is actually in flight: a page of
+          delivered orders has nothing to poll for and polling it would be pure
+          cost. Interval 0 keeps the catch-up on focus, which is what makes
+          coming back to the tab show current data either way — and the pull
+          gesture is how somebody asks in between. */}
+      {isSupabaseConfigured ? (
+        <AutoRefresh interval={active ? REFRESH_MS : 0} />
+      ) : null}
+      <PullToRefresh />
 
       <div className="glass sticky top-0 z-20 px-4 pb-3 pt-5">
         <h1 className="text-[23px] font-extrabold tracking-tight">Orders</h1>
       </div>
 
       {hasOrders ? (
-        <div className="px-4 pt-2">
+        <div className="space-y-5 px-4 pt-2">
           {active ? (
-            <>
-              <h2 className="mb-1 text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
-                Active
+            <section>
+              <h2 className="mb-2 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
+                <span className="size-1.5 animate-pulse rounded-full bg-green" />
+                Happening now
               </h2>
-              <div className="divide-y divide-line border-b border-line">
-                <OrderCard order={active} />
-              </div>
-            </>
+              <LiveOrderCard order={active} eta={eta} />
+            </section>
           ) : null}
 
           {past.length > 0 ? (
-            <>
-              <h2
-                className={cn(
-                  "mb-1 text-[13px] font-bold uppercase tracking-[0.06em] text-muted",
-                  active ? "mt-5" : ""
-                )}
-              >
-                Past orders
-              </h2>
-              <div className="divide-y divide-line">
-                {past.map((o) => (
-                  <OrderCard key={o.id} order={o} />
-                ))}
-              </div>
-            </>
+            <OrderHistory orders={past} hasMore={hasMore} />
           ) : null}
         </div>
       ) : !ok ? (

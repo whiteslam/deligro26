@@ -9,6 +9,10 @@ import { useRouter } from "next/navigation";
  * into props. Pauses while the tab is hidden and refreshes immediately when it
  * regains focus — near-realtime for the ops boards, no WebSocket wiring needed.
  *
+ * `interval={0}` drops the timer and keeps only the catch-up: for a screen
+ * with nothing in flight to poll for, where the cost of a poll buys nothing but
+ * coming back to a stale page still reads as a bug.
+ *
  * `whenHidden` opts out of the pause. Set it where nobody is looking at the tab
  * and that is exactly the problem: the kitchen display is a tablet that spends
  * its day on another tab or asleep, and pausing there meant new orders were not
@@ -28,13 +32,13 @@ export function AutoRefresh({
       if (whenHidden || !document.hidden) router.refresh();
     };
 
-    const id = setInterval(tick, interval);
+    const id = interval > 0 ? setInterval(tick, interval) : undefined;
     // Catch up the moment the operator returns to the tab.
     document.addEventListener("visibilitychange", tick);
     window.addEventListener("focus", tick);
 
     return () => {
-      clearInterval(id);
+      if (id !== undefined) clearInterval(id);
       document.removeEventListener("visibilitychange", tick);
       window.removeEventListener("focus", tick);
     };

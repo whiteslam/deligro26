@@ -57,6 +57,9 @@ export interface Order {
   /** Present once 0031 is applied. Rupees off the grand total; 0 when no coupon. */
   discount?: number;
   coupon_code?: string | null;
+  /** Present once 0051 is applied. Null on a row cancelled before it. */
+  cancelled_by?: string | null;
+  cancellation_reason?: string | null;
   created_at: string;
   address: { label?: string; line?: string } | null;
   order_items: OrderItem[];
@@ -75,6 +78,8 @@ const TIP_COLUMN = "orders.tip";
 const PAYMENT_COLUMNS = "orders.payment_method";
 /** `discount` / `coupon_code` arrive together in 0031. */
 const COUPON_COLUMNS = "orders.discount";
+/** `cancelled_by` / `cancellation_reason` arrive together in 0051. */
+const CANCELLATION_COLUMNS = "orders.cancelled_by";
 /** `idempotency_key` arrives in 0049. */
 const IDEMPOTENCY_COLUMN = "orders.idempotency_key";
 /** Postgres's "duplicate key value violates unique constraint". */
@@ -87,6 +92,8 @@ interface SelectFlags {
   payment: boolean;
   /** `discount` / `coupon_code` only exist from 0031. */
   coupon: boolean;
+  /** `cancelled_by` / `cancellation_reason` only exist from 0051. */
+  cancellation: boolean;
 }
 
 function select(flags: SelectFlags): string {
@@ -95,6 +102,7 @@ function select(flags: SelectFlags): string {
     flags.tip ? ", tip" : "",
     flags.payment ? ", payment_method, payment_status" : "",
     flags.coupon ? ", discount, coupon_code" : "",
+    flags.cancellation ? ", cancelled_by, cancellation_reason" : "",
     ", created_at, address",
     ", order_items(name, qty, price, menu_items(external_id, veg))",
     ", restaurants(slug, name, image_url, accent_tint, eta_min, eta_max)",
@@ -121,12 +129,14 @@ async function selectOrders<T>(
     tip: !columnKnownMissing(TIP_COLUMN),
     payment: !columnKnownMissing(PAYMENT_COLUMNS),
     coupon: !columnKnownMissing(COUPON_COLUMNS),
+    cancellation: !columnKnownMissing(CANCELLATION_COLUMNS),
   };
 
   // `isMissingColumn` doesn't say WHICH column is missing, so drop the newest
   // migration's group first and re-probe rather than guessing. At most one
   // attempt per still-optimistic group, plus the final bare one.
   const groups: Array<{ key: keyof SelectFlags; column: string }> = [
+    { key: "cancellation", column: CANCELLATION_COLUMNS },
     { key: "coupon", column: COUPON_COLUMNS },
     { key: "payment", column: PAYMENT_COLUMNS },
     { key: "tip", column: TIP_COLUMN },
@@ -151,7 +161,6 @@ async function selectOrders<T>(
   return data;
 }
 
-
 export interface CreateOrderLine {
   itemId: string;
   qty: number;
@@ -166,7 +175,12 @@ export interface CreateOrderInput {
    * send, so they are checked, never trusted (see the service-area gate in
    * `createOrder`).
    */
-  address: { label: string; line: string; lat?: number | null; lng?: number | null };
+  address: {
+    label: string;
+    line: string;
+    lat?: number | null;
+    lng?: number | null;
+  };
   /** Courier tip, in whole rupees. Clamped server-side to what the UI offers. */
   tip?: number;
   /**
@@ -243,9 +257,7 @@ export class PaymentRefused extends Error {
 
 /** Platform-level reasons an order is refused before anything is written. */
 export type OrderRefusalCode =
-  | "orders_paused"
-  | "below_minimum"
-  | "outside_delivery_area";
+  "orders_paused" | "below_minimum" | "outside_delivery_area";
 
 /**
  * The platform, not the shop, is refusing this order.
@@ -414,7 +426,11 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const wantsCoupon = input.couponCode?.trim();
   let previewDiscount = 0;
   if (wantsCoupon) {
-    const preview = await evaluateCoupon(wantsCoupon, itemSubtotal, restaurant.id);
+    const preview = await evaluateCoupon(
+      wantsCoupon,
+      itemSubtotal,
+      restaurant.id
+    );
     if (!preview.ok) throw new CouponRejected(preview.error as CouponFailure);
     previewDiscount = Math.max(0, Math.round(preview.discount ?? 0));
   }
@@ -441,7 +457,11 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
 
   // `payment_status` is deliberately not sent: the 0025 insert trigger pins it
   // to 'pending' for anything holding a user JWT, so sending it would be theatre.
-  const insertOrder = (withTip: boolean, withPayment: boolean, withIdempotency: boolean) =>
+  const insertOrder = (
+    withTip: boolean,
+    withPayment: boolean,
+    withIdempotency: boolean
+  ) =>
     supabase
       .from("orders")
       .insert({
@@ -470,16 +490,25 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     // refuse the order over a dedup guarantee this database can't yet keep.
     rememberColumn(IDEMPOTENCY_COLUMN, false);
     withIdempotency = false;
-    ({ data: order, error: orderError } = await insertOrder(withTip, withPayment, false));
+    ({ data: order, error: orderError } = await insertOrder(
+      withTip,
+      withPayment,
+      false
+    ));
   }
 
   if (orderError && isMissingColumn(orderError) && withPayment) {
     // Migration 0025 hasn't been applied. COD is what this database can record,
     // so a COD order proceeds unchanged; an online one cannot be taken at all.
     rememberColumn(PAYMENT_COLUMNS, false);
-    if (paymentMethod === "online") throw new Error("online_payments_unavailable");
+    if (paymentMethod === "online")
+      throw new Error("online_payments_unavailable");
     withPayment = false;
-    ({ data: order, error: orderError } = await insertOrder(withTip, false, withIdempotency));
+    ({ data: order, error: orderError } = await insertOrder(
+      withTip,
+      false,
+      withIdempotency
+    ));
   }
 
   if (orderError && isMissingColumn(orderError) && withTip) {
@@ -490,7 +519,11 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     rememberColumn(TIP_COLUMN, false);
     if (charges.tip > 0) throw new Error("tip_unsupported");
     withTip = false;
-    ({ data: order, error: orderError } = await insertOrder(false, withPayment, withIdempotency));
+    ({ data: order, error: orderError } = await insertOrder(
+      false,
+      withPayment,
+      withIdempotency
+    ));
   }
 
   if (orderError?.code === UNIQUE_VIOLATION && input.idempotencyKey) {
@@ -615,7 +648,9 @@ export async function listVisibleOrders(): Promise<Order[]> {
   return (data ?? []).map((row) => {
     const record = row as Record<string, unknown>;
     const restaurants = record.restaurants;
-    const restaurant = Array.isArray(restaurants) ? restaurants[0] : restaurants;
+    const restaurant = Array.isArray(restaurants)
+      ? restaurants[0]
+      : restaurants;
     return { ...record, restaurants: restaurant ?? null } as Order;
   });
 }
@@ -636,32 +671,47 @@ export async function listVisibleOrders(): Promise<Order[]> {
  * what RLS was already imposing — so this is the safe default for any
  * customer-facing surface.
  */
-export async function listMyOrders(): Promise<Order[]> {
+export async function listMyOrders(
+  options: {
+    /**
+     * Page backwards from here — an ISO `created_at`, exclusive. The cursor is
+     * a timestamp rather than an offset because the list is ordered by it and
+     * a new order arriving mid-scroll would otherwise shift every page
+     * boundary and show somebody the same row twice.
+     */
+    before?: string;
+    limit?: number;
+  } = {}
+): Promise<Order[]> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const data = await selectOrders<Record<string, unknown>[]>((columns) =>
-    supabase
+  // The Orders tab shows recent history, not a permanent archive — without a
+  // cap this fetches every order a long-tenured customer has ever placed, in
+  // full (items, restaurant), on every visit. An active order is always recent
+  // by definition, so this cannot hide the Active card. Callers page past it
+  // with `before`; 200 is the ceiling on what one request may ask for.
+  const limit = Math.min(Math.max(options.limit ?? 100, 1), 200);
+
+  const data = await selectOrders<Record<string, unknown>[]>((columns) => {
+    let query = supabase
       .from("orders")
       .select(columns)
       .eq("customer_id", user.id)
-      .order("created_at", { ascending: false })
-      // The Orders tab shows recent history, not a permanent archive — without
-      // a cap this fetches every order a long-tenured customer has ever placed,
-      // in full (items, restaurant), on every visit. An active order is always
-      // recent by definition, so this cannot hide the Active card. 100 is well
-      // past what anyone scrolls to on this screen today.
-      .limit(100)
-      .overrideTypes<Record<string, unknown>[]>()
-  );
+      .order("created_at", { ascending: false });
+    if (options.before) query = query.lt("created_at", options.before);
+    return query.limit(limit).overrideTypes<Record<string, unknown>[]>();
+  });
 
   return (data ?? []).map((row) => {
     const record = row as Record<string, unknown>;
     const restaurants = record.restaurants;
-    const restaurant = Array.isArray(restaurants) ? restaurants[0] : restaurants;
+    const restaurant = Array.isArray(restaurants)
+      ? restaurants[0]
+      : restaurants;
     return { ...record, restaurants: restaurant ?? null } as Order;
   });
 }

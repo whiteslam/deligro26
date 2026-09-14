@@ -4,26 +4,22 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Loader2, MapPin, Plus, Star, Trash2 } from "lucide-react";
 import { AddAddressForm } from "@/components/addresses/add-address-form";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSavedAddresses } from "@/hooks/use-saved-addresses";
-import { cn } from "@/lib/utils/cn";
 
 export default function ProfileAddressesPage() {
-  const {
-    addresses,
-    loading,
-    create,
-    remove,
-    setDefault,
-    refresh,
-  } = useSavedAddresses();
+  const { addresses, loading, create, remove, setDefault, refresh } =
+    useSavedAddresses();
   const [showAdd, setShowAdd] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** The address the confirm dialog is open for, if any. */
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Remove this address?")) return;
     setBusyId(id);
     try {
       await remove(id);
+      setConfirming(null);
     } finally {
       setBusyId(null);
     }
@@ -121,14 +117,17 @@ export default function ProfileAddressesPage() {
                       Set default
                     </button>
                   ) : null}
+                  {/* No longer dimmed on a default address. It was styled at
+                      50% opacity — the universal sign for "you cannot do this"
+                      — and then worked anyway, which is the worst of both: it
+                      discouraged a legitimate action without preventing it, and
+                      the thing it was discouraging (being left with no default)
+                      is now handled properly in `deleteAddress`. */}
                   <button
                     type="button"
                     disabled={busyId === a.id}
-                    onClick={() => handleDelete(a.id)}
-                    className={cn(
-                      "press inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-deal",
-                      a.isDefault && addresses.length > 1 && "opacity-50"
-                    )}
+                    onClick={() => setConfirming(a.id)}
+                    className="press inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-deal disabled:opacity-60"
                   >
                     <Trash2 className="size-3.5" /> Remove
                   </button>
@@ -137,6 +136,30 @@ export default function ProfileAddressesPage() {
             ))}
           </ul>
         )}
+
+        {/* `window.confirm` blocks the whole page with an OS dialog that names
+            the localhost origin rather than the app, and cannot say which
+            address is about to go. This one can. */}
+        <ConfirmDialog
+          open={confirming !== null}
+          title="Remove this address?"
+          message={
+            <>
+              {addresses.find((a) => a.id === confirming)?.line}
+              {addresses.find((a) => a.id === confirming)?.isDefault &&
+              addresses.length > 1 ? (
+                <span className="mt-2 block">
+                  It is your default — the next address will take over.
+                </span>
+              ) : null}
+            </>
+          }
+          confirmLabel="Remove"
+          danger
+          busy={busyId !== null && busyId === confirming}
+          onConfirm={() => confirming && handleDelete(confirming)}
+          onClose={() => setConfirming(null)}
+        />
 
         {showAdd ? (
           <section className="card mt-4 overflow-hidden">

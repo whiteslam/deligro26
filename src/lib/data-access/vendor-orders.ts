@@ -14,6 +14,7 @@ import {
   notifyOrderReady,
 } from "@/lib/notifications/order-events";
 import { queueRefundForOrder } from "@/lib/data-access/refunds";
+import { cancelOrderRow } from "@/lib/data-access/order-cancellation";
 import { cancelDeliveryForOrder, dispatchOrder } from "@/lib/dispatch/rider-dispatch";
 import {
   columnKnownMissing,
@@ -542,7 +543,18 @@ async function announceKitchenTransition(
  */
 export async function updateKitchenOrderStatus(
   orderId: string,
-  status: "kitchen" | "ready" | "cancelled"
+  status: "kitchen" | "ready" | "cancelled",
+  /**
+   * Why, when the kitchen is rejecting. Stored on the order and shown to the
+   * customer verbatim (0051) — five unexplained cancellations in a row is the
+   * complaint this exists to answer. Ignored for any other transition, where a
+   * reason would be a sentence attached to nothing.
+   *
+   * `cancelled_by` is NOT passed: this write goes out on the vendor's own
+   * client, so the trigger works out for itself that a shop owner did it, and
+   * a value supplied here would be discarded anyway.
+   */
+  reason?: string | null
 ): Promise<boolean> {
   const supabase = await createClient();
   const {
@@ -571,13 +583,26 @@ export async function updateKitchenOrderStatus(
     throw new Error("invalid_transition");
   }
 
-  const { data, error } = await supabase
-    .from("orders")
-    .update({ status })
-    .eq("id", orderId)
-    .eq("status", order.status)
-    .select("id")
-    .maybeSingle();
+  const { data, error } =
+    status === "cancelled"
+      ? await cancelOrderRow(
+          (patch) =>
+            supabase
+              .from("orders")
+              .update(patch)
+              .eq("id", orderId)
+              .eq("status", order.status)
+              .select("id")
+              .maybeSingle(),
+          { reason }
+        )
+      : await supabase
+          .from("orders")
+          .update({ status })
+          .eq("id", orderId)
+          .eq("status", order.status)
+          .select("id")
+          .maybeSingle();
 
   if (error) throw error;
   // The `.eq("status", order.status)` above is the optimistic lock: no row back

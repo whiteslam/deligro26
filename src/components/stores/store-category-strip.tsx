@@ -16,73 +16,117 @@ import { cn } from "@/lib/utils/cn";
 export function StoreCategoryStrip({
   active,
   categories = STORE_CATEGORIES,
+  counts,
 }: {
   active?: string;
   categories?: typeof STORE_CATEGORIES;
+  /**
+   * Shops behind each category id, and whether the tile leads somewhere even
+   * with none (Groceries and Pick & Drop open their own screens rather than a
+   * filtered list). Absent means "don't reason about it" — every tile then
+   * renders as live, which is the old behaviour.
+   */
+  counts?: Map<string, { shops: number; hasOwnScreen: boolean }>;
 }) {
   return (
-    <div className="no-scrollbar flex gap-2 overflow-x-auto px-4">
-      <Link
+    /*
+     * `py-1 -my-1` is not spacing, it is the fix for a clipped ring.
+     *
+     * `overflow-x: auto` makes the box clip on BOTH axes — there is no way to
+     * scroll one and let the other spill — so the active tile's `ring-2`, which
+     * a ring draws outside the element, was being sliced off along the top and
+     * bottom edges of this container. The padding gives the ring somewhere to
+     * land and the negative margin gives the space back to the layout, so
+     * nothing below moves.
+     */
+    <div className="no-scrollbar -my-1 flex gap-2 overflow-x-auto px-4 py-1">
+      <Tile
         href="/stores"
-        aria-current={!active ? "true" : undefined}
-        className="press flex w-[68px] shrink-0 flex-col items-center gap-1.5"
-      >
-        <span
-          className={cn(
-            "grid size-16 place-items-center rounded-xl transition-colors",
-            !active ? "bg-accent-soft ring-2 ring-accent" : "bg-surface-2"
-          )}
-        >
+        active={!active}
+        label="All stores"
+        icon={
           <LayoutGrid
             className={cn("size-7", !active ? "text-accent-ink" : "text-ink")}
           />
-        </span>
-        <span
-          className={cn(
-            "w-full truncate text-center text-[11px] font-semibold",
-            !active ? "text-accent-ink" : "text-ink"
-          )}
-        >
-          All stores
-        </span>
-      </Link>
+        }
+      />
       {categories.map((c) => {
         const isActive = c.id === active;
+        const meta = counts?.get(c.id);
+        // Nothing behind it and no screen of its own: still shown, because an
+        // admin switched it on deliberately, but not dressed up as somewhere
+        // worth tapping. See the page for why these also sort last.
+        const empty = Boolean(meta && meta.shops === 0 && !meta.hasOwnScreen);
         return (
-          <Link
+          <Tile
             key={c.id}
             href={isActive ? "/stores" : `/stores?category=${c.id}`}
-            aria-current={isActive ? "true" : undefined}
-            className="press flex w-[68px] shrink-0 flex-col items-center gap-1.5"
-          >
-            <span
-              className={cn(
-                "grid size-16 place-items-center rounded-xl transition-colors",
-                isActive
-                  ? "bg-accent-soft ring-2 ring-accent"
-                  : "bg-surface-2"
-              )}
-            >
-              {/* Emoji, not a photograph. The Home cuisine strip moved to real
-                  pictures of food; a storefront TYPE ("Pick & Drop", "Dairy")
-                  is a category of shop, not a dish, and there is no honest
-                  single photo of one. Revisit if these ever get real shop
-                  photography behind them. */}
+            active={isActive}
+            label={c.label}
+            empty={empty}
+            icon={
+              /* Emoji, not a photograph. The Home cuisine strip moved to real
+                 pictures of food; a storefront TYPE ("Pick & Drop", "Dairy") is
+                 a category of shop, not a dish, and there is no honest single
+                 photo of one. Revisit if these ever get real shop photography
+                 behind them. */
               <span className="text-4xl" role="img" aria-label={c.label}>
                 {c.emoji}
               </span>
-            </span>
-            <span
-              className={cn(
-                "w-full truncate text-center text-[11px] font-semibold",
-                isActive ? "text-accent-ink" : "text-ink"
-              )}
-            >
-              {c.label}
-            </span>
-          </Link>
+            }
+          />
         );
       })}
     </div>
+  );
+}
+
+function Tile({
+  href,
+  active,
+  label,
+  icon,
+  empty = false,
+}: {
+  href: string;
+  active: boolean;
+  label: string;
+  icon: React.ReactNode;
+  empty?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "true" : undefined}
+      className="press flex w-[72px] shrink-0 flex-col items-center gap-1.5"
+    >
+      <span
+        className={cn(
+          "grid size-16 place-items-center rounded-xl transition-colors",
+          active ? "bg-accent-soft ring-2 ring-accent" : "bg-surface-2",
+          empty && !active && "opacity-45"
+        )}
+      >
+        {icon}
+      </span>
+      {/*
+        Two lines, not an ellipsis.
+
+        These were `truncate` inside 68px, which at 11px semibold cuts the
+        longest labels the taxonomy actually has: "Pick & Drop" and "All
+        stores" both lost their last word to a "…". A category tile whose whole
+        job is to name a category should not be the thing that runs out of
+        room — so it wraps, and the box reserves both lines whether or not the
+        second one is used, to keep every tile's label on the same baseline.
+      */}
+      <span
+        className={cn(
+          "line-clamp-2 min-h-[2.1em] w-full text-center text-[11px] font-semibold leading-tight",
+          active ? "text-accent-ink" : empty ? "text-muted" : "text-ink"
+        )}
+      >
+        {label}
+      </span>
+    </Link>
   );
 }

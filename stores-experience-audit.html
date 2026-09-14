@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stores experience audit — Deligro</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: #14181b; --muted: #6b7580; --bg: #f7f6f3;
+        --surface: #ffffff; --line: #e2e0da;
+        --green: #17b26a; --amber: #d98c22; --red: #d9534f;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --ink: #e9edf0; --muted: #99a4ae; --bg: #14181b; --surface: #1b2126; --line: #2a3036; }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink);
+        font: 16px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      main { max-width: 860px; margin: 0 auto; padding: 48px 20px 96px; }
+      header.top { border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 40px; }
+      h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--muted); margin: 48px 0 12px; }
+      h3 { font-size: 18px; margin: 28px 0 6px; letter-spacing: -0.01em; }
+      .lede { color: var(--muted); margin: 0; }
+      .scenario { border-left: 3px solid var(--line); padding: 2px 0 2px 16px; margin: 22px 0; }
+      .scenario .said { font-style: italic; color: var(--muted); margin: 0 0 8px; }
+      .scenario p:last-child { margin-bottom: 0; }
+      table { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; }
+      th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+      td code, p code, li code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+      .tag { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+        text-transform: uppercase; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+      .tag.fixed { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
+      .tag.open { background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }
+      .wrap { overflow-x: auto; }
+      .tally { border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px;
+        background: var(--surface); margin: 18px 0; }
+      .tally table { margin: 0; font-size: 14px; }
+      .tally td { border: none; padding: 3px 0; }
+      .tally td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+      .tally td.zero { color: var(--red); font-weight: 700; }
+      ul { padding-left: 20px; }
+      .foot { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line);
+        color: var(--muted); font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="top">
+        <h1>Stores experience audit</h1>
+        <p class="lede">
+          The customer Stores tab (<code>/stores</code>), read as a customer and
+          measured against the live catalog. 14 September 2026.
+        </p>
+      </header>
+
+      <h2>What is actually behind the tiles</h2>
+      <p>
+        The Categories strip offers seven tiles. Counted against the 50 approved
+        shops, using the same cuisine-tag rule the page filters with:
+      </p>
+      <div class="tally">
+        <table>
+          <tr><td>All stores</td><td>50</td></tr>
+          <tr><td>Bakery</td><td>2</td></tr>
+          <tr><td>Groceries <span style="color:var(--muted)">— opens its own screen</span></td><td>0</td></tr>
+          <tr><td>Pick &amp; Drop <span style="color:var(--muted)">— opens its own screen</span></td><td>0</td></tr>
+          <tr><td>Dairy</td><td class="zero">0</td></tr>
+          <tr><td>Raw Meat</td><td class="zero">0</td></tr>
+          <tr><td>Chowpaty</td><td class="zero">0</td></tr>
+        </table>
+      </div>
+      <p>
+        The cuisine tags actually in use across the catalog are Fast Food (35),
+        Chinese (5), Biryani (3), Desserts (2), Italian (2), and one each of
+        Healthy, South Indian and North Indian. <strong>The storefront taxonomy
+        was written ahead of supply</strong> and almost none of it has anything
+        behind it. Two further numbers set the scene: of 50 approved shops,
+        <strong>11 are open</strong> at the time of the audit, and
+        <strong>exactly one has ever been rated</strong>.
+      </p>
+
+      <h2>Scenarios</h2>
+
+      <div class="scenario">
+        <p class="said">“I need milk.”</p>
+        <p>
+          Tap Dairy → “No dairy yet.” Tap Raw Meat → the same. Tap Chowpaty →
+          the same. Three of the seven tiles are permanent dead ends and the
+          strip gave no hint which, so the only way to learn was to tap each one
+          and come back. The empty state itself is well written; it is being
+          asked to do a job the strip should never have handed it.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“Which of these can I actually order from?”</p>
+        <p>
+          39 of the 50 shops are shut. The list was sorted by delivery estimate
+          alone, so closed kitchens were interleaved among open ones all the way
+          down — and a closed shop’s ETA is a claim about a kitchen that is not
+          cooking. You scrolled past shops you could not order from to find the
+          ones you could, with nothing but a small badge to tell them apart.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“What’s good here?”</p>
+        <p>
+          The “Open now” shelf was sorted by <code>rating</code> descending. One
+          shop out of fifty has ever been rated, so for the other forty-nine
+          that comparison is <code>0 − 0</code> and the shelf was whatever order
+          the database happened to return — presented as a curated pick.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“Why is this word cut in half?”</p>
+        <p>
+          The tiles were 68px wide with <code>truncate</code> on the label, which
+          at 11px semibold clips the longest names the taxonomy has: “Pick &amp;
+          Drop” and “All stores” both lost their last word to an ellipsis. A
+          tile whose entire job is to name a category should not be the thing
+          that runs out of room.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“The selected one looks clipped.”</p>
+        <p>
+          It was. The active tile is marked with <code>ring-2</code>, and a ring
+          is drawn <em>outside</em> the element. Its container is
+          <code>overflow-x-auto</code>, and that clips on <strong>both</strong>
+          axes — there is no way to scroll one and let the other spill — so with
+          no vertical padding the ring was sliced off along the top and bottom
+          edges.
+        </p>
+      </div>
+
+      <div class="scenario">
+        <p class="said">“Didn’t I just see these?”</p>
+        <p>
+          The page showed an “Open now” shelf of eleven 72px avatars, then every
+          shop again as a full card below it. The same eleven shops twice within
+          one screen — once as truncated names under thumbnails, once as cards
+          carrying the fee, the ETA, the distance and the closed badge.
+        </p>
+      </div>
+
+      <h2>Findings</h2>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>#</th><th>Finding</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Three of seven category tiles match zero shops, with nothing to signal it.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>2</td><td>Closed shops interleaved with open ones; 39 of 50 are shut.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>3</td><td>“Open now” shelf sorted by a rating 49 of 50 shops do not have.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>4</td><td>Category labels truncated — “Pick &amp; Drop”, “All stores”.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>5</td><td>Active tile’s ring clipped by the scroll container on both edges.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>6</td><td>The same eleven shops rendered twice, as a shelf and as cards.</td><td><span class="tag fixed">Fixed</span></td></tr>
+            <tr><td>7</td><td>Both Home and Stores head a strip “Categories” — one means cuisines, the other storefront types.</td><td><span class="tag open">Open</span></td></tr>
+            <tr><td>8</td><td>The storefront taxonomy is authored in code (<code>lib/taxonomy.ts</code>), so onboarding a dairy needs a deploy, not an admin action.</td><td><span class="tag open">Open</span></td></tr>
+            <tr><td>9</td><td>Category membership is inferred from free-text cuisine tags, so a shop joins “Bakery” only if somebody typed exactly that.</td><td><span class="tag open">Open</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>What changed</h2>
+
+      <h3>The strip stops sending people into dead ends</h3>
+      <p>
+        The page now counts what each category actually matches and hands the
+        strip the answer. Categories with nothing behind them sort to the end
+        and render muted — still present, because an admin switched them on
+        deliberately, but no longer dressed up as somewhere worth tapping.
+        Groceries and Pick &amp; Drop are exempt: they legitimately match no
+        shops because they open their own screens.
+      </p>
+
+      <h3>The clipping, both kinds</h3>
+      <p>
+        Labels wrap to two lines instead of truncating, and the box reserves
+        both lines whether or not the second is used, so every label sits on the
+        same baseline. The scroll container gains <code>py-1 -my-1</code> — the
+        padding gives the active ring somewhere to land, the negative margin
+        gives the space back so nothing below moves.
+      </p>
+
+      <h3>One list, split by the only question that matters</h3>
+      <p>
+        The avatar shelf is gone and the list is now <strong>Open now (11)</strong>
+        followed by <strong>Closed right now (39)</strong>, each sorted by
+        soonest arrival. When nothing is open the page says so once, at the top,
+        rather than leaving it to be inferred from a column of grey badges. The
+        cards were always the better container — they carry the fee, the ETA,
+        the distance and the closed state — so they do the whole job now.
+      </p>
+
+      <h2>Not done, and worth deciding on</h2>
+      <ul>
+        <li>
+          <strong>Two different things called “Categories” (7).</strong> Home’s
+          strip is cuisines, Stores’ is storefront types, and both carry the same
+          heading on adjacent tabs.
+        </li>
+        <li>
+          <strong>The taxonomy is code (8).</strong> <code>STORE_CATEGORIES</code>
+          is a constant. The admin can switch a category off, but adding one — or
+          fixing that nothing matches “Dairy” — needs a deploy.
+        </li>
+        <li>
+          <strong>Membership is a string match (9).</strong> A shop is a bakery
+          only if its free-text <code>cuisines</code> array contains “Bakery” or
+          “Desserts”. Nobody is prompted for that at onboarding, which is the
+          real reason four categories are empty — not that the shops do not
+          exist, but that nothing ever tagged them.
+        </li>
+      </ul>
+
+      <div class="foot">
+        Counts measured against the live catalog on 14 September 2026: 70
+        restaurant rows, 50 approved, 11 open, 1 rated. Verified by
+        <code>npx tsc --noEmit</code>, <code>npx eslint</code>,
+        <code>npm run build</code> and the <code>platform</code>,
+        <code>layering</code>, <code>switch</code>, <code>ranking</code> and
+        <code>sw</code> suites — all green. Not verified in a browser: this
+        environment has no headless browser, so the rewrapped labels and the
+        unclipped ring have not been seen rendering.
+      </div>
+    </main>
+  </body>
+</html>

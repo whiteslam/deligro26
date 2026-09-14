@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { queueRefundForOrder } from "@/lib/data-access/refunds";
+import { cancelOrderRow } from "@/lib/data-access/order-cancellation";
 import { cancelDeliveryForOrder } from "@/lib/dispatch/rider-dispatch";
 import {
   notifyOrderCancelled,
@@ -197,12 +198,19 @@ export async function cancelOrderAsAdmin(
   // Same staleness guard as the override. If the order was delivered in the
   // seconds since we read it, cancelling it now would contradict a delivery
   // that already happened.
-  const { data: cancelled, error } = await supabase
-    .from("orders")
-    .update({ status: "cancelled" })
-    .eq("id", orderId)
-    .eq("status", current.status)
-    .select("id");
+  // The reason has always been collected here and has only ever been filed
+  // against the refund — where the customer never sees it. It goes on the order
+  // too now, which is the row their screen reads.
+  const { data: cancelled, error } = await cancelOrderRow(
+    (patch) =>
+      supabase
+        .from("orders")
+        .update(patch)
+        .eq("id", orderId)
+        .eq("status", current.status)
+        .select("id"),
+    { actor: "admin", reason: trimmed }
+  );
 
   const stale = !error && (!cancelled || cancelled.length === 0);
   if (error || stale) {

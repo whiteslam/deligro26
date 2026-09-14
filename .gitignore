@@ -61,3 +61,7 @@ next-env.d.ts
 /Bolt Food ios May 2025/
 /WhatsApp Unknown */
 *.zip
+# Ops-script safety files: undo lists and pre-delete row backups. They are
+# snapshots of live catalog data, useful locally and not something to commit.
+scripts/ops/undo-dish-photos-*.json
+scripts/ops/deleted-menu-items-*.json

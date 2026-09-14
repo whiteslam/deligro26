@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -14,9 +14,16 @@ import {
   Navigation,
   Clock,
   WifiOff,
+  ReceiptText,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { TrackingMap, type RoadRoute } from "@/components/orders/tracking-map";
+import {
+  TrackingSheet,
+  SHEET_SNAPS,
+  SHEET_COLLAPSED_SNAP,
+  SHEET_DEFAULT_SNAP,
+} from "@/components/orders/tracking-sheet";
 import { RefundRequest } from "@/components/orders/refund-request";
 import { useLiveTracking } from "@/hooks/use-live-tracking";
 import {
@@ -24,7 +31,12 @@ import {
   statusIndex,
   canCustomerCancel,
 } from "@/lib/utils/order-status";
-import { shortOrderId, isOrderPaid, type UiOrder } from "@/lib/utils/order-map";
+import {
+  shortOrderId,
+  isOrderPaid,
+  cancellationNote,
+  type UiOrder,
+} from "@/lib/utils/order-map";
 import type { OrderEta } from "@/lib/orders/eta";
 import { formatINR } from "@/lib/utils/format";
 import { DEFAULT_CENTER } from "@/lib/maps/config";
@@ -167,8 +179,12 @@ export function TrackingView({
     ? live.riderPosition
     : showRiderOnMap
       ? {
-          lat: mockRestaurant.lat + (mockDestination.lat - mockRestaurant.lat) * 0.55,
-          lng: mockRestaurant.lng + (mockDestination.lng - mockRestaurant.lng) * 0.55,
+          lat:
+            mockRestaurant.lat +
+            (mockDestination.lat - mockRestaurant.lat) * 0.55,
+          lng:
+            mockRestaurant.lng +
+            (mockDestination.lng - mockRestaurant.lng) * 0.55,
         }
       : null;
 
@@ -193,7 +209,9 @@ export function TrackingView({
     setCancelBusy(true);
     setCancelMsg(null);
     try {
-      const res = await fetch(`/api/orders/${order.id}/cancel`, { method: "POST" });
+      const res = await fetch(`/api/orders/${order.id}/cancel`, {
+        method: "POST",
+      });
       if (res.ok) {
         router.refresh();
       } else {
@@ -244,6 +262,35 @@ export function TrackingView({
    */
   const estimateUnmeasured = Boolean(eta) && eta?.distanceKnown === false;
 
+  /*
+   * The sheet is dragged inside the stage — everything under the header — and
+   * the map is sized to the sheet's lowest stop, so both need that height in
+   * pixels. Measured rather than assumed: what is left under the header differs
+   * between a phone with a notch, a phone without one and the desktop frame,
+   * and all three are the same code path.
+   */
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stageHeight, setStageHeight] = useState(0);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const measure = () => setStageHeight(el.clientHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  /** Where the sheet is resting, and so how much of the map it is sitting on. */
+  const [sheetTop, setSheetTop] = useState(0);
+  const mapHeight = Math.round(stageHeight * SHEET_SNAPS[SHEET_COLLAPSED_SNAP]);
+  const mapInset = stageHeight ? Math.max(0, mapHeight - sheetTop) : 0;
+
+  // A finished order has nothing left to watch on a map — open on the details.
+  // Read once, when the sheet mounts, so a status arriving mid-read never yanks
+  // the sheet out from under the customer.
+  const initialSnap = delivered || cancelled ? 0 : SHEET_DEFAULT_SNAP;
+
   const headline = delivered
     ? "Delivered"
     : cancelled
@@ -259,9 +306,20 @@ export function TrackingView({
             : "Arriving";
 
   const showLateness = !delivered && !cancelled && Boolean(eta?.late);
+  const cancelNote = cancelled ? cancellationNote(order) : null;
 
   return (
-    <div className="relative">
+    /*
+     * Two shells, not one scrolling page.
+     *
+     * `owns-bottom` gives back the 80px the app shell reserves for the tab bar
+     * (see globals.css): this screen fills the frame exactly and scrolls
+     * nothing at the page level, so the sheet runs to the bottom edge and the
+     * bar floats over it. That reserved strip was the grey band under "Get help
+     * with this order" — the sheet ended with the content and the shell's
+     * background, plus the sheet's own drop shadow, showed through beneath it.
+     */
+    <div className="owns-bottom flex h-full flex-col">
       {toast ? (
         // Cleared below the status bar AND the sticky PageHeader beneath it
         // (top-[calc(var(--status-h)+1rem)] is the pattern used elsewhere for
@@ -278,214 +336,261 @@ export function TrackingView({
       <PageHeader
         title={`Order ${shortOrderId(order.id)}`}
         subtitle={order.restaurantName}
+        className="shrink-0"
       />
 
-      <TrackingMap
-        restaurant={restaurant}
-        destination={destination}
-        rider={riderOnMap}
-        showRider={showRiderOnMap}
-        snapRiderToRoute={riderPositionEstimated}
-        onRoute={setRoadRoute}
-      />
+      <div ref={stageRef} className="relative min-h-0 flex-1 overflow-hidden">
+        {/* Exactly as tall as the sheet's lowest stop, so dragging down runs
+            out of travel at the bottom of the map and never past it. The
+            percentage is the same height before the stage has been measured —
+            on the server, where there is nothing to measure. */}
+        <div
+          className="absolute inset-x-0 top-0 overflow-hidden"
+          style={{
+            height: stageHeight
+              ? mapHeight
+              : `${SHEET_SNAPS[SHEET_COLLAPSED_SNAP] * 100}%`,
+          }}
+        >
+          <TrackingMap
+            restaurant={restaurant}
+            destination={destination}
+            rider={riderOnMap}
+            showRider={showRiderOnMap}
+            snapRiderToRoute={riderPositionEstimated}
+            onRoute={setRoadRoute}
+            className="h-full"
+            bottomInset={mapInset}
+          />
+        </div>
 
-      <div className="bolt-sheet relative -mt-6 space-y-4 px-4 pt-2">
-        <div className="bolt-sheet-handle" />
-
-        {/* The screen has stopped hearing from the server. Everything below is
+        <TrackingSheet
+          stageHeight={stageHeight}
+          initialSnap={initialSnap}
+          onRestTop={setSheetTop}
+          header={
+            /*
+             * The one thing on this screen that is read out loud, to a stranger,
+             * at the door — so it lives in the sheet's header rather than in the
+             * scroll, and is on screen at every stop including the one where the
+             * sheet is pushed down to show the map. It used to be a tinted card
+             * four blocks into a scrolling page: present, but something you had
+             * to go and find while somebody waited.
+             *
+             * A hairline and two words, no fill and no box. The digits carry it.
+             */
+            deliveryOtp && !delivered && !cancelled ? (
+              <div className="flex items-center justify-between gap-3 border-b border-line px-4 pb-2.5 pt-0.5">
+                <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-muted">
+                  <ShieldCheck className="size-3.5 shrink-0" />
+                  Delivery code
+                </span>
+                <span className="text-data shrink-0 text-[22px] font-extrabold leading-none tracking-[0.22em] text-ink">
+                  {deliveryOtp}
+                </span>
+              </div>
+            ) : null
+          }
+        >
+          <div className="space-y-4 px-4 pt-1">
+            {/* The screen has stopped hearing from the server. Everything below is
             still the best we know, so it stays — but it is no longer live, and
             a tracking screen that looks live while frozen is worse than one
             that is visibly broken. The courier pin stops advancing at the same
             moment (see use-live-tracking). */}
-        {live.health.stale ? (
-          <p className="flex items-start gap-2 rounded-2xl border border-deal/30 bg-deal-soft px-3 py-2.5 text-xs font-medium leading-relaxed text-deal">
-            <WifiOff className="mt-0.5 size-3.5 shrink-0" />
-            <span>
-              {live.health.unauthorized ? (
-                <>
-                  You&apos;ve been signed out, so this has stopped updating.{" "}
-                  <Link href="/login" className="underline">
-                    Sign in
-                  </Link>{" "}
-                  to see live progress.
-                </>
-              ) : (
-                <>
-                  Not updating right now — showing the last status we received
-                  {live.health.ageMs !== null
-                    ? `, about ${Math.max(1, Math.round(live.health.ageMs / 60000))} min ago`
-                    : ""}
-                  . We&apos;ll reconnect automatically.
-                </>
-              )}
-            </span>
-          </p>
-        ) : null}
+            {live.health.stale ? (
+              <p className="flex items-start gap-2 rounded-2xl border border-deal/30 bg-deal-soft px-3 py-2.5 text-xs font-medium leading-relaxed text-deal">
+                <WifiOff className="mt-0.5 size-3.5 shrink-0" />
+                <span>
+                  {live.health.unauthorized ? (
+                    <>
+                      You&apos;ve been signed out, so this has stopped updating.{" "}
+                      <Link href="/login" className="underline">
+                        Sign in
+                      </Link>{" "}
+                      to see live progress.
+                    </>
+                  ) : (
+                    <>
+                      Not updating right now — showing the last status we
+                      received
+                      {live.health.ageMs !== null
+                        ? `, about ${Math.max(1, Math.round(live.health.ageMs / 60000))} min ago`
+                        : ""}
+                      . We&apos;ll reconnect automatically.
+                    </>
+                  )}
+                </span>
+              </p>
+            ) : null}
 
-        <div className="text-center">
-          <p className="text-sm text-muted">
-            {delivered
-              ? "Your order was delivered"
-              : cancelled
-                ? "This order was cancelled"
-                : estimateUnmeasured
-                  ? "Delivery time"
-                  : "Estimated time of delivery"}
-          </p>
-          <p
-            className={cn(
-              "text-[40px] font-extrabold leading-none tracking-tight",
-              delivered && "text-green",
-              cancelled && "text-deal"
-            )}
-          >
-            {headline}
-          </p>
-          {/* The trip, in the units a customer actually asks in. It is the
+            <div className="text-center">
+              <p className="text-sm text-muted">
+                {delivered
+                  ? "Your order was delivered"
+                  : cancelled
+                    ? "This order was cancelled"
+                    : estimateUnmeasured
+                      ? "Delivery time"
+                      : "Estimated time of delivery"}
+              </p>
+              <p
+                className={cn(
+                  "text-[40px] font-extrabold leading-none tracking-tight",
+                  delivered && "text-green",
+                  cancelled && "text-deal"
+                )}
+              >
+                {headline}
+              </p>
+              {/* The trip, in the units a customer actually asks in. It is the
               measured road distance, never the straight line the map used to
               draw — reading a distance off that line was the thing that could
               not be done, and quoting it here would have been the same error
               with more confidence. Absent until Directions answers, because
               until then we genuinely do not know it. */}
-          {roadRoute && !delivered && !cancelled ? (
-            <p className="text-xs font-medium text-muted">
-              {roadRoute.km < 1
-                ? `${Math.round(roadRoute.km * 1000)} m by road`
-                : `${roadRoute.km.toFixed(1)} km by road`}
-            </p>
-          ) : null}
+              {roadRoute && !delivered && !cancelled ? (
+                <p className="text-xs font-medium text-muted">
+                  {roadRoute.km < 1
+                    ? `${Math.round(roadRoute.km * 1000)} m by road`
+                    : `${roadRoute.km.toFixed(1)} km by road`}
+                </p>
+              ) : null}
 
-          {/* "Not available" on its own is a dead end. Say which fact is
+              {/* "Not available" on its own is a dead end. Say which fact is
               missing, so the answer is actionable by whoever can fix it —
               nobody can pin a shop they have not been told is unpinned. The
               shop is named as the gap because it is: the customer's own
               address is not at fault and must not be implied to be. */}
-          {estimateUnmeasured && !delivered && !cancelled ? (
-            <p className="mx-auto mt-1 max-w-[34ch] text-xs font-medium leading-snug text-muted">
-              {order.restaurantName
-                ? `${order.restaurantName} hasn't set its location yet, so we can't work out how long the trip takes.`
-                : "This shop hasn't set its location yet, so we can't work out how long the trip takes."}
-            </p>
-          ) : null}
-        </div>
+              {estimateUnmeasured && !delivered && !cancelled ? (
+                <p className="mx-auto mt-1 max-w-[34ch] text-xs font-medium leading-snug text-muted">
+                  {order.restaurantName
+                    ? `${order.restaurantName} hasn't set its location yet, so we can't work out how long the trip takes.`
+                    : "This shop hasn't set its location yet, so we can't work out how long the trip takes."}
+                </p>
+              ) : null}
+            </div>
 
-        {/* No cause is offered, because we do not know one. A late order is a
+            {/* No cause is offered, because we do not know one. A late order is a
             fact about the clock; guessing at traffic or a busy kitchen would be
             inventing the one part of this screen we have no evidence for. */}
-        {showLateness && eta ? (
-          <p className="flex items-center justify-center gap-2 rounded-2xl bg-deal-soft px-3 py-2.5 text-center text-sm font-bold text-deal">
-            <Clock className="size-4 shrink-0" />
-            Running about {minutesLabel(eta.lateByMinutes)} late
-          </p>
-        ) : null}
+            {showLateness && eta ? (
+              <p className="flex items-center justify-center gap-2 rounded-2xl bg-deal-soft px-3 py-2.5 text-center text-sm font-bold text-deal">
+                <Clock className="size-4 shrink-0" />
+                Running about {minutesLabel(eta.lateByMinutes)} late
+              </p>
+            ) : null}
 
-        {delivered ? (
-          <div className="rounded-2xl bg-green-soft p-5 text-center">
-            <p className="text-[15px] font-bold">
-              {rated ? "Thanks for rating!" : "Hope it was delicious. How was it?"}
-            </p>
-            <div className="mt-3 flex justify-center gap-2">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  disabled={rateBusy || rated || !isUuid}
-                  onClick={() => submitRating(n)}
-                  aria-label={`Rate ${n} star${n > 1 ? "s" : ""}`}
-                  className="press grid size-11 place-items-center rounded-full bg-surface disabled:opacity-100"
-                >
-                  <Star
-                    className={cn(
-                      "size-5",
-                      n <= rating ? "fill-pop text-pop" : "text-muted"
-                    )}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : cancelled ? null : (
-          <ol className="pl-1">
-            {steps.map((step, i) => {
-              const done = i < current;
-              const active = i === current;
-              const last = i === steps.length - 1;
-              return (
-                <li key={step.key} className="flex gap-3.5">
-                  <div className="flex flex-col items-center">
-                    <span
-                      className={cn(
-                        "grid size-6 shrink-0 place-items-center rounded-full border-2",
-                        done && "border-green bg-green text-[var(--on-green)]",
-                        active && "border-green bg-surface",
-                        !done && !active && "border-line bg-surface"
-                      )}
+            {delivered ? (
+              <div className="rounded-2xl bg-green-soft p-5 text-center">
+                <p className="text-[15px] font-bold">
+                  {rated
+                    ? "Thanks for rating!"
+                    : "Hope it was delicious. How was it?"}
+                </p>
+                <div className="mt-3 flex justify-center gap-2">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      disabled={rateBusy || rated || !isUuid}
+                      onClick={() => submitRating(n)}
+                      aria-label={`Rate ${n} star${n > 1 ? "s" : ""}`}
+                      className="press grid size-11 place-items-center rounded-full bg-surface disabled:opacity-100"
                     >
-                      {done ? (
-                        <Check className="size-3.5" strokeWidth={3} />
-                      ) : active ? (
-                        <span className="size-2.5 rounded-full bg-green" />
-                      ) : null}
-                    </span>
-                    {!last ? (
-                      <span
+                      <Star
                         className={cn(
-                          "my-1 w-0.5 flex-1 rounded-full",
-                          done ? "bg-green" : "bg-line"
+                          "size-5",
+                          n <= rating ? "fill-pop text-pop" : "text-muted"
                         )}
-                        style={{ minHeight: 26 }}
                       />
-                    ) : null}
-                  </div>
-                  <div className={cn("pb-5", last && "pb-0")}>
-                    <p
-                      className={cn(
-                        "text-[15px] font-bold leading-tight",
-                        !done && !active && "text-muted"
-                      )}
-                    >
-                      {step.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : cancelled ? (
+              /* The stages are meaningless for an order that stopped, so this is
+             what takes their place: who ended it and, when they said, why.
+             `cancellationNote` returns null for a row we cannot attribute —
+             cancelled before migration 0051, or a database without it — and
+             nothing is drawn rather than a guess about whose fault it was. */
+              cancelNote ? (
+                <div className="rounded-2xl bg-surface-2 p-4">
+                  <p className="text-[15px] font-bold">{cancelNote.who}</p>
+                  {cancelNote.reason ? (
+                    <p className="mt-1 text-sm leading-relaxed text-muted">
+                      &ldquo;{cancelNote.reason}&rdquo;
                     </p>
-                    <p className="mt-0.5 text-xs text-muted">{step.sub}</p>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        )}
+                  ) : null}
+                </div>
+              ) : null
+            ) : (
+              <ol className="pl-1">
+                {steps.map((step, i) => {
+                  const done = i < current;
+                  const active = i === current;
+                  const last = i === steps.length - 1;
+                  return (
+                    <li key={step.key} className="flex gap-3.5">
+                      <div className="flex flex-col items-center">
+                        <span
+                          className={cn(
+                            "grid size-6 shrink-0 place-items-center rounded-full border-2",
+                            done &&
+                              "border-green bg-green text-[var(--on-green)]",
+                            active && "border-green bg-surface",
+                            !done && !active && "border-line bg-surface"
+                          )}
+                        >
+                          {done ? (
+                            <Check className="size-3.5" strokeWidth={3} />
+                          ) : active ? (
+                            <span className="size-2.5 rounded-full bg-green" />
+                          ) : null}
+                        </span>
+                        {!last ? (
+                          <span
+                            className={cn(
+                              "my-1 w-0.5 flex-1 rounded-full",
+                              done ? "bg-green" : "bg-line"
+                            )}
+                            style={{ minHeight: 26 }}
+                          />
+                        ) : null}
+                      </div>
+                      <div className={cn("pb-5", last && "pb-0")}>
+                        <p
+                          className={cn(
+                            "text-[15px] font-bold leading-tight",
+                            !done && !active && "text-muted"
+                          )}
+                        >
+                          {step.title}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted">{step.sub}</p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
 
-        {/* The map draws the same confident green dot whether or not anybody
+            {/* The map draws the same confident green dot whether or not anybody
             reported a position, so the correction has to be made in words. The
             pin still earns its place — it shows progress along the route, which
             is real — but calling it the rider's location when
             `driver_location_source` says otherwise is the claim this caption
             takes back. It disappears of its own accord the moment a rider's
             device starts reporting. */}
-        {showRiderOnMap && riderPositionEstimated ? (
-          <p className="flex items-start gap-2 rounded-2xl bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-muted">
-            <Navigation className="mt-0.5 size-3.5 shrink-0" />
-            <span>
-              The courier pin is an estimate along the route — this rider
-              isn&apos;t sharing a live location.
-            </span>
-          </p>
-        ) : null}
-
-        {deliveryOtp && !delivered && !cancelled ? (
-          <div className="flex items-center gap-3 rounded-2xl bg-accent-soft p-4">
-            <span className="grid size-10 place-items-center rounded-xl bg-accent text-[var(--on-accent)]">
-              <ShieldCheck className="size-5" />
-            </span>
-            <div className="flex-1">
-              <p className="text-label !text-accent-ink">Delivery code</p>
-              <p className="text-xs text-muted">Share with your rider at the door</p>
-            </div>
-            <span className="text-data text-2xl font-extrabold tracking-[0.3em] text-accent-ink">
-              {deliveryOtp}
-            </span>
-          </div>
-        ) : null}
-
-        {/* The courier, as an ID card.
+            {showRiderOnMap && riderPositionEstimated ? (
+              <p className="flex items-start gap-2 rounded-2xl bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-muted">
+                <Navigation className="mt-0.5 size-3.5 shrink-0" />
+                <span>
+                  The courier pin is an estimate along the route — this rider
+                  isn&apos;t sharing a live location.
+                </span>
+              </p>
+            ) : null}
+            {/* The courier, as an ID card.
 
             It was a plain row — initial, name, "Your courier", call button —
             which is the same layout this app uses for a saved address or a
@@ -494,149 +599,172 @@ export function TrackingView({
             can hold their phone up against: the platform's name on it, the
             rider's name, their Deligro ID, and one control that does the one
             thing you would want to do with it. */}
-        {displayRider && !delivered && !cancelled ? (
-          <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-[var(--shadow-md)]">
-            <div className="flex items-center justify-between gap-2 bg-ink px-4 py-1.5">
-              <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[color:var(--surface)]">
-                Deligro rider
-              </span>
-              <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--surface)]/70">
-                <ShieldCheck className="size-3" /> Verified
-              </span>
-            </div>
+            {displayRider && !delivered && !cancelled ? (
+              <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-[var(--shadow-md)]">
+                <div className="flex items-center justify-between gap-2 bg-ink px-4 py-1.5">
+                  <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[color:var(--surface)]">
+                    Deligro rider
+                  </span>
+                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--surface)]/70">
+                    <ShieldCheck className="size-3" /> Verified
+                  </span>
+                </div>
 
-            <div className="flex items-center gap-3 p-3.5">
-              <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-surface-2 text-xl font-extrabold text-ink">
-                {displayRider.name.charAt(0).toUpperCase()}
-              </span>
+                <div className="flex items-center gap-3 p-3.5">
+                  <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-surface-2 text-xl font-extrabold text-ink">
+                    {displayRider.name.charAt(0).toUpperCase()}
+                  </span>
 
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-extrabold leading-tight">
-                  {displayRider.name}
-                </p>
-                {/* The ID is the point of the card: it is the thing a customer
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-extrabold leading-tight">
+                      {displayRider.name}
+                    </p>
+                    {/* The ID is the point of the card: it is the thing a customer
                     can quote to support about one specific courier, and the
                     thing that makes "is this my rider?" answerable at the door
                     rather than a matter of trusting whoever turned up. */}
-                {displayRider.id ? (
-                  <p className="text-data mt-0.5 text-[11px] font-bold tracking-[0.12em] text-muted">
-                    ID {displayRider.id}
-                  </p>
-                ) : null}
-                {/* Only shown when we actually know it. Every rider used to be
+                    {displayRider.id ? (
+                      <p className="text-data mt-0.5 text-[11px] font-bold tracking-[0.12em] text-muted">
+                        ID {displayRider.id}
+                      </p>
+                    ) : null}
+                    {/* Only shown when we actually know it. Every rider used to be
                     labelled "4.9 ★ · Bike" — a rating we have never collected. */}
-                {displayRider.rating !== undefined ? (
-                  <p className="mt-1 flex items-center gap-1 text-xs text-muted">
-                    <Star className="size-3 fill-pop text-pop" />
-                    {displayRider.rating}
-                    {displayRider.vehicle ? ` · ${displayRider.vehicle}` : ""}
-                  </p>
-                ) : displayRider.vehicle ? (
-                  <p className="mt-1 text-xs text-muted">{displayRider.vehicle}</p>
-                ) : (
-                  <p className="mt-1 text-xs text-muted">
-                    Bringing your order to the door
-                  </p>
-                )}
-              </div>
+                    {displayRider.rating !== undefined ? (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-muted">
+                        <Star className="size-3 fill-pop text-pop" />
+                        {displayRider.rating}
+                        {displayRider.vehicle
+                          ? ` · ${displayRider.vehicle}`
+                          : ""}
+                      </p>
+                    ) : displayRider.vehicle ? (
+                      <p className="mt-1 text-xs text-muted">
+                        {displayRider.vehicle}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-muted">
+                        Bringing your order to the door
+                      </p>
+                    )}
+                  </div>
 
-              {/* A "Message rider" button used to sit beside this: permanently
+                  {/* A "Message rider" button used to sit beside this: permanently
                   disabled, 50% opacity, no explanation, right next to a Call
                   button that works. There is no chat backend and none is
                   planned, so it was not a control waiting on data — it was a
                   control waiting on a feature. Removed rather than left greyed
                   out; calling is how you reach your rider, and the button that
                   does it is now the only one offered. */}
-              {riderTel ? (
-                <a
-                  href={`tel:${riderTel}`}
-                  aria-label={`Call ${displayRider.name}`}
-                  className="press flex shrink-0 flex-col items-center gap-1 rounded-xl bg-accent px-3.5 py-2.5 text-[var(--on-accent)] shadow-[var(--glow-accent)]"
-                >
-                  <Phone className="size-5" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">
-                    Call
-                  </span>
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  aria-label="Call rider"
-                  disabled
-                  title="No phone number recorded for this rider"
-                  className="press flex shrink-0 flex-col items-center gap-1 rounded-xl bg-accent px-3.5 py-2.5 text-[var(--on-accent)] opacity-50 shadow-[var(--glow-accent)]"
-                >
-                  <Phone className="size-5" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">
-                    Call
-                  </span>
-                </button>
-              )}
-            </div>
-          </div>
-        ) : null}
+                  {riderTel ? (
+                    <a
+                      href={`tel:${riderTel}`}
+                      aria-label={`Call ${displayRider.name}`}
+                      className="press flex shrink-0 flex-col items-center gap-1 rounded-xl bg-accent px-3.5 py-2.5 text-[var(--on-accent)] shadow-[var(--glow-accent)]"
+                    >
+                      <Phone className="size-5" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        Call
+                      </span>
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      aria-label="Call rider"
+                      disabled
+                      title="No phone number recorded for this rider"
+                      className="press flex shrink-0 flex-col items-center gap-1 rounded-xl bg-accent px-3.5 py-2.5 text-[var(--on-accent)] opacity-50 shadow-[var(--glow-accent)]"
+                    >
+                      <Phone className="size-5" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        Call
+                      </span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : null}
 
-        <div className="card p-4">
-          <h2 className="mb-3 text-[17px] font-extrabold tracking-tight">
-            Order {shortOrderId(order.id)}
-          </h2>
-          <ul className="space-y-2 text-sm">
-            {order.lines.map((l) => (
-              <li key={l.itemId} className="flex justify-between">
-                <span className="text-muted">
-                  {l.qty}× <span className="text-ink">{l.name}</span>
+            <div className="card p-4">
+              <h2 className="mb-3 text-[17px] font-extrabold tracking-tight">
+                Order {shortOrderId(order.id)}
+              </h2>
+              <ul className="space-y-2 text-sm">
+                {order.lines.map((l) => (
+                  <li key={l.itemId} className="flex justify-between">
+                    <span className="text-muted">
+                      {l.qty}× <span className="text-ink">{l.name}</span>
+                    </span>
+                    <span className="text-data">
+                      {formatINR(l.price * l.qty)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 flex justify-between border-t border-line pt-3">
+                <span className="font-extrabold">
+                  {totalLabel(order, delivered)}
                 </span>
-                <span className="text-data">{formatINR(l.price * l.qty)}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-3 flex justify-between border-t border-line pt-3">
-            <span className="font-extrabold">{totalLabel(order, delivered)}</span>
-            <span className="text-data text-base font-extrabold">
-              {formatINR(order.total)}
-            </span>
-          </div>
-        </div>
+                <span className="text-data text-base font-extrabold">
+                  {formatINR(order.total)}
+                </span>
+              </div>
+            </div>
 
-        {/* Once an order is finished — delivered or cancelled — asking for money
+            {/* Once an order is finished — delivered or cancelled — asking for money
             back is the only thing left to do with it. Mock orders are excluded
             because there is no row behind them to refund. */}
-        {isUuid && (delivered || cancelled) ? (
-          <RefundRequest
-            orderId={order.id}
-            orderTotal={order.total}
-            paid={paid}
-          />
-        ) : null}
-
-        {canCancel ? (
-          <div className="space-y-1">
-            <button
-              onClick={() => setShowCancelConfirm(true)}
-              disabled={cancelBusy}
-              className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-deal disabled:opacity-60"
-            >
-              {cancelBusy ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <XCircle className="size-4" />
-              )}
-              Cancel order
-            </button>
-            {cancelMsg ? (
-              <p className="rounded-xl bg-deal-soft px-3 py-2 text-center text-sm font-medium text-deal">
-                {cancelMsg}
-              </p>
+            {isUuid && (delivered || cancelled) ? (
+              <RefundRequest
+                orderId={order.id}
+                orderTotal={order.total}
+                paid={paid}
+              />
             ) : null}
-          </div>
-        ) : null}
 
-        <Link
-          href={`/profile/help?order=${encodeURIComponent(order.id)}`}
-          className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-ink"
-        >
-          <CircleHelp className="size-4" /> Get help with this order
-        </Link>
+            {canCancel ? (
+              <div className="space-y-1">
+                <button
+                  onClick={() => setShowCancelConfirm(true)}
+                  disabled={cancelBusy}
+                  className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-deal disabled:opacity-60"
+                >
+                  {cancelBusy ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <XCircle className="size-4" />
+                  )}
+                  Cancel order
+                </button>
+                {cancelMsg ? (
+                  <p className="rounded-xl bg-deal-soft px-3 py-2 text-center text-sm font-medium text-deal">
+                    {cancelMsg}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* A delivered order is a completed sale, and until now the app
+                produced no record of one. The receipt is its own page so it has
+                a URL to come back to and can be printed without the phone frame
+                around it. */}
+            {delivered ? (
+              <Link
+                href={`/orders/${order.id}/receipt`}
+                className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-ink"
+              >
+                <ReceiptText className="size-4" /> View receipt
+              </Link>
+            ) : null}
+
+            <Link
+              href={`/profile/help?order=${encodeURIComponent(order.id)}`}
+              className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-ink"
+            >
+              <CircleHelp className="size-4" /> Get help with this order
+            </Link>
+          </div>
+        </TrackingSheet>
       </div>
 
       {showCancelConfirm ? (
