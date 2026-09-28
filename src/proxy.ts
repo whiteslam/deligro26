@@ -162,7 +162,8 @@ export const config = {
   // periodic update check — which the browser makes with no guarantee of
   // credentials — could not see the script at all. Both files are static
   // `public/` assets containing no user data.
+  // manifests/ — the portal apps' manifests (role-manifest.ts); public, no user data.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|OneSignalSDKWorker\\.js|sw-core\\.js|offline\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|manifests/|OneSignalSDKWorker\\.js|sw-core\\.js|offline\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

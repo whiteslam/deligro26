@@ -1,6 +1,21 @@
 import { ManagerShell } from "@/components/manager/manager-shell";
+import { OneSignalInit } from "@/components/notifications/onesignal-init";
+import { FeaturesProvider } from "@/components/features/features-provider";
+import { getFeatures } from "@/lib/features/flags.server";
+import { allOn } from "@/lib/features/catalog";
 import { requireRole } from "@/lib/auth";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { resolveShellMode } from "@/lib/shell-mode.server";
+import type { Metadata } from "next";
+
+/**
+ * Installs as its own home-screen app on iPhone/Android ("Add to Home
+ * Screen" from this portal) — see src/lib/pwa/role-manifest.ts.
+ */
+export const metadata: Metadata = {
+  manifest: "/manifests/manager",
+  appleWebApp: { capable: true, title: "Deligro Manager", statusBarStyle: "default" },
+};
 
 /**
  * The Manager / Sub-Admin portal.
@@ -19,10 +34,20 @@ export default async function ManagerLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [, shellMode] = await Promise.all([
+  const [profile, shellMode] = await Promise.all([
     requireRole(["manager", "admin"]),
     resolveShellMode("manager"),
   ]);
 
-  return <ManagerShell initialMode={shellMode}>{children}</ManagerShell>;
+  // Switches apply to managers; an admin using this portal has everything.
+  const features =
+    profile.role === "admin" ? allOn() : await getFeatures("manager", profile.id);
+
+  return (
+    <FeaturesProvider features={features}>
+      {/* Ops alarms ("kitchen hasn't accepted", "no rider yet") are pushed. */}
+      <OneSignalInit userId={isSupabaseConfigured ? profile.id : null} />
+      <ManagerShell initialMode={shellMode}>{children}</ManagerShell>
+    </FeaturesProvider>
+  );
 }

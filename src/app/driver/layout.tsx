@@ -1,7 +1,21 @@
 import { StatusBar } from "@/components/layout/status-bar";
+import { OneSignalInit } from "@/components/notifications/onesignal-init";
+import { FeaturesProvider } from "@/components/features/features-provider";
+import { getFeatures } from "@/lib/features/flags.server";
 import { DriverHeader } from "@/components/driver/driver-header";
 import { DriverTabBar } from "@/components/driver/driver-tab-bar";
 import { requireRole } from "@/lib/auth";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import type { Metadata } from "next";
+
+/**
+ * Installs as its own home-screen app on iPhone/Android ("Add to Home
+ * Screen" from this portal) — see src/lib/pwa/role-manifest.ts.
+ */
+export const metadata: Metadata = {
+  manifest: "/manifests/rider",
+  appleWebApp: { capable: true, title: "Deligro Rider", statusBarStyle: "default" },
+};
 
 /**
  * The courier app runs in the phone frame, not the console shell.
@@ -36,17 +50,23 @@ export default async function DriverLayout({
   // naming the rider in the header costs no second query. (`getProfile` is not
   // memoised, so calling it again here would be a real extra round trip.)
   const profile = await requireRole("driver");
+  const features = await getFeatures("driver", profile.id);
 
   return (
+    <FeaturesProvider features={features}>
     <div className="device">
       <div className="app-shell">
         <div className="app-scroll no-scrollbar pb-[80px]">
           <DriverHeader name={profile.full_name} />
-          <div className="@container px-4 pb-6 pt-4">{children}</div>
+          <main className="@container px-4 pb-6 pt-4">{children}</main>
         </div>
         <DriverTabBar />
         <StatusBar />
+        {/* Push for pickup offers and cancellations — the rider's phone is in
+            a pocket most of the shift. See onesignal-init.tsx. */}
+        <OneSignalInit userId={isSupabaseConfigured ? profile.id : null} />
       </div>
     </div>
+    </FeaturesProvider>
   );
 }
