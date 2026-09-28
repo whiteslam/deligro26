@@ -20,14 +20,19 @@ const csp = [
   // React dev mode uses eval() for stack traces; production never needs it.
   // cdn.onesignal.com serves the web-push SDK; maps.googleapis.com the Maps JS;
   // checkout.razorpay.com the payment SDK, loaded on demand at checkout.
-  `script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://maps.googleapis.com https://maps.gstatic.com https://checkout.razorpay.com${isDev ? " 'unsafe-eval'" : ""}`,
+  // api.onesignal.com: the v16 SDK loads its app config as a JSONP script
+  // (/sync/<app-id>/web); blocking it times out OneSignal init, so web push
+  // never subscribes.
+  `script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://api.onesignal.com https://maps.googleapis.com https://maps.gstatic.com https://checkout.razorpay.com${isDev ? " 'unsafe-eval'" : ""}`,
   // Google Maps injects a stylesheet + Roboto webfont.
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://*.onesignal.com https://onesignal.com https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.razorpay.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   // OneSignal over WSS/HTTPS; Google Maps tiles/geocode/places over HTTPS;
   // Razorpay's API + its lumberjack telemetry host, both under *.razorpay.com.
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.onesignal.com https://onesignal.com wss://*.onesignal.com https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com https://*.razorpay.com",
+  // nominatim.openstreetmap.org is the reverse-geocode fallback in
+  // lib/utils/geocode.ts; without it a detected location never gets a name.
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.onesignal.com https://onesignal.com wss://*.onesignal.com https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com https://*.razorpay.com https://nominatim.openstreetmap.org",
   // The OneSignal service worker is served from our own origin.
   "worker-src 'self'",
   // Subscription/permission flow may open a OneSignal iframe. Razorpay Checkout

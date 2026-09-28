@@ -11,10 +11,15 @@ import {
 import { settlementEstimateFor } from "@/lib/data-access/admin-settlements";
 import type { VendorSettlementEstimate } from "@/lib/settlements/math";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { vendorFeatureOn } from "@/lib/features/guards.server";
+import { FeatureOffNotice } from "@/components/features/features-provider";
 
 export const dynamic = "force-dynamic";
 
 export default async function RestaurantEarningsPage() {
+  // Switchable in Admin → Feature access; the server actions behind this
+  // page check the same switch.
+  if (!(await vendorFeatureOn("vendor.earnings"))) return <FeatureOffNotice title="Earnings" />;
   if (!isSupabaseConfigured) {
     return (
       <div className="space-y-6">

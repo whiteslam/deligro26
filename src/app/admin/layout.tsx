@@ -1,4 +1,5 @@
 import { AdminShell } from "@/components/admin/admin-shell";
+import { OneSignalInit } from "@/components/notifications/onesignal-init";
 import { getProfile, requireRole } from "@/lib/auth";
 import {
   getAdminNavCounts,
@@ -45,7 +46,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireRole("admin");
+  const operator = await requireRole("admin");
 
   // The console's badges and its "signed in as". Both are chrome: a failure
   // here must not take the page under it down, so counts fall back to zero
@@ -68,15 +69,19 @@ export default async function AdminLayout({
   ]);
 
   return (
-    <AdminShell
-      initialMode={shellMode}
-      prefs={prefs}
-      counts={counts}
-      health={health}
-      name={profile?.full_name?.trim() || "Admin"}
-      email={email}
-    >
-      {children}
-    </AdminShell>
+    <>
+      {/* Ops alarms ("kitchen hasn't accepted", "no rider yet") are pushed. */}
+      <OneSignalInit userId={isSupabaseConfigured ? operator.id : null} />
+      <AdminShell
+        initialMode={shellMode}
+        prefs={prefs}
+        counts={counts}
+        health={health}
+        name={profile?.full_name?.trim() || "Admin"}
+        email={email}
+      >
+        {children}
+      </AdminShell>
+    </>
   );
 }

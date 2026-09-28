@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
+import { useFeatures } from "@/components/features/features-provider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, X } from "lucide-react";
 import { ConsoleThemeToggle } from "@/components/admin/console/chrome";
 import {
   VENDOR_NAV,
+  visibleVendorNav,
   VENDOR_NAV_GROUPS,
   activeVendorNavItem,
 } from "@/components/vendor/vendor-nav";
@@ -28,6 +30,7 @@ export function VendorNavDrawer({
   /** The console palette variant — the drawer sits outside the shell div. */
   theme?: string;
 }) {
+  const features = useFeatures();
   const pathname = usePathname();
   const current = activeVendorNavItem(pathname);
 
@@ -62,7 +65,7 @@ export function VendorNavDrawer({
             <span className="block truncate text-sm font-bold leading-none tracking-[-0.01em] text-white">
               Deligro
             </span>
-            <span className="mt-1 block truncate text-[10px] font-medium uppercase leading-none tracking-[0.06em] text-[var(--sb-group)]">
+            <span className="mt-1 block truncate text-[11px] font-medium uppercase leading-none tracking-[0.06em] text-[var(--sb-group)]">
               Partner hub
             </span>
           </span>
@@ -81,11 +84,11 @@ export function VendorNavDrawer({
           aria-label="Vendor navigation"
         >
           {VENDOR_NAV_GROUPS.map((group) => {
-            const items = VENDOR_NAV.filter((i) => i.group === group);
+            const items = visibleVendorNav(VENDOR_NAV, features).filter((i) => i.group === group);
             if (!items.length) return null;
             return (
               <div key={group}>
-                <p className="px-2 pb-[5px] pt-3.5 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--sb-group)]">
+                <p className="px-2 pb-[5px] pt-3.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sb-group)]">
                   {group}
                 </p>
                 <ul className="space-y-px">

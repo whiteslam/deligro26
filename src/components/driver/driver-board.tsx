@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useFeatures } from "@/components/features/features-provider";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -33,7 +34,7 @@ import type { TrackPoint } from "@/lib/tracking/rider-position";
 import { cn } from "@/lib/utils/cn";
 import { acceptDeliveryAction, advanceDeliveryAction } from "@/app/driver/actions";
 import { RiderAlert } from "@/components/driver/rider-alert";
-import { RouteSheet } from "@/components/driver/route-sheet";
+import { Modal } from "@/components/ui/confirm-dialog";
 
 /**
  * One position posted per this many milliseconds, however fast the device
@@ -42,6 +43,13 @@ import { RouteSheet } from "@/components/driver/route-sheet";
  * and the rider's data plan and battery are real costs.
  */
 const LOCATION_REPORT_INTERVAL_MS = 10_000;
+
+/**
+ * The longest a rider on an active delivery goes without a report while
+ * standing still — well inside the 45 s window after which the customer's map
+ * treats a fix as stale (GPS_FIX_MAX_AGE_MS in order-tracking.ts).
+ */
+const LOCATION_HEARTBEAT_MS = 20_000;
 
 type ReportingState =
   | "off" // nothing in flight, or the server said the delivery is over
@@ -86,7 +94,10 @@ function useLocationReporting(activeOrderId: string | null): {
   state: ReportingState;
   /**
    * The most recent fix this watch saw, for anything on screen that needs to
-   * know where the rider is — currently the route sheet's origin.
+   * know where the rider is. Nothing on the board reads it today (the in-app
+   * route sheet that did was removed — Navigate hands off to Google Maps,
+   * which finds the rider itself); it is kept because it costs nothing on top
+   * of the watch that reporting already needs.
    *
    * Handed back from the watch that is already running rather than opened as a
    * second one. Two `watchPosition` subscriptions on the same screen means two
@@ -115,6 +126,7 @@ function useLocationReporting(activeOrderId: string | null): {
     let watchId: number | null = null;
     let lastSentAt = 0;
     let inFlight = false;
+    let heartbeat: number | null = null;
     let cancelled = false; // the effect was torn down
     let done = false; // we have stopped watching on purpose
 
@@ -134,6 +146,10 @@ function useLocationReporting(activeOrderId: string | null): {
       if (done) return;
       done = true;
       clearWatch();
+      if (heartbeat !== null) {
+        window.clearInterval(heartbeat);
+        heartbeat = null;
+      }
       settle(next);
     };
 
@@ -235,6 +251,25 @@ function useLocationReporting(activeOrderId: string | null): {
         },
         { enableHighAccuracy: true, maximumAge: 5_000, timeout: 20_000 }
       );
+
+      // Heartbeat. `watchPosition` only fires when the device thinks it has
+      // moved, so a rider standing at the counter or at a gate reports nothing
+      // at all — one position in ~30 s in the 28 Sept live test — and after
+      // 45 s the customer's map stops trusting the fix and shows "estimated".
+      // Asking for a position on a timer keeps a stationary rider live. The
+      // cached-fix allowance is bounded, so this never re-sends a position the
+      // device itself no longer stands behind.
+      heartbeat = window.setInterval(() => {
+        if (cancelled || done) return;
+        if (Date.now() - lastSentAt < LOCATION_HEARTBEAT_MS) return;
+        navigator.geolocation.getCurrentPosition(
+          (position) => void send(position),
+          () => {
+            // Same weather as the watch's error path; try again next beat.
+          },
+          { enableHighAccuracy: true, maximumAge: 15_000, timeout: 15_000 }
+        );
+      }, LOCATION_HEARTBEAT_MS);
     };
 
     void start();
@@ -242,6 +277,7 @@ function useLocationReporting(activeOrderId: string | null): {
     return () => {
       cancelled = true;
       clearWatch();
+      if (heartbeat !== null) window.clearInterval(heartbeat);
     };
   }, [activeOrderId]);
 
@@ -383,6 +419,11 @@ export function DriverBoard({
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const { available, upcoming, active, today } = initial;
+  // Admin → Feature access. Calling also can't happen with it off: the page
+  // doesn't send the customer's number (driver/page.tsx).
+  const features = useFeatures();
+  const canNavigate = features["driver.navigation"];
+  const canCall = features["driver.call_customer"];
   const customerTel = callablePhone(active?.customerPhone);
   const [otp, setOtp] = useState("");
   const [otpError, setOtpError] = useState<string | null>(null);
@@ -396,25 +437,31 @@ export function DriverBoard({
       ? active.job.pickup
       : active.job.drop
     : null;
-  const navigationUrl = destination ? stopDirectionsUrl(destination) : null;
+  const navigationUrl =
+    canNavigate && destination ? stopDirectionsUrl(destination) : null;
 
   // Tied to the delivery: a rider carrying someone's dinner is sharing their
   // position for as long as they are carrying it. (This used to be phrased
   // against the online/offline toggle, which has since gone — see below.)
-  const { state: reporting, position: riderPosition } = useLocationReporting(
+  const { state: reporting } = useLocationReporting(
     live && active ? active.job.id : null
   );
 
   /**
-   * Which stop the route sheet is open for, or null when it is closed.
+   * The delivery that was just completed, for the "Order delivered" popup.
    *
-   * Holds the stop itself rather than a boolean: the board has two Navigate
-   * controls — the active leg's, and "Navigate to the kitchen" on an upcoming
-   * pickup — and they point at different places.
+   * Captured from `active` BEFORE the refresh, because the refresh is what
+   * takes the job off the board — by the time the new props land there is no
+   * active delivery left to read the order code or the cash amount from. The
+   * old success path was only that refresh: the card simply vanished, and a
+   * rider who had just typed a code at a door could not tell "delivered" from
+   * "the app lost my job".
    */
-  const [routeTo, setRouteTo] = useState<{
-    stop: DeliveryStop;
-    label: string;
+  const [delivered, setDelivered] = useState<{
+    code: string;
+    customer: string;
+    /** Cash the rider should now be holding; null for a prepaid order. */
+    cashCollected: number | null;
   } | null>(null);
 
   function accept(orderId: string) {
@@ -446,20 +493,43 @@ export function DriverBoard({
   function advance(orderId: string, code?: string) {
     setBusyId(orderId);
     setOtpError(null);
+    // Snapshot what the success popup needs while the job is still on screen.
+    const completing =
+      active && active.job.id === orderId && active.leg === "TO_CUSTOMER"
+        ? {
+            code: active.job.code,
+            customer: active.job.customer,
+            cashCollected:
+              active.payment.instruction === "collect"
+                ? active.payment.collectAmount
+                : null,
+          }
+        : null;
     startTransition(async () => {
       try {
-        const result = await advanceDeliveryAction(orderId, code);
+        let result: Awaited<ReturnType<typeof advanceDeliveryAction>>;
+        try {
+          result = await advanceDeliveryAction(orderId, code);
+        } catch {
+          // No signal at the door, or the server threw. Uncaught, this escaped
+          // the transition to the route's error boundary and replaced the
+          // whole board — code box, cash amount and all — with an error page.
+          setOtpError(
+            "Couldn't reach Deligro — check your internet and try again. / नेटवर्क नहीं मिला — इंटरनेट देखकर फिर से कोशिश करें।"
+          );
+          return;
+        }
         if (result && !result.ok) {
           setOtpError(
             result.error === "bad_otp"
-              ? "Wrong code — ask the customer again."
+              ? "Wrong code — ask the customer for their delivery code again. / गलत कोड — ग्राहक से डिलीवरी कोड फिर से पूछें।"
               : result.error === "bad_pickup_otp"
-                ? "Wrong code — ask the restaurant to read it again."
+                ? "Wrong code — ask the restaurant for the pickup code on their screen. / गलत कोड — रेस्टोरेंट से उनकी स्क्रीन वाला पिकअप कोड पूछें।"
               : result.error === "rate_limited"
-                ? "Too many attempts — wait a minute and try again."
+                ? "Too many attempts — wait a minute and try again. / बहुत बार कोशिश हुई — 1 मिनट रुककर फिर करें।"
                 : result.error === "order_not_active"
-                  ? "This order is no longer active — it may have been cancelled. Refreshing your board."
-                  : "Couldn't update. Try again."
+                  ? "This order is no longer active — it may have been cancelled. Refreshing your board. / यह ऑर्डर अब चालू नहीं है।"
+                  : "Couldn't update. Try again. / अपडेट नहीं हुआ — फिर से कोशिश करें।"
           );
           // A cancelled/reassigned order won't become active again by
           // retrying — refresh now so the stale job clears from the board
@@ -468,6 +538,7 @@ export function DriverBoard({
           return;
         }
         setOtp("");
+        if (completing) setDelivered(completing);
         router.refresh();
       } finally {
         setBusyId(null);
@@ -477,7 +548,11 @@ export function DriverBoard({
 
   return (
     <div className="space-y-6">
-      {live ? <AutoRefresh interval={4000} /> : null}
+      {/* `whenHidden`, as on the kitchen board: RiderAlert can only raise a
+          system notification when a poll brings a new job in, so pausing here
+          silenced the alert in exactly the case it exists for — the phone in a
+          pocket. Server push (onesignal-init) covers a fully closed app. */}
+      {live ? <AutoRefresh interval={4000} whenHidden /> : null}
 
       {/* This was an online/offline switch. It was `useState(true)` — never
           persisted, never sent anywhere, reset to online on every mount — and
@@ -520,22 +595,57 @@ export function DriverBoard({
         soundUrl={alertSoundUrl}
       />
 
-      {/* Mounted only while open, so each opening starts a fresh Directions
-          request for the stop actually being routed to rather than reviving the
-          last one. It covers the phone frame (`absolute inset-0` against
-          `.app-shell`), which is what keeps the OTP and the handover button one
-          tap behind it instead of a page away. */}
-      {routeTo ? (
-        <RouteSheet
-          destination={routeTo.stop.point ?? null}
-          destinationLabel={routeTo.label}
-          origin={riderPosition}
-          mapsUrl={stopDirectionsUrl(routeTo.stop)}
-          onClose={() => setRouteTo(null)}
-        />
-      ) : null}
+      {/* Delivered. A real confirmation rather than the card silently
+          disappearing on refresh — and, on a cash order, the amount the rider
+          should now be holding, said once more while the customer is still at
+          the door. Modal portals into `.app-shell` as `fixed`, so it covers
+          the whole phone frame, tab bar included. */}
+      <Modal
+        open={delivered !== null}
+        onClose={() => setDelivered(null)}
+        title="Order delivered / ऑर्डर डिलीवर हो गया"
+      >
+        {delivered ? (
+          <div className="space-y-4 text-center" role="status">
+            <span className="mx-auto grid size-16 place-items-center rounded-full bg-green-soft text-green">
+              <CheckCircle2 className="size-9" />
+            </span>
+            <div>
+              <p className="text-lg font-extrabold leading-tight">
+                Delivered ✓ / डिलीवर हो गया
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                Order {delivered.code} · {delivered.customer}
+              </p>
+            </div>
+            {delivered.cashCollected !== null ? (
+              <div className="rounded-xl border-2 border-deal bg-deal-soft px-4 py-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-deal">
+                  Cash collected / नकद लिया
+                </p>
+                <p className="text-data mt-1 text-3xl font-extrabold text-deal">
+                  {formatINR(delivered.cashCollected)}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm font-semibold text-green">
+                Prepaid — no cash to collect / पहले से भुगतान हो चुका
+              </p>
+            )}
+            <Button
+              size="lg"
+              className="w-full"
+              onClick={() => setDelivered(null)}
+            >
+              OK / ठीक है
+            </Button>
+          </div>
+        ) : null}
+      </Modal>
 
-      <StatCard label="Trips today" value={String(today.trips)} tone="accent" />
+      {features["driver.earnings"] ? (
+        <StatCard label="Trips today" value={String(today.trips)} tone="accent" />
+      ) : null}
 
       {/* Active delivery */}
       {active ? (
@@ -661,22 +771,25 @@ export function DriverBoard({
                   be unmissable, but a 50/50 split with a same-size button next
                   to it was the opposite of that. */}
               <div className="space-y-2">
-                {destination ? (
-                  <Button
-                    size="lg"
-                    className="w-full"
-                    onClick={() =>
-                      setRouteTo({
-                        stop: destination,
-                        label:
-                          active.leg === "TO_PICKUP"
-                            ? active.job.pickup.area
-                            : active.job.drop.area,
-                      })
-                    }
+                {!canNavigate ? null : navigationUrl ? (
+                  // ONE action: straight into Google Maps turn-by-turn. This
+                  // used to open an in-app "Directions" sheet — a second
+                  // Google map (often only a pin: the route needed a GPS fix
+                  // the board may not have had yet) carrying its own "Open in
+                  // Google Maps" button, so a rider saw two maps and still had
+                  // to tap again for guidance. That sheet was `absolute` inside
+                  // the scrolling content, so it also slid under the tab bar
+                  // and left the job card's map showing beneath it. The board
+                  // keeps its state while the rider is in Maps; switching back
+                  // lands on the same card, code box and all.
+                  <a
+                    href={navigationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={buttonClasses({ size: "lg", className: "w-full" })}
                   >
-                    <Navigation className="size-4" /> Navigate
-                  </Button>
+                    <Navigation className="size-4" /> Navigate / रास्ता देखें
+                  </a>
                 ) : (
                   <Button
                     size="lg"
@@ -692,7 +805,7 @@ export function DriverBoard({
                   </Button>
                 )}
 
-                {customerTel ? (
+                {!canCall ? null : customerTel ? (
                   <a
                     href={`tel:${customerTel}`}
                     className={buttonClasses({
@@ -718,7 +831,11 @@ export function DriverBoard({
 
               {active.leg === "TO_CUSTOMER" ? (
                 <div className="space-y-2">
-                  <label className="text-label block">Ask the customer for their delivery code</label>
+                  <label className="text-label block">Delivery code — from the customer</label>
+                  <p className="text-xs text-muted">
+                    Ask the customer for the code in their Deligro app. /
+                    ग्राहक से उनके ऐप वाला डिलीवरी कोड पूछें।
+                  </p>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -728,7 +845,14 @@ export function DriverBoard({
                     className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-center text-2xl tracking-[0.4em] outline-none focus:border-accent"
                     placeholder="••••"
                   />
-                  {otpError ? <p className="text-sm text-accent">{otpError}</p> : null}
+                  {otpError ? (
+                    <p
+                      role="alert"
+                      className="rounded-xl bg-deal-soft px-3 py-2 text-sm font-semibold text-deal"
+                    >
+                      {otpError}
+                    </p>
+                  ) : null}
                   <Button
                     className="w-full"
                     size="lg"
@@ -755,8 +879,19 @@ export function DriverBoard({
                     <div className="space-y-2">
                       <label className="text-label flex items-center gap-1.5">
                         <KeyRound className="size-3.5" />
-                        Ask the restaurant for the pickup code
+                        Pickup code — from the restaurant
                       </label>
+                      {/* Each order has TWO separate 4-digit codes. A rider
+                          who has already seen the customer's delivery code
+                          types it here and is told "wrong code" — which is
+                          correct, but only helpful if the screen says which
+                          code it wants and where it comes from. */}
+                      <p className="text-xs text-muted">
+                        Ask the shop for the code on their order screen — not
+                        the customer&apos;s delivery code. / दुकान से उनकी
+                        स्क्रीन वाला पिकअप कोड पूछें — ग्राहक का डिलीवरी कोड
+                        नहीं।
+                      </p>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -770,7 +905,14 @@ export function DriverBoard({
                       />
                     </div>
                   ) : null}
-                  {otpError ? <p className="text-sm text-accent">{otpError}</p> : null}
+                  {otpError ? (
+                    <p
+                      role="alert"
+                      className="rounded-xl bg-deal-soft px-3 py-2 text-sm font-semibold text-deal"
+                    >
+                      {otpError}
+                    </p>
+                  ) : null}
                   <Button
                     className="w-full"
                     size="lg"
@@ -823,10 +965,9 @@ export function DriverBoard({
           </p>
           <div className="space-y-3">
             {upcoming.map(({ job, readyInMinutes }) => {
-              // The sheet needs a pin; the Google Maps hand-off inside it can
-              // still work from a written address, which is why both are
-              // computed rather than one derived from the other.
-              const pickupPinned = Boolean(job.pickup.point);
+              // Pin if there is one, the written address if not — Google's
+              // geocoder on a street line beats no directions at all.
+              const kitchenUrl = stopDirectionsUrl(job.pickup);
               return (
                 <div key={job.id} className="card p-4">
                   <div className="flex items-start justify-between gap-2">
@@ -864,17 +1005,19 @@ export function DriverBoard({
                     />
                   </div>
 
-                  {pickupPinned ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 w-full"
-                      onClick={() =>
-                        setRouteTo({ stop: job.pickup, label: job.restaurant })
-                      }
+                  {canNavigate && kitchenUrl ? (
+                    <a
+                      href={kitchenUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={buttonClasses({
+                        variant: "outline",
+                        size: "sm",
+                        className: "mt-3 w-full",
+                      })}
                     >
                       <Navigation className="size-4" /> Navigate to the kitchen
-                    </Button>
+                    </a>
                   ) : null}
                 </div>
               );

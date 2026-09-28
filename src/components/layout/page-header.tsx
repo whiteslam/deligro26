@@ -33,7 +33,7 @@ export function PageHeader({
       <button
         onClick={() => router.back()}
         aria-label="Go back"
-        className="grid size-9 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
+        className="grid size-11 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
       >
         <ChevronLeft className="size-5" />
       </button>

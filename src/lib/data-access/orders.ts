@@ -28,6 +28,7 @@ import {
   rememberColumn,
 } from "@/lib/data-access/schema-probe";
 import type { PaymentMethod, PaymentStatus } from "@/types";
+import { deferNotify } from "@/lib/notifications/defer";
 
 /**
  * Secure data access for orders. Every query here runs through the anon key,
@@ -345,10 +346,10 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   // Delivery area. Measured from the address the customer is actually sending,
   // not the one they previewed with.
   //
-  // `blocksOrder`, not `status === "out_of_range"`: a radius that is set but
-  // cannot be evaluated — an unpinned shop, an address with no coordinates —
-  // now refuses too. It used to accept, which is how a 70 km order was taken
-  // from a shop that had never been pinned. See `checkServiceArea`.
+  // `blocksOrder`, not `status === "out_of_range"`: an address with no pin, or
+  // a shop pinned outside the city, refuses too. Measured from Bemetara's
+  // centre (one city circle), so an unpinned in-town shop is not taken offline.
+  // See `checkServiceArea`.
   const area = checkServiceArea({
     shop: restaurant,
     destination: input.address,
@@ -596,14 +597,14 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   // Announce it. Fire-and-forget by contract (order-events swallows its own
   // failures), and deliberately not awaited as a pair with the insert: the
   // order is already real, and a push outage must not fail a placed order.
-  void notifyOrderPlaced(order.id);
+  deferNotify(() => notifyOrderPlaced(order.id));
 
   // The vendor is alerted only once the order is actually theirs to cook. A COD
   // order is actionable immediately; an online one is not until the money
   // lands, and settlePayment() raises the alert then. Without this split a
   // kitchen would be rung for every abandoned checkout.
   if (paymentMethod === "cod") {
-    void notifyVendorNewOrder(order.id, input.lines.length);
+    deferNotify(() => notifyVendorNewOrder(order.id, input.lines.length));
   }
 
   const created = await getOrderById(order.id);

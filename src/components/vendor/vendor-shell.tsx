@@ -111,9 +111,11 @@ function VendorShellChrome({
                 isOpen={isOpen}
                 showControls={showControls}
               />
-              <div className="@container flex flex-col gap-5 px-4 pb-6 pt-4">
+              {/* <main>, as the console branch already has: without a landmark a
+                  screen reader has no "skip to content" on the phone. */}
+              <main className="@container flex flex-col gap-5 px-4 pb-6 pt-4">
                 {children}
-              </div>
+              </main>
             </div>
             <StatusBar />
             <VendorTabBar />

@@ -16,6 +16,7 @@
 import {
   buildVocabulary,
   expandQuery,
+  looselyContains,
   type ExpandedToken,
 } from "@/lib/search/semantic";
 import { distanceToShop } from "@/lib/geo/distance";
@@ -274,7 +275,16 @@ function scoreLiteral(d: IndexedDish, token: string): number {
  * it colours the ordering without ever outranking a real name match.
  */
 const ALIAS_WEIGHT = 0.75;
+/** Same pronunciation, different spelling — see `ExpandedToken.homophones`. */
+const HOMOPHONE_WEIGHT = 0.6;
 const FUZZY_WEIGHT = 0.5;
+/**
+ * Sounds-like ("panir" → paneer, "safran" → Saffron Kitchen). Below an
+ * edit-distance guess because it is a looser one, above an intent word because
+ * it is still an attempt to NAME the thing. Only ever reached for a word that
+ * matched nothing else anywhere in the catalog — see `gatePhonetic`.
+ */
+const PHONETIC_WEIGHT = 0.4;
 const INTENT_WEIGHT = 0.3;
 
 /**
@@ -294,11 +304,23 @@ function scoreToken(d: IndexedDish, t: ExpandedToken): number {
   }
   if (best) return best * ALIAS_WEIGHT;
 
+  for (const variant of t.homophones) {
+    const s = scoreLiteral(d, variant);
+    if (s > best) best = s;
+  }
+  if (best) return best * HOMOPHONE_WEIGHT;
+
   for (const variant of t.fuzzy) {
     const s = scoreLiteral(d, variant);
     if (s > best) best = s;
   }
   if (best) return best * FUZZY_WEIGHT;
+
+  for (const variant of t.phonetic) {
+    const s = scoreLiteral(d, variant);
+    if (s > best) best = s;
+  }
+  if (best) return best * PHONETIC_WEIGHT;
 
   for (const word of t.intent) {
     const s = scoreLiteral(d, word);
@@ -803,12 +825,14 @@ export function searchDishes(
 
   const eligible = pool.filter((d) => passesFilters(d, effective));
 
-  const hits = rank(eligible, expanded.tokens, true, ctx);
+  const tokens2 = gatePhonetic(index, expanded.tokens);
+
+  const hits = rank(eligible, tokens2, true, ctx);
 
   // "chicken tikka" with no tikka anywhere would otherwise be a dead end, so a
   // phrase that matches nothing whole is re-run word by word. Flagged partial:
   // these are near misses, and the screen labels them as such.
-  const results = hits.length ? hits : rank(eligible, expanded.tokens, false, ctx);
+  const results = hits.length ? hits : rank(eligible, tokens2, false, ctx);
 
   return results.sort((a, b) => compare(a, b, sort));
 }
@@ -827,10 +851,107 @@ function vocabularyOf(index: IndexedDish[]): Set<string> {
   const hit = VOCAB_CACHE.get(index);
   if (hit) return hit;
   const vocab = buildVocabulary(
-    index.map((d) => ({ name: d.name, category: d.category }))
+    index.map((d) => ({ name: d.name, category: d.category, shop: d.shop }))
   );
   VOCAB_CACHE.set(index, vocab);
   return vocab;
+}
+
+/**
+ * Per index, per token: does this word already match something in the catalog
+ * through a tier stronger than sound-alike? Memoised because it is a full-index
+ * scan and search runs on every keystroke.
+ */
+const MATCHED_CACHE = new WeakMap<object, Map<string, boolean>>();
+
+function matchesAnywhere(
+  index: IndexedDish[],
+  cacheKey: string,
+  test: (d: IndexedDish) => boolean
+): boolean {
+  let cache = MATCHED_CACHE.get(index);
+  if (!cache) {
+    cache = new Map();
+    MATCHED_CACHE.set(index, cache);
+  }
+  const hit = cache.get(cacheKey);
+  if (hit !== undefined) return hit;
+  const found = index.some(test);
+  cache.set(cacheKey, found);
+  return found;
+}
+
+/**
+ * Keep the phonetic tier only for words the catalog has no stronger answer to.
+ *
+ * Sound-alike is loose on purpose — loose enough that "cake" sounds like
+ * "coke". That is harmless when "cake" matches nothing (then Coke is a fair
+ * guess) and wrong when the catalog has cakes. So a token that matches anything
+ * literally, by alias, by edit distance or by intent anywhere in the catalog
+ * keeps its phonetic list empty, and exact results are never diluted by it.
+ * Checked against the whole index rather than the filtered pool: a filter that
+ * hides the real cakes must not turn "cake" into a search for Coke.
+ */
+function gatePhonetic(
+  index: IndexedDish[],
+  tokens: ExpandedToken[]
+): ExpandedToken[] {
+  return tokens.map((t) => {
+    if (!t.phonetic.length) return t;
+    const bare: ExpandedToken = { ...t, phonetic: [] };
+    const known = matchesAnywhere(index, `strong:${t.token}`, (d) =>
+      scoreToken(d, bare) > 0
+    );
+    return known ? bare : t;
+  });
+}
+
+/**
+ * What the customer probably meant, when what they typed matched nothing as
+ * spelled: "panir tika" → "paneer tikka", "safron" → "saffron". Null when every
+ * word was found as typed (or no result stands in for it).
+ *
+ * Read off the top result rather than guessed independently, so the words
+ * shown are exactly the ones the list is answering. A word that exists
+ * literally anywhere in the catalog is never "corrected" — typing "noodles" and
+ * reaching a menu's "Noodels" through the fuzzy tier is the vendor's typo, not
+ * the customer's, and telling them otherwise would be backwards.
+ */
+export function searchCorrection(
+  index: IndexedDish[],
+  query: string,
+  hits: DishHit[]
+): string | null {
+  const top = hits[0];
+  if (!top) return null;
+  const raw = tokenize(query);
+  if (!raw.length) return null;
+  const expanded = expandQuery(raw, vocabularyOf(index));
+
+  let changed = false;
+  const out = raw.map((word) => {
+    const t = expanded.tokens.find((e) => e.token === word);
+    if (!t || t.intentOnly || t.aliases.length) return word;
+    const spelledRight = matchesAnywhere(index, `literal:${word}`, (d) =>
+      scoreLiteral(d, word) > 0
+    );
+    if (spelledRight) return word;
+
+    let best: string | null = null;
+    let bestScore = 0;
+    for (const v of [...t.homophones, ...t.fuzzy, ...t.phonetic]) {
+      const s = scoreLiteral(top, v);
+      if (s > bestScore) {
+        bestScore = s;
+        best = v;
+      }
+    }
+    if (!best) return word;
+    changed = true;
+    return best;
+  });
+
+  return changed ? out.join(" ") : null;
 }
 
 /**
@@ -1139,9 +1260,16 @@ export function groupByShop(
 
       const shop = r.name.toLowerCase();
       const cuisines = r.cuisines.join(" ").toLowerCase();
+      // Typo-tolerant like the dish path: a menu-less shop searched as "safron
+      // kichen" is still "Saffron Kitchen".
       const matched =
         !tokens.length ||
-        tokens.every((t) => startsWord(shop, t) || startsWord(cuisines, t));
+        tokens.every(
+          (t) =>
+            startsWord(shop, t) ||
+            startsWord(cuisines, t) ||
+            looselyContains(shop, t)
+        );
       if (!matched) continue;
 
       bySlug.set(r.slug, {

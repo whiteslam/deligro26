@@ -91,7 +91,7 @@ export default function ProfileAddressesPage() {
                     <p className="flex items-center gap-2 text-[15px] font-bold">
                       {a.label}
                       {a.isDefault ? (
-                        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent-ink">
+                        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-accent-ink">
                           Default
                         </span>
                       ) : null}

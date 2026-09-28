@@ -126,7 +126,7 @@ declare namespace google.maps {
     /**
      * Two-wheeler routing. Served in India (and a handful of other regions) and
      * not everywhere else, so a caller must be ready for the request to be
-     * rejected and fall back to DRIVING — see `driver/route-sheet.tsx`.
+     * rejected and fall back to DRIVING.
      */
     TWO_WHEELER = "TWO_WHEELER",
   }
@@ -149,7 +149,7 @@ declare namespace google.maps {
    * One written instruction. `instructions` is an HTML FRAGMENT, not text —
    * Google marks road names with `<b>` and separates clauses with `<div>`.
    * Typed as the string it is so no caller mistakes it for something safe to
-   * render; `route-sheet.tsx` parses it to text rather than injecting it.
+   * render: parse it to text (DOMParser + textContent), never inject it.
    */
   interface DirectionsStep {
     instructions?: string;

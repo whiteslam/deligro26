@@ -121,7 +121,7 @@ export function OrderCard({ order }: { order: UiOrder }) {
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <h3 className="truncate text-[15px] font-extrabold tracking-tight">
+            <h3 className="line-clamp-2 text-[15px] font-extrabold leading-snug tracking-tight">
               {order.restaurantName}
             </h3>
             <span className="text-data shrink-0 font-bold">
@@ -129,7 +129,7 @@ export function OrderCard({ order }: { order: UiOrder }) {
             </span>
           </div>
           {items ? (
-            <p className="mt-0.5 truncate text-[13px] text-ink/75">{items}</p>
+            <p className="mt-0.5 line-clamp-2 text-[13px] text-ink/75">{items}</p>
           ) : null}
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 truncate text-[12px] text-muted">
             <span

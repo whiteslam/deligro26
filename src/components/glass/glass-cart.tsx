@@ -65,9 +65,9 @@ export function GlassCart() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-bold">
-                View basket
+                View basket · टोकरी देखें
               </span>
-              <span className="block truncate text-xs font-medium text-white/85">
+              <span className="block truncate text-xs font-semibold">
                 {restaurantName} · {formatINR(subtotal)}
               </span>
             </span>
@@ -77,7 +77,7 @@ export function GlassCart() {
           <button
             onClick={clear}
             aria-label="Clear basket"
-            className="press grid size-8 shrink-0 place-items-center rounded-full bg-white/20"
+            className="press tap-target grid size-9 shrink-0 place-items-center rounded-full bg-white/25"
           >
             <X className="size-4" />
           </button>

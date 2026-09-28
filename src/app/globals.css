@@ -289,6 +289,25 @@ h6 {
     font-size: 0.8125rem; /* 13px default — used when no size utility is set */
     letter-spacing: -0.01em;
   }
+
+  /* A 44×44 touch area around a control that is drawn smaller.
+     The dish "Add" (64×27), the basket stepper (28×28), filter chips (30px)
+     were all under the 44px minimum on a 360px phone. Growing the drawing
+     would crowd dense lists; this grows only the part a thumb can hit, with an
+     invisible box centred on the control. In the components layer so a
+     positioning utility (`absolute`) on the same element still wins. */
+  .tap-target {
+    position: relative;
+  }
+  .tap-target::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
 }
 
 /* ---------- Docked action bar ----------
@@ -521,7 +540,10 @@ button.card:active {
   border-radius: 11px;
   background: var(--accent);
   padding: 11px 14px;
-  color: #fff;
+  /* The palette's own ink for orange, as on "Place order". This was #fff:
+     white on #f2660c measured 3.1:1 for "View basket" and 2.7:1 for the
+     12px shop-and-total line under it (28 Sept phone audit). */
+  color: var(--on-accent);
   box-shadow: var(--glow-accent);
 }
 
@@ -623,6 +645,59 @@ button.card:active {
    the specificity: Tailwind's utilities live in @layer utilities. */
 .app-scroll:has(.owns-bottom) {
   padding-bottom: 0;
+}
+
+/* ---------- No zoom-on-focus on iPhone ----------
+   iOS Safari zooms the whole page when a text field under 16px gets focus,
+   and does not zoom back out. 33 different fields did it in the 28 Sept phone
+   audit — checkout (flat, floor, promo), both search boxes, every vendor menu
+   price, the promotion form, and the manager's phone-order and cash forms.
+   One rule instead of 33 class edits: on a touch screen, inside the phone
+   shell, a text field is at least 16px. Fields drawn deliberately larger (the
+   rider's code boxes, `text-lg` and up) are left alone. Unlayered, so it wins
+   over the utilities that set these fields' size. The desktop consoles are
+   not `.app-shell` and are untouched. */
+@media (pointer: coarse) {
+  .app-shell
+    :is(
+      input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="hidden"]),
+      textarea,
+      select
+    ):not([class*="text-lg"], [class*="text-xl"], [class*="text-2xl"], [class*="text-3xl"], [class*="text-4xl"], [class*="text-[18px]"], [class*="text-[20px]"], [class*="text-[22px]"], [class*="text-[24px]"], [class*="text-[28px]"], [class*="text-[30px]"], [class*="text-[32px]"]) {
+    font-size: 16px;
+  }
+}
+
+/* ---------- Room for floating bars ----------
+   The shells reserve room for the tab bar only. Two more things float over
+   the foot of the page: the basket bar and the install card. With either one
+   showing, the last row of a page sat underneath it and could not be scrolled
+   clear — "Sign out", "Contact us", a vendor's promotion buttons, the last
+   "Add" on a menu (12 pages on an iPhone SE in the 28 Sept phone audit).
+   The install card publishes its height as --install-inset while it is
+   shown (install-prompt.tsx); the basket bar's height is fixed. */
+.app-scroll::after {
+  content: "";
+  display: block;
+  height: var(--install-inset, 0px);
+}
+/* The install card sits above the basket bar when both show (below), so the
+   room needed is whichever reaches higher — not the two added together. */
+.app-shell:has(.bolt-basket-bar) .app-scroll::after {
+  height: max(var(--install-inset, 0px), 76px);
+}
+
+/* The install card floats over the tab bar; with the basket bar also showing,
+   it moves up above that too instead of covering "View basket" (iPhone SE,
+   28 Sept phone audit). Was an inline style, which a stylesheet can't adjust. */
+.install-card {
+  bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+.app-shell:has(.bolt-basket-bar) .install-card {
+  bottom: calc(5.5rem + 72px + env(safe-area-inset-bottom, 0px));
+}
+.app-scroll:has(.owns-bottom)::after {
+  height: 0;
 }
 .app-shell:has(.immersive) .status-bar {
   background: linear-gradient(
@@ -1318,6 +1393,20 @@ body:has(.dashboard-shell) {
   --c-pad-x: 14px; /* panel and table cell inline padding */
   --c-row-y: 9px; /* table cell block padding */
   --c-row-y-dense: 6px;
+}
+
+/* Re-resolve the inherited text colour inside the console.
+   `body { color: var(--ink) }` is computed at <body>, against the customer
+   palette, and what children inherit is the resulting rgb — not the variable.
+   Redefining `--ink` on `.console-theme` therefore changed nothing for any
+   element without its own colour class: page titles, the kitchen alert
+   banner and the "Running behind?" row all rendered in the light theme's
+   near-black ink on the dark console (measured rgb(14,20,23) on rgb(11,13,16)
+   in the 28 Sept audit). Declaring `color` here makes the console's own ink
+   the inherited default, for both palettes, and for the drawer and upload
+   dock that carry the class outside the shell. */
+.console-theme {
+  color: var(--ink);
 }
 
 /* The light console. Same structure, inverted values — kept because an
@@ -2216,10 +2305,6 @@ a.c-metric:hover {
     var(--accent) 100%
   );
 }
-.vendor-fab {
-  box-shadow: var(--glow-accent), var(--shadow-lg);
-}
-
 /* Small status/labelling pill used across the role portals. */
 .pill {
   display: inline-flex;

@@ -1,16 +1,23 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { staffFeatureOn } from "@/lib/features/guards.server";
+import { FEATURE_OFF_MESSAGE } from "@/lib/features/catalog";
 import { requireRole } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   notifyOrderAccepted,
   notifyOrderReady,
   notifyOnTheWay,
   notifyDelivered,
+  notifyDriverAssigned,
+  notifyVendorRiderAssigned,
 } from "@/lib/notifications/order-events";
+import { dispatchOrder } from "@/lib/dispatch/rider-dispatch";
 import { columnKnownMissing, isMissingColumn, rememberColumn } from "@/lib/data-access/schema-probe";
+import { deferNotify } from "@/lib/notifications/defer";
 
 export interface ActionResult {
   ok: boolean;
@@ -57,6 +64,7 @@ export async function advanceOrder(
   // already passes it — it just stops the portal's own buttons from bouncing
   // the admin the layout let in.
   await requireRole(["manager", "admin"]);
+  if (!(await staffFeatureOn("manager.move_status"))) return { ok: false, error: FEATURE_OFF_MESSAGE };
   if (!isSupabaseConfigured) return { ok: false, error: DEMO };
 
   const target = NEXT[expected];
@@ -84,10 +92,16 @@ export async function advanceOrder(
     };
   }
 
-  if (target === "kitchen") void notifyOrderAccepted(orderId);
-  else if (target === "ready") void notifyOrderReady(orderId);
-  else if (target === "on_the_way") void notifyOnTheWay(orderId);
-  else if (target === "delivered") void notifyDelivered(orderId);
+  if (target === "kitchen") deferNotify(() => notifyOrderAccepted(orderId));
+  else if (target === "ready") deferNotify(() => notifyOrderReady(orderId));
+  else if (target === "on_the_way") deferNotify(() => notifyOnTheWay(orderId));
+  else if (target === "delivered") deferNotify(() => notifyDelivered(orderId));
+
+  // Dispatch, exactly as when the kitchen makes the same move — see
+  // announceKitchenTransition in vendor-orders.ts. Without it an order a
+  // manager advanced was offered to no rider.
+  if (target === "kitchen") deferNotify(() => dispatchOrder(orderId, "accepted"));
+  else if (target === "ready") deferNotify(() => dispatchOrder(orderId, "ready"));
 
   revalidatePath("/manager");
   return { ok: true };
@@ -107,6 +121,7 @@ export async function assignRider(
   riderId: string
 ): Promise<ActionResult> {
   await requireRole(["manager", "admin"]);
+  if (!(await staffFeatureOn("manager.assign_rider"))) return { ok: false, error: FEATURE_OFF_MESSAGE };
   if (!isSupabaseConfigured) return { ok: false, error: DEMO };
 
   if (!orderId || !riderId) {
@@ -188,6 +203,33 @@ export async function assignRider(
   if ((data ?? []).length === 0) {
     return { ok: false, error: "A rider took this order first." };
   }
+
+  // Tell the rider they have a job, and the kitchen who is coming for it.
+  // Assignment used to be silent: the rider learned of it on their next board
+  // refresh, which with the phone in a pocket meant whenever they next looked.
+  // Service-role reads, after the response: the cookie-bound client is not
+  // safe to use once the request has finished, and requireRole() above is the
+  // authorization for this path (AGENTS.md rule 5).
+  deferNotify(async () => {
+    const admin = createAdminClient();
+    const { data: order } = await admin
+      .from("orders")
+      .select("restaurants(name)")
+      .eq("id", orderId)
+      .maybeSingle();
+    const shop = order?.restaurants as { name: string | null } | { name: string | null }[] | null;
+    const restaurantName =
+      (Array.isArray(shop) ? shop[0]?.name : shop?.name)?.trim() || "the restaurant";
+    const { data: rider } = await admin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", riderId)
+      .maybeSingle();
+    await Promise.all([
+      notifyDriverAssigned(riderId, { orderId, restaurantName }),
+      notifyVendorRiderAssigned(orderId, rider?.full_name ?? null),
+    ]);
+  });
 
   revalidatePath("/manager");
   return { ok: true };

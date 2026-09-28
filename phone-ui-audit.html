@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Phone UI Audit — Deligro</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: #14181b; --muted: #6b7580; --bg: #f7f6f3; --surface: #ffffff;
+        --line: #e2e0da; --green: #17b26a; --red: #d9534f; --amber: #d98c22; --blue: #3a7bd5;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --ink: #e9edf0; --muted: #99a4ae; --bg: #14181b; --surface: #1b2126; --line: #2a3036; }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink);
+        font: 16px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      main { max-width: 960px; margin: 0 auto; padding: 48px 16px 96px; }
+      header.top { border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 32px; }
+      h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 44px 0 12px; }
+      h3 { font-size: 17px; margin: 24px 0 6px; }
+      .lede { color: var(--muted); margin: 0; }
+      .wrap { overflow-x: auto; }
+      table { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; min-width: 640px; }
+      th, td { text-align: left; padding: 9px 11px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+      code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface);
+        border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; word-break: break-word; }
+      .tag { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+      .ok { color: var(--green); border: 1px solid var(--green); }
+      .warn { color: var(--amber); border: 1px solid var(--amber); }
+      .bad { color: var(--red); border: 1px solid var(--red); }
+      .info { color: var(--blue); border: 1px solid var(--blue); }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 12px; }
+      .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+      .stat b { display: block; font-size: 26px; letter-spacing: -0.02em; line-height: 1.2; }
+      .stat span { color: var(--muted); font-size: 13px; }
+      .callout { border-left: 3px solid var(--green); background: var(--surface); padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+      .callout.red { border-color: var(--red); }
+      .muted { color: var(--muted); }
+      ol li, ul li { margin: 5px 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="top">
+        <h1>Phone UI Audit — Customer · Vendor · Rider · Manager</h1>
+        <p class="lede">
+          28 Sept 2026. Every phone screen except the admin console, driven with Playwright at three phone sizes:
+          <strong>360×800</strong> (budget Android, the main target for Bemetara), <strong>375×667</strong> (iPhone SE,
+          short screen) and <strong>412×915</strong> (large Android), plus the customer app in dark mode.
+          92 page checks and 38 tap-through steps. Read-only: nothing was submitted, no data changed.
+        </p>
+      </header>
+
+      <div class="grid">
+        <div class="stat"><b>0</b><span>pages that scroll sideways, on any size</span></div>
+        <div class="stat"><b>0</b><span>console errors or broken images</span></div>
+        <div class="stat"><b>38 / 38</b><span>tap-through steps pass</span></div>
+        <div class="stat"><b>12</b><span>pages where the last buttons hide behind a bar (iPhone SE)</span></div>
+        <div class="stat"><b>33</b><span>different text inputs that make iPhones zoom in</span></div>
+        <div class="stat"><b>~2%</b><span>Hindi on most screens</span></div>
+      </div>
+
+      <div class="callout">
+        <strong>The good news:</strong> the foundations are solid. Nothing overflows sideways at 360 px. Pinch-zoom is
+        allowed. Every tab bar, sheet, filter, search box, stepper and tab works. Navigating between tabs takes
+        0.3–0.7 s. The <strong>rider app is the best of the four</strong>: no undersized buttons, 11 px minimum text and
+        partly bilingual. What's left is polish that matters for this audience: bars covering content on short screens,
+        iPhone zoom on inputs, small buttons in lists, and Hindi.
+      </div>
+
+      <h2>1 · Scorecard by app (360×800)</h2>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>App</th><th>Pages</th><th>Buttons &lt; 40 px</th><th>&lt; 32 px</th><th>iOS-zoom inputs</th><th>Smallest text</th><th>Hindi</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td>Customer</td><td>16</td><td>333 / 806</td><td>150</td><td>12</td><td>10 px</td><td>~2%</td><td><span class="tag warn">good, needs polish</span></td></tr>
+            <tr><td>Vendor (phone)</td><td>8</td><td>81 / 190</td><td>46</td><td>19</td><td>9 px</td><td>~2%</td><td><span class="tag warn">busiest screens need work</span></td></tr>
+            <tr><td>Rider</td><td>3</td><td>0 / 22</td><td>0</td><td>0</td><td>11 px</td><td>~4%</td><td><span class="tag ok">good</span></td></tr>
+            <tr><td>Manager</td><td>3</td><td>3 / 23</td><td>3</td><td>12</td><td>11 px</td><td>0%</td><td><span class="tag warn">forms zoom on iPhone</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">"Buttons &lt; 40 px" counts every tappable element narrower or shorter than 40 px; the recommended minimum is 44–48 px. Most of the customer count is the 197-button search page.</p>
+
+      <h2>2 · Findings, most important first</h2>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>#</th><th>Finding</th><th>Where</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><strong>The "Install Deligro" card covers the bottom of the page</strong> and doesn't make room. On a short screen the last item cannot be reached until it is dismissed: "Sign out", "Contact us", "Contact support", "Save shop location", the promotion Edit/Pause/Delete buttons, the last "Add" on a menu.</td><td>Customer and vendor, 12 pages on iPhone SE</td><td><span class="tag bad">high</span></td></tr>
+            <tr><td>2</td><td><strong>Home header reads "DELIVER TO H… · Chhattisgarh 4900…"</strong> at 360 px. Both the address label and the place are cut to nothing useful. It should show the locality ("Smriti Nagar", "Berla").</td><td>Customer home</td><td><span class="tag bad">high</span></td></tr>
+            <tr><td>3</td><td><strong>33 different text inputs zoom the page when tapped on an iPhone</strong> (font under 16 px): checkout (flat, floor, entry code, promo), search boxes, all vendor menu price fields, the promotion form, and the whole manager phone-order and cash forms.</td><td>All except rider</td><td><span class="tag bad">high</span></td></tr>
+            <tr><td>4</td><td><strong>Hindi is still missing on most screens.</strong> Only the order flow, checkout buttons and boards changed in the last pass have it (11–13%). Home, stores, search, restaurant, profile, vendor menu, earnings and profile, and the manager forms are English-only.</td><td>Customer, vendor, manager</td><td><span class="tag bad">high</span></td></tr>
+            <tr><td>5</td><td><strong>Small buttons in lists:</strong> "Add" on dishes 64×27, the +/− stepper 28×28, search chips 35 px tall, "Clear" in search 24×24, vendor menu filter chips 30 px, stock toggles, promotion Pause/Delete 36×36, manager "Sign out"/"Board" links 20 px tall, carousel dots 20×6.</td><td>Customer search and restaurant, vendor menu and promotions, manager</td><td><span class="tag warn">med</span></td></tr>
+            <tr><td>6</td><td><strong>Low contrast:</strong>
+              <ul>
+                <li>The orange basket bar's small line (white on orange, 2.7:1).</li>
+                <li>The vendor storefront "Open" chip, green on a dark photo (nearly invisible).</li>
+                <li>Vendor storefront chips "Accepting orders / Approved / Promoted" (2.7:1).</li>
+                <li>Search result counts (3.2:1), and the "Look up" and "Apply" buttons (3.4:1).</li>
+              </ul></td><td>Customer, vendor, manager</td><td><span class="tag warn">med</span></td></tr>
+            <tr><td>7</td><td><strong>The item sheet isn't announced as a dialog</strong>: no <code>role="dialog"</code>, and Escape doesn't close it (tapping outside does). The checkout address sheet also ignores Escape.</td><td>Customer</td><td><span class="tag warn">med</span></td></tr>
+            <tr><td>8</td><td>Text still under 11 px: vendor earnings chart labels (9 px), vendor overview and promotions (10 px), customer order detail and checkout (10 px). These come from shared chart/console components the last pass didn't reach.</td><td>Vendor, customer</td><td><span class="tag warn">med</span></td></tr>
+            <tr><td>9</td><td>The vendor Menu has both an "Add item" button and a floating "+" that covers the filter chip row while scrolling.</td><td>Vendor menu</td><td><span class="tag info">low</span></td></tr>
+            <tr><td>10</td><td>The vendor phone app has no <code>&lt;main&gt;</code> landmark (the desktop console does), so screen readers can't jump to the content.</td><td>Vendor phone</td><td><span class="tag info">low</span></td></tr>
+            <tr><td>11</td><td>Truncated names: home categories ("Samosa &amp; Chaat", "Paratha &amp; Roti") and long restaurant/dish names in Orders are cut with "…". Two lines would fit.</td><td>Customer</td><td><span class="tag info">low</span></td></tr>
+            <tr><td>12</td><td>"Cash on delivery · नकद भुगतान" wraps its Hindi onto a second line at 360 px. Hindi below English reads better than " · " inline on narrow cards.</td><td>Checkout</td><td><span class="tag info">low</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>3 · What was tapped (all passed)</h2>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>App</th><th>Steps</th></tr></thead>
+          <tbody>
+            <tr><td>Customer</td><td>All 5 tab-bar tabs; open a restaurant from home; open and close the item sheet; +/− stepper updates the basket (₹520 for 2× Paneer); menu search finds "Garlic Naan"; search page typing (18 results); Restaurants tab; Filters sheet; checkout address picker; tip ₹20 shows in the bill; open the delivered order; profile → notifications.</td></tr>
+            <tr><td>Vendor</td><td>Orders tabs New / Prep / Ready / Cancel / Done; all 5 tab-bar tabs; menu search filters to one dish; Add-item sheet opens; earnings range switch.</td></tr>
+            <tr><td>Rider</td><td>Jobs / History / Profile tabs; today's ₹103 delivery is in History.</td></tr>
+            <tr><td>Manager</td><td>Open the phone-order form; look up a customer by phone (found); cash page renders.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">Not visible on a phone test: rider tabs take 1–3.4 s to load in dev, the slowest of the four apps. The black "N" circle in screenshots is the Next.js dev badge and does not ship.</p>
+
+      <h2>4 · Suggested fixes, in order</h2>
+      <ol>
+        <li><strong>Install card:</strong> make room for it (add its height to the page's bottom padding while shown), or show it once as a top banner. Never let it cover content.</li>
+        <li><strong>Home header:</strong> show "Home · Smriti Nagar" (label plus the locality before the PIN code), the same parsing checkout now uses.</li>
+        <li><strong>16 px on every input</strong> (<code>text-base</code>) on phone screens. That alone stops iPhone zoom on all 33.</li>
+        <li><strong>Hindi, next wave:</strong> home, search, restaurant, profile, vendor menu and earnings, manager forms. Put Hindi on its own line under the English where space is tight.</li>
+        <li><strong>44 px tap targets</strong> for dish "Add", the stepper, chips, filter pills and list actions. Keep the look by padding the tap area, not the drawing.</li>
+        <li><strong>Contrast:</strong> darken the orange behind white text (or use dark text on it), and put the storefront chips on a solid dark pill.</li>
+        <li><strong>Sheets:</strong> add <code>role="dialog"</code>, <code>aria-modal</code>, a label and Escape-to-close to the item and address sheets.</li>
+        <li>Raise the remaining 9–10 px chart and console text to 11 px. Drop the vendor Menu floating "+". Add <code>&lt;main&gt;</code> to the vendor phone shell. Allow two lines for names.</li>
+      </ol>
+
+      <h2>5 · Fixes applied (28 Sept 2026) — before → after</h2>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>Measure</th><th>Before</th><th>After</th></tr></thead>
+          <tbody>
+            <tr><td>Pages where the last buttons can't be reached (all devices)</td><td>12</td><td><strong>0</strong></td></tr>
+            <tr><td>Text inputs that zoom an iPhone on tap</td><td>33 fields (43 page instances)</td><td><strong>0</strong></td></tr>
+            <tr><td>Low-contrast text, 360 px light, excluding text on photos</td><td>~23</td><td><strong>3</strong>: two disabled buttons, one 4.3:1 badge</td></tr>
+            <tr><td>Home header at 360 px</td><td>"H… · Chhattisgarh 4900…"</td><td><strong>"Home · Smriti Nagar"</strong></td></tr>
+            <tr><td>Smallest text we control (charts, badges, labels)</td><td>9 px</td><td><strong>11 px</strong>. The only 10 px left is inside Google Maps.</td></tr>
+            <tr><td>Console errors / sideways overflow</td><td>0 / 0</td><td>0 / 0</td></tr>
+            <tr><td>Tap-through steps</td><td>38 / 38</td><td>38 / 38</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>#</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><strong>Install card and basket bar make room.</strong> The card measures how far it reaches above the bottom and publishes <code>--install-inset</code>; <code>.app-scroll::after</code> adds that much scroll room, or 76 px when the basket bar shows. When both show, the card sits above the basket bar instead of on it.</td></tr>
+            <tr><td>2</td><td><strong>Home header</strong> shows the label plus the locality before the PIN code (new <code>addressLocality()</code> helper, also used by checkout). The label no longer truncates. Bell and profile buttons are 44 px. "Deliver to · पहुंचाएं".</td></tr>
+            <tr><td>3</td><td><strong>No iPhone zoom:</strong> one rule, touch screens only, inside the phone shell: text fields are at least 16 px. Deliberately large fields such as the rider's code boxes keep their size. Desktop consoles are untouched.</td></tr>
+            <tr><td>4</td><td><strong>Hindi</strong> added to:
+              <ul>
+                <li>Home: Categories, Popular right now, Restaurants near you.</li>
+                <li>Search: Try searching, Popular dishes.</li>
+                <li>The basket bar.</li>
+                <li>Profile: every menu row and Sign out.</li>
+                <li>The vendor Menu (title, Add item, In stock / Sold out), Earnings, and the Open/Closed pill.</li>
+                <li>The manager home: phone order, cash, and all three counters.</li>
+              </ul></td></tr>
+            <tr><td>5</td><td><strong>Tap targets:</strong> a new <code>.tap-target</code> gives an invisible 44×44 touch area to dish "Add", the +/− steppers, search suggestion chips, "Clear search" and "Clear basket". These are drawn at the same size, so a bounding-box count still lists them as small. Vendor filter chips, search tabs and promotion Pause/Delete are now 44 px tall, as are the manager's "Board" and "Sign out". Tab-bar labels went from 11 to 12 px.</td></tr>
+            <tr><td>6</td><td><strong>Contrast:</strong>
+              <ul>
+                <li>Basket bar text uses the palette's <code>--on-accent</code> ink, not white on orange.</li>
+                <li>Storefront chips sit on 60% black, and the Open pill on the photo gets a dark backing with a green dot.</li>
+                <li>The header Open pill, the Bestseller badge and the search counts were raised above 4.5:1.</li>
+              </ul></td></tr>
+            <tr><td>7</td><td><strong>Item sheet</strong> is a real dialog (<code>role="dialog"</code>, <code>aria-modal</code>, labelled with the dish name). Focus moves into it and Escape closes it. The address sheet also closes on Escape.</td></tr>
+            <tr><td>8</td><td>Chart axis labels and badges went from 9–10 px to 11 px (vendor Overview and Earnings, promotions, address picker). The vendor Menu's floating "+" and its CSS were removed. The customer, vendor, rider and manager phone shells now have a <code>&lt;main&gt;</code> landmark. Category and order names wrap to two lines instead of "…".</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">Verified: <code>tsc</code> clean. ESLint shows 0 errors. QA suites unchanged: platform 35/37 (the same 2 admin-nav failures), and driver-app, sw, vendor-readiness, layering, switch and theme-color all pass. The phone audit was re-run on three devices plus a clean sequential customer pass, and all 38 tap-through steps pass.</p>
+
+      <p class="muted" style="margin-top:40px; font-size:13px">
+        Method: Playwright 1.63 against the local dev server (live database, read-only). Three device profiles, light
+        and dark. Contrast is WCAG 2.1 computed from the rendered colours; text sitting on photos was judged by eye from
+        screenshots, because a script can't see the image behind it. Tap sizes are measured bounding boxes.
+      </p>
+    </main>
+  </body>
+</html>

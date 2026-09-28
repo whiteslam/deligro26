@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useFeatures } from "@/components/features/features-provider";
 import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import {
@@ -9,6 +10,7 @@ import {
 } from "@/components/admin/console/chrome";
 import {
   VENDOR_NAV,
+  visibleVendorNav,
   VENDOR_NAV_GROUPS,
   activeVendorNavItem,
 } from "@/components/vendor/vendor-nav";
@@ -45,6 +47,7 @@ export function VendorSidebar({
   name: string;
   email: string | null;
 }) {
+  const features = useFeatures();
   const pathname = usePathname();
   const current = activeVendorNavItem(pathname);
   const multiStore = restaurants.length > 1;
@@ -78,7 +81,7 @@ export function VendorSidebar({
                 <span className="block truncate text-[13.5px] font-bold leading-none tracking-[-0.01em] text-white">
                   Deligro
                 </span>
-                <span className="mt-1 block truncate text-[9.5px] font-medium uppercase leading-none tracking-[0.08em] text-[var(--sb-group)]">
+                <span className="mt-1 block truncate text-[11px] font-medium uppercase leading-none tracking-[0.08em] text-[var(--sb-group)]">
                   Partner hub
                 </span>
               </span>
@@ -94,7 +97,7 @@ export function VendorSidebar({
           aria-label="Vendor navigation"
         >
           {VENDOR_NAV_GROUPS.map((group, groupIndex) => {
-            const items = VENDOR_NAV.filter((i) => i.group === group);
+            const items = visibleVendorNav(VENDOR_NAV, features).filter((i) => i.group === group);
             if (!items.length) return null;
             return (
               <div key={group}>
@@ -109,7 +112,7 @@ export function VendorSidebar({
                     />
                   ) : null
                 ) : (
-                  <p className="px-2 pb-[5px] pt-3.5 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--sb-group)]">
+                  <p className="px-2 pb-[5px] pt-3.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sb-group)]">
                     {group}
                   </p>
                 )}
@@ -206,7 +209,7 @@ export function VendorSidebar({
                   {name}
                 </span>
                 {email ? (
-                  <span className="block truncate text-[10.5px] leading-tight text-[var(--sb-meta)]">
+                  <span className="block truncate text-[11px] leading-tight text-[var(--sb-meta)]">
                     {email}
                   </span>
                 ) : null}
@@ -250,7 +253,7 @@ function StoreCard({
   return (
     <div className="rounded-[9px] border border-[var(--sb-border)] px-[11px] py-2.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--sb-group)]">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--sb-group)]">
           Store
         </span>
         <span

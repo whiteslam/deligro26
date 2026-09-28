@@ -1,34 +1,42 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { shortOrderId } from "@/lib/utils/order-map";
-import { sendPush, isPushConfigured } from "./onesignal";
+import { sendPush, isPushConfigured, type PushText } from "./onesignal";
 
 /**
- * Order notifications — every transition, for both sides of it.
+ * Order notifications — every transition, for every side of it.
  *
  * This file used to cover two of six transitions: on-the-way and delivered. A
  * customer heard nothing when the restaurant accepted their order, nothing when
  * it was ready, and — worst of the set — nothing when it was rejected. The two
  * moments people actually wait for were the silent ones.
  *
- * Everything here is fire-and-forget and never throws into the caller. A failed
- * push must not roll back the transition that triggered it; an order that moved
- * and wasn't announced is recoverable, an order that didn't move is not.
+ * Everything here never throws into the caller. A failed push must not roll
+ * back the transition that triggered it; an order that moved and wasn't
+ * announced is recoverable, an order that didn't move is not. Callers schedule
+ * these with `deferNotify()` (./defer.ts) rather than `void`, so the send
+ * survives the end of a serverless invocation.
  *
- * Reads use the service-role client because the contexts that trigger these —
- * a driver advancing a delivery, a webhook, a vendor accepting — cannot see the
- * counterparty's push id under RLS.
+ * Recipients are addressed by profile id first — the OneSignal `external_id`
+ * set by `OneSignal.login()` in every portal — with the stored
+ * `profiles.onesignal_id` as a fallback for devices that subscribed before
+ * login existed. Reads use the service-role client because the contexts that
+ * trigger these — a driver advancing a delivery, a webhook, a vendor accepting
+ * — cannot see the counterparty's push id under RLS.
+ *
+ * Copy is English + Hindi; OneSignal shows the one matching the device.
  */
 
-async function pushToPlayer(
+async function pushToUser(
+  userId: string | null | undefined,
   playerId: string | null | undefined,
-  heading: string,
-  message: string,
+  heading: PushText,
+  message: PushText,
   url: string
 ): Promise<void> {
-  if (!playerId) return;
+  if (!userId && !playerId) return;
   try {
-    await sendPush(playerId, heading, message, { url });
+    await sendPush({ userIds: [userId], playerIds: [playerId] }, heading, message, { url });
   } catch {
     // swallow — fire-and-forget
   }
@@ -38,25 +46,26 @@ function one<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
 }
 
+type PushProfile = { id: string; onesignal_id: string | null };
+
 /** Push an order update to the order's customer. */
 export async function notifyCustomer(
   orderId: string,
-  heading: string,
-  message: string
+  heading: PushText,
+  message: PushText
 ): Promise<void> {
   if (!isPushConfigured) return;
   try {
     const supabase = createAdminClient();
     const { data } = await supabase
       .from("orders")
-      .select("customer:profiles!orders_customer_id_fkey(onesignal_id)")
+      .select("customer:profiles!orders_customer_id_fkey(id, onesignal_id)")
       .eq("id", orderId)
       .maybeSingle();
 
-    const customer = one(
-      data?.customer as { onesignal_id: string | null } | { onesignal_id: string | null }[] | null
-    );
-    await pushToPlayer(
+    const customer = one(data?.customer as PushProfile | PushProfile[] | null);
+    await pushToUser(
+      customer?.id,
       customer?.onesignal_id,
       heading,
       message,
@@ -70,14 +79,14 @@ export async function notifyCustomer(
 /**
  * Push to the owner of the restaurant an order was placed with.
  *
- * The vendor board polls every four seconds, which is fine when someone is
+ * The vendor board polls every eight seconds, which is fine when someone is
  * watching it and useless when nobody is. A new order is the one event a
  * kitchen cannot afford to discover late.
  */
 export async function notifyVendor(
   orderId: string,
-  heading: string,
-  message: string
+  heading: PushText,
+  message: PushText
 ): Promise<void> {
   if (!isPushConfigured) return;
   try {
@@ -99,7 +108,7 @@ export async function notifyVendor(
       .eq("id", restaurant.owner_id)
       .maybeSingle();
 
-    await pushToPlayer(owner?.onesignal_id, heading, message, `/vendor`);
+    await pushToUser(restaurant.owner_id, owner?.onesignal_id, heading, message, `/vendor`);
   } catch {
     // swallow — fire-and-forget
   }
@@ -115,8 +124,8 @@ export async function notifyVendor(
  */
 export async function notifyDriver(
   driverId: string,
-  heading: string,
-  message: string
+  heading: PushText,
+  message: PushText
 ): Promise<void> {
   if (!isPushConfigured) return;
   try {
@@ -127,7 +136,39 @@ export async function notifyDriver(
       .eq("id", driverId)
       .maybeSingle();
 
-    await pushToPlayer(data?.onesignal_id, heading, message, "/driver");
+    await pushToUser(driverId, data?.onesignal_id, heading, message, "/driver");
+  } catch {
+    // swallow — fire-and-forget
+  }
+}
+
+/**
+ * Push to everyone running operations: admins and managers.
+ *
+ * For the two failures nobody on the order is placed to notice — a kitchen that
+ * hasn't accepted, an order with no rider — which the admin board only shows to
+ * someone already looking at it. See lib/dispatch/sweep.ts.
+ */
+export async function notifyOps(
+  heading: PushText,
+  message: PushText,
+  url: string
+): Promise<void> {
+  if (!isPushConfigured) return;
+  try {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, onesignal_id")
+      .in("role", ["admin", "manager"]);
+    const ops = (data ?? []) as PushProfile[];
+    if (ops.length === 0) return;
+    await sendPush(
+      { userIds: ops.map((p) => p.id), playerIds: ops.map((p) => p.onesignal_id) },
+      heading,
+      message,
+      { url }
+    );
   } catch {
     // swallow — fire-and-forget
   }
@@ -141,10 +182,14 @@ export async function notifyDriver(
  * to tell.
  */
 export function notifyOrderPlaced(orderId: string): Promise<void> {
+  const id = shortOrderId(orderId);
   return notifyCustomer(
     orderId,
-    "Order sent 🧾",
-    `Order #${shortOrderId(orderId)} is with the restaurant. We'll tell you the moment they accept.`
+    { en: "Order sent 🧾", hi: "ऑर्डर भेजा गया 🧾" },
+    {
+      en: `Order #${id} is with the restaurant. We'll tell you the moment they accept.`,
+      hi: `ऑर्डर #${id} रेस्टोरेंट को भेज दिया गया है। जैसे ही वे स्वीकार करेंगे, हम आपको बताएंगे।`,
+    }
   );
 }
 
@@ -152,36 +197,55 @@ export function notifyOrderAccepted(
   orderId: string,
   restaurantName?: string
 ): Promise<void> {
+  const id = shortOrderId(orderId);
   return notifyCustomer(
     orderId,
-    "Order accepted 👨‍🍳",
+    { en: "Order accepted 👨‍🍳", hi: "ऑर्डर स्वीकार हुआ 👨‍🍳" },
     restaurantName
-      ? `${restaurantName} accepted order #${shortOrderId(orderId)} and started cooking.`
-      : `Order #${shortOrderId(orderId)} was accepted and is being cooked.`
+      ? {
+          en: `${restaurantName} accepted order #${id} and started cooking.`,
+          hi: `${restaurantName} ने ऑर्डर #${id} स्वीकार कर लिया है और खाना बनना शुरू हो गया है।`,
+        }
+      : {
+          en: `Order #${id} was accepted and is being cooked.`,
+          hi: `ऑर्डर #${id} स्वीकार हो गया है और खाना बन रहा है।`,
+        }
   );
 }
 
 export function notifyOrderReady(orderId: string): Promise<void> {
+  const id = shortOrderId(orderId);
   return notifyCustomer(
     orderId,
-    "Food is ready 🍽️",
-    `Order #${shortOrderId(orderId)} is packed and waiting for a rider.`
+    { en: "Food is ready 🍽️", hi: "खाना तैयार है 🍽️" },
+    {
+      en: `Order #${id} is packed and waiting for a rider.`,
+      hi: `ऑर्डर #${id} पैक हो गया है और राइडर का इंतज़ार कर रहा है।`,
+    }
   );
 }
 
 export function notifyOnTheWay(orderId: string): Promise<void> {
+  const id = shortOrderId(orderId);
   return notifyCustomer(
     orderId,
-    "Your order is on the way 🛵",
-    `Order #${shortOrderId(orderId)} has left the kitchen and is heading to you.`
+    { en: "Your order is on the way 🛵", hi: "आपका ऑर्डर रास्ते में है 🛵" },
+    {
+      en: `Order #${id} has left the kitchen and is heading to you.`,
+      hi: `ऑर्डर #${id} किचन से निकल चुका है और आपकी ओर आ रहा है।`,
+    }
   );
 }
 
 export function notifyDelivered(orderId: string): Promise<void> {
+  const id = shortOrderId(orderId);
   return notifyCustomer(
     orderId,
-    "Delivered ✅",
-    `Order #${shortOrderId(orderId)} was delivered. Enjoy your meal!`
+    { en: "Delivered ✅", hi: "डिलीवर हो गया ✅" },
+    {
+      en: `Order #${id} was delivered. Enjoy your meal!`,
+      hi: `ऑर्डर #${id} डिलीवर हो गया। खाने का आनंद लें!`,
+    }
   );
 }
 
@@ -194,23 +258,39 @@ export function notifyOrderCancelled(
   orderId: string,
   opts: { byVendor?: boolean; refundQueued?: boolean } = {}
 ): Promise<void> {
-  const money = opts.refundQueued
+  const id = shortOrderId(orderId);
+  const moneyEn = opts.refundQueued
     ? " Your refund has been requested and is being processed."
+    : "";
+  const moneyHi = opts.refundQueued
+    ? " आपका रिफ़ंड अनुरोध दर्ज हो गया है और प्रोसेस हो रहा है।"
     : "";
   return notifyCustomer(
     orderId,
-    opts.byVendor ? "Order declined" : "Order cancelled",
     opts.byVendor
-      ? `The restaurant couldn't take order #${shortOrderId(orderId)}.${money}`
-      : `Order #${shortOrderId(orderId)} was cancelled.${money}`
+      ? { en: "Order declined", hi: "ऑर्डर अस्वीकार हुआ" }
+      : { en: "Order cancelled", hi: "ऑर्डर रद्द हुआ" },
+    opts.byVendor
+      ? {
+          en: `The restaurant couldn't take order #${id}.${moneyEn}`,
+          hi: `रेस्टोरेंट ऑर्डर #${id} नहीं ले सका।${moneyHi}`,
+        }
+      : {
+          en: `Order #${id} was cancelled.${moneyEn}`,
+          hi: `ऑर्डर #${id} रद्द कर दिया गया।${moneyHi}`,
+        }
   );
 }
 
 export function notifyPaymentFailed(orderId: string): Promise<void> {
+  const id = shortOrderId(orderId);
   return notifyCustomer(
     orderId,
-    "Payment didn't go through",
-    `Order #${shortOrderId(orderId)} is saved but unpaid. Open it to try again.`
+    { en: "Payment didn't go through", hi: "भुगतान नहीं हो पाया" },
+    {
+      en: `Order #${id} is saved but unpaid. Open it to try again.`,
+      hi: `ऑर्डर #${id} सेव है लेकिन भुगतान बाकी है। दोबारा कोशिश करने के लिए इसे खोलें।`,
+    }
   );
 }
 
@@ -218,12 +298,21 @@ export function notifyRefundDecided(
   orderId: string,
   approved: boolean
 ): Promise<void> {
+  const id = shortOrderId(orderId);
   return notifyCustomer(
     orderId,
-    approved ? "Refund approved 💸" : "Refund declined",
     approved
-      ? `Your refund for order #${shortOrderId(orderId)} was approved.`
-      : `We couldn't approve the refund for order #${shortOrderId(orderId)}. Contact support if this looks wrong.`
+      ? { en: "Refund approved 💸", hi: "रिफ़ंड मंज़ूर 💸" }
+      : { en: "Refund declined", hi: "रिफ़ंड अस्वीकार" },
+    approved
+      ? {
+          en: `Your refund for order #${id} was approved.`,
+          hi: `ऑर्डर #${id} का आपका रिफ़ंड मंज़ूर हो गया है।`,
+        }
+      : {
+          en: `We couldn't approve the refund for order #${id}. Contact support if this looks wrong.`,
+          hi: `हम ऑर्डर #${id} का रिफ़ंड मंज़ूर नहीं कर सके। अगर यह गलत लगे तो सपोर्ट से संपर्क करें।`,
+        }
   );
 }
 
@@ -251,13 +340,15 @@ export function notifyDriverPickupOffered(
     pickupArea?: string | null;
   }
 ): Promise<void> {
+  const id = shortOrderId(opts.orderId);
   const where = opts.pickupArea?.trim() ? ` (${opts.pickupArea.trim()})` : "";
   return notifyDriver(
     driverId,
-    "Pickup coming your way 🛵",
-    `${opts.restaurantName}${where} is cooking order #${shortOrderId(
-      opts.orderId
-    )} — ready in about ${opts.readyInMinutes} min. Head over.`
+    { en: "Pickup coming your way 🛵", hi: "पिकअप आ रहा है 🛵" },
+    {
+      en: `${opts.restaurantName}${where} is cooking order #${id} — ready in about ${opts.readyInMinutes} min. Head over.`,
+      hi: `${opts.restaurantName}${where} ऑर्डर #${id} बना रहा है — लगभग ${opts.readyInMinutes} मिनट में तैयार। निकल पड़िए।`,
+    }
   );
 }
 
@@ -266,12 +357,58 @@ export function notifyDriverPickupReady(
   driverId: string,
   opts: { orderId: string; restaurantName: string }
 ): Promise<void> {
+  const id = shortOrderId(opts.orderId);
   return notifyDriver(
     driverId,
-    "Order ready to collect 📦",
-    `${opts.restaurantName} has packed order #${shortOrderId(
-      opts.orderId
-    )}. It's held for you — accept it in the app.`
+    { en: "Order ready to collect 📦", hi: "ऑर्डर लेने के लिए तैयार 📦" },
+    {
+      en: `${opts.restaurantName} has packed order #${id}. It's held for you — accept it in the app.`,
+      hi: `${opts.restaurantName} ने ऑर्डर #${id} पैक कर दिया है। यह आपके लिए रखा है — ऐप में स्वीकार करें।`,
+    }
+  );
+}
+
+/**
+ * A manager put this rider on the order by hand. Without this the rider only
+ * found out on their next board refresh — which, with the phone in a pocket,
+ * is whenever they next looked.
+ */
+export function notifyDriverAssigned(
+  driverId: string,
+  opts: { orderId: string; restaurantName: string }
+): Promise<void> {
+  const id = shortOrderId(opts.orderId);
+  return notifyDriver(
+    driverId,
+    { en: "New delivery assigned 🛵", hi: "नई डिलीवरी मिली 🛵" },
+    {
+      en: `You've been assigned order #${id} from ${opts.restaurantName}. Open the app for pickup details.`,
+      hi: `आपको ${opts.restaurantName} का ऑर्डर #${id} दिया गया है। पिकअप की जानकारी के लिए ऐप खोलें।`,
+    }
+  );
+}
+
+/**
+ * The order this rider was offered or carrying is off. A rider already riding
+ * to the shop used to keep riding until they looked at the screen.
+ */
+export function notifyDriverOrderCancelled(
+  driverId: string,
+  opts: { orderId: string; pickedUp: boolean }
+): Promise<void> {
+  const id = shortOrderId(opts.orderId);
+  return notifyDriver(
+    driverId,
+    { en: "Order cancelled ✋", hi: "ऑर्डर रद्द ✋" },
+    opts.pickedUp
+      ? {
+          en: `Order #${id} was cancelled. If you already have the food, contact support.`,
+          hi: `ऑर्डर #${id} रद्द हो गया है। अगर खाना आपके पास है तो सपोर्ट से संपर्क करें।`,
+        }
+      : {
+          en: `Order #${id} was cancelled. Don't pick it up.`,
+          hi: `ऑर्डर #${id} रद्द हो गया है। इसे पिकअप न करें।`,
+        }
   );
 }
 
@@ -285,13 +422,15 @@ export function notifyDriverPickupReady(
  * street for five minutes wondering whether they misread it.
  */
 export function notifyRiderArriving(orderId: string, riderName?: string | null): Promise<void> {
-  const who = riderName?.trim() || "Your rider";
+  const id = shortOrderId(orderId);
+  const name = riderName?.trim();
   return notifyCustomer(
     orderId,
-    "Your rider is here 🛵",
-    `${who} has reached your place with order #${shortOrderId(
-      orderId
-    )}. Have your delivery code ready.`
+    { en: "Your rider is here 🛵", hi: "आपका राइडर पहुँच गया 🛵" },
+    {
+      en: `${name || "Your rider"} has reached your place with order #${id}. Have your delivery code ready.`,
+      hi: `${name || "आपके राइडर"} ऑर्डर #${id} लेकर आपके पते पर पहुँच गए हैं। अपना डिलीवरी कोड तैयार रखें।`,
+    }
   );
 }
 
@@ -301,14 +440,17 @@ export function notifyVendorNewOrder(
   orderId: string,
   itemCount?: number
 ): Promise<void> {
-  const items =
-    typeof itemCount === "number" && itemCount > 0
-      ? ` · ${itemCount} item${itemCount > 1 ? "s" : ""}`
-      : "";
+  const id = shortOrderId(orderId);
+  const hasCount = typeof itemCount === "number" && itemCount > 0;
+  const itemsEn = hasCount ? ` · ${itemCount} item${itemCount > 1 ? "s" : ""}` : "";
+  const itemsHi = hasCount ? ` · ${itemCount} आइटम` : "";
   return notifyVendor(
     orderId,
-    "New order 🔔",
-    `Order #${shortOrderId(orderId)}${items} is waiting for you to accept.`
+    { en: "New order 🔔", hi: "नया ऑर्डर 🔔" },
+    {
+      en: `Order #${id}${itemsEn} is waiting for you to accept.`,
+      hi: `ऑर्डर #${id}${itemsHi} आपके स्वीकार करने का इंतज़ार कर रहा है।`,
+    }
   );
 }
 
@@ -320,13 +462,83 @@ export function notifyVendorOrderCancelled(
   orderId: string,
   opts: { byAdmin?: boolean } = {}
 ): Promise<void> {
+  const id = shortOrderId(orderId);
   // Who pulled the order changes what the kitchen does next: a customer
   // cancelling is routine, support cancelling on their behalf usually means
   // something went wrong that the restaurant is about to be asked about.
-  // Default unchanged, so the existing customer-path callers are untouched.
   return notifyVendor(
     orderId,
-    opts.byAdmin ? "Order cancelled by support" : "Order cancelled by customer",
-    `Order #${shortOrderId(orderId)} was cancelled. Stop preparing it.`
+    opts.byAdmin
+      ? { en: "Order cancelled by support", hi: "सपोर्ट ने ऑर्डर रद्द किया" }
+      : { en: "Order cancelled by customer", hi: "ग्राहक ने ऑर्डर रद्द किया" },
+    {
+      en: `Order #${id} was cancelled. Stop preparing it.`,
+      hi: `ऑर्डर #${id} रद्द हो गया है। इसे बनाना बंद करें।`,
+    }
+  );
+}
+
+/** A rider has taken the order — the kitchen knows who to hand the bag to. */
+export function notifyVendorRiderAssigned(
+  orderId: string,
+  riderName?: string | null
+): Promise<void> {
+  const id = shortOrderId(orderId);
+  const name = riderName?.trim();
+  return notifyVendor(
+    orderId,
+    { en: "Rider on the way to you 🛵", hi: "राइडर आ रहा है 🛵" },
+    {
+      en: `${name || "A rider"} is picking up order #${id}.`,
+      hi: `${name || "एक राइडर"} ऑर्डर #${id} लेने आ रहे हैं।`,
+    }
+  );
+}
+
+/* ---------- operations ---------- */
+
+export function notifyOpsKitchenSlow(
+  orderId: string,
+  opts: { restaurantName: string; minutes: number }
+): Promise<void> {
+  const id = shortOrderId(orderId);
+  return notifyOps(
+    { en: "Kitchen hasn't accepted ⏱️", hi: "किचन ने स्वीकार नहीं किया ⏱️" },
+    {
+      en: `Order #${id} at ${opts.restaurantName} has waited ${opts.minutes} min without being accepted. Call the shop.`,
+      hi: `${opts.restaurantName} पर ऑर्डर #${id} ${opts.minutes} मिनट से स्वीकार नहीं हुआ। दुकान को कॉल करें।`,
+    },
+    `/admin/orders/${orderId}`
+  );
+}
+
+export function notifyOpsStuck(
+  orderId: string,
+  opts: { restaurantName: string; hours: number; status: string }
+): Promise<void> {
+  const id = shortOrderId(orderId);
+  const stage = opts.status.replace(/_/g, " ");
+  return notifyOps(
+    { en: "Order stuck — close it out 🧹", hi: "ऑर्डर अटका है — बंद करें 🧹" },
+    {
+      en: `Order #${id} at ${opts.restaurantName} has been "${stage}" for ${opts.hours} h. Deliver or cancel it so the customer isn't left waiting.`,
+      hi: `${opts.restaurantName} पर ऑर्डर #${id} ${opts.hours} घंटे से "${stage}" है। डिलीवर या रद्द करें।`,
+    },
+    `/admin/orders/${orderId}`
+  );
+}
+
+export function notifyOpsNoRider(
+  orderId: string,
+  opts: { restaurantName: string; minutes: number }
+): Promise<void> {
+  const id = shortOrderId(orderId);
+  return notifyOps(
+    { en: "No rider yet 🚨", hi: "अभी तक कोई राइडर नहीं 🚨" },
+    {
+      en: `Order #${id} at ${opts.restaurantName} has been ready ${opts.minutes} min with no rider. Assign one.`,
+      hi: `${opts.restaurantName} पर ऑर्डर #${id} ${opts.minutes} मिनट से तैयार है, कोई राइडर नहीं। किसी को असाइन करें।`,
+    },
+    "/manager"
   );
 }

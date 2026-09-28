@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { staffFeatureOn } from "@/lib/features/guards.server";
+import { FEATURE_OFF_MESSAGE } from "@/lib/features/catalog";
 import { requireRole } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -41,6 +43,7 @@ export async function recordHandoverAction(input: {
   note?: string;
 }): Promise<CashActionResult> {
   const profile = await requireRole(["manager", "admin"]);
+  if (!(await staffFeatureOn("manager.cash"))) return { ok: false, error: FEATURE_OFF_MESSAGE };
   if (!isSupabaseConfigured) return { ok: false, error: DEMO };
 
   // A handful of these a day at most — well above what a real shift needs,
@@ -61,6 +64,7 @@ export async function recordExpenseAction(input: {
   note?: string;
 }): Promise<CashActionResult> {
   const profile = await requireRole(["manager", "admin"]);
+  if (!(await staffFeatureOn("manager.cash"))) return { ok: false, error: FEATURE_OFF_MESSAGE };
   if (!isSupabaseConfigured) return { ok: false, error: DEMO };
 
   const limit = await rateLimit(`operational-expense:${profile.id}`, 30, 60_000);

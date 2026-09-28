@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import { useFeature } from "@/components/features/features-provider";
 import {
   Banknote,
   Bell,
@@ -8,6 +9,7 @@ import {
   ChevronDown,
   Clock,
   CreditCard,
+  Bike,
   ExternalLink,
   KeyRound,
   MapPin,
@@ -59,7 +61,7 @@ function orderDescription(order: KitchenOrder): string {
 }
 
 const BADGE =
-  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide";
+  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide";
 
 /**
  * How this order is paid, in the two words a kitchen actually needs.
@@ -246,7 +248,7 @@ function OrderCard({
               {order.code}
             </p>
             {variant === "new" ? (
-              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase text-accent">
+              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-bold uppercase text-accent">
                 New
               </span>
             ) : null}
@@ -355,6 +357,8 @@ function IncomingList({
   busy: string | null;
   onPatch: (o: KitchenOrder, s: "kitchen" | "ready" | "cancelled") => void;
 }) {
+  // Admin → Feature access; PATCH /api/orders/[id]/status refuses it too.
+  const canReject = useFeature("vendor.reject_orders");
   if (orders.length === 0) {
     return (
       <VendorEmptyState
@@ -367,22 +371,24 @@ function IncomingList({
     <div className="space-y-3">
       {orders.map((o) => (
         <OrderCard key={o.id} order={o} variant="new">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            disabled={busy === o.id}
-            onClick={() => onPatch(o, "cancelled")}
-          >
-            <X className="size-4" /> Reject
-          </Button>
+          {canReject ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              disabled={busy === o.id}
+              onClick={() => onPatch(o, "cancelled")}
+            >
+              <X className="size-4" /> Reject · मना करें
+            </Button>
+          ) : null}
           <Button
             size="sm"
             className="w-full"
             disabled={busy === o.id}
             onClick={() => onPatch(o, "kitchen")}
           >
-            <Check className="size-4" /> Accept
+            <Check className="size-4" /> Accept · स्वीकार
           </Button>
         </OrderCard>
       ))}
@@ -399,6 +405,8 @@ function PreparingList({
   busy: string | null;
   onPatch: (o: KitchenOrder, s: "kitchen" | "ready" | "cancelled") => void;
 }) {
+  // Admin → Feature access; PATCH /api/orders/[id]/status refuses it too.
+  const canReject = useFeature("vendor.reject_orders");
   if (orders.length === 0) {
     return (
       <VendorEmptyState
@@ -415,22 +423,24 @@ function PreparingList({
           order={o}
           meta={<KitchenTimer since={o.acceptedAt} />}
         >
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            disabled={busy === o.id}
-            onClick={() => onPatch(o, "cancelled")}
-          >
-            <X className="size-4" /> Cancel
-          </Button>
+          {canReject ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              disabled={busy === o.id}
+              onClick={() => onPatch(o, "cancelled")}
+            >
+              <X className="size-4" /> Cancel
+            </Button>
+          ) : null}
           <Button
             size="sm"
             className="w-full"
             disabled={busy === o.id}
             onClick={() => onPatch(o, "ready")}
           >
-            <Bell className="size-4" /> Ready
+            <Bell className="size-4" /> Ready · तैयार
           </Button>
         </OrderCard>
       ))}
@@ -447,6 +457,8 @@ function ReadyList({
   busy: string | null;
   onPatch: (o: KitchenOrder, s: "kitchen" | "ready" | "cancelled") => void;
 }) {
+  // Admin → Feature access; PATCH /api/orders/[id]/status refuses it too.
+  const canReject = useFeature("vendor.reject_orders");
   if (orders.length === 0) {
     return (
       <VendorEmptyState
@@ -459,6 +471,30 @@ function ReadyList({
     <div className="space-y-3">
       {orders.map((o) => (
         <OrderCard key={o.id} order={o}>
+          {/* Who is coming, and whether they have been. The kitchen had no way
+              to know either: no rider name, and the card sat here until the
+              order was delivered. */}
+          {o.rider ? (
+            <div
+              className={cn(
+                "col-span-2 flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold text-ink",
+                o.rider.stage === "picked_up"
+                  ? "border-green/30 bg-green/10"
+                  : "border-line bg-surface-2"
+              )}
+            >
+              <Bike className="size-4 shrink-0" />
+              <span className="min-w-0">
+                {o.rider.stage === "picked_up"
+                  ? `Picked up by ${o.rider.name} · on the way / ${o.rider.name} ने ले लिया`
+                  : `${o.rider.name} is coming to collect / ${o.rider.name} लेने आ रहे हैं`}
+              </span>
+            </div>
+          ) : (
+            <p className="col-span-2 text-sm text-muted">
+              Waiting for a rider / राइडर का इंतज़ार
+            </p>
+          )}
           {/* The counter's half of the handover. The rider cannot mark this
               order collected without entering it, so reading it out is what
               releases the food — and it is only read out to the courier who
@@ -466,26 +502,30 @@ function ReadyList({
               has existed since migration 0006 with no UI, and the one attempt
               at using it showed the code to the RIDER, who then did not have to
               produce it for anyone. */}
-          {o.pickupOtp ? (
+          {o.pickupOtp && o.rider?.stage !== "picked_up" ? (
             <div className="col-span-2 flex items-center justify-between gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2">
               <span className="text-label flex items-center gap-1.5">
                 <KeyRound className="size-3.5" />
-                Read to the rider
+                Read to the rider / राइडर को बताएं
               </span>
               <span className="text-data text-xl font-bold tracking-[0.3em]">
                 {o.pickupOtp}
               </span>
             </div>
           ) : null}
-          <Button
-            variant="outline"
-            size="sm"
-            className="col-span-2 w-full"
-            disabled={busy === o.id}
-            onClick={() => onPatch(o, "cancelled")}
-          >
-            <X className="size-4" /> Cancel order
-          </Button>
+          {/* Once the bag has left, cancelling from the counter is not the
+              kitchen's call — that is support's, with the rider in view. */}
+          {o.rider?.stage === "picked_up" || !canReject ? null : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="col-span-2 w-full"
+              disabled={busy === o.id}
+              onClick={() => onPatch(o, "cancelled")}
+            >
+              <X className="size-4" /> Cancel order
+            </Button>
+          )}
         </OrderCard>
       ))}
     </div>
@@ -521,7 +561,7 @@ function HistoryOrderCard({
             </span>
             <span
               className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
+                "rounded-full px-2 py-0.5 text-[11px] font-bold uppercase",
                 statusTone === "cancelled"
                   ? "bg-red-500/10 text-red-500"
                   : "bg-green/15 text-green"
@@ -705,6 +745,7 @@ export function VendorOrdersBoard({
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<OrderTab>("new");
+  const canBusy = useFeature("vendor.busy_mode");
   const [historyDialog, setHistoryDialog] = useState<
     null | "cancelled" | "completed"
   >(null);
@@ -712,7 +753,12 @@ export function VendorOrdersBoard({
   const [rejecting, setRejecting] = useState<KitchenOrder | null>(null);
 
   // When auto-refresh pulls fresh server data, adopt it as the source of truth
-  // (new orders appear, accepted ones move) while keeping the local ready tally.
+  // — every column, Ready included.
+  //
+  // Ready used to be excluded ("keeping the local ready tally"), which meant it
+  // never heard from the server again: a rider taking the bag, or the order
+  // being delivered, left the card sitting in Ready until the page was
+  // reloaded. The 28 Sept live test watched it stay there for the whole ride.
   //
   // Done during render, not in an effect: an effect would paint one frame of the
   // stale board before correcting itself, and a kitchen screen showing an order
@@ -720,6 +766,7 @@ export function VendorOrdersBoard({
   const [adopted, setAdopted] = useState({
     initialIncoming,
     initialPreparing,
+    initialReady,
     initialRecent,
     initialCancelled,
   });
@@ -727,17 +774,20 @@ export function VendorOrdersBoard({
     live &&
     (adopted.initialIncoming !== initialIncoming ||
       adopted.initialPreparing !== initialPreparing ||
+      adopted.initialReady !== initialReady ||
       adopted.initialRecent !== initialRecent ||
       adopted.initialCancelled !== initialCancelled)
   ) {
     setAdopted({
       initialIncoming,
       initialPreparing,
+      initialReady,
       initialRecent,
       initialCancelled,
     });
     setIncoming(initialIncoming);
     setPreparing(initialPreparing);
+    setReady(initialReady);
     setRecent(initialRecent);
     setCancelled(initialCancelled);
   }
@@ -773,6 +823,22 @@ export function VendorOrdersBoard({
 
     setBusy(order.id);
     setActionError(null);
+
+    // Move the card now and put it back if the server says no. Accept and
+    // Ready used to wait for the whole round trip before anything moved on the
+    // kitchen's own screen — 6.6 s for an Accept in the live test — which on a
+    // busy pass reads as "didn't register" and gets tapped again.
+    const snapshot = { incoming, preparing, ready, cancelled };
+    const restore = () => {
+      setIncoming(snapshot.incoming);
+      setPreparing(snapshot.preparing);
+      setReady(snapshot.ready);
+      setCancelled(snapshot.cancelled);
+    };
+    if (status === "kitchen") acceptLocal(order);
+    else if (status === "cancelled") rejectLocal(order);
+    else readyLocal(order);
+
     try {
       const res = await fetch(`/api/orders/${order.id}/status`, {
         method: "PATCH",
@@ -783,19 +849,19 @@ export function VendorOrdersBoard({
         const body = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
+        restore();
         setActionError(
           body?.error === "invalid_transition"
-            ? "That status change is no longer valid. Refreshing…"
-            : "Could not update order. Try again."
+            ? "That status change is no longer valid. Refreshing… / यह बदलाव अब मान्य नहीं है।"
+            : "Could not update order. Try again. / ऑर्डर अपडेट नहीं हुआ, फिर से कोशिश करें।"
         );
         return;
       }
-
-      if (status === "kitchen") acceptLocal(order);
-      else if (status === "cancelled") rejectLocal(order);
-      else readyLocal(order);
     } catch {
-      setActionError("Network error. Check your connection.");
+      restore();
+      setActionError(
+        "Network error. Check your connection. / नेटवर्क की समस्या — कनेक्शन जांचें।"
+      );
     } finally {
       setBusy(null);
     }
@@ -847,7 +913,6 @@ export function VendorOrdersBoard({
 
       <VendorHero
         live={live}
-        tag={live ? "Live" : undefined}
         title="Live orders"
         subtitle={
           restaurantName
@@ -865,7 +930,7 @@ export function VendorOrdersBoard({
         />
       ) : null}
 
-      {live && pace?.supported ? (
+      {live && pace?.supported && canBusy ? (
         <KitchenBusyControl
           extraMinutes={pace.extraMinutes}
           until={pace.until}
@@ -930,20 +995,20 @@ export function VendorOrdersBoard({
 
       <div className="hidden gap-4 @3xl:grid @3xl:grid-cols-3">
         <VendorKanbanColumn
-          title="New orders"
+          title="New orders · नए ऑर्डर"
           count={incoming.length}
           tone="accent"
         >
           <IncomingList orders={incoming} busy={busy} onPatch={patchStatus} />
         </VendorKanbanColumn>
         <VendorKanbanColumn
-          title="Preparing"
+          title="Preparing · बन रहा है"
           count={preparing.length}
           tone="blue"
         >
           <PreparingList orders={preparing} busy={busy} onPatch={patchStatus} />
         </VendorKanbanColumn>
-        <VendorKanbanColumn title="Ready" count={ready.length} tone="green">
+        <VendorKanbanColumn title="Ready · तैयार" count={ready.length} tone="green">
           <ReadyList orders={ready} busy={busy} onPatch={patchStatus} />
         </VendorKanbanColumn>
       </div>

@@ -246,5 +246,12 @@ export function useLiveTracking(
         ? "estimated"
         : tracking.riderPositionSource
       : "none",
+    /**
+     * Re-read now instead of waiting for the next 3s tick. The view derives its
+     * status from this hook, not from the server-rendered prop, so a
+     * `router.refresh()` alone left a just-cancelled order showing "Order sent"
+     * and a live Cancel button.
+     */
+    refresh: poll,
   };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useFeatures } from "@/components/features/features-provider";
 import {
   LoaderCircle,
   ArrowRight,
@@ -17,10 +18,10 @@ import { advanceOrder, assignRider } from "@/app/manager/actions";
 import type { ManagerOrderRow, ManagerRider } from "@/lib/data-access/manager-orders";
 
 const NEXT_LABEL: Record<string, string> = {
-  placed: "Mark preparing",
-  kitchen: "Mark ready",
-  ready: "Mark on the way",
-  on_the_way: "Mark delivered",
+  placed: "Mark preparing · बन रहा है",
+  kitchen: "Mark ready · तैयार",
+  ready: "Mark on the way · रास्ते में",
+  on_the_way: "Mark delivered · डिलीवर",
 };
 
 const STATUS: Record<ManagerOrderRow["status"], { label: string; cls: string }> = {
@@ -83,12 +84,16 @@ function OrderCard({
   const [rider, setRider] = useState("");
 
   const waited = waitingMinutes(o.createdAtIso);
-  const nextLabel = NEXT_LABEL[o.dbStatus];
+  // Admin → Feature access; the actions behind these refuse it too.
+  const features = useFeatures();
+  const nextLabel = features["manager.move_status"] ? NEXT_LABEL[o.dbStatus] : undefined;
 
   // Dispatch is offered from `ready` onward — before the food is packed there is
   // nothing for a rider to collect. Hidden once one is assigned.
   const canDispatch =
-    !o.rider && (o.dbStatus === "ready" || o.dbStatus === "on_the_way");
+    features["manager.assign_rider"] &&
+    !o.rider &&
+    (o.dbStatus === "ready" || o.dbStatus === "on_the_way");
 
   const advance = () => {
     startTransition(async () => {
@@ -164,7 +169,7 @@ function OrderCard({
             {o.rider.name}
           </span>
         ) : null}
-        {o.customerPhone ? (
+        {o.customerPhone && features["manager.call_customer"] ? (
           <a
             href={`tel:${o.customerPhone}`}
             className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink hover:bg-line/60"

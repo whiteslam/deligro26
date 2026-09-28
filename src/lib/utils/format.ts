@@ -4,6 +4,40 @@ export function formatINR(amount: number): string {
   return "₹" + amount.toLocaleString("en-IN");
 }
 
+/**
+ * "12 min late", "3 h late", "23 days late". A stuck order used to read
+ * "33927 min late" — a number nobody can picture.
+ */
+export function formatLateness(minutes: number): string {
+  const m = Math.max(0, Math.round(minutes));
+  if (m < 60) return `${m} min late`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} h late`;
+  const d = Math.round(m / 1440);
+  return `${d} ${d === 1 ? "day" : "days"} late`;
+}
+
+/**
+ * Past this, a lateness figure stops being information for the customer and
+ * becomes an accusation: "27 days late · Accepted" is what a stuck order read
+ * on the customer's own Orders screen in the 28 Sept live test. Ops is pushed
+ * about it (lib/dispatch/sweep.ts); the customer is told a person is on it.
+ */
+export const CUSTOMER_LATE_CAP_MINUTES = 180;
+
+/**
+ * Customer-facing lateness, English + Hindi. Exact up to the cap, then a
+ * plain "delayed" — never "27 days late". Operator screens keep the exact
+ * figure (`formatLateness`), because for them the number is the point.
+ */
+export function formatCustomerLateness(minutes: number): string {
+  const m = Math.max(0, Math.round(minutes));
+  if (m >= CUSTOMER_LATE_CAP_MINUTES) return "Delayed — we're on it / देरी — हम देख रहे हैं";
+  if (m < 60) return `${m} min late / ${m} मिनट देर`;
+  const h = Math.round(m / 60);
+  return `${h} h late / ${h} घंटे देर`;
+}
+
 export function formatRating(rating: number): string {
   return rating.toFixed(1);
 }

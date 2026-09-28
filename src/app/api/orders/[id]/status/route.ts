@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { featureOffResponse, vendorFeatureOn } from "@/lib/features/guards.server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getProfile } from "@/lib/auth";
 import { hasVendorAccess } from "@/lib/auth/vendor-access";
@@ -61,6 +62,10 @@ export async function PATCH(
 
   if (!body.status || !ALLOWED.has(body.status)) {
     return NextResponse.json({ error: "invalid_status" }, { status: 400 });
+  }
+  // Rejecting / cancelling is switchable per shop; accept and ready are core.
+  if (body.status === "cancelled" && !(await vendorFeatureOn("vendor.reject_orders"))) {
+    return featureOffResponse("vendor.reject_orders");
   }
 
   // Trimmed and capped here as well as in the database: the column's check

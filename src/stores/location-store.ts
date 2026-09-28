@@ -339,35 +339,48 @@ export const useLocation = create<LocationState>((set, get) => ({
 
     const timer = setTimeout(finish, DETECT_TIMEOUT_MS);
 
-    watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        if (!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
-        if (pos.coords.accuracy <= GOOD_ACCURACY_M) finish();
-      },
-      (err) => {
-        // Hold out for the timer if we already have something to fall back on;
-        // a late error shouldn't throw away a usable fix.
-        if (settled || best) return;
-        settled = true;
-        stop();
+    const onPosition = (pos: GeolocationPosition) => {
+      if (settled) return;
+      if (!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
+      if (pos.coords.accuracy <= GOOD_ACCURACY_M) finish();
+    };
 
-        const denied = err.code === err.PERMISSION_DENIED;
-        const timedOut = err.code === err.TIMEOUT;
-        set({
-          status: denied ? "denied" : "idle",
-          blocked: denied,
-          // Only surface the popup when they genuinely lack permission — a
-          // transient timeout shouldn't throw a sheet in the user's face.
-          askOpen: denied,
-          error: denied
-            ? "Location is off for Deligro. Turn it on in your browser or device settings, or pick an address manually."
-            : timedOut
-              ? "Your device took too long to find you. Try again."
-              : "Couldn't get your location. Please try again.",
-        });
-      },
-      { enableHighAccuracy: true, timeout: DETECT_TIMEOUT_MS, maximumAge: 0 }
-    );
+    const onError = (err: GeolocationPositionError) => {
+      // Hold out for the timer if we already have something to fall back on;
+      // a late error shouldn't throw away a usable fix.
+      if (settled || best) return;
+      settled = true;
+      stop();
+
+      const denied = err.code === err.PERMISSION_DENIED;
+      const timedOut = err.code === err.TIMEOUT;
+      set({
+        status: denied ? "denied" : "idle",
+        blocked: denied,
+        // Only surface the popup when they genuinely lack permission — a
+        // transient timeout shouldn't throw a sheet in the user's face.
+        askOpen: denied,
+        error: denied
+          ? "Location is blocked for Deligro, so your phone won't ask again. Turn it on with the steps below, or pick an address manually."
+          : timedOut
+            ? "Your device took too long to find you. Try again."
+            : "Couldn't get your location. Please try again.",
+      });
+    };
+
+    const options: PositionOptions = {
+      enableHighAccuracy: true,
+      timeout: DETECT_TIMEOUT_MS,
+      maximumAge: 0,
+    };
+
+    // Both calls run synchronously inside the caller's tap, which is what lets
+    // the browser show its permission prompt. `getCurrentPosition` is the
+    // canonical prompt trigger (some WebKit shells — Brave/Chrome on iPhone —
+    // are most reliable with it); the watch then keeps sharpening the fix. They
+    // share one prompt and feed the same `best`.
+    navigator.geolocation.getCurrentPosition(onPosition, onError, options);
+    watchId = navigator.geolocation.watchPosition(onPosition, onError, options);
   },
 
   // A hand-picked address is as good as a detected fix as far as the header is

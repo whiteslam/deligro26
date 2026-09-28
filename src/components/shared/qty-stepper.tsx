@@ -65,7 +65,7 @@ export function QtyStepper({
       <button
         onClick={onDec}
         aria-label="Remove one"
-        className="press grid size-8 place-items-center rounded-full hover:bg-white/15"
+        className="tap-target press grid size-8 place-items-center rounded-full hover:bg-white/15"
       >
         <Minus className="size-4" strokeWidth={2.75} />
       </button>
@@ -73,7 +73,7 @@ export function QtyStepper({
       <button
         onClick={onInc}
         aria-label="Add one"
-        className="press grid size-8 place-items-center rounded-full hover:bg-white/15"
+        className="tap-target press grid size-8 place-items-center rounded-full hover:bg-white/15"
       >
         <Plus className="size-4" strokeWidth={2.5} />
       </button>

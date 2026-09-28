@@ -30,15 +30,18 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   acceptingOrders: true,
   maintenanceMessage: "",
   featureGrocery: true,
-  featurePharmacy: true,
-  featurePickDrop: true,
+  // Bemetara launch scope (28 Sept 2026): food, grocery and dairy only.
+  // Medicines and Pick & Drop stay built but hidden until switched on.
+  featurePharmacy: false,
+  featurePickDrop: false,
   // Off until an admin turns it on. This default is also what an un-migrated or
   // unreadable settings row falls back to, which is the safe direction: the
   // failure mode is "COD only", never "offer a payment we cannot take".
   featureOnlinePayment: false,
 
   defaultPrepMinutes: 20,
-  deliveryRadiusKm: 8,
+  // One circle around Bemetara city centre — see lib/geo/service-area.ts.
+  deliveryRadiusKm: 25,
   riderCommission: RIDER_COMMISSION,
   riderMinPayout: RIDER_MIN_PAYOUT,
 

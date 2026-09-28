@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { vendorFeatureOn } from "@/lib/features/guards.server";
+import { FEATURE_OFF_MESSAGE } from "@/lib/features/catalog";
 import { redirect } from "next/navigation";
 import { requireVendorAccess } from "@/lib/auth/vendor-access";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -87,6 +89,9 @@ export async function saveVendorPromotionAction(
   form: FormData
 ): Promise<ActionResult> {
   await requireVendorAccess();
+  if (!(await vendorFeatureOn("vendor.promotions"))) {
+    return { ok: false, error: FEATURE_OFF_MESSAGE };
+  }
   if (!isSupabaseConfigured) {
     return {
       ok: false,
@@ -143,6 +148,9 @@ async function mutate(
   fn: (restaurantId: string) => Promise<unknown>
 ): Promise<ActionResult> {
   await requireVendorAccess();
+  if (!(await vendorFeatureOn("vendor.promotions"))) {
+    return { ok: false, error: FEATURE_OFF_MESSAGE };
+  }
   if (!isSupabaseConfigured) {
     return { ok: false, error: "Demo mode: connect Supabase to run promotions." };
   }

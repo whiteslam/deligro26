@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Check, MapPin, Plus, X } from "lucide-react";
 import type { SavedAddress } from "@/hooks/use-saved-addresses";
 import { cn } from "@/lib/utils/cn";
@@ -19,6 +20,16 @@ export function AddressPickerSheet({
   onClose: () => void;
   onAddNew: () => void;
 }) {
+  // Escape closes it, like every other sheet a keyboard can reach.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (
@@ -78,7 +89,7 @@ export function AddressPickerSheet({
                       <span className="flex items-center gap-2 text-[15px] font-bold">
                         {a.label}
                         {a.isDefault ? (
-                          <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+                          <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-muted">
                             Default
                           </span>
                         ) : null}

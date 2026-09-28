@@ -1,5 +1,6 @@
 import type { Order, OrderStatus, PaymentMethod, PaymentStatus } from "@/types";
 import type { Order as DbOrder } from "@/lib/data-access/orders";
+import { formatIst, istDateKey, istDaysBetween } from "@/lib/utils/ist-time";
 
 /**
  * One row per `order_status` value — no folding.
@@ -30,26 +31,20 @@ export function dbStatusToUi(status: string): OrderStatus {
 }
 
 export function formatOrderPlacedAt(iso: string): string {
+  // Every part of this label is computed in IST, not the runtime's zone. It is
+  // built on the server (UTC on Vercel), so the time used to read 5h30m early
+  // and "Today"/"Yesterday" flipped at 5:30 am IST instead of midnight.
   const date = new Date(iso);
   const now = new Date();
-  const time = date.toLocaleTimeString("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const time = formatIst(date, { hour: "numeric", minute: "2-digit" });
+  const days = istDaysBetween(date, now);
 
-  if (date.toDateString() === now.toDateString()) {
-    return `Today, ${time}`;
-  }
-
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) {
-    return `Yesterday, ${time}`;
-  }
+  if (days === 0) return `Today, ${time}`;
+  if (days === 1) return `Yesterday, ${time}`;
 
   // Inside the week a weekday is the fastest thing to read.
-  if (daysAgo(date, now) < 7) {
-    return date.toLocaleDateString("en-IN", {
+  if (days < 7) {
+    return formatIst(date, {
       weekday: "short",
       hour: "numeric",
       minute: "2-digit",
@@ -61,21 +56,13 @@ export function formatOrderPlacedAt(iso: string): string {
   // and a history of one regular restaurant became a wall of rows nobody could
   // tell apart or date. Older rows get a real date, and the year once it is not
   // this one.
-  const day = date.toLocaleDateString("en-IN", {
+  const sameYear = istDateKey(date).slice(0, 4) === istDateKey(now).slice(0, 4);
+  const day = formatIst(date, {
     day: "numeric",
     month: "short",
-    ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
+    ...(sameYear ? {} : { year: "numeric" }),
   });
   return `${day}, ${time}`;
-}
-
-/** Whole calendar days between two instants — not 24-hour blocks. */
-function daysAgo(date: Date, now: Date): number {
-  const a = new Date(date);
-  const b = new Date(now);
-  a.setHours(0, 0, 0, 0);
-  b.setHours(0, 0, 0, 0);
-  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
 }
 
 interface DbMenuItemRef {

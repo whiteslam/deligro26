@@ -14,6 +14,7 @@ import {
 import { useLocation } from "@/stores/location-store";
 import { useScrollCollapse } from "@/hooks/use-scroll-collapse";
 import { cn } from "@/lib/utils/cn";
+import { addressLocality } from "@/lib/utils/address-locality";
 
 /** The user's saved default address, resolved server-side and passed in. */
 export interface SavedAddress {
@@ -64,7 +65,8 @@ export function HomeHeader({
   const saved = savedAddress
     ? {
         label: savedAddress.label,
-        sublabel: savedAddress.line.split(",").slice(-2).join(",").trim(),
+        // The locality, not "Chhattisgarh 490020, India" — see addressLocality.
+        sublabel: addressLocality(savedAddress.line) ?? "",
       }
     : null;
   const fallback = label ? { label, sublabel } : null;
@@ -95,7 +97,7 @@ export function HomeHeader({
                 permission the device has already answered does nothing. */}
             <Link
               href="/location"
-              className="press flex min-w-0 flex-1 items-center gap-2 text-left"
+              className="press flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left"
               aria-label="Change delivery location"
             >
               <span className="grid size-7 shrink-0 place-items-center rounded-full bg-blue/12 text-blue">
@@ -109,10 +111,13 @@ export function HomeHeader({
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
-                  {detecting ? "Locating…" : "Deliver to"}
+                  {detecting ? "Locating… / खोज रहे हैं" : "Deliver to · पहुंचाएं"}
                 </span>
                 <span className="flex min-w-0 items-center gap-1 text-[15px] font-extrabold leading-tight tracking-tight">
-                  <span className="min-w-0 truncate">{primary}</span>
+                  {/* The label keeps its width ("Home" is short); only the
+                      locality after it gives way. Both used to truncate, and
+                      "Home" lost first — "H…" at 360px. */}
+                  <span className="max-w-[60%] shrink-0 truncate">{primary}</span>
                   {secondary ? (
                     <span className="truncate font-semibold text-muted">
                       · {secondary}
@@ -126,14 +131,14 @@ export function HomeHeader({
             <Link
               href="/profile/notifications"
               aria-label="Notifications"
-              className="press grid size-9 shrink-0 place-items-center rounded-full bg-accent/12 text-accent"
+              className="press grid size-11 shrink-0 place-items-center rounded-full bg-accent/12 text-accent"
             >
               <Bell className="size-[18px]" />
             </Link>
             <Link
               href="/profile"
               aria-label="Profile"
-              className="press grid size-9 shrink-0 place-items-center rounded-full bg-violet-500/15 text-violet-500"
+              className="press grid size-11 shrink-0 place-items-center rounded-full bg-violet-500/15 text-violet-500"
             >
               <User className="size-[18px]" />
             </Link>
@@ -155,7 +160,7 @@ export function HomeHeader({
             type="button"
             onClick={() => onQueryChange?.("")}
             aria-label="Clear search"
-            className="press grid size-6 shrink-0 place-items-center rounded-full bg-surface text-muted"
+            className="press tap-target grid size-6 shrink-0 place-items-center rounded-full bg-surface text-muted"
           >
             <X className="size-4" />
           </button>

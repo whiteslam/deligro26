@@ -13,12 +13,12 @@ export const STATUS_META: Record<
   OrderStatus,
   { label: string; tone: "accent" | "green" | "muted" }
 > = {
-  PLACED: { label: "Sent to restaurant", tone: "accent" },
-  KITCHEN: { label: "Preparing", tone: "accent" },
-  READY: { label: "Waiting for rider", tone: "accent" },
-  ON_THE_WAY: { label: "On the way", tone: "accent" },
-  DELIVERED: { label: "Delivered", tone: "green" },
-  CANCELLED: { label: "Cancelled", tone: "muted" },
+  PLACED: { label: "Sent to restaurant · भेजा गया", tone: "accent" },
+  KITCHEN: { label: "Preparing · बन रहा है", tone: "accent" },
+  READY: { label: "Waiting for rider · राइडर का इंतज़ार", tone: "accent" },
+  ON_THE_WAY: { label: "On the way · रास्ते में", tone: "accent" },
+  DELIVERED: { label: "Delivered · डिलीवर हो गया", tone: "green" },
+  CANCELLED: { label: "Cancelled · रद्द", tone: "muted" },
 };
 
 /**
@@ -35,7 +35,9 @@ export const STATUS_META: Record<
  *
  * The wording deliberately matches the push notifications in
  * `notifications/order-events.ts`, so the phone and the screen tell the same
- * story rather than two slightly different ones.
+ * story rather than two slightly different ones — in both languages: English
+ * then Hindi, the pattern the rider app established. Most customers here read
+ * Hindi first; the 28 Sept audit found no Hindi on any customer screen.
  */
 export function trackingSteps({
   restaurantName,
@@ -47,31 +49,31 @@ export function trackingSteps({
   return [
     {
       key: "PLACED" as const,
-      title: "Order sent",
+      title: "Order sent · ऑर्डर भेजा गया",
       sub: restaurantName
         ? `Waiting for ${restaurantName} to accept`
         : "Waiting for the restaurant to accept",
     },
     {
       key: "KITCHEN" as const,
-      title: "Accepted",
+      title: "Accepted · स्वीकार हुआ",
       sub: restaurantName
         ? `${restaurantName} started cooking`
         : "The kitchen started cooking",
     },
     {
       key: "READY" as const,
-      title: "Packed",
+      title: "Packed · पैक हो गया",
       sub: "Waiting for a rider to collect it",
     },
     {
       key: "ON_THE_WAY" as const,
-      title: "On the way",
+      title: "On the way · रास्ते में",
       sub: riderName ? `${riderName} is heading to you` : "Heading to you",
     },
     {
       key: "DELIVERED" as const,
-      title: "Delivered",
+      title: "Delivered · डिलीवर हो गया",
       sub: "Handed to you at the door",
     },
   ];

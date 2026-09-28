@@ -29,7 +29,7 @@ const IN_FLIGHT: AdminOrderRow["status"][] = [
  * How long an order may sit without a rider before it counts as a dispatch
  * failure. Matches the reassignment window the settings screen describes.
  */
-const UNASSIGNED_AFTER_MIN = 8;
+export const UNASSIGNED_AFTER_MIN = 8;
 
 /** How deep to look for in-flight work. Beyond this it is a backlog, not a board. */
 const SCAN = 120;

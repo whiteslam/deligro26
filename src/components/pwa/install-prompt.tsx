@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Share, X } from "lucide-react";
 
 /**
@@ -20,12 +21,49 @@ export function InstallPrompt({
   onInstall: () => void;
   onDismiss: () => void;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Make room for the card instead of covering what's under it. It floats
+  // above the tab bar, and on a short phone it sat over the last row of every
+  // page — "Sign out", "Contact us", a vendor's promotion actions — with no way
+  // to scroll them clear until the card was dismissed (12 pages on an iPhone SE
+  // in the 28 Sept phone audit). Its height is published as --install-inset,
+  // which `.app-scroll::after` turns into extra scroll room (globals.css).
+  //
+  // Measured, not assumed: the room needed is the distance from the card's top
+  // edge to the bottom of the scroller, less the padding the shell already
+  // reserves there. Using the card's height alone was right only above a tab
+  // bar — the manager app has none, and the card's 88px offset went uncounted.
+  // Re-measured on a timer as well as on resize, because the card moves when
+  // the basket bar appears beneath it (globals.css) without changing size.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const publish = () => {
+      const scroller = el.closest(".app-shell")?.querySelector<HTMLElement>(".app-scroll");
+      const bottom = scroller ? scroller.getBoundingClientRect().bottom : window.innerHeight;
+      const reserved = scroller ? parseFloat(getComputedStyle(scroller).paddingBottom) || 0 : 0;
+      const need = Math.max(0, Math.ceil(bottom - el.getBoundingClientRect().top + 12 - reserved));
+      root.style.setProperty("--install-inset", `${need}px`);
+    };
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    const timer = window.setInterval(publish, 1000);
+    return () => {
+      ro.disconnect();
+      window.clearInterval(timer);
+      root.style.removeProperty("--install-inset");
+    };
+  }, []);
+
   return (
     <div
+      ref={ref}
       role="dialog"
       aria-label="Install Deligro"
-      className="pointer-events-auto fixed inset-x-3 z-[88] mx-auto max-w-sm rounded-xl border border-line bg-surface px-3.5 py-3 shadow-[var(--shadow-lg)]"
-      style={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom, 0px))" }}
+      className="install-card pointer-events-auto fixed inset-x-3 z-[88] mx-auto max-w-sm rounded-xl border border-line bg-surface px-3.5 py-3 shadow-[var(--shadow-lg)]"
     >
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">

@@ -40,7 +40,23 @@ export function callablePhone(
  * and says why, rather than opening a map of nowhere.
  */
 export function mapsDirectionsUrl(
-  destination: { lat: number; lng: number } | string | null | undefined
+  destination: { lat: number; lng: number } | string | null | undefined,
+  {
+    travelMode,
+    navigate = false,
+  }: {
+    /**
+     * Google Maps URLs' `travelmode`. `two-wheeler` is served in India and
+     * routes a bike the way a bike goes; where it is not served Google falls
+     * back to its own default, so asking for it costs nothing.
+     */
+    travelMode?: "driving" | "two-wheeler";
+    /**
+     * `dir_action=navigate` — open straight into turn-by-turn (voice guidance)
+     * rather than a route preview the rider then has to press Start on.
+     */
+    navigate?: boolean;
+  } = {}
 ): string | null {
   const query =
     typeof destination === "string"
@@ -49,9 +65,10 @@ export function mapsDirectionsUrl(
         ? `${destination.lat},${destination.lng}`
         : "";
   if (!query) return null;
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-    query
-  )}`;
+  const params = new URLSearchParams({ api: "1", destination: query });
+  if (travelMode) params.set("travelmode", travelMode);
+  if (navigate) params.set("dir_action", "navigate");
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
 
 /**
@@ -66,5 +83,10 @@ export function stopDirectionsUrl(stop: {
   area?: string;
   point?: { lat: number; lng: number };
 }): string | null {
-  return mapsDirectionsUrl(stop.point ?? stop.address ?? null);
+  // Every caller is a rider on two wheels who wants to be guided, not shown a
+  // preview — see the Navigate button in driver-board.tsx.
+  return mapsDirectionsUrl(stop.point ?? stop.address ?? null, {
+    travelMode: "two-wheeler",
+    navigate: true,
+  });
 }

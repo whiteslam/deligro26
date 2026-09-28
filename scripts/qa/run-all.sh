@@ -48,6 +48,10 @@ echo "═══ 10/16 Delivery area fails closed ═══"
 npx tsx scripts/qa/service-area.ts
 
 echo ""
+echo "═══ 10b Role feature switches resolve ═══"
+npx tsx scripts/qa/role-features.ts
+
+echo ""
 echo "═══ 11/16 Tracking origin not invented ═══"
 npx tsx scripts/qa/tracking-origin.ts
 

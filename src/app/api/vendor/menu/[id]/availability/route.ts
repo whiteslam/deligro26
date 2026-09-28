@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { featureOffResponse, vendorFeatureOn } from "@/lib/features/guards.server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { ownsAnyRestaurant } from "@/lib/auth/vendor-access";
@@ -39,6 +40,10 @@ export async function PATCH(
     !(await ownsAnyRestaurant(user.id))
   ) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+  // Stock toggling is part of menu editing (Admin → Feature access).
+  if (!(await vendorFeatureOn("vendor.menu_edit"))) {
+    return featureOffResponse("vendor.menu_edit");
   }
 
   let body: { available?: boolean };

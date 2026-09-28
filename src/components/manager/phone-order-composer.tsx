@@ -630,7 +630,7 @@ function Stepper({
         type="button"
         onClick={() => onChange(1)}
         aria-label={`Add ${label}`}
-        className="press grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-ink hover:bg-line/60"
+        className="tap-target press grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-ink hover:bg-line/60"
       >
         <Plus className="size-4" />
       </button>
@@ -705,7 +705,7 @@ export function BackToBoard() {
   return (
     <Link
       href="/manager"
-      className="press inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-ink"
+      className="press inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-muted hover:text-ink"
     >
       <ArrowLeft className="size-4" />
       Board

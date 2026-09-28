@@ -81,7 +81,7 @@ export function TabBar() {
             key={tab.href}
             href={tab.href}
             className={cn(
-              "press relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] transition-colors",
+              "press relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[12px] transition-colors",
               active ? cn("font-bold", tab.color.text) : "font-medium text-muted"
             )}
           >

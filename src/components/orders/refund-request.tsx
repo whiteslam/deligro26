@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PortalToShell } from "@/components/shared/portal-to-shell";
 import { formatINR } from "@/lib/utils/format";
 
 /**
@@ -75,7 +76,7 @@ export function RefundRequest({
               ? "We couldn't find this order."
               : data.error === "unauthorized"
                 ? "Your session expired. Sign in and try again."
-                : "Couldn't send the request. Try again."
+                : "Couldn't send the request. Try again.",
       );
     } finally {
       setBusy(false);
@@ -102,72 +103,84 @@ export function RefundRequest({
       </button>
 
       {open ? (
-        // `fixed` so it covers the phone screen rather than the scrolled page
-        // it's rendered inside — the app shell is the containing block.
-        <div className="fixed inset-0 z-50">
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={() => setOpen(false)}
-            className="animate-fade-in absolute inset-0 bg-ink/40"
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="refund-request-title"
-            className="bolt-sheet animate-sheet-in absolute inset-x-0 bottom-0 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h2 id="refund-request-title" className="text-heading">
-                Request a refund
-              </h2>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="press grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-
-            <p className="text-sm leading-relaxed text-muted">
-              We&apos;ll review your request for the full order —{" "}
-              <span className="text-data font-semibold text-ink">
-                {formatINR(orderTotal)}
-              </span>
-              .{" "}
-              {paid
-                ? "If it's approved the money goes back to however you paid."
-                : "This order was paid in cash, so an approved refund is settled by our team directly rather than through the app."}
-            </p>
-
-            <label
-              htmlFor="refund-reason"
-              className="mt-4 block text-xs font-semibold text-muted"
-            >
-              What went wrong?
-            </label>
-            <textarea
-              id="refund-reason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              maxLength={500}
-              rows={3}
-              placeholder="Missing items, food arrived cold, never delivered…"
-              className="mt-1.5 w-full resize-none rounded-xl bg-surface-2 px-3.5 py-3 text-[15px] outline-none focus:ring-2 focus:ring-accent/30"
+        // Portalled out, not rendered in place. This button lives inside the
+        // tracking screen's draggable `TrackingSheet`, whose `transform` makes
+        // it the containing block for `position: fixed` — so `fixed inset-0`
+        // meant "the sheet's box", which is pushed down by the sheet's offset
+        // and clipped by the stage's `overflow-hidden`. The dialog's bottom
+        // (the "Send request" button) landed off-screen and under the tab bar,
+        // leaving only a squashed textarea visible. In `.app-shell` it covers
+        // the phone screen and sits above the tab bar (z-30).
+        <PortalToShell>
+          <div className="fixed inset-0 z-50">
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setOpen(false)}
+              className="animate-fade-in absolute inset-0 bg-ink/40"
             />
-
-            {error ? <p className="mt-2 text-sm text-deal">{error}</p> : null}
-
-            <Button
-              className="mt-4 w-full"
-              disabled={busy || reason.trim().length === 0}
-              onClick={submit}
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="refund-request-title"
+              className="bolt-sheet animate-sheet-in absolute inset-x-0 bottom-0 max-h-[calc(100%-1rem)] overflow-y-auto overscroll-contain p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
             >
-              {busy ? <Loader2 className="size-4 animate-spin" /> : "Send request"}
-            </Button>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 id="refund-request-title" className="text-heading">
+                  Request a refund
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="press grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+
+              <p className="text-sm leading-relaxed text-muted">
+                We&apos;ll review your request for the full order —{" "}
+                <span className="text-data font-semibold text-ink">
+                  {formatINR(orderTotal)}
+                </span>
+                .{" "}
+                {paid
+                  ? "If it's approved the money goes back to however you paid."
+                  : "This order was paid in cash, so an approved refund is settled by our team directly rather than through the app."}
+              </p>
+
+              <label
+                htmlFor="refund-reason"
+                className="mt-4 block text-xs font-semibold text-muted"
+              >
+                What went wrong?
+              </label>
+              <textarea
+                id="refund-reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                maxLength={500}
+                rows={3}
+                placeholder="Missing items, food arrived cold, never delivered…"
+                className="mt-1.5 w-full resize-none rounded-xl bg-surface-2 px-3.5 py-3 text-base outline-none focus:ring-2 focus:ring-accent/30"
+              />
+
+              {error ? <p className="mt-2 text-sm text-deal">{error}</p> : null}
+
+              <Button
+                className="mt-4 w-full"
+                disabled={busy || reason.trim().length === 0}
+                onClick={submit}
+              >
+                {busy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  "Send request"
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
+        </PortalToShell>
       ) : null}
     </>
   );

@@ -186,7 +186,7 @@ function RevenueLineChart({
             tickLine={false}
           />
           <YAxis
-            tick={{ fill: C.muted, fontSize: 10 }}
+            tick={{ fill: C.muted, fontSize: 11 }}
             axisLine={false}
             tickLine={false}
             width={44}
@@ -399,7 +399,7 @@ function ProductTile(props: TileProps) {
             x={x + 10}
             y={y + 34}
             fill="rgba(255,255,255,0.9)"
-            fontSize={10}
+            fontSize={11}
             fontWeight={600}
           >
             {size} sold
@@ -603,13 +603,13 @@ export function VendorOverviewBoard({
           <div className="text-right">
             <p className="text-data text-sm font-bold">{stats.monthOrders}</p>
             {stats.monthChangePercent === null ? (
-              <p className="text-[10px] font-medium text-muted">
+              <p className="text-[11px] font-medium text-muted">
                 Orders this month
               </p>
             ) : (
               <p
                 className={cn(
-                  "text-[10px] font-bold",
+                  "text-[11px] font-bold",
                   stats.monthChangePercent >= 0 ? "text-green" : "text-red-500"
                 )}
               >
@@ -733,12 +733,12 @@ export function VendorOverviewBoard({
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-semibold">{c.name}</p>
                     {i === 0 ? (
-                      <span className="rounded-full bg-green/15 px-2 py-0.5 text-[10px] font-bold uppercase text-green">
+                      <span className="rounded-full bg-green/15 px-2 py-0.5 text-[11px] font-bold uppercase text-green">
                         Best
                       </span>
                     ) : null}
                     {c.orders >= 2 ? (
-                      <span className="rounded-full bg-accent/12 px-2 py-0.5 text-[10px] font-bold uppercase text-accent">
+                      <span className="rounded-full bg-accent/12 px-2 py-0.5 text-[11px] font-bold uppercase text-accent">
                         Repeat
                       </span>
                     ) : null}

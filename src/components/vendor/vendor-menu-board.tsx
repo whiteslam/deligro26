@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useFeature } from "@/components/features/features-provider";
 import { useRouter } from "next/navigation";
 import {
   CheckSquare,
@@ -33,8 +34,6 @@ import {
   duplicateMenuItemAction,
   reorderMenuItemsAction,
 } from "@/app/vendor/actions";
-import { PortalToShell } from "@/components/shared/portal-to-shell";
-import { useVendorShellMode } from "@/hooks/use-vendor-shell-mode";
 import type { VendorMenuItem } from "@/lib/data-access/vendor-menu";
 import {
   downloadTextFile,
@@ -61,7 +60,9 @@ export function VendorMenuBoard({
   live?: boolean;
 }) {
   const router = useRouter();
-  const shellMode = useVendorShellMode();
+  // Admin → Feature access. Off = hidden here AND refused by the actions.
+  const canEdit = useFeature("vendor.menu_edit");
+  const canImport = useFeature("vendor.menu_import");
   const [items, setItems] = useState(initialItems);
   const [actionError, setActionError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -347,8 +348,8 @@ export function VendorMenuBoard({
 
   const statusChips: { id: StatusFilter; label: string; count: number }[] = [
     { id: "all", label: "All", count: items.length },
-    { id: "in_stock", label: "In stock", count: inStock },
-    { id: "sold_out", label: "Sold out", count: soldOut },
+    { id: "in_stock", label: "In stock · उपलब्ध", count: inStock },
+    { id: "sold_out", label: "Sold out · खत्म", count: soldOut },
     {
       id: "veg",
       label: "Veg",
@@ -360,7 +361,7 @@ export function VendorMenuBoard({
   return (
     <>
       <VendorHero
-        title="Menu"
+        title="Menu · मेन्यू"
         subtitle={`${restaurantName} — dishes, pricing, stock & sheet import.`}
         action={
           live ? (
@@ -382,22 +383,26 @@ export function VendorMenuBoard({
                   View storefront
                 </Button>
               ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="hidden @3xl:inline-flex"
-                onClick={() => setImportOpen(true)}
-              >
-                <FileUp className="size-4" /> Import sheet
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => setSheet({ mode: "create" })}
-              >
-                <Plus className="size-4" /> Add item
-              </Button>
+              {canImport ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="hidden @3xl:inline-flex"
+                  onClick={() => setImportOpen(true)}
+                >
+                  <FileUp className="size-4" /> Import sheet
+                </Button>
+              ) : null}
+              {canEdit ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setSheet({ mode: "create" })}
+                >
+                  <Plus className="size-4" /> Add item · नया आइटम
+                </Button>
+              ) : null}
             </div>
           ) : null
         }
@@ -466,7 +471,7 @@ export function VendorMenuBoard({
         </div>
       ) : null}
 
-      {live ? (
+      {live && canImport ? (
         <div className="flex flex-wrap gap-2 sm:hidden">
           <Button
             type="button"
@@ -503,23 +508,28 @@ export function VendorMenuBoard({
           </label>
           {live ? (
             <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setCategoryOpen(true)}
-              >
-                <Layers className="size-4" /> Categories
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="hidden @3xl:inline-flex"
-                onClick={handleExport}
-              >
-                <Download className="size-4" /> Export
-              </Button>
+              {canEdit ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCategoryOpen(true)}
+                >
+                  <Layers className="size-4" /> Categories
+                </Button>
+              ) : null}
+              {canImport ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="hidden @3xl:inline-flex"
+                  onClick={handleExport}
+                >
+                  <Download className="size-4" /> Export
+                </Button>
+              ) : null}
+              {canEdit ? (
               <Button
                 type="button"
                 variant={bulkMode ? "primary" : "outline"}
@@ -536,6 +546,7 @@ export function VendorMenuBoard({
                   </>
                 )}
               </Button>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -664,18 +675,22 @@ export function VendorMenuBoard({
           title="Menu is empty"
           description="Add dishes one by one, or import a filled CSV template."
           action={
-            live ? (
+            live && (canEdit || canImport) ? (
               <div className="flex flex-wrap justify-center gap-2">
-                <Button size="sm" onClick={() => setSheet({ mode: "create" })}>
-                  <Plus className="size-4" /> Add item
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setImportOpen(true)}
-                >
-                  <FileUp className="size-4" /> Import sheet
-                </Button>
+                {canEdit ? (
+                  <Button size="sm" onClick={() => setSheet({ mode: "create" })}>
+                    <Plus className="size-4" /> Add item · नया आइटम
+                  </Button>
+                ) : null}
+                {canImport ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setImportOpen(true)}
+                  >
+                    <FileUp className="size-4" /> Import sheet
+                  </Button>
+                ) : null}
               </div>
             ) : null
           }
@@ -712,7 +727,9 @@ export function VendorMenuBoard({
                   >
                     <VendorMenuItemCard
                       item={item}
-                      live={live}
+                      // Read-only card (plain price, stock as text, no
+                      // actions) when menu editing is switched off.
+                      live={live && canEdit}
                       bulkMode={bulkMode}
                       showReorder={reorderEnabled}
                       selected={selected.has(item.dbId)}
@@ -766,18 +783,9 @@ export function VendorMenuBoard({
         })
       )}
 
-      {live && shellMode === "app" ? (
-        <PortalToShell>
-          <Button
-            size="lg"
-            className="vendor-fab fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] right-4 z-30 size-14 rounded-full p-0"
-            onClick={() => setSheet({ mode: "create" })}
-            aria-label="Add menu item"
-          >
-            <Plus className="size-6" />
-          </Button>
-        </PortalToShell>
-      ) : null}
+      {/* No floating "+" here. It duplicated the header's "Add item" and sat
+          over the right edge of the list — the stock toggles and the filter
+          chips — on a 360px phone (28 Sept phone audit). */}
 
       {sheet ? (
         <MenuItemFormSheet

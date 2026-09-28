@@ -21,11 +21,13 @@ import {
   buildDishIndex,
   capPerVendor,
   groupByDish,
+  groupByShop,
   normalizeDishName,
+  searchCorrection,
   searchDishes,
   type RankContext,
 } from "../../src/lib/search/dishes";
-import { fuzzyVariants, withinEdits } from "../../src/lib/search/semantic";
+import { fuzzyVariants, soundsLike, withinEdits } from "../../src/lib/search/semantic";
 import type { MenuItem, Restaurant } from "../../src/types";
 
 let passed = 0;
@@ -449,8 +451,86 @@ console.log("\n═══ Typo tolerance ═══");
 }
 
 /* ------------------------------------------------------------------ *
-
+ * Transliteration and restaurant-name typos
+ * ------------------------------------------------------------------ *
+ * The live bug: "Safron" showed "0 dishes · 0 restaurants" with Saffron
+ * Kitchen open, because shop names were never in the fuzzy vocabulary, and
+ * "panir"/"chaumin" sit outside any edit budget that doesn't also turn "rice"
+ * into "nice". The phonetic tier is the fix; these pin both what it must
+ * reach and what it must not.
  * ------------------------------------------------------------------ */
+
+console.log("\n═══ Phonetic / restaurant-name typos ═══");
+
+{
+  const saffron = shop({
+    slug: "saffron",
+    name: "Saffron Kitchen",
+    menu: [
+      dish({ id: "1", name: "Veg Dum Biryani" }),
+      dish({ id: "2", name: "Paneer Tikka" }),
+    ],
+  });
+  const wok = shop({
+    slug: "wok",
+    name: "Wok Express",
+    menu: [dish({ id: "1", name: "Veg Chowmein" }), dish({ id: "2", name: "Chilli Paneer" })],
+  });
+  const cafe = shop({
+    slug: "cafe",
+    name: "Cafe Bliss",
+    menu: [
+      dish({ id: "1", name: "Chocolate Cake" }),
+      dish({ id: "2", name: "Coke" }),
+      dish({ id: "3", name: "Margherita Pizza" }),
+    ],
+  });
+  const dhaba = shop({ slug: "dhaba", name: "Sharma Dhaba", menu: [] });
+  const all = [saffron, wok, cafe, dhaba];
+  const index = buildDishIndex(all);
+  const shopsFor = (q: string) =>
+    groupByShop(searchDishes(index, q), all, q).map((s) => s.restaurant.slug);
+
+  for (const q of ["Safron", "safran", "saffron kichen"]) {
+    check(`"${q}" finds Saffron Kitchen`, shopsFor(q).includes("saffron"), true);
+  }
+  check("...and says what it searched for", searchCorrection(index, "safron", searchDishes(index, "safron")), "saffron");
+  check(
+    "\"saffron kichen\" is corrected word by word",
+    searchCorrection(index, "saffron kichen", searchDishes(index, "saffron kichen")),
+    "saffron kitchen"
+  );
+  check("\"biriyani\" finds Veg Dum Biryani", searchDishes(index, "biriyani")[0]?.item.name, "Veg Dum Biryani");
+  check("\"panir\" (2 edits from paneer) finds paneer", searchDishes(index, "panir").length, 2);
+  check("\"panir tika\" finds Paneer Tikka whole, not partially", searchDishes(index, "panir tika")[0]?.partial, undefined);
+  check("\"chaumin\" (3 edits) finds Veg Chowmein", searchDishes(index, "chaumin")[0]?.item.name, "Veg Chowmein");
+  check("\"piza\" (4 letters) finds pizza", searchDishes(index, "piza")[0]?.item.name, "Margherita Pizza");
+  // Live-catalog regression: "panir" is one letter from "pani" (Pani Gupchup)
+  // but SOUNDS exactly like paneer — the sound-alike must win.
+  {
+    const chaat = shop({ slug: "chaat", name: "Chatkara Cafe", menu: [dish({ id: "1", name: "Pani Gupchup" })] });
+    const idx = buildDishIndex([saffron, chaat]);
+    check("\"panir\" ranks paneer above \"pani\"", searchDishes(idx, "panir")[0]?.item.name, "Paneer Tikka");
+    check("...and the hint says paneer", searchCorrection(idx, "panir", searchDishes(idx, "panir")), "paneer");
+  }
+  check("a menu-less shop is found misspelled", shopsFor("sarma dhaba").includes("dhaba"), true);
+
+  // Exact first, and a correct word never pulls sound-alikes in with it.
+  check("\"cake\" finds the cake and NOT the Coke", searchDishes(index, "cake").map((h) => h.item.name).join(), "Chocolate Cake");
+  check("a correctly spelled query is never 'corrected'", searchCorrection(index, "paneer", searchDishes(index, "paneer")), null);
+  check(
+    "exact spelling outranks the same dish found by sound",
+    searchDishes(index, "paneer")[0].score > searchDishes(index, "panir")[0].score,
+    true
+  );
+
+  // The collisions the budget exists to prevent.
+  check("\"roti\" does not sound like \"raita\"", soundsLike("roti", "raita"), false);
+  check("\"rice\" does not sound like \"nice\"", soundsLike("rice", "nice"), false);
+  check("\"egg\" does not sound like \"aag\"", soundsLike("egg", "aag"), false);
+  check("gibberish still finds nothing", searchDishes(index, "xyzzy").length, 0);
+}
+
 
 console.log(`\n${failed === 0 ? "✓" : "✗"} ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

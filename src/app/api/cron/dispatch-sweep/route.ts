@@ -1,0 +1,46 @@
+import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { sweepDispatch } from "@/lib/dispatch/sweep";
+
+/**
+ * Scheduled dispatch sweep — see lib/dispatch/sweep.ts for what it does.
+ *
+ * Authenticated by `CRON_SECRET`, sent as `Authorization: Bearer <secret>`,
+ * which is the header Vercel Cron attaches on its own. Fails closed: with no
+ * secret configured the route refuses everyone (AGENTS.md rule 2) rather than
+ * becoming a public "push every admin" button.
+ *
+ * Scheduling it is optional. The vendor and rider boards already trigger a
+ * throttled sweep after their polls (`maybeSweepDispatch`), so this matters
+ * for the hours when no board is open. Every-minute schedules need Vercel Pro
+ * (Hobby allows daily only — a per-minute entry fails the deployment), which
+ * is why no `vercel.json` entry ships with it. Alternatives: Supabase
+ * `pg_cron` + `pg_net`, or any external pinger hitting this URL each minute.
+ */
+
+export const dynamic = "force-dynamic";
+
+function authorized(req: Request): boolean {
+  const secret = process.env.CRON_SECRET ?? "";
+  if (secret.length < 16) return false;
+  const header = req.headers.get("authorization") ?? "";
+  const expected = `Bearer ${secret}`;
+  const a = Buffer.from(header);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+export async function GET(req: Request) {
+  if (!authorized(req)) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+  if (!isSupabaseConfigured) {
+    return NextResponse.json({ ok: false, error: "not_configured" }, { status: 503 });
+  }
+  const result = await sweepDispatch();
+  return NextResponse.json(
+    { ok: true, ...result },
+    { headers: { "Cache-Control": "no-store" } }
+  );
+}

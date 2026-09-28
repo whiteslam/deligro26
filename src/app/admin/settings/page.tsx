@@ -53,6 +53,7 @@ const MENU_DESC: Record<string, string> = {
   "/admin/banners": "Pause or end a live campaign",
   "/admin/customers": "Directory, order history & contact",
   "/admin/settings/employees": "Create manager & driver logins",
+  "/admin/settings/features": "What vendors, managers & riders can use",
   "/admin/storage": "Food photos and home-strip category pictures",
 };
 

@@ -48,7 +48,10 @@ export default async function CustomerLayout({
     >
       <div className="device">
         <div className="app-shell">
-          <div className="app-scroll no-scrollbar pb-[80px]">{children}</div>
+          <div className="app-scroll no-scrollbar pb-[80px]">
+            {/* The content landmark screen readers jump to. */}
+            <main>{children}</main>
+          </div>
           <StatusBar />
           <ItemSheet />
           <CartSwitchDialog />
@@ -57,7 +60,8 @@ export default async function CustomerLayout({
           <CartHydrator />
           <TabBar />
           <SplashScreen />
-          {profile ? <OneSignalInit /> : null}
+          {/* Always mounted: signed out, it logs this browser out of push. */}
+          <OneSignalInit userId={profile?.id ?? null} />
         </div>
       </div>
     </ChargesConfigProvider>

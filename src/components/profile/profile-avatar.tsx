@@ -20,12 +20,15 @@ export function ProfileAvatar({
   initials,
   avatarUrl,
   developer = false,
+  readOnly = false,
 }: {
   name: string;
   initials: string;
   avatarUrl: string | null;
   // App owner / developer — wraps the avatar in a golden ring.
   developer?: boolean;
+  /** Shown but not changeable (a rider with "Edit profile" switched off). */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -110,8 +113,12 @@ export function ProfileAvatar({
     <>
       <button
         type="button"
-        onClick={() => (avatarUrl ? setSheet(true) : pick())}
-        disabled={busy}
+        onClick={() => {
+          if (readOnly) return;
+          if (avatarUrl) setSheet(true);
+          else pick();
+        }}
+        disabled={busy || readOnly}
         aria-label={avatarUrl ? "Change or remove profile photo" : "Add a profile photo"}
         className="press relative shrink-0 rounded-full"
       >

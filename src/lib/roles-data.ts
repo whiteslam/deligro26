@@ -56,6 +56,18 @@ export interface KitchenOrder {
    * the bag is the courier this order was assigned to.
    */
   pickupOtp?: string | null;
+  /**
+   * The rider on this order once one has taken it — Ready column only. The
+   * kitchen used to have no idea who was coming, or that the bag had already
+   * left: the card sat in Ready until the order was delivered.
+   */
+  rider?: KitchenOrderRider | null;
+}
+
+export interface KitchenOrderRider {
+  name: string;
+  /** `assigned`: heading to the counter. `picked_up`: has the food. */
+  stage: "assigned" | "picked_up";
 }
 
 export const RESTAURANT_NAME = "Saffron Kitchen";

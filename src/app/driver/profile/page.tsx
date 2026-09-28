@@ -1,6 +1,7 @@
 import { Bike, Phone, User } from "lucide-react";
 import { ProfileAvatar } from "@/components/profile/profile-avatar";
 import { DriverProfileRows } from "@/components/driver/driver-profile-rows";
+import { staffFeatureOn } from "@/lib/features/guards.server";
 import { requireRole } from "@/lib/auth";
 import { getProfileSummary } from "@/lib/data-access/profile";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -33,7 +34,11 @@ export default async function DriverProfilePage() {
   // assumption AGENTS.md rule 3 exists to refuse.
   const profile = await requireRole("driver");
 
-  const summary = isSupabaseConfigured ? await getProfileSummary() : null;
+  const [summary, canEdit] = await Promise.all([
+    isSupabaseConfigured ? getProfileSummary() : Promise.resolve(null),
+    // Admin → Feature access; /api/profile and /api/profile/avatar refuse too.
+    staffFeatureOn("driver.profile_edit"),
+  ]);
 
   const name = summary?.name ?? profile.full_name ?? "";
   const phone = summary?.phone ?? profile.phone ?? null;
@@ -45,6 +50,7 @@ export default async function DriverProfilePage() {
           name={name}
           initials={summary?.initials ?? "🙂"}
           avatarUrl={summary?.avatarUrl ?? null}
+          readOnly={!canEdit}
         />
         <div>
           <p className="text-lg font-extrabold tracking-tight">
@@ -64,7 +70,7 @@ export default async function DriverProfilePage() {
       <DriverProfileRows
         name={name}
         phone={phone}
-        editable={isSupabaseConfigured}
+        editable={isSupabaseConfigured && canEdit}
       />
 
       <section className="card space-y-2.5 p-4">

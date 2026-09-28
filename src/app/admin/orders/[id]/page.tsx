@@ -17,7 +17,7 @@ import {
 } from "@/components/admin/console";
 import { ORDER_STATUS, STATUS_TONE } from "@/components/admin/order-status";
 import { OrderIntervention } from "@/components/admin/order-intervention";
-import { formatINR } from "@/lib/utils/format";
+import { formatINR, formatLateness } from "@/lib/utils/format";
 import { formatDateTime } from "@/lib/utils/relative-time";
 import {
   getAdminOrderDetail,
@@ -81,7 +81,7 @@ export default async function AdminOrderDetailPage({
               {stage.label}
             </StatusBadge>
             {late ? (
-              <StatusBadge tone="red">{order.lateByMinutes} min late</StatusBadge>
+              <StatusBadge tone="red">{formatLateness(order.lateByMinutes ?? 0)}</StatusBadge>
             ) : null}
           </>
         }

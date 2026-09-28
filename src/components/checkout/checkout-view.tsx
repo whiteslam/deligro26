@@ -25,6 +25,7 @@ import { AddAddressForm } from "@/components/addresses/add-address-form";
 import { AddressPickerSheet } from "@/components/addresses/address-picker-sheet";
 import { useSavedAddresses } from "@/hooks/use-saved-addresses";
 import { cn } from "@/lib/utils/cn";
+import { addressLocality } from "@/lib/utils/address-locality";
 import { formatINR } from "@/lib/utils/format";
 import { computeChargesWith, TIP_OPTIONS } from "@/lib/pricing";
 import {
@@ -263,9 +264,15 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   if (addressId !== syncedAddressId) {
     setSyncedAddressId(addressId);
     if (selectedAddress) {
-      if (selectedAddress.lat != null && selectedAddress.lng != null) {
-        setMapCoords({ lat: selectedAddress.lat, lng: selectedAddress.lng });
-      }
+      // An address without a pin starts WITHOUT one. Keeping the previous
+      // address's coordinates here let a pinless "Bhilai" inherit a Bemetara
+      // pin: the area check measured the old pin, passed, and the order was sent
+      // with those coordinates too.
+      setMapCoords(
+        selectedAddress.lat != null && selectedAddress.lng != null
+          ? { lat: selectedAddress.lat, lng: selectedAddress.lng }
+          : null
+      );
       setPinSaved(false);
     }
   }
@@ -290,12 +297,14 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   // without an effect having to clear it — a stale "out of range" left on screen
   // for a pin the customer has already corrected is the one failure mode here.
   const areaKey = mapCoords ? `${mapCoords.lat},${mapCoords.lng}` : null;
+  // `area: null` records a check that could not be made (network) — the order
+  // API still decides then, but the button is no longer waiting on it.
   const [measured, setMeasured] = useState<{
     key: string;
-    area: ServiceArea;
+    area: ServiceArea | null;
   } | null>(null);
-  const serviceArea =
-    measured && measured.key === areaKey ? measured.area : null;
+  const measuredNow = measured && measured.key === areaKey ? measured : null;
+  const serviceArea = measuredNow?.area ?? null;
 
   useEffect(() => {
     if (!restaurantSlug || !isSupabaseConfigured || !areaKey || !mapCoords) {
@@ -311,11 +320,12 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
     )
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { area?: ServiceArea } | null) => {
-        if (live && d?.area) setMeasured({ key: areaKey, area: d.area });
+        if (live) setMeasured({ key: areaKey, area: d?.area ?? null });
       })
       .catch(() => {
-        // Can't check ≠ out of range. Leave it unmeasured and say nothing; the
-        // order API is the gate that decides.
+        // Can't check ≠ out of range. Say nothing; the order API is the gate
+        // that decides — but stop holding the button for an answer.
+        if (live) setMeasured({ key: areaKey, area: null });
       });
     return () => {
       live = false;
@@ -326,16 +336,83 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   // copy of the rule. This screen and that gate disagreeing is how a customer
   // fills in an address, taps Place order, and is told no.
   const outOfArea = serviceArea ? blocksOrder(serviceArea) : false;
+
+  /**
+   * The default address is outside this shop's area, but another saved one
+   * isn't: switch to it, once, and say so.
+   *
+   * Checkout used to pre-select the DEFAULT address unconditionally. In the
+   * 28 Sept live test that was a Bhilai home 59.8 km from a Bemetara shop
+   * while the same account had a deliverable Berla address saved — so the
+   * customer met a blocked button and had to find the picker themselves.
+   *
+   * Only before the customer has chosen: a deliberate pick is never
+   * overridden. Uses the same serviceability endpoint and `blocksOrder` as the
+   * check above, so the switch can't land on an address the order API refuses.
+   * The selection lives in memory only — the saved default is not changed.
+   */
+  const userPickedAddress = useRef(false);
+  const autoPickTried = useRef(false);
+  const [autoPicked, setAutoPicked] = useState<string | null>(null);
+  const pickAddress = (id: string) => {
+    userPickedAddress.current = true;
+    setAutoPicked(null);
+    setSelectedId(id);
+  };
+  useEffect(() => {
+    if (!outOfArea || !restaurantSlug || autoPickTried.current) return;
+    if (userPickedAddress.current) return;
+    autoPickTried.current = true;
+    const others = addresses.filter(
+      (a) => a.id !== selectedAddress?.id && a.lat != null && a.lng != null
+    );
+    if (others.length === 0) return;
+    let live = true;
+    void (async () => {
+      for (const a of others) {
+        const query = new URLSearchParams({ lat: String(a.lat), lng: String(a.lng) });
+        const d = (await fetch(
+          `/api/restaurants/${encodeURIComponent(restaurantSlug)}/serviceability?${query}`
+        )
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null)) as { area?: ServiceArea } | null;
+        if (!live || userPickedAddress.current) return;
+        if (d?.area && !blocksOrder(d.area)) {
+          // Label AND area: two saved addresses are often both "Home".
+          const area = addressLocality(a.line);
+          setAutoPicked(area ? `${a.label} · ${area}` : a.label);
+          setSelectedId(a.id);
+          return;
+        }
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [outOfArea, restaurantSlug, addresses, selectedAddress?.id, setSelectedId]);
   // An address with no pin is not "far away" — it is unmeasurable, and the fix
   // is one the customer can act on, so that is what the notice asks for.
-  const addressUnpinned = Boolean(selectedAddress) && !mapCoords;
+  //
+  // It BLOCKS, because the order API refuses a pinless address at every radius
+  // (`checkServiceArea`). It used to be a grey hint with the button still live.
+  // Only with a backend: the demo build has no gate and may have no map.
+  const addressUnpinned =
+    isSupabaseConfigured && Boolean(selectedAddress) && !mapCoords;
+  // The pin is set but its area answer hasn't come back yet. Held rather than
+  // waved through, so a far pin can't be ordered in the gap before the warning.
+  const areaPending =
+    isSupabaseConfigured &&
+    Boolean(restaurantSlug) &&
+    Boolean(mapCoords) &&
+    !measuredNow;
 
   // Everything that stops this basket being placed, in one value. Out-of-area
   // joins the pre-existing gates for the same stated reason: learning it from
   // "Could not place the order" after filling in an address is a worse way to
   // find out. An unverifiable area now blocks here too, because it blocks
   // server-side — see `checkServiceArea`.
-  const orderBlocked = checkoutBlocked || outOfArea;
+  const orderBlocked =
+    checkoutBlocked || outOfArea || addressUnpinned || areaPending;
 
   async function savePinToAddress() {
     if (!selectedAddress || !mapCoords) return;
@@ -446,6 +523,12 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
     }
     if (outOfArea && serviceArea) {
       setError(outOfRangeMessage(serviceArea));
+      return;
+    }
+    if (addressUnpinned) {
+      setError(
+        "Put your address on the map first — drop a pin or tap \"Use my location\"."
+      );
       return;
     }
     if (!selectedAddress) {
@@ -667,17 +750,29 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
                 <ChevronRight className="size-5 shrink-0 text-muted" />
               </button>
 
+              {autoPicked && !outOfArea ? (
+                <div className="flex items-start gap-2.5 border-b border-line bg-green-soft px-4 py-3 text-sm font-medium text-ink">
+                  <MapPin className="mt-0.5 size-4 shrink-0 text-green" />
+                  <span>
+                    Your default address is outside this shop&apos;s delivery
+                    area, so we picked your saved &ldquo;{autoPicked}&rdquo;
+                    address. Tap above to change it. / आपका डिफ़ॉल्ट पता
+                    डिलीवरी क्षेत्र से बाहर है, इसलिए दूसरा सेव पता चुना गया।
+                  </span>
+                </div>
+              ) : null}
               {outOfArea && serviceArea ? (
                 <div className="flex items-start gap-2.5 border-b border-line bg-deal-soft px-4 py-3 text-sm font-medium text-deal">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                   <span>{outOfRangeMessage(serviceArea)}</span>
                 </div>
               ) : addressUnpinned ? (
-                <div className="flex items-start gap-2.5 border-b border-line bg-surface-2 px-4 py-3 text-sm font-medium text-muted">
+                <div className="flex items-start gap-2.5 border-b border-line bg-deal-soft px-4 py-3 text-sm font-medium text-deal">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                   <span>
-                    This address has no map pin, so we can&apos;t check it&apos;s
-                    in the delivery area. Drop a pin below.
+                    This address is not on the map yet, so we can&apos;t check
+                    we deliver there. Drop a pin below or tap &ldquo;Use my
+                    location&rdquo; to order.
                   </span>
                 </div>
               ) : null}
@@ -777,7 +872,7 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
             ) : null}
             <PaymentOption
               icon={<Banknote className="size-5" />}
-              label="Cash on delivery"
+              label="Cash on delivery · नकद भुगतान"
               desc={
                 availability.codRefusal === "over_limit"
                   ? "Not available for this amount."
@@ -954,6 +1049,16 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
             <AlertTriangle className="size-4 shrink-0" />
             This shop cannot take payment right now.
           </p>
+        ) : outOfArea ? (
+          <p className="mb-2 flex items-center justify-center gap-1.5 text-center text-sm font-medium text-deal">
+            <AlertTriangle className="size-4 shrink-0" />
+            We don&apos;t deliver to this address.
+          </p>
+        ) : addressUnpinned ? (
+          <p className="mb-2 flex items-center justify-center gap-1.5 text-center text-sm font-medium text-deal">
+            <AlertTriangle className="size-4 shrink-0" />
+            Set your address on the map to order.
+          </p>
         ) : null}
         <button
           onClick={placeOrder}
@@ -970,9 +1075,15 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
             </span>
           ) : ordersClosed ? (
             <span className="mx-auto">Orders paused</span>
+          ) : outOfArea ? (
+            <span className="mx-auto">Outside delivery area</span>
+          ) : areaPending ? (
+            <span className="mx-auto flex items-center gap-2">
+              <Loader2 className="size-5 animate-spin" /> Checking delivery area… / जांच हो रही है
+            </span>
           ) : (
             <>
-              <span>{payOnline ? "Pay & place order" : "Place order"}</span>
+              <span>{payOnline ? "Pay & place order · भुगतान करें" : "Place order · ऑर्डर करें"}</span>
               <span>{formatINR(payTotal)}</span>
             </>
           )}
@@ -983,7 +1094,7 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
         open={showPicker}
         addresses={addresses}
         selectedId={selectedId}
-        onSelect={setSelectedId}
+        onSelect={pickAddress}
         onClose={() => setShowPicker(false)}
         onAddNew={() => setAddFormRequested(true)}
       />
@@ -1094,7 +1205,7 @@ function PaymentOption({
         <span className="flex flex-wrap items-center gap-2">
           <span className="text-[15px] font-semibold">{label}</span>
           {badge ? (
-            <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+            <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-muted">
               {badge}
             </span>
           ) : null}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useFeatures } from "@/components/features/features-provider";
 import { usePathname } from "next/navigation";
 import { DRIVER_TABS } from "@/components/driver/driver-nav";
 import { cn } from "@/lib/utils/cn";
@@ -20,6 +21,7 @@ const COLORS = {
 } as const;
 
 export function DriverTabBar() {
+  const features = useFeatures();
   const pathname = usePathname();
 
   return (
@@ -27,7 +29,7 @@ export function DriverTabBar() {
       className="tab-bar-shell absolute inset-x-0 bottom-0 z-30 flex items-stretch justify-around px-1 pb-[env(safe-area-inset-bottom)]"
       aria-label="Courier"
     >
-      {DRIVER_TABS.map((tab) => {
+      {DRIVER_TABS.filter((t) => !t.feature || features[t.feature]).map((tab) => {
         const active = tab.match(pathname);
         const color = COLORS[tab.tone];
         const Icon = tab.icon;
@@ -37,7 +39,7 @@ export function DriverTabBar() {
             href={tab.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "press relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] transition-colors",
+              "press relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[12px] transition-colors",
               active ? cn("font-bold", color.text) : "font-medium text-muted"
             )}
           >

@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { vendorFeatureOn } from "@/lib/features/guards.server";
+import { FEATURE_OFF_MESSAGE } from "@/lib/features/catalog";
 import { requireVendorAccess } from "@/lib/auth/vendor-access";
 import { updateShopLocation } from "@/lib/data-access/restaurants";
 
@@ -16,6 +18,9 @@ export async function saveShopLocation(input: {
   address: string;
 }): Promise<SaveShopLocationResult> {
   await requireVendorAccess();
+  if (!(await vendorFeatureOn("vendor.shop_profile"))) {
+    return { ok: false, error: FEATURE_OFF_MESSAGE };
+  }
 
   if (!Number.isFinite(input.lat) || !Number.isFinite(input.lng)) {
     return { ok: false, error: "Drop a pin on the map first." };

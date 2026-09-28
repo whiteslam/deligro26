@@ -7,6 +7,7 @@ import { decideRefund } from "@/lib/data-access/refunds";
 import type { RefundDecisionError } from "@/lib/data-access/refunds";
 import { notifyRefundDecided } from "@/lib/notifications/order-events";
 import { rateLimit } from "@/lib/rate-limit";
+import { deferNotify } from "@/lib/notifications/defer";
 
 export interface ActionResult {
   ok: boolean;
@@ -93,7 +94,7 @@ export async function decideRefundAction(
   // Fire-and-forget: order-events never throws, and a push outage must not
   // undo a decision that has already been written (and, on an online order,
   // already been paid out).
-  void notifyRefundDecided(result.orderId, result.approved);
+  deferNotify(() => notifyRefundDecided(result.orderId, result.approved));
 
   revalidatePath("/admin/refunds");
   revalidatePath("/admin");

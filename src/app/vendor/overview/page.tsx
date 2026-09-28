@@ -6,10 +6,15 @@ import { getVendorOverviewSummary } from "@/lib/data-access/vendor-overview";
 import type { VendorOverviewSummary } from "@/lib/data-access/vendor-overview";
 import { resolveVendorRestaurant } from "@/lib/data-access/vendor-restaurant";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { vendorFeatureOn } from "@/lib/features/guards.server";
+import { FeatureOffNotice } from "@/components/features/features-provider";
 
 export const dynamic = "force-dynamic";
 
 export default async function VendorOverviewPage() {
+  // Switchable in Admin → Feature access; the server actions behind this
+  // page check the same switch.
+  if (!(await vendorFeatureOn("vendor.earnings"))) return <FeatureOffNotice title="Overview" />;
   if (!isSupabaseConfigured) {
     return (
       <div className="space-y-6">

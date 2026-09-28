@@ -1,3 +1,6 @@
+// Server components run in UTC; every label here is read by people in India.
+const IST = "Asia/Kolkata";
+
 /** Relative label e.g. "2 min ago" for kitchen boards. */
 export function formatRelativeTime(iso: string): string {
   const date = new Date(iso);
@@ -10,17 +13,18 @@ export function formatRelativeTime(iso: string): string {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
 
-  return date.toLocaleDateString("en-IN", { weekday: "short" });
+  return date.toLocaleDateString("en-IN", { weekday: "short", timeZone: IST });
 }
 
 /** Absolute date + time e.g. "24 Jul, 8:24 PM" for order feeds. */
 export function formatDateTime(iso: string): string {
   const date = new Date(iso);
-  const day = date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const day = date.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: IST });
   const time = date.toLocaleTimeString("en-IN", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
+    timeZone: IST,
   });
   return `${day}, ${time}`;
 }

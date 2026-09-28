@@ -5,6 +5,7 @@ import { Loader2, LocateFixed, Search } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { loadGoogleMaps } from "@/lib/maps/loader";
 import { isMapsConfigured, DEFAULT_CENTER } from "@/lib/maps/config";
+import { locationSettingsSteps } from "@/lib/location/permission-help";
 
 export interface PickedLocation {
   lat: number;
@@ -50,6 +51,7 @@ export function MapPicker({
     isMapsConfigured ? "loading" : "error"
   );
   const [locating, setLocating] = useState(false);
+  const [locateError, setLocateError] = useState<string | null>(null);
 
   // Move the pin, recentre, reverse-geocode, and report upward.
   function settle(pos: google.maps.LatLng) {
@@ -120,8 +122,20 @@ export function MapPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Called straight from the button's click — `getCurrentPosition` has to run
+  // inside the tap for the browser to show its permission prompt. Failures used
+  // to be swallowed (`() => setLocating(false)`), so a blocked permission looked
+  // like a button that did nothing; now each one says what to do.
   function useMyLocation() {
-    if (!("geolocation" in navigator)) return;
+    setLocateError(null);
+    if (!("geolocation" in navigator)) {
+      setLocateError("This device can't share its location. Drag the pin instead.");
+      return;
+    }
+    if (!window.isSecureContext) {
+      setLocateError("Location needs a secure (https) connection. Drag the pin instead.");
+      return;
+    }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -129,7 +143,16 @@ export function MapPicker({
         mapObj.current?.setZoom(17);
         settle(new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
       },
-      () => setLocating(false),
+      (err) => {
+        setLocating(false);
+        setLocateError(
+          err.code === err.PERMISSION_DENIED
+            ? `Location is blocked for this site. ${locationSettingsSteps().join(" ")} Or drag the pin to your address.`
+            : err.code === err.TIMEOUT
+              ? "Your phone took too long to find you. Try again, or drag the pin."
+              : "Couldn't get your location. Try again, or drag the pin."
+        );
+      },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   }
@@ -176,22 +199,30 @@ export function MapPicker({
               Adjust pin
             </span>
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={useMyLocation}
-            disabled={locating}
-            className="press absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-accent shadow-[var(--shadow-md)] disabled:opacity-60"
-          >
-            {locating ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <LocateFixed className="size-3.5" />
-            )}
-            Use my location
-          </button>
-        )}
+        ) : null}
+        {/* On every variant — the checkout map used to render only the "Adjust
+            pin" pill, so the one map where the pin decides whether we deliver
+            had no way to jump to where you are. Top-right, clear of the zoom
+            control Google puts at the bottom-right. */}
+        <button
+          type="button"
+          onClick={useMyLocation}
+          disabled={locating || status !== "ready"}
+          className="press absolute right-2 top-2 flex items-center gap-1.5 rounded-full bg-surface px-3 py-2 text-sm font-semibold text-accent shadow-[var(--shadow-md)] disabled:opacity-60"
+        >
+          {locating ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <LocateFixed className="size-4" />
+          )}
+          {locating ? "Locating…" : "Use my location"}
+        </button>
       </div>
+      {locateError ? (
+        <p role="alert" className={cn("text-xs font-medium text-deal", checkout && "mt-2")}>
+          {locateError}
+        </p>
+      ) : null}
       {!checkout ? (
         <p className="text-xs text-muted">
           Tap the map or drag the pin to set your exact delivery spot.

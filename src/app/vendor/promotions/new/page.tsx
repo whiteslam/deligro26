@@ -3,10 +3,15 @@ import { resolveVendorRestaurant } from "@/lib/data-access/vendor-restaurant";
 import { VendorPageHeader } from "@/components/vendor/vendor-page-header";
 import { PromotionForm } from "@/components/promotions/promotion-form";
 import { saveVendorPromotionAction } from "../actions";
+import { vendorFeatureOn } from "@/lib/features/guards.server";
+import { FeatureOffNotice } from "@/components/features/features-provider";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewVendorPromotionPage() {
+  // Switchable in Admin → Feature access; the server actions behind this
+  // page check the same switch.
+  if (!(await vendorFeatureOn("vendor.promotions"))) return <FeatureOffNotice title="Promotions" />;
   await requireVendorAccess();
   const restaurant = await resolveVendorRestaurant();
 

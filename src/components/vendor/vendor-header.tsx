@@ -30,12 +30,12 @@ export function VendorHeader({
         <p className="text-label mt-1 truncate leading-none">{subtitle}</p>
       </div>
       {showControls ? <RestaurantOpenToggle isOpen={isOpen} /> : null}
-      <ThemeToggle className="size-9" />
+      <ThemeToggle className="size-11" />
       {isSupabaseConfigured ? (
         <form action="/auth/signout" method="post">
           <button
             type="submit"
-            className="press grid size-9 place-items-center rounded-full border border-line bg-surface text-muted"
+            className="press grid size-11 place-items-center rounded-full border border-line bg-surface text-muted"
             aria-label="Sign out"
           >
             <LogOut className="size-4" />
@@ -44,7 +44,7 @@ export function VendorHeader({
       ) : (
         <Link
           href="/"
-          className="press grid size-9 place-items-center rounded-full border border-line bg-surface text-xs font-bold text-muted"
+          className="press grid size-11 place-items-center rounded-full border border-line bg-surface text-xs font-bold text-muted"
         >
           ✕
         </Link>

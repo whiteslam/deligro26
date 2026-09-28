@@ -4,9 +4,11 @@ import { haversineKm } from "@/lib/geo/distance";
 import { getSettings } from "@/lib/settings";
 import { kitchenPrepMinutes } from "@/lib/orders/eta";
 import {
+  notifyDriverOrderCancelled,
   notifyDriverPickupOffered,
   notifyDriverPickupReady,
 } from "@/lib/notifications/order-events";
+import { deferNotify } from "@/lib/notifications/defer";
 import {
   columnKnownMissing,
   isMissingColumn,
@@ -249,17 +251,17 @@ async function pendingOffersByRider(
  */
 export async function chooseRider(
   from: Point | null,
-  opts: { now?: number; exceptOrderId?: string } = {}
+  opts: { now?: number; exceptOrderId?: string; excludeRiderIds?: string[] } = {}
 ): Promise<RiderChoice | null> {
   const supabase = createAdminClient();
   const now = opts.now ?? Date.now();
 
-  const candidates = await loadCandidates(
-    supabase,
-    from,
-    now,
-    opts.exceptOrderId
-  );
+  // Riders who already let an offer for this order lapse (see sweep.ts). Asking
+  // the same person again is how an ignored offer used to become a stranded one.
+  const excluded = new Set(opts.excludeRiderIds ?? []);
+  const candidates = (
+    await loadCandidates(supabase, from, now, opts.exceptOrderId)
+  ).filter((c) => !excluded.has(c.id));
   if (candidates.length === 0) return null;
 
   // Rule 1: anyone not already committed — neither mid-delivery nor holding an
@@ -441,7 +443,8 @@ export interface DispatchResult {
  */
 export async function dispatchOrder(
   orderId: string,
-  stage: DispatchStage
+  stage: DispatchStage,
+  opts: { excludeRiderIds?: string[] } = {}
 ): Promise<DispatchResult> {
   const empty: DispatchResult = { rider: null, offered: false };
   try {
@@ -457,7 +460,11 @@ export async function dispatchOrder(
     const shop = one(data.restaurants);
     const from = pointOf(shop?.lat, shop?.lng);
 
-    const rider = await chooseRider(from, { now, exceptOrderId: orderId });
+    const rider = await chooseRider(from, {
+      now,
+      exceptOrderId: orderId,
+      excludeRiderIds: opts.excludeRiderIds,
+    });
     if (!rider) return empty;
 
     const outcome = await writeOffer(supabase, orderId, rider.id, now);
@@ -469,20 +476,23 @@ export async function dispatchOrder(
     const restaurantName = shop?.name?.trim() || "the restaurant";
 
     if (stage === "ready") {
-      void notifyDriverPickupReady(rider.id, { orderId, restaurantName });
+      deferNotify(() => notifyDriverPickupReady(rider.id, { orderId, restaurantName }));
       return { rider, offered };
     }
 
     const settings = await getSettings();
-    void notifyDriverPickupOffered(rider.id, {
-      orderId,
-      restaurantName,
-      readyInMinutes: kitchenPrepMinutes({
-        restaurantPrepMinutes: shop?.prep_minutes,
-        defaultPrepMinutes: settings.defaultPrepMinutes,
-      }),
-      pickupArea: shop?.address ?? null,
+    const readyInMinutes = kitchenPrepMinutes({
+      restaurantPrepMinutes: shop?.prep_minutes,
+      defaultPrepMinutes: settings.defaultPrepMinutes,
     });
+    deferNotify(() =>
+      notifyDriverPickupOffered(rider.id, {
+        orderId,
+        restaurantName,
+        readyInMinutes,
+        pickupArea: shop?.address ?? null,
+      })
+    );
     return { rider, offered };
   } catch {
     // Swallowed by contract — see the module header.
@@ -518,6 +528,25 @@ export async function dispatchOrder(
 export async function cancelDeliveryForOrder(orderId: string): Promise<void> {
   try {
     const supabase = createAdminClient();
+
+    // Who has to be told, read before the row changes. A rider holding a live
+    // offer or carrying the job used to find out only by looking at the screen
+    // — one already riding to the shop kept riding.
+    const { data: row } = await supabase
+      .from("deliveries")
+      .select(
+        columnKnownMissing(DISPATCH_COLUMNS)
+          ? "driver_id, status"
+          : "driver_id, status, offered_driver_id"
+      )
+      .eq("order_id", orderId)
+      .maybeSingle()
+      .overrideTypes<{
+        driver_id: string | null;
+        status: string;
+        offered_driver_id?: string | null;
+      }>();
+
     if (!columnKnownMissing(DISPATCH_COLUMNS)) {
       await supabase
         .from("deliveries")
@@ -530,6 +559,26 @@ export async function cancelDeliveryForOrder(orderId: string): Promise<void> {
       .update({ status: "cancelled" })
       .eq("order_id", orderId)
       .in("status", ["assigned", "picked_up"]);
+
+    if (row) {
+      const carrying =
+        (row.status === "assigned" || row.status === "picked_up") && row.driver_id
+          ? row.driver_id
+          : null;
+      // Told even after their exclusive window lapsed: "head over" may have
+      // already put them on the road.
+      const offered =
+        row.status === "unassigned" ? (row.offered_driver_id ?? null) : null;
+      const riderId = carrying ?? offered;
+      if (riderId) {
+        deferNotify(() =>
+          notifyDriverOrderCancelled(riderId, {
+            orderId,
+            pickedUp: row.status === "picked_up",
+          })
+        );
+      }
+    }
   } catch {
     // swallow — see the module header
   }

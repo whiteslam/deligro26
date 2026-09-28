@@ -6,6 +6,9 @@ import { requireRole } from "@/lib/auth";
 import { getDriverHistory } from "@/lib/data-access/driver-orders";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { formatINR } from "@/lib/utils/format";
+import { formatIst, istDaysBetween } from "@/lib/utils/ist-time";
+import { staffFeatureOn } from "@/lib/features/guards.server";
+import { FeatureOffNotice } from "@/components/features/features-provider";
 
 /**
  * Everything this rider has delivered, newest first.
@@ -28,28 +31,23 @@ export const dynamic = "force-dynamic";
 /** Day heading: "Today", "Yesterday", else "Tue, 9 Sep". */
 function dayLabel(iso: string, now: Date): string {
   const d = new Date(iso);
-  const days = Math.round(
-    (new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() -
-      new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) /
-      86_400_000
-  );
+  // IST calendar days: this renders on a UTC server, where "Today" would
+  // otherwise roll over at 5:30 am.
+  const days = istDaysBetween(d, now);
   if (days === 0) return "Today";
   if (days === 1) return "Yesterday";
-  return d.toLocaleDateString("en-IN", {
+  return formatIst(d, {
     weekday: "short",
     day: "numeric",
     month: "short",
     // Only once the year stops being obvious — a rider scrolling back through
     // last season does not want to read "2026" on every heading.
-    year: d.getFullYear() === now.getFullYear() ? undefined : "numeric",
+    year: formatIst(d, { year: "numeric" }) === formatIst(now, { year: "numeric" }) ? undefined : "numeric",
   });
 }
 
 function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatIst(iso, { hour: "numeric", minute: "2-digit" });
 }
 
 export default async function DriverHistoryPage({
@@ -57,6 +55,9 @@ export default async function DriverHistoryPage({
 }: {
   searchParams: Promise<{ before?: string }>;
 }) {
+  // Switchable in Admin → Feature access; the server actions behind this
+  // page check the same switch.
+  if (!(await staffFeatureOn("driver.history"))) return <FeatureOffNotice title="Delivery history" />;
   // The layout gates this too. Repeated because a Server Component is reachable
   // on its own, and because `profile.id` below IS the authorization for the
   // query — it must come from the session, never from the URL.

@@ -18,6 +18,7 @@ import {
   rememberColumn,
 } from "@/lib/data-access/schema-probe";
 import type { Profile } from "@/lib/auth";
+import { deferNotify } from "@/lib/notifications/defer";
 
 /**
  * Phone-in orders — the job the manager role was created for.
@@ -512,8 +513,8 @@ export async function placePhoneOrder(
   // though they rang, and a confirmation for an order somebody else typed on
   // their behalf is the one case where a notification is genuinely load-bearing:
   // it is how a caller finds out if the number was misheard.
-  void notifyOrderPlaced(order.id);
-  void notifyVendorNewOrder(order.id, orderItems.length);
+  deferNotify(() => notifyOrderPlaced(order.id));
+  deferNotify(() => notifyVendorNewOrder(order.id, orderItems.length));
 
   return {
     orderId: order.id,

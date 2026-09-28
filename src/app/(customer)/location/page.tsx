@@ -9,12 +9,14 @@ import {
   MapPin,
   Navigation,
   Plus,
+  RotateCw,
   Search,
 } from "lucide-react";
 import { useLocation } from "@/stores/location-store";
 import { useSavedAddresses } from "@/hooks/use-saved-addresses";
 import { isMapsConfigured } from "@/lib/maps/config";
 import { loadGoogleMaps } from "@/lib/maps/loader";
+import { locationSettingsSteps } from "@/lib/location/permission-help";
 
 /**
  * Delivery-location picker.
@@ -33,6 +35,7 @@ export default function LocationPage() {
   const status = useLocation((s) => s.status);
   const label = useLocation((s) => s.label);
   const error = useLocation((s) => s.error);
+  const blocked = useLocation((s) => s.blocked);
   const detect = useLocation((s) => s.detect);
   const setPlace = useLocation((s) => s.setPlace);
 
@@ -128,7 +131,7 @@ export default function LocationPage() {
         <div className="mt-4 divide-y divide-line">
           <button
             type="button"
-            onClick={detect}
+            onClick={() => detect()}
             disabled={detecting}
             className="press flex w-full items-center gap-3 py-3.5 text-left disabled:opacity-60"
           >
@@ -162,10 +165,48 @@ export default function LocationPage() {
           </Link>
         </div>
 
-        {error ? (
-          <p role="alert" className="mt-3 text-[13px] font-medium text-accent-ink">
-            {error}
-          </p>
+        {/* The error is a button, not a caption. It used to be a plain <p>, so
+            tapping the message — the obvious thing to do — did nothing at all.
+            Tapping it runs `detect()` inside the tap, which is what lets the
+            browser show its permission prompt. When the browser has BLOCKED the
+            site it will not prompt again whatever we call, so the steps to
+            unblock it are spelled out beneath. */}
+        {error && !detecting ? (
+          <div role="alert" className="mt-3 rounded-xl bg-accent-soft p-3">
+            <button
+              type="button"
+              onClick={() => detect()}
+              className="press flex w-full items-start gap-2 text-left text-[14px] font-semibold text-accent-ink"
+            >
+              <RotateCw className="mt-0.5 size-4 shrink-0" />
+              <span>
+                {error}
+                <span className="mt-1 block text-[13px] font-bold underline">
+                  Tap here to try again
+                </span>
+              </span>
+            </button>
+
+            {blocked ? (
+              <div className="mt-3 border-t border-line pt-3">
+                <p className="text-[13px] font-bold text-ink">
+                  How to turn location on:
+                </p>
+                <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-[13px] leading-snug text-ink">
+                  {locationSettingsSteps().map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="press mt-3 w-full rounded-full border border-accent py-2 text-[14px] font-bold text-accent-ink"
+                >
+                  Reload page
+                </button>
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         <h2 className="pb-1 pt-6 text-[13px] font-bold uppercase tracking-[0.08em] text-muted">
@@ -202,7 +243,7 @@ export default function LocationPage() {
                     <span className="flex items-center gap-2 text-[15px] font-bold">
                       {a.label}
                       {a.isDefault ? (
-                        <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+                        <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-muted">
                           Default
                         </span>
                       ) : null}

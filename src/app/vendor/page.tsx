@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { VendorOrdersBoard } from "@/components/vendor/vendor-orders-board";
 import { VendorPageHeader } from "@/components/vendor/vendor-page-header";
 import { getProfile } from "@/lib/auth";
@@ -13,6 +14,7 @@ import {
 } from "@/lib/data-access/vendor-restaurant";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getSettings } from "@/lib/settings";
+import { maybeSweepDispatch } from "@/lib/dispatch/sweep";
 import { DEFAULT_SETTINGS } from "@/lib/settings-defaults";
 import type { KitchenOrder } from "@/lib/roles-data";
 import type { PlatformSettings } from "@/types";
@@ -67,6 +69,10 @@ export default async function VendorOrdersPage() {
       </div>
     );
   }
+
+  // The kitchen board polls every 8 s even when hidden — the dispatch sweep's
+  // heartbeat on a deployment without a cron. See lib/dispatch/sweep.ts.
+  after(maybeSweepDispatch);
 
   let incoming: KitchenOrder[] = [];
   let preparing: KitchenOrder[] = [];

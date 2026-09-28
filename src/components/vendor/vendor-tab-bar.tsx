@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { VENDOR_PHONE_TABS } from "@/components/vendor/vendor-nav";
+import { VENDOR_PHONE_TABS, visibleVendorNav } from "@/components/vendor/vendor-nav";
+import { useFeatures } from "@/components/features/features-provider";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -22,6 +23,7 @@ const COLORS = {
 } as const;
 
 export function VendorTabBar() {
+  const features = useFeatures();
   const pathname = usePathname();
 
   return (
@@ -29,7 +31,7 @@ export function VendorTabBar() {
       className="tab-bar-shell absolute inset-x-0 bottom-0 z-30 flex items-stretch justify-around px-1 pb-[env(safe-area-inset-bottom)]"
       aria-label="Vendor"
     >
-      {VENDOR_PHONE_TABS.map((tab) => {
+      {visibleVendorNav(VENDOR_PHONE_TABS, features).map((tab) => {
         const active = tab.match(pathname);
         const color = COLORS[tab.tone];
         const Icon = tab.icon;
@@ -39,7 +41,7 @@ export function VendorTabBar() {
             href={tab.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "press relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] transition-colors",
+              "press relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[12px] transition-colors",
               active ? cn("font-bold", color.text) : "font-medium text-muted"
             )}
           >

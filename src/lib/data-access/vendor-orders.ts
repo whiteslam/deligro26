@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import type { KitchenOrder } from "@/lib/roles-data";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { KitchenOrder, KitchenOrderRider } from "@/lib/roles-data";
 import type {
   VendorHistoryQuery,
 } from "@/types/vendor-orders";
@@ -21,6 +22,7 @@ import {
   isMissingColumn,
   rememberColumn,
 } from "@/lib/data-access/schema-probe";
+import { deferNotify } from "@/lib/notifications/defer";
 
 export type {
   VendorHistoryKind,
@@ -210,6 +212,7 @@ function formatPlacedAt(iso: string): string {
     month: "short",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: "Asia/Kolkata",
   });
 }
 
@@ -278,7 +281,10 @@ export async function listKitchenOrders(restaurantId: string): Promise<{
         .from("orders")
         .select(columns)
         .eq("restaurant_id", restaurantId)
-        .in("status", ["placed", "kitchen", "ready"]);
+        // `on_the_way` too: a bag that has left is still the kitchen's to know
+        // about until it lands. It used to drop off the board at pickup and
+        // reappear only at delivery, so "has the rider been?" had no answer.
+        .in("status", ["placed", "kitchen", "ready", "on_the_way"]);
       return withPaymentFilter(base, flags.payment)
         .order("created_at", { ascending: false })
         .overrideTypes<Record<string, unknown>[]>();
@@ -292,11 +298,71 @@ export async function listKitchenOrders(restaurantId: string): Promise<{
   const preparing = rows
     .filter((r) => r.status === "kitchen")
     .map(mapKitchenOrder);
-  const ready = rows
-    .filter((r) => r.status === "ready")
-    .map(mapKitchenOrder);
+  const readyRows = rows.filter(
+    (r) => r.status === "ready" || r.status === "on_the_way"
+  );
+  const riders = await ridersForOrders(readyRows.map((r) => String(r.id)));
+  const ready = readyRows.map((r) => ({
+    ...mapKitchenOrder(r),
+    rider: riders.get(String(r.id)) ?? null,
+  }));
 
   return { incoming, preparing, ready };
+}
+
+/**
+ * order id → the rider carrying it, for orders already on this board.
+ *
+ * Service-role read, and safe as one: the ids come from the RLS-scoped query
+ * above, which only ever returns this vendor's own orders, so this can name
+ * no rider the kitchen isn't already dealing with. It has to be service-role
+ * because a vendor cannot read another user's `profiles` row under RLS, and
+ * the name is the whole point. Best-effort: no rider info, not no board.
+ */
+async function ridersForOrders(
+  orderIds: string[]
+): Promise<Map<string, KitchenOrderRider>> {
+  const out = new Map<string, KitchenOrderRider>();
+  if (orderIds.length === 0) return out;
+  try {
+    const admin = createAdminClient();
+    // Two plain reads rather than an embedded join: `deliveries` has two FKs
+    // to `profiles` (driver_id, and offered_driver_id from 0042), so an embed
+    // needs a constraint-name hint that differs by migration state. Same
+    // shape as ridersByOrder in admin-dispatch.ts.
+    const { data: rows } = await admin
+      .from("deliveries")
+      .select("order_id, status, driver_id")
+      .in("order_id", orderIds)
+      .in("status", ["assigned", "picked_up"]);
+    const deliveries = (rows ?? []) as {
+      order_id: string;
+      status: "assigned" | "picked_up";
+      driver_id: string | null;
+    }[];
+    const driverIds = [
+      ...new Set(deliveries.map((d) => d.driver_id).filter((d): d is string => Boolean(d))),
+    ];
+    const names = new Map<string, string>();
+    if (driverIds.length) {
+      const { data: profiles } = await admin
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", driverIds);
+      for (const p of (profiles ?? []) as { id: string; full_name: string | null }[]) {
+        names.set(p.id, p.full_name?.trim() || "Rider");
+      }
+    }
+    for (const d of deliveries) {
+      out.set(d.order_id, {
+        name: (d.driver_id && names.get(d.driver_id)) || "Rider",
+        stage: d.status,
+      });
+    }
+  } catch {
+    // leave empty — the card simply doesn't name a rider
+  }
+  return out;
 }
 
 /** Completed + cancelled order history for the selected restaurant. */
@@ -456,10 +522,10 @@ const KITCHEN_TRANSITIONS: Record<
  * and a push outage must never undo a status the database has accepted.
  *
  * The refund IS awaited, because whether the money is coming back is part of
- * the sentence we are about to send the customer. **Dispatch is awaited too**,
- * for a different reason — it writes the offer row the driver board reads, and
- * an un-awaited write is one a serverless runtime may abandon. Like the pushes
- * it swallows its own failures, so awaiting it cannot cost the transition.
+ * the sentence we are about to send the customer. Dispatch writes the offer
+ * row the driver board reads, so it goes through `after()` (deferNotify) —
+ * guaranteed to finish, without holding the kitchen's tap while riders are
+ * ranked. Like the pushes it swallows its own failures.
  */
 async function announceKitchenTransition(
   orderId: string,
@@ -468,7 +534,7 @@ async function announceKitchenTransition(
   actorId: string
 ): Promise<void> {
   if (status === "kitchen") {
-    void notifyOrderAccepted(orderId, restaurantName);
+    deferNotify(() => notifyOrderAccepted(orderId, restaurantName));
     // And the other half of the acceptance, which nobody used to be told: a
     // rider. Orders only ever surfaced to couriers at `ready`, i.e. once the
     // food was already on the pass, so every road leg began from a standing
@@ -476,23 +542,23 @@ async function announceKitchenTransition(
     // those, the nearest to this shop) and sends them the prep estimate so they
     // can be at the counter when the bag is.
     //
-    // Awaited, unlike the pushes around it, because it WRITES — the offer row
-    // is what holds the order for that rider and what the board reads. It
-    // swallows its own failures by contract, so awaiting it cannot turn a
-    // dispatch outage into a failed transition; it only stops the write being
-    // abandoned when the serverless invocation ends.
-    await dispatchOrder(orderId, "accepted");
+    // After the response, through `after()` (deferNotify): it WRITES the offer
+    // row, so it must not be abandoned when the invocation ends — which is what
+    // `after()` guarantees — but it no longer has to be waited on. Awaiting it
+    // here held the kitchen's own Accept for several seconds (6.6 s measured
+    // in the 28 Sept live test) while riders were ranked.
+    deferNotify(() => dispatchOrder(orderId, "accepted"));
     return;
   }
 
   if (status === "ready") {
-    void notifyOrderReady(orderId);
+    deferNotify(() => notifyOrderReady(orderId));
     // Re-run rather than reuse the rider picked at acceptance: twenty minutes
     // of cooking later, that rider may be halfway across town with somebody
     // else's dinner. This is also what re-stamps `offered_at`, i.e. what starts
     // the exclusivity window the board and `acceptDelivery` both read — so it
-    // is awaited for the same reason as the acceptance branch above.
-    await dispatchOrder(orderId, "ready");
+    // runs after the response, like the acceptance branch above.
+    deferNotify(() => dispatchOrder(orderId, "ready"));
     return;
   }
 
@@ -525,7 +591,7 @@ async function announceKitchenTransition(
   // for why an already-accepted delivery is cancelled rather than deleted.
   await cancelDeliveryForOrder(orderId);
 
-  void notifyOrderCancelled(orderId, { byVendor: true, refundQueued });
+  deferNotify(() => notifyOrderCancelled(orderId, { byVendor: true, refundQueued }));
 }
 
 /**

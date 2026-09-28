@@ -6,6 +6,7 @@ import {
   notifyVendorNewOrder,
 } from "@/lib/notifications/order-events";
 import type { PaymentStatus } from "@/types";
+import { deferNotify } from "@/lib/notifications/defer";
 
 /**
  * Payment records (migration 0025).
@@ -265,9 +266,9 @@ export async function settlePayment(input: SettleInput): Promise<string | null> 
   // createOrder deliberately stayed quiet for it, so the alert belongs here.
   // Only on the transition into 'paid', which the guards above make once-only.
   if (input.status === "paid") {
-    void notifyVendorNewOrder(orderId);
+    deferNotify(() => notifyVendorNewOrder(orderId));
   } else if (input.status === "failed") {
-    void notifyPaymentFailed(orderId);
+    deferNotify(() => notifyPaymentFailed(orderId));
   }
 
   return orderId;

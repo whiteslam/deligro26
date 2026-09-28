@@ -1,7 +1,9 @@
 import { haversineKm } from "@/lib/geo/distance";
+import { PINNED_LOCATION } from "@/lib/location/pinned";
 
 /**
- * Is this address inside the shop's delivery area?
+ * Is this address inside Deligro's delivery area — one circle around
+ * Bemetara (see SERVICE_CENTRE)?
  *
  * One rule, shared by the checkout warning and the order API that refuses, so
  * the sentence a customer reads before they commit and the decision made after
@@ -35,19 +37,25 @@ export type ServiceAreaStatus =
   | "out_of_range"
   /** No radius configured — nothing to check, so nothing to refuse. */
   | "unlimited"
-  /** A radius IS set and a pin is missing, so the check cannot be made. */
+  /** The delivery address has no pin, so the check cannot be made. */
   | "unverifiable";
 
-/** Which end was missing. Only set when `status` is `unverifiable`. */
-export type ServiceAreaGap = "shop_unpinned" | "address_unpinned";
+/**
+ * Why an order was refused, when it isn't simply "the address is too far".
+ *
+ * `address_unpinned` — the delivery address has no map pin (`unverifiable`).
+ * `shop_outside_area` — the shop itself is pinned outside the city circle
+ *   (`out_of_range`); a customer in town can't order from it.
+ */
+export type ServiceAreaGap = "address_unpinned" | "shop_outside_area";
 
 export interface ServiceArea {
   status: ServiceAreaStatus;
-  /** Straight-line km, or null when either end has no coordinates. */
+  /** Straight-line km from the city centre, or null when the address has no pin. */
   distanceKm: number | null;
   /** The configured radius, echoed so callers can write the message. */
   radiusKm: number;
-  /** Why the answer is `unverifiable`; absent for every other status. */
+  /** Set when the refusal is not the plain "address too far" case. */
   reason?: ServiceAreaGap;
 }
 
@@ -55,6 +63,16 @@ export interface Point {
   lat?: number | null;
   lng?: number | null;
 }
+
+/**
+ * The centre of the delivery area: Bemetara.
+ *
+ * Deligro launches as a one-city app (decided 28 Sept 2026): a single circle of
+ * `delivery_radius_km` around the city centre, not a circle around each shop.
+ * Going multi-city means replacing this with the customer's city — the same
+ * seam as PINNED_LOCATION, which it reads.
+ */
+export const SERVICE_CENTRE = PINNED_LOCATION.coords;
 
 function coords(p: Point | null | undefined): { lat: number; lng: number } | null {
   if (!p) return null;
@@ -64,62 +82,62 @@ function coords(p: Point | null | undefined): { lat: number; lng: number } | nul
 }
 
 /**
- * The answer, and it fails CLOSED.
+ * The answer. Measured from the CITY CENTRE, and it still fails closed.
  *
- * What this used to do, and why it was wrong: every unanswerable case returned
- * `unknown`, and `createOrder` refused only `out_of_range` — so `unknown` was an
- * accept. On a database where 68 of 70 shops had never been pinned, that meant
- * 68 shops took orders from any distance on earth. One of them took a 70 km
- * order at the flat delivery fee and put a rider on it.
+ * It used to measure from the shop and refuse every order from an unpinned
+ * shop once a radius was set — correct for a per-shop radius (a Durg shop took
+ * a 70 km order that way), and the reason most shops could not take orders at
+ * all while 68 of 70 were unpinned. With one city circle the question is
+ * "is this address in Bemetara's delivery area?", which needs no shop pin.
  *
- * The distinction that fixes it is between a DECISION and a FAILURE:
+ * What still refuses:
+ *   - an address with no pin, at any radius (`unverifiable`, `address_unpinned`):
+ *     nobody can deliver to it;
+ *   - an address outside the circle (`out_of_range`);
+ *   - a shop that IS pinned outside the circle (`out_of_range`,
+ *     `shop_outside_area`) — the one piece of the old per-shop rule worth
+ *     keeping, so a shop onboarded outside the city cannot take town orders.
  *
- *   - radius 0 — the admin has not limited anything. There is no check to make,
- *     so there is nothing to fail, and a missing pin is irrelevant. `unlimited`.
- *   - radius set, a pin missing — there IS a check to make and we cannot make
- *     it. `unverifiable`, which `blocksOrder` refuses.
- *
- * The cost is deliberate and is the point: turning a radius on now takes every
- * unpinned shop offline until somebody pins it. That is the safe direction —
- * AGENTS.md rule 2, "a failed config check must reduce access, never widen it" —
- * and the shop comes back the moment its pin is set.
+ * An unpinned shop is taken to be in town: shops are onboarded by hand, in
+ * Bemetara. Radius 0 is still the admin switching the limit off (`unlimited`).
  */
 export function checkServiceArea(input: {
-  shop: Point | null | undefined;
+  /** Checked only when pinned — see above. */
+  shop?: Point | null;
   destination: Point | null | undefined;
   radiusKm: number;
+  /** Defaults to Bemetara. */
+  centre?: Point;
 }): ServiceArea {
   const radiusKm = Number.isFinite(input.radiusKm)
     ? Math.max(0, input.radiusKm)
     : 0;
-
-  const from = coords(input.shop);
+  const centre = coords(input.centre) ?? SERVICE_CENTRE;
   const to = coords(input.destination);
 
-  // Checked FIRST, and before the pins are looked at: with no radius there is
-  // no question being asked, so an unpinned shop cannot fail to answer it.
-  // Ordering this after the pin checks would refuse orders on a platform that
-  // had deliberately switched the limit off, which is the opposite mistake.
-  if (radiusKm <= 0) {
-    return {
-      status: "unlimited",
-      distanceKm: from && to ? haversineKm(from, to) : null,
-      radiusKm,
-    };
-  }
-
-  // A radius is set, so the check is real. Either end missing means we cannot
-  // perform it — and an unperformed check is a refusal, not a pass.
-  if (!from || !to) {
+  // The delivery address must always be on the map, whatever the radius — a
+  // pinless saved "Bhilai" was once orderable from a Bemetara shop.
+  if (!to) {
     return {
       status: "unverifiable",
       distanceKm: null,
       radiusKm,
-      reason: !from ? "shop_unpinned" : "address_unpinned",
+      reason: "address_unpinned",
     };
   }
 
-  const distanceKm = haversineKm(from, to);
+  const distanceKm = haversineKm(centre, to);
+
+  // No radius: the admin has decided not to limit anything.
+  if (radiusKm <= 0) {
+    return { status: "unlimited", distanceKm, radiusKm };
+  }
+
+  const shop = coords(input.shop);
+  if (shop && haversineKm(centre, shop) > radiusKm) {
+    return { status: "out_of_range", distanceKm, radiusKm, reason: "shop_outside_area" };
+  }
+
   return {
     status: distanceKm > radiusKm ? "out_of_range" : "in_range",
     distanceKm,
@@ -141,23 +159,19 @@ export function blocksOrder(area: ServiceArea): boolean {
 }
 
 /**
- * Why the order was refused, in a sentence a customer can act on.
- *
- * An unpinned SHOP is not the customer's fault and must not be described as if
- * it were: telling somebody their address is outside a delivery area, when the
- * truth is the restaurant never set its location, sends them off to re-pin an
- * address that was fine.
+ * Why the order was refused, in a sentence a customer can act on — English
+ * then Hindi, the pattern the rest of the app uses.
  */
 export function outOfRangeMessage(area: ServiceArea): string {
   if (area.status === "unverifiable") {
-    return area.reason === "shop_unpinned"
-      ? "This shop hasn't set its location yet, so we can't confirm it delivers to you. Please try another shop while they finish setting up."
-      : "We need your delivery location on the map before we can confirm this shop delivers to you. Please pick your address again.";
+    return 'Put your delivery address on the map first (drop a pin or tap "Use my location"), so we can check we deliver there. / पहले नक्शे पर अपना पता लगाएं।';
   }
-
+  if (area.reason === "shop_outside_area") {
+    return `This shop is outside our ${area.radiusKm} km Bemetara delivery area, so it can't deliver to you. Please pick another shop. / यह दुकान हमारे डिलीवरी क्षेत्र से बाहर है।`;
+  }
   const distance =
     area.distanceKm === null ? null : Math.round(area.distanceKm * 10) / 10;
   return distance === null
-    ? `This address is outside the ${area.radiusKm} km delivery area for this shop.`
-    : `This address is about ${distance} km from the shop, outside its ${area.radiusKm} km delivery area.`;
+    ? `Sorry, we deliver only within ${area.radiusKm} km of Bemetara. / हम केवल बेमेतरा के ${area.radiusKm} किमी के अंदर डिलीवरी करते हैं।`
+    : `Sorry, we deliver only within ${area.radiusKm} km of Bemetara — this address is about ${distance} km away. / हम केवल बेमेतरा के ${area.radiusKm} किमी के अंदर डिलीवरी करते हैं।`;
 }

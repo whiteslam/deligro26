@@ -378,7 +378,7 @@ export function TrackingMap({
       {routeFailed ? (
         <p
           style={{ bottom: bottomInset }}
-          className="absolute inset-x-0 bg-surface/85 px-3 py-1.5 text-[10px] font-medium leading-snug text-muted"
+          className="absolute inset-x-0 bg-surface/85 px-3 py-1.5 text-[11px] font-medium leading-snug text-muted"
         >
           Road route unavailable — the line is direct, not along roads.
         </p>
@@ -551,7 +551,7 @@ function TrackingMapFallback({
 
       <p
         style={{ bottom: bottomInset }}
-        className="absolute inset-x-0 bg-surface/85 px-3 py-1.5 text-[10px] font-medium leading-snug text-muted"
+        className="absolute inset-x-0 bg-surface/85 px-3 py-1.5 text-[11px] font-medium leading-snug text-muted"
       >
         No map available — positions shown in a straight line, not along roads.
       </p>

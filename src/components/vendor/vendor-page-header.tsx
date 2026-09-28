@@ -121,7 +121,7 @@ export function VendorSegmentedTabs<T extends string>({
               {tab.count !== undefined ? (
                 <span
                   className={cn(
-                    "mt-0.5 block text-[10px] font-bold",
+                    "mt-0.5 block text-[11px] font-bold",
                     selected ? "text-accent" : "text-muted"
                   )}
                 >

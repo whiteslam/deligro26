@@ -5,7 +5,11 @@ import type { OrderEta } from "@/lib/orders/eta";
 import { shortOrderId } from "@/lib/utils/order-map";
 import { statusIndex, trackingSteps } from "@/lib/utils/order-status";
 import { PhotoTile } from "@/components/shared/photo-tile";
-import { formatINR } from "@/lib/utils/format";
+import {
+  CUSTOMER_LATE_CAP_MINUTES,
+  formatCustomerLateness,
+  formatINR,
+} from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -43,7 +47,13 @@ export function LiveOrderCard({
    */
   const unmeasured = Boolean(eta) && eta?.distanceKnown === false;
   const minutes = eta?.minutesRemaining ?? null;
-  const headline = unmeasured
+  // Far past its promise, any countdown is fiction: "115 min" sat next to
+  // "Delayed" on an order that had been open for 27 days. Say what we know.
+  const stuck =
+    Boolean(eta?.late) && (eta?.lateByMinutes ?? 0) >= CUSTOMER_LATE_CAP_MINUTES;
+  const headline = stuck
+    ? "Delayed · देरी"
+    : unmeasured
     ? "On its way"
     : minutes !== null
       ? minutes > 0
@@ -52,7 +62,9 @@ export function LiveOrderCard({
       : order.etaMinutes
         ? `~${order.etaMinutes} min`
         : "On its way";
-  const caption = unmeasured
+  const caption = stuck
+    ? "We're looking into this order"
+    : unmeasured
     ? "We can't estimate this one"
     : minutes !== null || order.etaMinutes
       ? "Estimated arrival"
@@ -95,10 +107,10 @@ export function LiveOrderCard({
             {headline}
           </p>
         </div>
-        {eta?.late ? (
+        {eta?.late && !stuck ? (
           <span className="flex shrink-0 items-center gap-1 rounded-full bg-deal-soft px-2.5 py-1 text-[11px] font-bold text-deal">
             <Clock className="size-3" />
-            {eta.lateByMinutes} min late
+            {formatCustomerLateness(eta.lateByMinutes)}
           </span>
         ) : null}
       </div>

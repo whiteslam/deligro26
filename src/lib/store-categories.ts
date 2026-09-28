@@ -17,12 +17,11 @@ import type { PlatformSettings } from "@/types";
  *
  * ## feature_pharmacy
  *
- * Deliberately absent. There is no pharmacy category, hero or vertical anywhere
- * in the product, so the toggle has nothing to gate: wiring it here would create
- * the appearance of a control over a feature that does not exist. It has been
- * removed from the Settings form instead. The column stays — dropping it is a
- * migration, and it costs nothing where it is — but nothing now presents it as
- * operational.
+ * There is no pharmacy category, hero or vertical in the product, so it gates
+ * no category here. It does gate BANNERS (below): a "Medicines at your door"
+ * campaign pointed customers at a service that does not exist. The toggle is
+ * not on the Settings form; the column defaults off and is flipped in the
+ * database the day a pharmacy vertical ships.
  */
 const CATEGORY_FEATURE: Record<string, keyof PlatformSettings> = {
   groceries: "featureGrocery",
@@ -36,6 +35,25 @@ export function isStoreCategoryEnabled(
   const flag = CATEGORY_FEATURE[id];
   if (!flag) return true;
   return Boolean((settings as Record<string, unknown>)[flag]);
+}
+
+/**
+ * Should a banner pointing at this target be shown?
+ *
+ * Same flags as the categories. Banners were the gap: switching Pick & Drop off
+ * hid its category tile, but the home carousel went on advertising "Pick &
+ * Drop, anywhere" and "Medicines at your door" — the first two things a
+ * customer saw on the home screen, for services the launch doesn't offer
+ * (Bemetara launch scope, 28 Sept 2026: food, grocery and dairy only).
+ */
+export function isBannerTargetEnabled(
+  type: string,
+  settings: Pick<PlatformSettings, "featureGrocery" | "featurePickDrop" | "featurePharmacy">
+): boolean {
+  if (type === "grocery") return settings.featureGrocery;
+  if (type === "pick_drop") return settings.featurePickDrop;
+  if (type === "pharmacy") return settings.featurePharmacy;
+  return true;
 }
 
 export function enabledStoreCategories(

@@ -1,6 +1,8 @@
 import { ShopLocationForm } from "@/components/vendor/shop-location-form";
 import { VendorHero, VendorPanel } from "@/components/vendor/vendor-ui";
 import { getOwnedRestaurantFromDb } from "@/lib/data-access/restaurants";
+import { vendorFeatureOn } from "@/lib/features/guards.server";
+import { FeatureOffNotice } from "@/components/features/features-provider";
 
 /**
  * Vendor → Settings. The shop pin, and nothing else.
@@ -12,6 +14,9 @@ import { getOwnedRestaurantFromDb } from "@/lib/data-access/restaurants";
 export const dynamic = "force-dynamic";
 
 export default async function VendorSettingsPage() {
+  // Switchable in Admin → Feature access; the server actions behind this
+  // page check the same switch.
+  if (!(await vendorFeatureOn("vendor.shop_profile"))) return <FeatureOffNotice title="Shop settings" />;
   const restaurant = await getOwnedRestaurantFromDb();
 
   return (

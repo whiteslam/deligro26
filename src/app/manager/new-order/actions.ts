@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { staffFeatureOn } from "@/lib/features/guards.server";
+import { FEATURE_OFF_MESSAGE } from "@/lib/features/catalog";
 import { requireRole } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -57,6 +59,7 @@ export interface PlaceResult {
 /** Who owns the number the operator just typed, if anyone. */
 export async function lookupCallerAction(phone: string): Promise<LookupResult> {
   const profile = await requireRole(["manager", "admin"]);
+  if (!(await staffFeatureOn("manager.phone_orders"))) return { ok: false, error: FEATURE_OFF_MESSAGE };
   if (!isSupabaseConfigured) return { ok: false, error: DEMO };
 
   const limit = await rateLimit(`phone-order-lookup:${profile.id}`, 120, 60_000);
@@ -74,6 +77,7 @@ export async function lookupCallerAction(phone: string): Promise<LookupResult> {
 /** One shop's orderable dishes, fetched when the operator picks it. */
 export async function loadShopMenuAction(slug: string): Promise<MenuResult> {
   const profile = await requireRole(["manager", "admin"]);
+  if (!(await staffFeatureOn("manager.phone_orders"))) return { ok: false, error: FEATURE_OFF_MESSAGE };
   if (!isSupabaseConfigured) return { ok: false, error: DEMO };
 
   const limit = await rateLimit(`phone-order-menu:${profile.id}`, 120, 60_000);
@@ -116,6 +120,7 @@ export async function placePhoneOrderAction(
   input: PhoneOrderInput
 ): Promise<PlaceResult> {
   const profile = await requireRole(["manager", "admin"]);
+  if (!(await staffFeatureOn("manager.phone_orders"))) return { ok: false, error: FEATURE_OFF_MESSAGE };
   if (!isSupabaseConfigured) return { ok: false, error: DEMO };
 
   // Tighter than the customer checkout's 20/min: a human on a phone call places

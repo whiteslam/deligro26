@@ -31,26 +31,59 @@ export interface PushOptions {
 }
 
 /**
- * Send a push to one or more OneSignal player ids. Best-effort: never throws
- * into the caller's request path — a failed push must not fail an order update.
- * Returns true if OneSignal accepted the request.
+ * Notification copy. OneSignal requires `en` and picks the entry matching the
+ * device language, so a Hindi phone reads `hi` and everything else falls back
+ * to English. Most of this app's customers, riders and kitchens are Hindi-first.
  */
-export async function sendPush(
-  playerIds: string | Array<string | null | undefined>,
-  heading: string,
-  message: string,
-  opts: PushOptions = {}
+export interface PushText {
+  en: string;
+  hi?: string;
+}
+
+function localized(text: string | PushText): PushText {
+  return typeof text === "string" ? { en: text } : text;
+}
+
+/**
+ * Who to send to.
+ *
+ * `userIds` is the primary target: the browser SDK calls `OneSignal.login(user.id)`
+ * (see onesignal-init.tsx), which makes the profile id the subscription's
+ * `external_id`, so every device a person is signed in on gets the push — the
+ * counter tablet and the owner's phone, not whichever registered last.
+ *
+ * `playerIds` is the fallback for devices that subscribed before login existed
+ * and have not opened the app since. It is only tried when the external-id send
+ * reached nobody: the two targets cannot be combined in one request.
+ */
+export interface PushTarget {
+  userIds?: Array<string | null | undefined>;
+  playerIds?: Array<string | null | undefined>;
+}
+
+function present(ids: Array<string | null | undefined> | undefined): string[] {
+  return [...new Set((ids ?? []).filter((id): id is string => typeof id === "string" && id.length > 0))];
+}
+
+/**
+ * One create-notification call. Returns true only when OneSignal accepted it
+ * AND it had somebody to deliver to: a send to an external id with no
+ * subscribed device comes back 200 with an empty `id`, which is the signal to
+ * try the fallback target rather than a success.
+ */
+async function createNotification(
+  targeting: Record<string, unknown>,
+  heading: PushText,
+  message: PushText,
+  opts: PushOptions,
+  targetKind: "external_id" | "player_id",
+  count: number
 ): Promise<boolean> {
-  const ids = (Array.isArray(playerIds) ? playerIds : [playerIds])
-    .filter((id): id is string => typeof id === "string" && id.length > 0);
-
-  if (!isPushConfigured || ids.length === 0) return false;
-
   const body: Record<string, unknown> = {
     app_id: APP_ID,
-    include_player_ids: ids,
-    headings: { en: heading },
-    contents: { en: message },
+    ...targeting,
+    headings: heading,
+    contents: message,
   };
   if (CHANNEL_ID) body.android_channel_id = CHANNEL_ID;
   if (opts.url) body.url = opts.url;
@@ -59,8 +92,7 @@ export async function sendPush(
   // Fire-and-forget still has to be observable. Before this, a push that
   // OneSignal rejected and a push that was never attempted looked identical
   // from outside — `false`, and nothing else — so "customers stopped being told
-  // their order was on its way" was not a question anyone could answer. The
-  // return value is unchanged; only the record is new.
+  // their order was on its way" was not a question anyone could answer.
   const started = Date.now();
   try {
     const res = await fetch(ENDPOINT, {
@@ -73,6 +105,26 @@ export async function sendPush(
       // Don't let a slow provider hang the caller.
       signal: AbortSignal.timeout(8000),
     });
+    let reached = res.ok;
+    if (res.ok) {
+      // "Accepted" is not "reached anyone". OneSignal answers 200 when none of
+      // the targets resolve, signalling it with an empty `id` and/or an
+      // `errors` field (`invalid_aliases` for an external id with no
+      // subscription, "All included players are not subscribed" for player
+      // ids). Either one means nobody got it — which is what has to trigger
+      // the player-id fallback, or a customer who subscribed before login
+      // existed would silently stop getting pushes.
+      const json = (await res.json().catch(() => null)) as {
+        id?: string;
+        errors?: unknown;
+      } | null;
+      const hasErrors =
+        json?.errors != null &&
+        (Array.isArray(json.errors)
+          ? json.errors.length > 0
+          : typeof json.errors === "object" && Object.keys(json.errors).length > 0);
+      reached = typeof json?.id === "string" && json.id.length > 0 && !hasErrors;
+    }
     recordProvider(
       "onesignal",
       "notifications.create",
@@ -82,15 +134,14 @@ export async function sendPush(
         status: res.status,
         // The status line, not the body: OneSignal echoes the notification
         // payload back on some errors, and that payload contains player ids.
-        detail: res.ok ? undefined : res.statusText,
+        detail: res.ok ? (reached ? undefined : "no_subscribed_recipients") : res.statusText,
       },
-      { attrs: { itemCount: ids.length } }
+      { attrs: { itemCount: count, target: targetKind } }
     );
-    return res.ok;
+    return reached;
   } catch (err) {
-    // Network error / timeout / abort — swallowed as before, but no longer
-    // silent. A timeout here is the 8s abort above, which is a different
-    // diagnosis to a 400 and needs to be told apart from one.
+    // Network error / timeout / abort — swallowed, but not silent. A timeout
+    // here is the 8s abort above, which is a different diagnosis to a 400.
     recordProvider(
       "onesignal",
       "notifications.create",
@@ -99,8 +150,57 @@ export async function sendPush(
         durationMs: Date.now() - started,
         detail: err instanceof Error ? err.name : "network_error",
       },
-      { attrs: { itemCount: ids.length } }
+      { attrs: { itemCount: count, target: targetKind } }
     );
     return false;
   }
+}
+
+/**
+ * Send a push. Best-effort: never throws into the caller's request path — a
+ * failed push must not fail an order update. Returns true if it reached at
+ * least one device.
+ *
+ * A bare string or array is read as player ids, the pre-login call shape.
+ */
+export async function sendPush(
+  target: PushTarget | string | Array<string | null | undefined>,
+  heading: string | PushText,
+  message: string | PushText,
+  opts: PushOptions = {}
+): Promise<boolean> {
+  if (!isPushConfigured) return false;
+
+  const t: PushTarget =
+    typeof target === "string" || Array.isArray(target)
+      ? { playerIds: Array.isArray(target) ? target : [target] }
+      : target;
+  const userIds = present(t.userIds);
+  const playerIds = present(t.playerIds);
+  const h = localized(heading);
+  const m = localized(message);
+
+  if (userIds.length > 0) {
+    const reached = await createNotification(
+      { include_aliases: { external_id: userIds }, target_channel: "push" },
+      h,
+      m,
+      opts,
+      "external_id",
+      userIds.length
+    );
+    if (reached) return true;
+  }
+
+  if (playerIds.length > 0) {
+    return createNotification(
+      { include_player_ids: playerIds },
+      h,
+      m,
+      opts,
+      "player_id",
+      playerIds.length
+    );
+  }
+  return false;
 }

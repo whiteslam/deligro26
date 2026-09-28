@@ -47,19 +47,19 @@ const OTHER: {
 }[] = [
   {
     icon: MapPin,
-    label: "Saved addresses",
+    label: "Saved addresses · सेव पते",
     href: "/profile/addresses",
     tone: "blue",
   },
   {
     icon: Bell,
-    label: "Notifications",
+    label: "Notifications · सूचनाएं",
     href: "/profile/notifications",
     tone: "accent",
   },
   {
     icon: CircleHelp,
-    label: "Help & support",
+    label: "Help & support · मदद",
     href: "/profile/help",
     tone: "green",
   },
@@ -68,11 +68,11 @@ const OTHER: {
   // support FAQ, which says nothing about either privacy or security.
   {
     icon: ShieldCheck,
-    label: "Privacy & security",
+    label: "Privacy & security · गोपनीयता",
     href: "/profile/privacy",
     tone: "violet",
   },
-  { icon: Info, label: "About Deligro", href: "/profile/about", tone: "blue" },
+  { icon: Info, label: "About Deligro · हमारे बारे में", href: "/profile/about", tone: "blue" },
 ];
 
 // Change this to the developers' inbox. Powers the "Contact developers" row.
@@ -276,7 +276,7 @@ export default async function ProfilePage() {
           type="submit"
           className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-deal"
         >
-          <LogOut className="size-4" /> Sign out
+          <LogOut className="size-4" /> Sign out · लॉग आउट
         </button>
       </form>
 

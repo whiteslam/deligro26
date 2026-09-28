@@ -617,7 +617,7 @@ export function SettingsForm({
               defaultValue={settings.defaultPrepMinutes}
             />
           </Row>
-          <Row label="Delivery radius" hint="Kilometres from the shop." htmlFor="deliveryRadiusKm">
+          <Row label="Delivery radius" hint="Kilometres from Bemetara city centre — one circle for the whole city. 0 switches the limit off." htmlFor="deliveryRadiusKm">
             <Num
               id="deliveryRadiusKm"
               name="deliveryRadiusKm"

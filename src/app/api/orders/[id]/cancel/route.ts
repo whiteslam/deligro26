@@ -10,6 +10,7 @@ import {
   notifyOrderCancelled,
   notifyVendorOrderCancelled,
 } from "@/lib/notifications/order-events";
+import { deferNotify } from "@/lib/notifications/defer";
 
 /**
  * POST /api/orders/:id/cancel — a customer cancels their own order, but only
@@ -120,8 +121,8 @@ export async function POST(
 
   // Fire-and-forget, by contract: order-events swallows its own failures. A
   // push outage must not fail a cancellation that has already happened.
-  void notifyOrderCancelled(id, { refundQueued });
-  void notifyVendorOrderCancelled(id);
+  deferNotify(() => notifyOrderCancelled(id, { refundQueued }));
+  deferNotify(() => notifyVendorOrderCancelled(id));
 
   return NextResponse.json({ ok: true, refundQueued });
 }

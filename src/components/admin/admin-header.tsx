@@ -24,16 +24,16 @@ export function AdminHeader({
         href="/"
         aria-label="Open the customer app"
         title="Customer app"
-        className="press grid size-9 shrink-0 place-items-center rounded-full border border-line bg-surface text-muted"
+        className="press grid size-11 shrink-0 place-items-center rounded-full border border-line bg-surface text-muted"
       >
         <UtensilsCrossed className="size-4" />
       </Link>
-      <ThemeToggle className="size-9" />
+      <ThemeToggle className="size-11" />
       {isSupabaseConfigured ? (
         <form action="/auth/signout?next=/admin/login" method="post">
           <button
             type="submit"
-            className="press grid size-9 place-items-center rounded-full border border-line bg-surface text-muted"
+            className="press grid size-11 place-items-center rounded-full border border-line bg-surface text-muted"
             aria-label="Sign out"
           >
             <LogOut className="size-4" />

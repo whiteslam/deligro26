@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Plus, Minus } from "lucide-react";
 import { useCart } from "@/stores/cart-store";
 import { useCartSwitch } from "@/stores/cart-switch-store";
@@ -48,6 +48,20 @@ function ItemSheetInner() {
     onClose();
   };
 
+  // A dialog, announced as one: it was a plain div, so a screen reader landed
+  // on nothing it could name, and Escape (a hardware keyboard, a TalkBack
+  // back gesture mapped to it) did nothing. Focus moves into the sheet when it
+  // opens so the next swipe reads the dish, not the menu behind it.
+  const sheetRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    sheetRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <div className="absolute inset-0 z-50">
       <button
@@ -55,7 +69,14 @@ function ItemSheetInner() {
         onClick={onClose}
         className="animate-fade-in absolute inset-0 bg-ink/40"
       />
-      <div className="animate-sheet-in bolt-sheet absolute inset-x-0 bottom-0 max-h-[92%] overflow-hidden">
+      <div
+        ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={item.name}
+        tabIndex={-1}
+        className="animate-sheet-in bolt-sheet absolute inset-x-0 bottom-0 max-h-[92%] overflow-hidden outline-none"
+      >
         <div className="bolt-sheet-handle" />
         <div className="no-scrollbar max-h-[92vh] overflow-y-auto">
           {/* Hero image with close */}
@@ -104,7 +125,7 @@ function ItemSheetInner() {
             <button
               onClick={() => setLocalQty((q) => Math.max(1, q - 1))}
               aria-label="Remove one"
-              className="press grid size-11 place-items-center rounded-full text-ink hover:bg-surface-2"
+              className="tap-target press grid size-11 place-items-center rounded-full text-ink hover:bg-surface-2"
             >
               <Minus className="size-5" strokeWidth={2.5} />
             </button>
@@ -114,7 +135,7 @@ function ItemSheetInner() {
             <button
               onClick={() => setLocalQty((q) => q + 1)}
               aria-label="Add one"
-              className="press grid size-11 place-items-center rounded-full text-ink hover:bg-surface-2"
+              className="tap-target press grid size-11 place-items-center rounded-full text-ink hover:bg-surface-2"
             >
               <Plus className="size-5" strokeWidth={2.5} />
             </button>

@@ -11,6 +11,8 @@ import {
   phoneOrdersReady,
   type OrderableShop,
 } from "@/lib/data-access/manager-phone-orders";
+import { staffFeatureOn } from "@/lib/features/guards.server";
+import { FeatureOffNotice } from "@/components/features/features-provider";
 
 export const metadata: Metadata = { title: "Phone order · Deligro" };
 
@@ -31,6 +33,9 @@ export const dynamic = "force-dynamic";
  * get its authorization second-hand from a parent that could be refactored.
  */
 export default async function NewPhoneOrderPage() {
+  // Switchable in Admin → Feature access; the server actions behind this
+  // page check the same switch.
+  if (!(await staffFeatureOn("manager.phone_orders"))) return <FeatureOffNotice title="Phone orders" />;
   await requireRole(["manager", "admin"]);
 
   let shops: OrderableShop[] = [];

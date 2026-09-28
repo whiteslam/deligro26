@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bug-fix pass — Deligro</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: #14181b; --muted: #6b7580; --bg: #f7f6f3; --surface: #ffffff;
+        --line: #e2e0da; --green: #17b26a; --red: #d9534f; --amber: #d98c22; --accent: #f0731e;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --ink: #e9edf0; --muted: #99a4ae; --bg: #14181b; --surface: #1b2126; --line: #2a3036; }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink);
+        font: 16px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      main { max-width: 900px; margin: 0 auto; padding: 48px 16px 96px; }
+      header.top { border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 32px; }
+      h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 44px 0 12px; }
+      .lede { color: var(--muted); margin: 0; }
+      .wrap { overflow-x: auto; }
+      table { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; min-width: 620px; }
+      th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+      code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface);
+        border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; word-break: break-word; }
+      .tag { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+        padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+      .ok { color: var(--green); border: 1px solid var(--green); }
+      .warn { color: var(--amber); border: 1px solid var(--amber); }
+      .bad { color: var(--red); border: 1px solid var(--red); }
+      .callout { border-left: 3px solid var(--red); background: var(--surface); padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+      .callout.amber { border-color: var(--amber); }
+      ul { padding-left: 20px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="top">
+        <h1>Bug-fix pass — 25 Sept 2026</h1>
+        <p class="lede">
+          8 reported bugs (customer + rider), verified with Playwright against the live Supabase
+          database on a 390px phone viewport, plus 11 further bugs found during testing.
+          Type-check clean, lint 0 errors, 13 QA suites green.
+        </p>
+      </header>
+
+      <div class="callout">
+        <strong>Action needed — 4 database migrations are not applied in production.</strong>
+        A read-only probe of the live schema found these missing:
+        <code>0039_vendor_login_credentials</code>, <code>0042_rider_dispatch</code>,
+        <code>0048_settlement_corrections</code>, <code>0051_cancellation_provenance</code>.
+        The app degrades around them (rider "first refusal" offers are off, vendor credentials
+        can't be read back, settlement corrections and cancellation reasons aren't stored),
+        and the console's "Settings store: Migrated" badge wrongly reports all-clear. Apply them
+        through the usual migration path, after running <code>docs/SECURITY_AUDIT.md</code>
+        (0039 touches credentials).
+      </div>
+
+      <h2>Reported bugs</h2>
+      <div class="wrap"><table>
+        <thead><tr><th>#</th><th>Bug</th><th>Root cause</th><th>Fix</th><th>Verified</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Tapping the location error doesn't ask for permission</td>
+            <td>The error was plain text; once a site is blocked iOS/Brave never re-prompt, so taps looked dead.</td>
+            <td>Error is a "Tap here to try again" button that calls geolocation inside the tap; blocked state shows iPhone/Android steps + reload. <code>location/page.tsx</code>, <code>location-store.ts</code>, new <code>permission-help.ts</code></td>
+            <td><span class="tag ok">PLAYWRIGHT</span></td></tr>
+          <tr><td>2</td><td>No current-location button on the checkout map</td>
+            <td><code>map-picker.tsx</code> only drew "Use my location" for the form variant.</td>
+            <td>Button on every map variant, top-right, with clear errors.</td>
+            <td><span class="tag ok">PLAYWRIGHT</span></td></tr>
+          <tr><td>3</td><td>Refund form has no visible button, UI collapsed</td>
+            <td>The dialog sat inside the draggable order sheet, whose CSS transform trapped <code>position: fixed</code> — clipped and under the tab bar.</td>
+            <td>Portaled to <code>.app-shell</code>, scrollable, 16px textarea. <code>refund-request.tsx</code></td>
+            <td><span class="tag ok">PLAYWRIGHT</span></td></tr>
+          <tr><td>4</td><td>Receipt time wrong (7:42 am for a 1:12 pm order)</td>
+            <td>Server renders in UTC; dates formatted without <code>timeZone</code>.</td>
+            <td><code>formatIst</code> / <code>istDaysBetween</code> in <code>ist-time.ts</code>; applied to receipt, order cards, history, notifications, admin/vendor/manager feeds, rider history.</td>
+            <td><span class="tag ok">PLAYWRIGHT</span> <span class="tag ok">TZ=UTC SCRIPT</span></td></tr>
+          <tr><td>5</td><td>Misspelled search ("Safron") shows 0 results</td>
+            <td>Restaurant names weren't in the typo vocabulary; typo budget too tight for Hindi spellings.</td>
+            <td>Sounds-like matching, shop names in vocabulary, "Showing results for …" hint. <code>semantic.ts</code>, <code>dishes.ts</code></td>
+            <td><span class="tag ok">PLAYWRIGHT</span> <span class="tag ok">80 TESTS</span></td></tr>
+          <tr><td>6</td><td>App accepts orders outside the delivery area</td>
+            <td>Pinless addresses passed the server gate; switching address kept the previous pin; Place order stayed live.</td>
+            <td>Fail closed on client and server. <code>service-area.ts</code>, <code>checkout-view.tsx</code></td>
+            <td><span class="tag ok">PLAYWRIGHT</span> server returns 400 for far pin and no pin</td></tr>
+          <tr><td>7</td><td>Rider "Navigate" opens two maps</td>
+            <td>In-app route sheet trapped under the tab bar with the job card's map showing through; it had no turn-by-turn anyway.</td>
+            <td>Navigate opens Google Maps two-wheeler turn-by-turn directly; route sheet deleted.</td>
+            <td><span class="tag warn">CODE + TESTS</span> needs rider login</td></tr>
+          <tr><td>8</td><td>No confirmation after delivery OTP</td>
+            <td>Success path only refreshed; errors could crash to the error page.</td>
+            <td>"Order delivered / ऑर्डर डिलीवर हो गया" modal with cash-to-collect; bilingual errors; pickup vs delivery code labels clarified.</td>
+            <td><span class="tag warn">CODE + TESTS</span> needs rider login</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2>Found during testing, fixed</h2>
+      <div class="wrap"><table>
+        <thead><tr><th>Bug</th><th>Cause</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr><td>"panir" returned Pani Gupchup instead of paneer</td><td>Exact sound-alikes ranked below one-letter typos and were dropped.</td><td>New homophone tier above edit-distance; regression test added.</td></tr>
+          <tr><td>Detected location never gets a name ("Tap to detect")</td><td>CSP blocked the Nominatim reverse-geocode fallback.</td><td><code>nominatim.openstreetmap.org</code> added to <code>connect-src</code>.</td></tr>
+          <tr><td>Web push never initialises</td><td>CSP blocked OneSignal's <code>api.onesignal.com</code> config script; init ran twice.</td><td>Added to <code>script-src</code>; one-time init guard.</td></tr>
+          <tr><td>Cancelled order keeps showing "Order sent" + Cancel</td><td>Status comes from the live-tracking hook, which <code>router.refresh()</code> doesn't touch.</td><td>Hook exposes <code>refresh()</code>, called after cancel.</td></tr>
+          <tr><td>Cancelled cash order offers "Request a refund"</td><td>Refund offered on any cancelled order.</td><td>Only when delivered, or cancelled and actually paid.</td></tr>
+          <tr><td>"33927 min late"</td><td>Raw minutes.</td><td><code>formatLateness</code> → "24 days late".</td></tr>
+          <tr><td>React hydration error on /orders</td><td><code>PortalToShell</code> rendered differently on first client render.</td><td>Gated on <code>useIsClient</code>.</td></tr>
+          <tr><td>Admin → Customers: 500</td><td>Ambiguous <code>profiles→orders</code> embed (customer_id and placed_by).</td><td>Named FK <code>orders!orders_customer_id_fkey</code>.</td></tr>
+          <tr><td>Admin → Observability → Delivery: 500</td><td>Reads <code>offered_driver_id</code> (migration 0042 not applied).</td><td>Falls back without the column.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2>Open — needs a decision or data fix</h2>
+      <ul>
+        <li><strong>Stuck order D8A8DA3D</strong> (Saffron Kitchen, ₹743) has been "Accepted" for 24 days and still shows as live to the customer. Cancel or complete it from the admin console.</li>
+        <li><strong>Address text vs pin:</strong> after "Use my location" the pin moves but the written address still names the old place (e.g. Bhilai). Riders may see a mismatch. Decide: force the customer to update the text, or auto-fill it from the pin.</li>
+        <li><strong>Saffron Kitchen menu</strong> shows a category named "test" to customers.</li>
+        <li><strong>Test order F5936A22</strong> (₹302, Saffron Kitchen) was placed by accident during testing and cancelled ~2 minutes later; the kitchen may have seen an alert.</li>
+        <li><code>test:platform</code> fails 2 checks because <code>admin-nav.ts</code> is CRLF and the test splits on LF — pre-existing, unrelated.</li>
+        <li><code>test:idor</code> not run: it creates QA accounts, and local <code>.env.local</code> points at production.</li>
+        <li>Rider and vendor apps were not exercised in a browser (no login available); rider changes are covered by <code>test:driver-app</code> only.</li>
+      </ul>
+
+      <h2>Verification</h2>
+      <ul>
+        <li>Playwright, 390×844 and 1440×900: 33 admin/manager routes and 31 phone-width routes — no 5xx, no horizontal overflow, no NaN/undefined/Invalid Date.</li>
+        <li><code>tsc --noEmit</code> clean; ESLint 0 errors (5 pre-existing <code>&lt;img&gt;</code> warnings).</li>
+        <li>Suites green: ranking 80, service-area 20, driver-app 37, layering 16, tracking-origin 10, eta 35, payments 15, sw 36, obs 69, theme-color 11, switch 14, vendor-readiness 27, app-version 47.</li>
+      </ul>
+    </main>
+  </body>
+</html>

@@ -465,7 +465,7 @@ export const ROLE_MILESTONES: Record<Exclude<BuildTab, "customer">, Milestone[]>
         },
         {
           title: "Near-realtime order updates",
-          detail: "AutoRefresh poll every 4s on kitchen board — not a Supabase Realtime channel",
+          detail: "AutoRefresh poll every 8s on kitchen board (runs while hidden) — not a Supabase Realtime channel",
           db: "orders (poll)",
           status: "done",
         },

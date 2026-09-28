@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useFeatures } from "@/components/features/features-provider";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -125,6 +126,9 @@ export function VendorProfileView({
   profile: VendorProfileSummary;
   live: boolean;
 }) {
+  // Admin → Feature access.
+  const features = useFeatures();
+  const canEditShop = features["vendor.shop_profile"];
   const [editing, setEditing] = useState(false);
   const r = profile.restaurant;
   const since = r ? storeSince(r.createdAt) : null;
@@ -158,29 +162,29 @@ export function VendorProfileView({
           <div className="mb-auto flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
               {live && r?.isOpen ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
                   <LivePulse />
                   Accepting orders
                 </span>
               ) : null}
               {r?.approved ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+                <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
                   <ShieldCheck className="size-3" />
                   Approved
                 </span>
               ) : r ? (
-                <span className="rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-bold text-white/90 backdrop-blur-sm">
+                <span className="rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white/90 backdrop-blur-sm">
                   Pending approval
                 </span>
               ) : null}
               {r?.promoted ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+                <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
                   <Sparkles className="size-3" />
                   Promoted
                 </span>
               ) : null}
             </div>
-            {r ? (
+            {r && canEditShop ? (
               <Button
                 type="button"
                 size="sm"
@@ -217,11 +221,11 @@ export function VendorProfileView({
 
             {r ? (
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                <RestaurantOpenToggle isOpen={r.isOpen} />
+                <RestaurantOpenToggle isOpen={r.isOpen} onPhoto />
                 {r.cuisines.slice(0, 4).map((c) => (
                   <span
                     key={c}
-                    className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm"
+                    className="rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm"
                   >
                     {c}
                   </span>
@@ -253,6 +257,7 @@ export function VendorProfileView({
               <li key={item}>
                 <button
                   type="button"
+                  disabled={!canEditShop}
                   onClick={() => setEditing(true)}
                   className="press inline-flex items-center gap-1.5 rounded-full border border-dashed border-line bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-muted"
                 >
@@ -323,15 +328,17 @@ export function VendorProfileView({
                     What customers see on Deligro.
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditing(true)}
-                >
-                  <Pencil className="size-3.5" />
-                  Edit
-                </Button>
+                {canEditShop ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditing(true)}
+                  >
+                    <Pencil className="size-3.5" />
+                    Edit
+                  </Button>
+                ) : null}
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
@@ -383,13 +390,17 @@ export function VendorProfileView({
                   icon={Sparkles}
                   label="Promo offer"
                   value={
-                    <Link
-                      href="/vendor/promotions"
-                      className="inline-flex items-center gap-1 text-accent"
-                    >
-                      {r.offer?.trim() || "Run a promotion"}
-                      <ExternalLink className="size-3.5" />
-                    </Link>
+                    features["vendor.promotions"] ? (
+                      <Link
+                        href="/vendor/promotions"
+                        className="inline-flex items-center gap-1 text-accent"
+                      >
+                        {r.offer?.trim() || "Run a promotion"}
+                        <ExternalLink className="size-3.5" />
+                      </Link>
+                    ) : (
+                      r.offer?.trim() || "—"
+                    )
                   }
                 />
                 <Fact
@@ -480,16 +491,20 @@ export function VendorProfileView({
                   label="Orders"
                   hint={`${profile.stats.activeOrders} in the kitchen`}
                 />
-                <QuickLink
-                  href="/vendor/earnings"
-                  label="Earnings"
-                  hint="Settlements & sales trends"
-                />
-                <QuickLink
-                  href="/vendor/settings"
-                  label="Settings"
-                  hint="Where your shop sits on the map"
-                />
+                {features["vendor.earnings"] ? (
+                  <QuickLink
+                    href="/vendor/earnings"
+                    label="Earnings"
+                    hint="Settlements & sales trends"
+                  />
+                ) : null}
+                {features["vendor.shop_profile"] ? (
+                  <QuickLink
+                    href="/vendor/settings"
+                    label="Settings"
+                    hint="Where your shop sits on the map"
+                  />
+                ) : null}
                 {live ? (
                   <QuickLink
                     href={`/restaurant/${r.slug}`}

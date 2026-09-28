@@ -7,6 +7,7 @@ import {
   User,
   UtensilsCrossed,
 } from "lucide-react";
+import type { FeatureKey } from "@/lib/features/catalog";
 
 /**
  * One nav definition, three consumers: the web sidebar, the phone bottom tabs,
@@ -23,6 +24,8 @@ export interface VendorNavItem {
   primary?: boolean;
   tone: "green" | "blue" | "accent" | "deal" | "violet";
   match: (pathname: string) => boolean;
+  /** Hidden when this switch is off for the shop (Admin → Feature access). */
+  feature?: FeatureKey;
 }
 
 export const VENDOR_NAV: VendorNavItem[] = [
@@ -37,6 +40,7 @@ export const VENDOR_NAV: VendorNavItem[] = [
   },
   {
     href: "/vendor/overview",
+    feature: "vendor.earnings",
     label: "Overview",
     icon: LayoutDashboard,
     group: "Overview",
@@ -55,6 +59,7 @@ export const VENDOR_NAV: VendorNavItem[] = [
   },
   {
     href: "/vendor/earnings",
+    feature: "vendor.earnings",
     label: "Earnings",
     icon: IndianRupee,
     group: "Money",
@@ -67,6 +72,7 @@ export const VENDOR_NAV: VendorNavItem[] = [
     // revenue to buy orders, and it sits next to the screen that shows what
     // that revenue is.
     href: "/vendor/promotions",
+    feature: "vendor.promotions",
     label: "Promotions",
     icon: TicketPercent,
     group: "Money",
@@ -84,6 +90,7 @@ export const VENDOR_NAV: VendorNavItem[] = [
   },
   {
     href: "/vendor/settings",
+    feature: "vendor.shop_profile",
     label: "Settings",
     icon: Settings,
     group: "Account",
@@ -99,6 +106,14 @@ export const VENDOR_NAV_GROUPS = [
   "Money",
   "Account",
 ] as const;
+
+/** Nav items this shop may use: drops entries whose feature is switched off. */
+export function visibleVendorNav<T extends VendorNavItem>(
+  items: T[],
+  features: Record<string, boolean>
+): T[] {
+  return items.filter((i) => !i.feature || features[i.feature] !== false);
+}
 
 /** The five that fit the phone's bottom bar. */
 export const VENDOR_PHONE_TABS = VENDOR_NAV.filter((i) => i.primary);

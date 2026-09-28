@@ -10,6 +10,7 @@ import {
 import { Bell, BellOff, BellRing } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { playAlertSound } from "@/lib/alerts/tones";
+import { requestPushOptIn } from "@/components/notifications/onesignal-init";
 
 /**
  * Tells a rider a job has appeared in the available pool.
@@ -153,6 +154,10 @@ export function RiderAlert({
       }
     }
 
+    // Same tap subscribes this device to server push, which is what reaches
+    // it when the board isn't running at all — a sleeping screen, a closed tab.
+    requestPushOptIn();
+
     announced.current = new Set(incomingIds);
     seeded.current = true;
     lastRepeat.current = Date.now();
@@ -210,7 +215,7 @@ export function RiderAlert({
       )}
       <p className="min-w-0 flex-1 font-medium">
         {on ? (
-          "Sound and vibration on for new jobs."
+          "Sound and vibration on for new jobs. / नए जॉब पर आवाज़ चालू है।"
         ) : audioFailed ? (
           <>
             <span className="font-bold">
@@ -222,17 +227,17 @@ export function RiderAlert({
         ) : (
           <>
             <span className="font-bold">Alerts are off.</span> New jobs will
-            arrive silently on this device.
+            arrive silently on this device. / अलर्ट बंद हैं — नए जॉब की आवाज़ नहीं आएगी।
           </>
         )}
       </p>
       {on ? (
         <Button variant="ghost" size="sm" onClick={disarm} className="shrink-0">
-          Mute
+          Mute · बंद करें
         </Button>
       ) : (
         <Button size="sm" onClick={arm} className="shrink-0">
-          <Bell className="size-4" /> Turn on alerts
+          <Bell className="size-4" /> Turn on alerts · अलर्ट चालू करें
         </Button>
       )}
     </div>

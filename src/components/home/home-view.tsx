@@ -10,6 +10,7 @@ import { distanceToShop } from "@/lib/geo/distance";
 import {
   buildDishIndex,
   groupByShop,
+  searchCorrection,
   searchDishes,
   type RankContext,
 } from "@/lib/search/dishes";
@@ -98,6 +99,12 @@ export function HomeView({
     [dishes, restaurants, typed]
   );
 
+  // Typed "Safron", found Saffron Kitchen — say so, as the search tab does.
+  const correction = useMemo(
+    () => (typed ? searchCorrection(index, typed, dishes) : null),
+    [index, typed, dishes]
+  );
+
   return (
     <>
       <HomeHeader
@@ -114,6 +121,13 @@ export function HomeView({
             {shops.length === 1 ? "restaurant" : "restaurants"} for &ldquo;
             {query.trim()}&rdquo;
           </p>
+
+          {correction ? (
+            <p className="mt-1 text-[13px] font-medium leading-snug text-muted">
+              Showing results for{" "}
+              <span className="font-bold text-ink">&ldquo;{correction}&rdquo;</span>
+            </p>
+          ) : null}
 
           {dishes[0]?.partial ? (
             <p className="mt-1 text-[13px] font-medium leading-snug text-muted">
@@ -172,11 +186,11 @@ export function HomeView({
           ) : null}
 
           <section className="space-y-3">
-            <h2 className="px-4 text-heading">Categories</h2>
+            <h2 className="px-4 text-heading">Categories · श्रेणियाँ</h2>
             <CategoryStrip categories={categories} />
           </section>
 
-          <Section title="Popular right now" href="/search">
+          <Section title="Popular right now · अभी लोकप्रिय" href="/search">
             <div className="no-scrollbar flex gap-4 overflow-x-auto px-4">
               {popular.map((r) => (
                 <RestaurantCard key={r.slug} restaurant={r} variant="carousel" />
@@ -204,7 +218,7 @@ export function HomeView({
           <section className="space-y-3">
             <div className="bolt-section-head px-4">
               <div>
-                <h2 className="text-heading">Restaurants near you</h2>
+                <h2 className="text-heading">Restaurants near you · पास के रेस्टोरेंट</h2>
                 <p className="text-xs font-medium text-muted">
                   {anyPinned ? "Nearest first" : "Fastest delivery first"}
                 </p>

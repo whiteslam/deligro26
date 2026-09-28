@@ -20,6 +20,8 @@ import {
 import { formatINR } from "@/lib/utils/format";
 import { offerBadgeText } from "@/lib/promotion-rules";
 import { VendorPromotionRowActions } from "./promotion-row-actions";
+import { vendorFeatureOn } from "@/lib/features/guards.server";
+import { FeatureOffNotice } from "@/components/features/features-provider";
 
 /**
  * Vendor → Promotions.
@@ -65,6 +67,9 @@ function Shell({
 }
 
 export default async function VendorPromotionsPage() {
+  // Switchable in Admin → Feature access; the server actions behind this
+  // page check the same switch.
+  if (!(await vendorFeatureOn("vendor.promotions"))) return <FeatureOffNotice title="Promotions" />;
   if (!isSupabaseConfigured) {
     return <Shell subtitle="Connect Supabase to run promotions." />;
   }
@@ -204,7 +209,7 @@ function Figure({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <dd className="truncate text-[13px] font-bold leading-none text-ink">{value}</dd>
-      <dt className="mt-1 truncate text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">
+      <dt className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
         {label}
       </dt>
     </div>

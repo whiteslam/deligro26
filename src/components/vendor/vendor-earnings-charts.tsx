@@ -333,7 +333,7 @@ export function VendorEarningsCharts({
   return (
     <>
       <VendorHero
-        title="Earnings"
+        title="Earnings · कमाई"
         subtitle={
           restaurantName
             ? `${restaurantName} · revenue, fees & top dishes.`
@@ -345,13 +345,13 @@ export function VendorEarningsCharts({
               {formatINR(stats.periodRevenue)}
             </p>
             {stats.periodChangePercent === null ? (
-              <p className="text-[10px] font-medium text-muted">
+              <p className="text-[11px] font-medium text-muted">
                 {stats.rangeLabel}
               </p>
             ) : (
               <p
                 className={cn(
-                  "text-[10px] font-bold",
+                  "text-[11px] font-bold",
                   stats.periodChangePercent >= 0 ? "text-green" : "text-red-500"
                 )}
               >
@@ -452,13 +452,13 @@ export function VendorEarningsCharts({
                   />
                   <XAxis
                     dataKey="label"
-                    tick={{ fill: C.muted, fontSize: 10 }}
+                    tick={{ fill: C.muted, fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                     interval="preserveStartEnd"
                   />
                   <YAxis
-                    tick={{ fill: C.muted, fontSize: 10 }}
+                    tick={{ fill: C.muted, fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                     width={40}
@@ -506,14 +506,14 @@ export function VendorEarningsCharts({
                   />
                   <XAxis
                     dataKey="label"
-                    tick={{ fill: C.muted, fontSize: 10 }}
+                    tick={{ fill: C.muted, fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                     interval="preserveStartEnd"
                   />
                   <YAxis
                     allowDecimals={false}
-                    tick={{ fill: C.muted, fontSize: 10 }}
+                    tick={{ fill: C.muted, fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                     width={28}
@@ -593,14 +593,14 @@ export function VendorEarningsCharts({
                 />
                 <XAxis
                   dataKey="hour"
-                  tick={{ fill: C.muted, fontSize: 9 }}
+                  tick={{ fill: C.muted, fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                   interval={2}
                 />
                 <YAxis
                   allowDecimals={false}
-                  tick={{ fill: C.muted, fontSize: 10 }}
+                  tick={{ fill: C.muted, fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                   width={28}
@@ -698,7 +698,7 @@ export function VendorEarningsCharts({
                     <p className="text-data text-sm font-bold">
                       {formatINR(o.total)}
                     </p>
-                    <p className="text-[10px] font-semibold uppercase text-muted">
+                    <p className="text-[11px] font-semibold uppercase text-muted">
                       {o.status.replace(/_/g, " ")}
                     </p>
                   </div>

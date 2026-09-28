@@ -18,6 +18,8 @@ import {
   type OperationalExpenseRow,
 } from "@/lib/data-access/operational-expenses";
 import { CashRecorder } from "@/components/manager/cash-recorder";
+import { staffFeatureOn } from "@/lib/features/guards.server";
+import { FeatureOffNotice } from "@/components/features/features-provider";
 
 export const metadata: Metadata = { title: "Cash & expenses · Deligro" };
 
@@ -40,6 +42,9 @@ export const dynamic = "force-dynamic";
  * for it.
  */
 export default async function ManagerCashPage() {
+  // Switchable in Admin → Feature access; the server actions behind this
+  // page check the same switch.
+  if (!(await staffFeatureOn("manager.cash"))) return <FeatureOffNotice title="Cash & expenses" />;
   await requireRole(["manager", "admin"]);
 
   let riders: ManagerRider[] = [];

@@ -673,3 +673,26 @@ where r.slug = 'burger-republic';
 ---
 
 *Last generated from migrations in-repo. Re-run `/build` or query Supabase for live row counts.*
+
+---
+
+### `role_feature_flags`
+
+Admin switches for what vendors, managers and riders may use (migration `0052`). **RLS on, no policies; all privileges revoked from `anon`/`authenticated`** — read and written only through server-only `src/lib/features/flags.server.ts`, behind `requireRole`.
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `id` | `uuid` PK | `gen_random_uuid()` | |
+| `role` | `text` | — | `vendor`, `manager` or `driver` |
+| `feature` | `text` | — | Key from `src/lib/features/catalog.ts`, e.g. `vendor.promotions` |
+| `subject_kind` | `text` | `'role'` | `role` (everyone), `restaurant` (one shop), `profile` (one person) |
+| `subject_id` | `uuid` | null | Null for `role`; the shop or profile id otherwise (no FK — cleaned up by delete triggers) |
+| `enabled` | `boolean` | — | |
+| `updated_at` | `timestamptz` | `now()` | |
+| `updated_by` | `uuid` → `profiles.id` | null | The admin who last set it |
+
+**Precedence:** this shop's / person's row → the role-wide row → **on**. No row means on, so an empty table (or a database without `0052`) changes nothing.
+
+**Enforcement:** hidden in the app via `FeaturesProvider` / `useFeature`, and refused on the server by `vendorFeatureOn` / `staffFeatureOn` / `assertVendorFeature` in `src/lib/features/guards.server.ts`. Admins are never switched off.
+
+**UI:** Admin → Settings → Feature access (`/admin/settings/features`).

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { featureOffResponse, riderProfileEditBlocked } from "@/lib/features/guards.server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { removeAvatar, uploadAvatar } from "@/lib/data-access/profile";
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
 
   const limited = await throttle();
   if (limited) return limited;
+  if (await riderProfileEditBlocked()) return featureOffResponse("driver.profile_edit");
 
   let file: FormDataEntryValue | null;
   try {
@@ -71,6 +73,7 @@ export async function DELETE() {
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: "backend_not_configured" }, { status: 503 });
   }
+  if (await riderProfileEditBlocked()) return featureOffResponse("driver.profile_edit");
 
   try {
     await removeAvatar();

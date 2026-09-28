@@ -214,22 +214,22 @@ export function VendorMenuItemCard({
                   {item.name}
                 </p>
                 {item.popular ? (
-                  <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase text-accent">
+                  <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-bold uppercase text-accent">
                     Popular
                   </span>
                 ) : null}
                 {item.bestseller ? (
-                  <span className="rounded-full bg-green/15 px-2 py-0.5 text-[10px] font-bold uppercase text-green">
+                  <span className="rounded-full bg-green-soft px-2 py-0.5 text-[11px] font-bold uppercase text-green">
                     Bestseller
                   </span>
                 ) : null}
                 {item.soldOut ? (
-                  <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-bold uppercase text-muted">
+                  <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-bold uppercase text-muted">
                     Sold out
                   </span>
                 ) : null}
                 {!item.image ? (
-                  <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-bold uppercase text-accent">
+                  <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-bold uppercase text-accent">
                     No photo
                   </span>
                 ) : null}
@@ -258,7 +258,7 @@ export function VendorMenuItemCard({
                     aria-label={`Price for ${item.name}`}
                   />
                   {pending ? (
-                    <span className="text-[10px] text-muted">Saving…</span>
+                    <span className="text-[11px] text-muted">Saving…</span>
                   ) : null}
                 </label>
               ) : (

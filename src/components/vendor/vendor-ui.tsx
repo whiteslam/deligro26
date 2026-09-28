@@ -193,7 +193,7 @@ export function VendorChip({
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "press inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all",
+        "press inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all @3xl:min-h-0",
         active
           ? "border-accent bg-accent text-[var(--on-accent)] shadow-[var(--glow-accent)]"
           : "border-line bg-surface text-muted hover:border-accent/40 hover:text-ink"
@@ -203,7 +203,7 @@ export function VendorChip({
       {count !== undefined ? (
         <span
           className={cn(
-            "grid min-w-5 place-items-center rounded-full px-1 text-[10px] font-bold",
+            "grid min-w-5 place-items-center rounded-full px-1 text-[11px] font-bold",
             active ? "bg-white/20 text-white" : "bg-surface-2 text-muted"
           )}
         >

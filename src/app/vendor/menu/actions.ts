@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertVendorFeature } from "@/lib/features/guards.server";
 import { requireVendorAccess } from "@/lib/auth/vendor-access";
 import { updateMenuItemAvailability } from "@/lib/data-access/restaurants";
 import {
@@ -24,6 +25,7 @@ export async function setMenuItemAvailability(input: {
   restaurantSlug?: string;
 }): Promise<SetMenuAvailabilityResult> {
   await requireVendorAccess();
+  await assertVendorFeature("vendor.menu_edit");
 
   const itemId = input.itemId?.trim();
   if (!itemId) return { ok: false, error: "Missing dish." };
@@ -63,6 +65,7 @@ export async function suggestVendorFoodImages(
   dishName: string
 ): Promise<{ suggestions: { image: FoodImage; score: number; reason: string }[] }> {
   await requireVendorAccess();
+  await assertVendorFeature("vendor.menu_edit");
   if (!dishName.trim()) return { suggestions: [] };
   try {
     return { suggestions: await suggestImages(dishName.trim()) };
@@ -76,6 +79,7 @@ export async function searchVendorFoodImages(
   query: string
 ): Promise<{ images: FoodImage[] }> {
   await requireVendorAccess();
+  await assertVendorFeature("vendor.menu_edit");
   try {
     return { images: await listFoodImages({ query: query.trim(), limit: 40 }) };
   } catch {

@@ -325,6 +325,194 @@ export function fuzzyVariants(token: string, vocabulary: Set<string>): string[] 
 }
 
 /* ------------------------------------------------------------------ *
+ * Phonetic matching — how a word SOUNDS, not how it is spelled
+ * ------------------------------------------------------------------ */
+
+/**
+ * Edit distance is the wrong ruler for transliterated Hindi. There is no one
+ * right way to write पनीर in Latin letters, so "panir" and "paneer" are the
+ * same word written by two people — yet they are two edits apart, and at five
+ * letters `maxEdits` allows one. "chaumin" is three edits from "chowmein".
+ * "safran" is two from "Saffron". Each of those searches used to show zero.
+ *
+ * Loosening `maxEdits` would fix them and break everything else ("rice" →
+ * "nice", "roti" → "raita"). So this is a separate tier with a different
+ * ruler: spell both words the way they sound, then measure with vowels
+ * counting half. Vowels are what transliteration disagrees about; consonants
+ * are what distinguishes one food from another.
+ */
+const VOWELS = new Set(["a", "e", "i", "o", "u"]);
+
+/**
+ * A spelling-neutral form of a Latin-script word.
+ *
+ *   paneer / panir / panner  → panir
+ *   chowmein / chaumin       → çoumein / çaumin   (one vowel apart)
+ *   saffron / safron         → safron
+ *   kitchen / kichen         → kiçen
+ *
+ * Returns "" for anything with no Latin letters (Devanagari input), which the
+ * phonetic tier then simply skips — there is no transliteration to undo.
+ */
+export function phoneticKey(word: string): string {
+  let w = word.toLowerCase().replace(/[^a-z]/g, "");
+  if (!w) return "";
+  // Digraphs first, longest first. "ç" is a placeholder for the ch sound so the
+  // bare-c rule below cannot eat it.
+  w = w
+    .replace(/tch/g, "ç")
+    .replace(/ch/g, "ç")
+    .replace(/sh/g, "s")
+    .replace(/ph/g, "f")
+    .replace(/ck/g, "k")
+    .replace(/([kgbdtj])h/g, "$1") // kh gh bh dh th jh: aspiration is spelled or not
+    .replace(/q/g, "k")
+    .replace(/x/g, "ks")
+    .replace(/z/g, "j")
+    .replace(/c/g, "k")
+    .replace(/ç/g, "c")
+    // "ee" is how Hindi long-i is usually written, "oo" long-u.
+    .replace(/ee/g, "i")
+    .replace(/oo/g, "u")
+    // w before a vowel is a v (wada/vada, halwa/halva); elsewhere it is the
+    // tail of a vowel (chow-mein), and is written as one.
+    .replace(/w(?=[aeiou])/g, "v")
+    .replace(/w/g, "u");
+  // A silent/aspirate h anywhere but the start: dahi/dai, mohan/moan.
+  w = w[0] + w.slice(1).replace(/h/g, "");
+  // Doubled letters are spelling, not sound: saffron/safron, tikka/tika.
+  return w.replace(/(.)\1+/g, "$1");
+}
+
+/**
+ * Weighted optimal-string-alignment distance over phonetic keys: a vowel
+ * inserted, deleted or swapped for another vowel costs half; anything touching
+ * a consonant costs one. Bails out once a whole row is over budget.
+ */
+export function phoneticDistance(a: string, b: string, budget: number): number {
+  if (a === b) return 0;
+  const m = a.length;
+  const n = b.length;
+  const ins = (c: string) => (VOWELS.has(c) ? 0.5 : 1);
+  const sub = (x: string, y: string) =>
+    x === y ? 0 : VOWELS.has(x) && VOWELS.has(y) ? 0.5 : 1;
+
+  let prev2: number[] = [];
+  let prev: number[] = new Array(n + 1);
+  prev[0] = 0;
+  for (let j = 1; j <= n; j++) prev[j] = prev[j - 1] + ins(b[j - 1]);
+
+  for (let i = 1; i <= m; i++) {
+    const curr: number[] = new Array(n + 1);
+    curr[0] = prev[0] + ins(a[i - 1]);
+    let rowMin = curr[0];
+    for (let j = 1; j <= n; j++) {
+      let v = Math.min(
+        prev[j] + ins(a[i - 1]),
+        curr[j - 1] + ins(b[j - 1]),
+        prev[j - 1] + sub(a[i - 1], b[j - 1])
+      );
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        v = Math.min(v, prev2[j - 2] + 1);
+      }
+      curr[j] = v;
+      if (v < rowMin) rowMin = v;
+    }
+    if (rowMin > budget) return Infinity;
+    prev2 = prev;
+    prev = curr;
+  }
+  return prev[n];
+}
+
+/**
+ * Phonetic budget by key length. Three letters and under must sound identical
+ * ("dal"/"daal" yes, "egg"/"aag" no). Four gets one vowel's worth — enough for
+ * "piza", not enough for "roti"→"raita" (a vowel swap AND an extra vowel).
+ */
+function phoneticBudget(len: number): number {
+  if (len <= 3) return 0;
+  if (len === 4) return 0.5;
+  if (len <= 6) return 1;
+  return 1.5;
+}
+
+/**
+ * Do these two words plausibly sound the same? Same first sound is required —
+ * people misspell the middle of a word, rarely its start — and it is the cheap
+ * guard that keeps "rice" away from "nice" under any budget.
+ */
+/** Keys are recomputed for every vocabulary word on every new token; cache them. */
+const KEY_CACHE = new Map<string, string>();
+
+function cachedKey(word: string): string {
+  let k = KEY_CACHE.get(word);
+  if (k === undefined) {
+    k = phoneticKey(word);
+    // Bounded by the catalog's vocabulary plus what customers type; cleared
+    // wholesale rather than LRU'd because it only exists to save a regex pass.
+    if (KEY_CACHE.size > 20000) KEY_CACHE.clear();
+    KEY_CACHE.set(word, k);
+  }
+  return k;
+}
+
+export function soundsLike(typed: string, word: string): boolean {
+  const a = cachedKey(typed);
+  const b = cachedKey(word);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const firstOk = a[0] === b[0] || (VOWELS.has(a[0]) && VOWELS.has(b[0]));
+  if (!firstOk) return false;
+  const budget = phoneticBudget(Math.min(a.length, b.length));
+  if (budget === 0) return false;
+  return phoneticDistance(a, b, budget) <= budget;
+}
+
+const PHONETIC_CACHE = new WeakMap<Set<string>, Map<string, string[]>>();
+
+/**
+ * Catalog words that sound like this token. Same shape and memoisation as
+ * `fuzzyVariants`; the caller decides whether to use them (they are a last
+ * resort — see `searchDishes`).
+ */
+export function phoneticVariants(token: string, vocabulary: Set<string>): string[] {
+  let cache = PHONETIC_CACHE.get(vocabulary);
+  if (!cache) {
+    cache = new Map();
+    PHONETIC_CACHE.set(vocabulary, cache);
+  }
+  const hit = cache.get(token);
+  if (hit) return hit;
+
+  const out: string[] = [];
+  if (phoneticKey(token)) {
+    for (const word of vocabulary) {
+      if (word === token) continue;
+      if (soundsLike(token, word)) out.push(word);
+    }
+  }
+  cache.set(token, out);
+  return out;
+}
+
+/**
+ * Loose word match for places that have no vocabulary to expand against (the
+ * menu-less shop fallback in `groupByShop`): every word of `hay` is tried as a
+ * typo target for `token`, by edit distance and then by sound.
+ */
+export function looselyContains(hay: string, token: string): boolean {
+  const budget = maxEdits(token.length);
+  for (const word of hay.split(/[^\p{L}\p{N}]+/u)) {
+    if (!word) continue;
+    if (word.startsWith(token)) return true;
+    if (budget > 0 && withinEdits(token, word, budget)) return true;
+    if (soundsLike(token, word)) return true;
+  }
+  return false;
+}
+
+/* ------------------------------------------------------------------ *
  * Query expansion
  * ------------------------------------------------------------------ */
 
@@ -333,8 +521,21 @@ export interface ExpandedToken {
   token: string;
   /** Same food, different name — full credit; these are curated, not guessed. */
   aliases: string[];
+  /**
+   * Catalog words spelled differently but pronounced the SAME ("panir" →
+   * paneer: identical phonetic key). A transliteration, not a typo — so it
+   * ranks above an edit-distance guess, which is how "panir" used to land on
+   * "pani" (one letter off) instead of paneer.
+   */
+  homophones: string[];
   /** Probably the same word misspelled — scored below an alias. */
   fuzzy: string[];
+  /**
+   * Catalog words that SOUND like this token ("panir" → paneer, "safran" →
+   * saffron). Weakest name tier; `searchDishes` only keeps it for a token that
+   * nothing stronger matched, so it can never crowd out a real hit.
+   */
+  phonetic: string[];
   /** Attribute words this token implies, e.g. spicy → chilli, schezwan. */
   intent: string[];
   /** True when the token is only an attribute and names no dish. */
@@ -387,12 +588,21 @@ export function expandQuery(
     // said "known", and the open shop's "Vanila Shake" was never reached. A
     // word being present somewhere says nothing about whether its misspellings
     // should also match. Memoised below, so the scan is paid once per token.
-    const fuzzy = fuzzyVariants(token, vocabulary);
+    const sounds = phoneticVariants(token, vocabulary);
+    const key = phoneticKey(token);
+    const homophones = key ? sounds.filter((w) => cachedKey(w) === key) : [];
+    const fuzzy = fuzzyVariants(token, vocabulary).filter(
+      (w) => !homophones.includes(w)
+    );
 
     out.push({
       token,
       aliases,
+      homophones,
       fuzzy,
+      phonetic: sounds.filter(
+        (w) => !fuzzy.includes(w) && !homophones.includes(w)
+      ),
       intent,
       // "cheap" on its own is a filter, not a thing to match against a name.
       intentOnly: Boolean(intentDef) && aliases.length === 0 && intent.length === 0,
@@ -408,17 +618,21 @@ export function expandQuery(
 }
 
 /**
- * Every word in the catalog, for fuzzy matching to aim at.
+ * Every word in the catalog — dish names, categories and shop names — for
+ * fuzzy and phonetic matching to aim at.
  *
  * Built once per index by the caller and handed in — rebuilding it per query
  * would put an 800-word scan on every keystroke.
  */
 export function buildVocabulary(
-  entries: Iterable<{ name: string; category: string }>
+  entries: Iterable<{ name: string; category: string; shop?: string }>
 ): Set<string> {
   const vocab = new Set<string>();
   for (const e of entries) {
-    for (const source of [e.name, e.category]) {
+    // The shop's name too. It used to be dish name and category only, so a
+    // misspelled RESTAURANT name had nothing to be corrected towards: "Safron"
+    // found zero results with "Saffron Kitchen" open in town.
+    for (const source of [e.name, e.category, e.shop ?? ""]) {
       for (const w of source.split(/[^\p{L}\p{N}]+/u)) {
         if (w.length > 2) vocab.add(w.toLowerCase());
       }

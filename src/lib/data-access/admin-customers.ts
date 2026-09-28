@@ -52,7 +52,9 @@ export async function listCustomers(limit = 100): Promise<AdminCustomerRow[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, phone, created_at, orders(count)")
+    // Named FK: orders reaches profiles twice (customer_id and placed_by, the
+    // operator who took a phone order), and a bare `orders(count)` is PGRST201.
+    .select("id, full_name, phone, created_at, orders!orders_customer_id_fkey(count)")
     .eq("role", "customer")
     .order("created_at", { ascending: false })
     .limit(limit);

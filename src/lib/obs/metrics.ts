@@ -6,6 +6,7 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/config";
 import { isRazorpayConfigured } from "@/lib/payments/razorpay";
+import { isMissingColumn } from "@/lib/data-access/schema-probe";
 import { isPushConfigured } from "@/lib/notifications/onesignal";
 import { smsConfigured } from "@/lib/sms/renflair";
 import { rangeStart, previousWindow, type ObsRange } from "./read";
@@ -764,20 +765,24 @@ export async function getDeliveryHealth(): Promise<DeliveryHealth> {
   if (!(await guard())) return empty;
 
   const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("deliveries")
-    .select("id, driver_id, offered_driver_id, delivered_at")
-    .is("delivered_at", null)
-    .limit(1000);
+  const read = (cols: string) =>
+    supabase.from("deliveries").select(cols).is("delivered_at", null).limit(1000);
+  let { data, error } = await read("id, driver_id, offered_driver_id, delivered_at");
+  // Before migration 0042 there is no dispatch offer to count. That used to
+  // throw and take the whole Delivery tab down with a 500; without the column
+  // every rider-less delivery is simply unassigned.
+  if (error && isMissingColumn(error)) {
+    ({ data, error } = await read("id, driver_id, delivered_at"));
+  }
 
   if (error) {
     if (isNotMigrated(error)) return empty;
     throw error;
   }
 
-  const rows = (data ?? []) as Array<{
+  const rows = (data ?? []) as unknown as Array<{
     driver_id: string | null;
-    offered_driver_id: string | null;
+    offered_driver_id?: string | null;
   }>;
 
   return {

@@ -54,7 +54,7 @@ function ManagerShellChrome({ children }: { children: React.ReactNode }) {
         <div className="device">
           <div className="app-shell">
             <div className="app-scroll no-scrollbar @container px-4 pb-6 pt-4">
-              {children}
+              <main>{children}</main>
             </div>
             <StatusBar />
           </div>

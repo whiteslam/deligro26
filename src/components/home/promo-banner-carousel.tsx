@@ -210,7 +210,7 @@ function BannerSlide({
         />
 
         {sponsored ? (
-          <span className="absolute right-3 top-3 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.06em] text-white/90 backdrop-blur-sm">
+          <span className="absolute right-3 top-3 rounded-full bg-black/45 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.06em] text-white/90 backdrop-blur-sm">
             Sponsored{banner.sponsorName ? ` · ${banner.sponsorName}` : ""}
           </span>
         ) : null}

@@ -6,7 +6,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { queueRefundForOrder } from "@/lib/data-access/refunds";
 import { cancelOrderRow } from "@/lib/data-access/order-cancellation";
-import { cancelDeliveryForOrder } from "@/lib/dispatch/rider-dispatch";
+import { cancelDeliveryForOrder, dispatchOrder } from "@/lib/dispatch/rider-dispatch";
 import {
   notifyOrderCancelled,
   notifyOrderAccepted,
@@ -15,6 +15,7 @@ import {
   notifyDelivered,
   notifyVendorOrderCancelled,
 } from "@/lib/notifications/order-events";
+import { deferNotify } from "@/lib/notifications/defer";
 
 export interface ActionResult {
   ok: boolean;
@@ -128,10 +129,17 @@ export async function overrideOrderStatus(
 
   // Same customer-facing events the vendor and rider paths fire, so an
   // overridden order is not a silent one. Fire-and-forget by contract.
-  if (status === "kitchen") void notifyOrderAccepted(orderId);
-  else if (status === "ready") void notifyOrderReady(orderId);
-  else if (status === "on_the_way") void notifyOnTheWay(orderId);
-  else if (status === "delivered") void notifyDelivered(orderId);
+  if (status === "kitchen") deferNotify(() => notifyOrderAccepted(orderId));
+  else if (status === "ready") deferNotify(() => notifyOrderReady(orderId));
+  else if (status === "on_the_way") deferNotify(() => notifyOnTheWay(orderId));
+  else if (status === "delivered") deferNotify(() => notifyDelivered(orderId));
+
+  // And the rider, as the vendor path does. An order support pushed to kitchen
+  // or ready used to get no dispatch at all: no offer, no rider told, and it
+  // sat until somebody happened to open the pool. After the response via
+  // after(), which guarantees the offer write finishes.
+  if (status === "kitchen") deferNotify(() => dispatchOrder(orderId, "accepted"));
+  else if (status === "ready") deferNotify(() => dispatchOrder(orderId, "ready"));
 
   refresh(orderId);
   return { ok: true };
@@ -232,9 +240,9 @@ export async function cancelOrderAsAdmin(
   // comment for why an accepted delivery is cancelled rather than deleted.
   await cancelDeliveryForOrder(orderId);
 
-  void notifyOrderCancelled(orderId, { refundQueued });
+  deferNotify(() => notifyOrderCancelled(orderId, { refundQueued }));
   // The kitchen may already be cooking this. Telling them is not optional.
-  if (current.restaurant_id) void notifyVendorOrderCancelled(orderId, { byAdmin: true });
+  if (current.restaurant_id) deferNotify(() => notifyVendorOrderCancelled(orderId, { byAdmin: true }));
 
   refresh(orderId);
   revalidatePath("/admin/refunds");

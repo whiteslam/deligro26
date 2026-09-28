@@ -18,6 +18,7 @@ import {
   buildDishIndex,
   categoryBasis,
   groupByShop,
+  searchCorrection,
   searchDishes,
   FOOD_CATEGORIES,
   type DishSort,
@@ -182,6 +183,13 @@ export function SearchView({
   const byCuisineOnly = categoryBasis(index, category) === "cuisine";
   const partial = Boolean(typed) && Boolean(shown[0]?.partial);
 
+  // "panir tika" found Paneer Tikka by sound, not by spelling. Say which words
+  // the list is answering, so a fuzzy result doesn't read as a wrong one.
+  const correction = useMemo(
+    () => (typed ? searchCorrection(index, deferredQuery, dishes) : null),
+    [typed, index, deferredQuery, dishes]
+  );
+
   // When a category chip is what emptied the screen, the useful thing to say is
   // not "nothing matches" — it is "there are 10 of these, just not under Thali".
   // Only computed when the screen is already empty and a category is on, so the
@@ -344,7 +352,7 @@ export function SearchView({
         {showSuggestions ? (
           <div className={history.length ? "mt-4" : ""}>
             <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
-              Try searching
+              Try searching · यह खोजें
             </p>
             <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1">
               {SUGGESTIONS.map((term) => (
@@ -352,7 +360,7 @@ export function SearchView({
                   key={term}
                   type="button"
                   onClick={() => setQuery(term)}
-                  className="press flex items-center gap-1.5 py-1.5 text-[15px] font-semibold text-ink"
+                  className="press tap-target flex items-center gap-1.5 py-1.5 text-[15px] font-semibold text-ink"
                 >
                   <Search className="size-3.5 shrink-0 text-muted" />
                   {term}
@@ -454,7 +462,7 @@ export function SearchView({
 
         {!typed && tab === "dishes" && shown.length ? (
           <h2 className="mt-4 text-[17px] font-extrabold tracking-tight">
-            {activeCategory ? activeCategory.label : "Popular dishes near you"}
+            {activeCategory ? activeCategory.label : "Popular dishes near you · पास के लोकप्रिय व्यंजन"}
           </h2>
         ) : null}
 
@@ -462,6 +470,13 @@ export function SearchView({
           <p className="mt-2 text-[13px] font-medium leading-snug text-muted">
             No dish near you is listed as {activeCategory.label.toLowerCase()}{" "}
             yet — showing what these kitchens do serve.
+          </p>
+        ) : null}
+
+        {correction ? (
+          <p className="mt-3 text-[13px] font-medium leading-snug text-muted">
+            Showing results for{" "}
+            <span className="font-bold text-ink">&ldquo;{correction}&rdquo;</span>
           </p>
         ) : null}
 
@@ -630,7 +645,7 @@ function TabBtn({
         // without this the label and icon sit *behind* the orange pill.
         // Colour changes slower than the thumb moves, so the label settles just
         // after it arrives rather than racing ahead of it.
-        "press relative z-10 flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 transition-colors duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+        "press relative z-10 flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full py-2 transition-colors duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
         on ? "text-[var(--on-accent)]" : "text-muted"
       )}
     >
@@ -639,7 +654,7 @@ function TabBtn({
       {/* Was "Dishes (3,157)" — the count in parentheses at the label's own
           weight, so a four-digit number shouted as loudly as the word it
           qualifies. Same information, one step down in emphasis. */}
-      <span className={cn("font-semibold", on ? "opacity-75" : "opacity-70")}>
+      <span className={cn("font-semibold", on && "opacity-90")}>
         {count.toLocaleString("en-IN")}
       </span>
     </button>

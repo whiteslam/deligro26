@@ -309,7 +309,16 @@ function renderOrders(
             <p className="truncate text-[12px] text-ink">
               {o.paymentMethod === "online" ? "Online" : "Cash"}
             </p>
-            {o.paymentStatus && o.paymentStatus !== "paid" ? (
+            {o.paymentMethod === "cod" &&
+            o.status === "DELIVERED" &&
+            o.paymentStatus === "pending" ? (
+              // Delivered cash: the rider confirmed collection at the door, so
+              // "pending" read as unpaid while the rider's own screen said
+              // "CASH COLLECTED". payment_status deliberately stays 'pending'
+              // until the handover chain reconciles it (0047 and the note in
+              // advanceDelivery) — this changes the word, not the money.
+              <p className="truncate text-[11px] text-muted">collected</p>
+            ) : o.paymentStatus && o.paymentStatus !== "paid" ? (
               <p
                 className={
                   o.paymentStatus === "failed"

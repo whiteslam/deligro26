@@ -79,7 +79,7 @@ export function MenuItemRow({
             type="button"
             onClick={handleAdd}
             aria-label={`Add ${item.name}`}
-            className="press bolt-add"
+            className="tap-target press bolt-add"
           >
             Add
           </button>
@@ -92,7 +92,7 @@ export function MenuItemRow({
                 setQty(item.id, qty - 1);
               }}
               aria-label="Remove one"
-              className="grid size-7 place-items-center rounded-md hover:bg-white/15"
+              className="tap-target grid size-7 place-items-center rounded-md hover:bg-white/15"
             >
               <Minus className="size-4" strokeWidth={2.75} />
             </button>
@@ -106,7 +106,7 @@ export function MenuItemRow({
                 setQty(item.id, qty + 1);
               }}
               aria-label="Add one"
-              className="grid size-7 place-items-center rounded-md hover:bg-white/15"
+              className="tap-target grid size-7 place-items-center rounded-md hover:bg-white/15"
             >
               <Plus className="size-4" strokeWidth={2.75} />
             </button>

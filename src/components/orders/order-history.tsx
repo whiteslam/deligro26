@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Loader2, Search, X } from "lucide-react";
 import { OrderCard } from "@/components/orders/order-card";
+import { formatIst, istDateKey } from "@/lib/utils/ist-time";
 import type { UiOrder } from "@/lib/utils/order-map";
 import { cn } from "@/lib/utils/cn";
 
@@ -31,16 +32,16 @@ function monthKey(order: UiOrder): string {
   if (!order.createdAt) return "Earlier";
   const d = new Date(order.createdAt);
   if (Number.isNaN(d.getTime())) return "Earlier";
-  const now = new Date();
-  if (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth()
-  ) {
-    return "This month";
-  }
-  return d.toLocaleDateString("en-IN", {
+  // IST months, not the runtime's: this also renders on the server (UTC), where
+  // an order from 1 am IST on the 1st landed in the previous month.
+  const orderMonth = istDateKey(d).slice(0, 7); // YYYY-MM
+  const thisMonth = istDateKey().slice(0, 7);
+  if (orderMonth === thisMonth) return "This month";
+  return formatIst(d, {
     month: "long",
-    ...(d.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
+    ...(orderMonth.slice(0, 4) === thisMonth.slice(0, 4)
+      ? {}
+      : { year: "numeric" }),
   });
 }
 
@@ -96,7 +97,7 @@ export function OrderHistory({
     setPageError(null);
     try {
       const res = await fetch(
-        `/api/orders/history?before=${encodeURIComponent(oldest)}`
+        `/api/orders/history?before=${encodeURIComponent(oldest)}`,
       );
       const data = (await res.json().catch(() => null)) as {
         ok?: boolean;
@@ -122,7 +123,7 @@ export function OrderHistory({
       delivered: orders.filter((o) => o.status === "DELIVERED").length,
       cancelled: orders.filter((o) => o.status === "CANCELLED").length,
     }),
-    [orders]
+    [orders],
   );
 
   const shown = useMemo(() => {
@@ -171,7 +172,7 @@ export function OrderHistory({
                 "press shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-bold transition-colors",
                 active
                   ? "border-transparent bg-ink text-bg"
-                  : "border-line bg-surface text-muted"
+                  : "border-line bg-surface text-muted",
               )}
             >
               {f.label}

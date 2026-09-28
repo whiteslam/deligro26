@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { featureOffResponse, vendorFeatureOn } from "@/lib/features/guards.server";
 import { getProfile } from "@/lib/auth";
 import { hasVendorAccess } from "@/lib/auth/vendor-access";
 import {
@@ -24,6 +25,9 @@ export async function GET(request: Request) {
   const restaurant = await resolveVendorRestaurant();
   if (!restaurant) {
     return NextResponse.json({ error: "no_restaurant" }, { status: 404 });
+  }
+  if (!(await vendorFeatureOn("vendor.earnings"))) {
+    return featureOffResponse("vendor.earnings");
   }
 
   const rangeParam = new URL(request.url).searchParams.get("range") ?? "week";

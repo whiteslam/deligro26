@@ -9,6 +9,8 @@ import {
 } from "@/lib/data-access/banners";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { Banner, BannerPlacement } from "@/types";
+import { getSettings } from "@/lib/settings";
+import { isBannerTargetEnabled } from "@/lib/store-categories";
 
 /**
  * Server facade for promotional banners: live Supabase campaigns when the
@@ -36,6 +38,16 @@ function mockActive(placement: BannerPlacement): Banner[] {
 export async function listActiveBanners(
   placement: BannerPlacement
 ): Promise<Banner[]> {
+  const [banners, settings] = await Promise.all([
+    loadActiveBanners(placement),
+    getSettings(),
+  ]);
+  // A campaign for a switched-off service is not served: see
+  // isBannerTargetEnabled. Filtered here, the one door every placement uses.
+  return banners.filter((b) => isBannerTargetEnabled(b.target.type, settings));
+}
+
+async function loadActiveBanners(placement: BannerPlacement): Promise<Banner[]> {
   if (!isSupabaseConfigured) return mockActive(placement);
 
   try {

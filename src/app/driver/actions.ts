@@ -4,15 +4,22 @@ import { revalidatePath } from "next/cache";
 import { getProfile } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { acceptDelivery, advanceDelivery } from "@/lib/data-access/driver-orders";
+import { deferNotify } from "@/lib/notifications/defer";
+import { notifyVendorRiderAssigned } from "@/lib/notifications/order-events";
 
-async function requireDriverId(): Promise<string> {
+async function requireDriver() {
   const profile = await getProfile();
   if (!profile || profile.role !== "driver") throw new Error("forbidden");
-  return profile.id;
+  return profile;
+}
+
+async function requireDriverId(): Promise<string> {
+  return (await requireDriver()).id;
 }
 
 export async function acceptDeliveryAction(orderId: string) {
-  const driverId = await requireDriverId();
+  const driver = await requireDriver();
+  const driverId = driver.id;
 
   // A rider genuinely taps Accept a handful of times an hour; the cap is here so
   // a script cannot sweep the ready pool the instant orders appear.
@@ -20,6 +27,11 @@ export async function acceptDeliveryAction(orderId: string) {
   if (!limit.ok) return { ok: false, error: "rate_limited" };
 
   const result = await acceptDelivery(driverId, orderId);
+  // The kitchen learns who is coming for the bag, instead of finding out on the
+  // board's next refresh — or when a stranger walks up to the counter.
+  if (result.ok) {
+    deferNotify(() => notifyVendorRiderAssigned(orderId, driver.full_name));
+  }
   revalidatePath("/driver");
   return result;
 }

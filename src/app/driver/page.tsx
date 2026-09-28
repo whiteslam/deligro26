@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { after } from "next/server";
 import { Bike } from "lucide-react";
 import { DriverBoard } from "@/components/driver/driver-board";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -7,6 +8,8 @@ import { getProfile } from "@/lib/auth";
 import { getDriverBoard, type DriverBoardData } from "@/lib/data-access/driver-orders";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getSettings } from "@/lib/settings";
+import { maybeSweepDispatch } from "@/lib/dispatch/sweep";
+import { staffFeatureOn } from "@/lib/features/guards.server";
 import { AVAILABLE_JOBS, DRIVER_TODAY } from "@/lib/roles-data";
 
 const DEMO_BOARD: DriverBoardData = {
@@ -55,10 +58,21 @@ export default async function DriverPage() {
     );
   }
 
-  const [board, settings] = await Promise.all([
+  const [loaded, settings, canCall] = await Promise.all([
     getDriverBoard(profile.id),
     getSettings(),
+    staffFeatureOn("driver.call_customer"),
   ]);
+  // Calling switched off (Admin → Feature access): don't send the number at
+  // all — hiding the button alone would still ship it to the phone.
+  const board =
+    !canCall && loaded.active
+      ? { ...loaded, active: { ...loaded.active, customerPhone: null } }
+      : loaded;
+  // This page re-renders every 4 s while a rider works, which makes it a free
+  // heartbeat for the dispatch sweep (lapsed offers, ops alarms). Throttled to
+  // about once a minute platform-wide; runs after the response.
+  after(maybeSweepDispatch);
   return (
     <DriverBoard
       initial={board}

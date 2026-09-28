@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sync &amp; Flow Audit — Deligro</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: #14181b; --muted: #6b7580; --bg: #f7f6f3; --surface: #ffffff;
+        --line: #e2e0da; --green: #17b26a; --red: #d9534f; --amber: #d98c22; --blue: #3a7bd5; --accent: #f0731e;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --ink: #e9edf0; --muted: #99a4ae; --bg: #14181b; --surface: #1b2126; --line: #2a3036; }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink);
+        font: 16px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      main { max-width: 960px; margin: 0 auto; padding: 48px 16px 96px; }
+      header.top { border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 32px; }
+      h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 48px 0 12px; }
+      h3 { font-size: 17px; margin: 28px 0 6px; }
+      .lede { color: var(--muted); margin: 0; }
+      .wrap { overflow-x: auto; }
+      table { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; min-width: 700px; }
+      th, td { text-align: left; padding: 9px 11px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+      code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface);
+        border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; word-break: break-word; }
+      .tag { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+        padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+      .ok { color: var(--green); border: 1px solid var(--green); }
+      .warn { color: var(--amber); border: 1px solid var(--amber); }
+      .bad { color: var(--red); border: 1px solid var(--red); }
+      .info { color: var(--blue); border: 1px solid var(--blue); }
+      .callout { border-left: 3px solid var(--red); background: var(--surface); padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+      .callout.amber { border-color: var(--amber); }
+      .callout.green { border-color: var(--green); }
+      ul, ol { padding-left: 20px; }
+      li { margin: 4px 0; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; }
+      .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+      .stat b { display: block; font-size: 26px; letter-spacing: -0.02em; line-height: 1.2; }
+      .stat span { color: var(--muted); font-size: 13px; }
+      figure { margin: 16px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+      figure svg { width: 100%; height: auto; display: block; }
+      figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
+      pre.tree { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px;
+        font: 13px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-x: auto; margin: 12px 0; }
+      pre.tree .g { color: var(--green); } pre.tree .r { color: var(--red); } pre.tree .a { color: var(--amber); }
+      pre.tree .m { color: var(--muted); } pre.tree b { color: var(--accent); }
+      .finding { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
+      .finding h3 { margin: 0 0 6px; font-size: 16px; }
+      .finding p { margin: 6px 0; }
+      .muted { color: var(--muted); }
+      svg text { font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="top">
+        <h1>Sync &amp; Flow Audit — Customer · Vendor · Rider · Admin</h1>
+        <p class="lede">
+          How an order's state travels between the four apps, how long each hop takes, and where it
+          silently doesn't arrive. Read from the code on 28 Sept 2026. Nothing was changed and no
+          live data was touched.
+        </p>
+      </header>
+
+      <div class="grid">
+        <div class="stat"><b>0</b><span>Supabase Realtime channels. All sync is polling</span></div>
+        <div class="stat"><b>3–8 s</b><span>Worst-case delay between apps while the screen is on</span></div>
+        <div class="stat"><b>Unbounded</b><span>Delay for vendors and riders when their screen is off</span></div>
+        <div class="stat"><b>1 of 4</b><span>Roles that can get a push notification (customer only)</span></div>
+      </div>
+
+      <div class="callout">
+        <strong>The bottom line.</strong> While every app is open and on screen, the platform stays in
+        sync within <strong>about 2–8 seconds</strong>, which is fine for food delivery. The problem is
+        the moment a phone goes in a pocket. Vendors and riders <strong>never register for push
+        notifications</strong>: <code>OneSignalInit</code> is mounted only in the customer layout. The
+        rider board also stops polling when hidden. So a new order or a rider offer is only found when
+        someone <em>looks at the screen</em>. That gap, not the poll speed, is what costs you minutes.
+      </div>
+
+      <!-- ============================================================ -->
+      <h2>1 · How sync works today</h2>
+      <p>There are three channels. None of them is a live connection.</p>
+      <ol>
+        <li><strong>Page polling (<code>router.refresh()</code>)</strong>: <code>AutoRefresh</code>
+          (<code>src/components/shared/auto-refresh.tsx</code>) re-renders the whole server page on a
+          timer. It pauses when the tab is hidden, except on the vendor board (<code>whenHidden</code>).
+          It also refreshes immediately when the tab regains focus.</li>
+        <li><strong>API polling</strong>: the customer tracking screen calls
+          <code>/api/orders/:id/tracking</code> every 3 s (<code>src/hooks/use-live-tracking.ts:181</code>),
+          only while visible, and stops once the order is delivered or cancelled.</li>
+        <li><strong>Push (OneSignal)</strong>: <code>src/lib/notifications/order-events.ts</code> sends a
+          push on each transition. In practice only customers ever have a push id saved.</li>
+      </ol>
+
+      <figure>
+        <svg viewBox="0 0 880 440" role="img" aria-label="Sync map: four apps poll the Next.js server, which reads and writes Supabase; OneSignal push reaches only the customer.">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted)" />
+            </marker>
+          </defs>
+          <!-- role boxes -->
+          <g>
+            <rect x="15" y="15" width="195" height="92" rx="8" style="fill: var(--bg); stroke: var(--line)" />
+            <text x="30" y="40" style="fill: var(--ink); font-size: 15px; font-weight: 700">Customer (PWA)</text>
+            <text x="30" y="62" style="fill: var(--muted); font-size: 12px">Tracking: API poll 3 s</text>
+            <text x="30" y="78" style="fill: var(--muted); font-size: 12px">Orders list: 10 s (active only)</text>
+            <text x="30" y="94" style="fill: var(--muted); font-size: 12px">Hidden → paused</text>
+
+            <rect x="232" y="15" width="195" height="92" rx="8" style="fill: var(--bg); stroke: var(--line)" />
+            <text x="247" y="40" style="fill: var(--ink); font-size: 15px; font-weight: 700">Vendor (kitchen)</text>
+            <text x="247" y="62" style="fill: var(--muted); font-size: 12px">Board: page poll 8 s</text>
+            <text x="247" y="78" style="fill: var(--muted); font-size: 12px">Hidden → keeps polling*</text>
+            <text x="247" y="94" style="fill: var(--muted); font-size: 12px">Beep if alert armed</text>
+
+            <rect x="449" y="15" width="195" height="92" rx="8" style="fill: var(--bg); stroke: var(--line)" />
+            <text x="464" y="40" style="fill: var(--ink); font-size: 15px; font-weight: 700">Rider</text>
+            <text x="464" y="62" style="fill: var(--muted); font-size: 12px">Board: page poll 4 s</text>
+            <text x="464" y="78" style="fill: var(--muted); font-size: 12px">GPS write every 10 s</text>
+            <text x="464" y="94" style="fill: var(--red); font-size: 12px">Hidden → paused</text>
+
+            <rect x="666" y="15" width="199" height="92" rx="8" style="fill: var(--bg); stroke: var(--line)" />
+            <text x="681" y="40" style="fill: var(--ink); font-size: 15px; font-weight: 700">Admin / Manager</text>
+            <text x="681" y="62" style="fill: var(--muted); font-size: 12px">Orders + manager: 4 s</text>
+            <text x="681" y="78" style="fill: var(--muted); font-size: 12px">Slots: 8 s · Dashboard: none</text>
+            <text x="681" y="94" style="fill: var(--muted); font-size: 12px">Hidden → paused</text>
+          </g>
+
+          <!-- push lane -->
+          <rect x="15" y="135" width="850" height="46" rx="8" style="fill: none; stroke: var(--line); stroke-dasharray: 4 4" />
+          <text x="25" y="128" style="fill: var(--muted); font-size: 11px; letter-spacing: .06em">ONESIGNAL PUSH LANE</text>
+          <text x="118" y="164" text-anchor="middle" style="fill: var(--green); font-size: 13px; font-weight: 700">✓ registered</text>
+          <text x="335" y="164" text-anchor="middle" style="fill: var(--red); font-size: 13px; font-weight: 700">✗ never registers</text>
+          <text x="552" y="164" text-anchor="middle" style="fill: var(--red); font-size: 13px; font-weight: 700">✗ never registers†</text>
+          <text x="765" y="164" text-anchor="middle" style="fill: var(--red); font-size: 13px; font-weight: 700">✗ no admin alerts</text>
+
+          <!-- vertical links -->
+          <g style="stroke: var(--muted); stroke-width: 1.5; fill: none">
+            <line x1="90" y1="195" x2="90" y2="262" marker-end="url(#ah)" />
+            <line x1="140" y1="262" x2="140" y2="195" marker-end="url(#ah)" />
+            <line x1="307" y1="195" x2="307" y2="262" marker-end="url(#ah)" />
+            <line x1="357" y1="262" x2="357" y2="195" marker-end="url(#ah)" />
+            <line x1="524" y1="195" x2="524" y2="262" marker-end="url(#ah)" />
+            <line x1="574" y1="262" x2="574" y2="195" marker-end="url(#ah)" />
+            <line x1="741" y1="195" x2="741" y2="262" marker-end="url(#ah)" />
+            <line x1="791" y1="262" x2="791" y2="195" marker-end="url(#ah)" />
+            <line x1="440" y1="318" x2="440" y2="350" marker-end="url(#ah)" />
+            <line x1="460" y1="350" x2="460" y2="318" marker-end="url(#ah)" />
+          </g>
+          <g style="fill: var(--muted); font-size: 11px">
+            <text x="84" y="232" text-anchor="end">write</text><text x="146" y="232">poll</text>
+            <text x="301" y="232" text-anchor="end">write</text><text x="363" y="232">poll</text>
+            <text x="518" y="232" text-anchor="end">write</text><text x="580" y="232">poll</text>
+            <text x="735" y="232" text-anchor="end">write</text><text x="797" y="232">poll</text>
+          </g>
+
+          <!-- server -->
+          <rect x="15" y="265" width="850" height="52" rx="8" style="fill: var(--surface); stroke: var(--accent); stroke-width: 1.5" />
+          <text x="440" y="287" text-anchor="middle" style="fill: var(--ink); font-size: 14px; font-weight: 700">Next.js on Vercel</text>
+          <text x="440" y="306" text-anchor="middle" style="fill: var(--muted); font-size: 12px">Server actions write · router.refresh() re-renders pages · sends push via void notify*() (not after())</text>
+
+          <!-- db -->
+          <rect x="15" y="353" width="850" height="72" rx="8" style="fill: var(--surface); stroke: var(--line)" />
+          <text x="440" y="378" text-anchor="middle" style="fill: var(--ink); font-size: 14px; font-weight: 700">Supabase Postgres</text>
+          <text x="440" y="397" text-anchor="middle" style="fill: var(--muted); font-size: 12px">orders · deliveries (offer, driver_id, rider GPS) · profiles.onesignal_id (one device per user)</text>
+          <text x="440" y="414" text-anchor="middle" style="fill: var(--red); font-size: 12px">Realtime: not used by any screen</text>
+        </svg>
+        <figcaption>
+          Every app asks the server "anything new?" on a timer. The database never tells anyone.
+          * Mobile browsers throttle or freeze background timers, and a sleeping tablet runs no JavaScript.
+          † Unless the external rider APK registers push natively. It is built outside this repo, so check it.
+        </figcaption>
+      </figure>
+
+      <!-- ============================================================ -->
+      <h2>2 · Order lifecycle mapping tree</h2>
+      <p>
+        Each branch below is one state change: who makes it, then how every other role finds out.
+        <span class="g" style="color:var(--green)">Green</span> = working.
+        <span style="color:var(--amber)">Amber</span> = works only while the screen is on.
+        <span style="color:var(--red)">Red</span> = nobody is told.
+      </p>
+<pre class="tree"><b>ORDER</b>
+│
+├─ <b>① placed</b>  <span class="m">by Customer (or Manager phone order) · online orders only after payment verifies</span>
+│   ├─ Vendor ........ <span class="a">board poll 8 s + beep if armed</span>   <span class="r">push ✗ (vendor has no push id)</span>
+│   ├─ Admin ......... <span class="a">/admin/orders poll 4 s</span>
+│   ├─ Manager ....... <span class="a">poll 4 s</span>
+│   └─ Customer ...... <span class="g">push "Order sent"</span>
+│
+├─ <b>② kitchen (accepted)</b>  <span class="m">by Vendor → vendor-orders.ts:472</span>
+│   ├─ Customer ...... <span class="g">tracking poll 3 s + push "Order accepted"</span>
+│   ├─ Rider ......... dispatchOrder("accepted") → exclusive offer to nearest free rider (3 min)
+│   │                  <span class="a">board poll 4 s + RiderAlert beep</span>   <span class="r">push ✗ (rider has no push id)</span>
+│   └─ Admin/Manager . <span class="a">poll 4 s</span>
+│   <span class="r">✗ If Admin or Manager moves it to kitchen instead: NO dispatch, no rider offer</span>
+│
+├─ <b>③ ready</b>  <span class="m">by Vendor</span>
+│   ├─ Customer ...... <span class="g">poll 3 s + push "Food is ready"</span>
+│   ├─ Rider ......... re-dispatch, new 3-min offer   <span class="a">poll 4 s</span>   <span class="r">push ✗</span>
+│   ├─ <span class="r">Offer expires after 3 min → pool opens silently. No re-dispatch, no push to the next rider</span>
+│   └─ <span class="r">Admin: flagged "unassigned" only after 8 min, and only if someone is looking</span>
+│
+├─ <b>④ rider accepts</b>  <span class="m">by Rider → driver-orders.ts:667</span>
+│   ├─ Customer ...... <span class="a">rider name appears on next 3 s poll</span>   <span class="r">no push</span>
+│   ├─ Vendor ........ <span class="a">next 8 s poll</span>   <span class="r">no push ("Ramesh is coming")</span>
+│   └─ <span class="r">Manager assignRider(): the assigned rider is NOT pushed. Finds out on next poll</span>
+│
+├─ <b>⑤ on the way (picked up)</b>  <span class="m">by Rider</span>
+│   ├─ Customer ...... <span class="g">poll 3 s + push "On the way"</span>
+│   ├─ Rider GPS ..... written every 10 s → customer sees it ≤ 3 s later  <span class="m">(≈ 6–13 s old)</span>
+│   │                  <span class="r">Rider screen locked → web GPS stops → customer map falls back to "estimated" after 45 s</span>
+│   └─ within 500 m .. <span class="g">push "Your rider is here" (once)</span>
+│
+├─ <b>⑥ delivered</b>  <span class="m">by Rider (OTP)</span>
+│   ├─ Customer ...... <span class="g">push + tracking stops polling</span>
+│   └─ Vendor/Admin .. <span class="a">next poll</span>
+│
+└─ <b>✕ cancelled</b>
+    ├─ by Customer ... Vendor: <span class="a">poll 8 s</span> <span class="r">push ✗</span> · Rider: delivery row cancelled, <span class="r">NO push; a rider already
+    │                  riding to the shop keeps riding until they look at the screen</span>
+    ├─ by Vendor ..... Customer: <span class="g">push "Order declined" (+ refund note)</span> · Rider: <span class="r">offer removed silently</span>
+    └─ by Admin ...... Customer: <span class="g">push</span> · Vendor: <span class="r">push ✗</span> · Rider: <span class="r">no push</span>
+
+<b>OUTSIDE THE ORDER</b>
+├─ Vendor opens/closes shop, edits menu ... customer sees it on next page load (all pages force-dynamic)
+│                                           <span class="a">an already-open store page does not update</span>
+├─ Admin changes fees/settings ............ next request (no cache)
+└─ Idle rider position .................... <span class="r">not reported at all. Dispatch uses the last fix from the previous job (up to 30 min old)</span></pre>
+
+      <!-- ============================================================ -->
+      <h2>3 · How long each hop takes</h2>
+      <p class="muted">
+        Poll delay is <em>average = half the interval, worst = the full interval</em>. Add server render time on
+        top (not measured here; one <code>router.refresh()</code> re-runs every query on the page, typically
+        a few hundred ms). "Screen off" means the app is backgrounded, the phone is locked or the tablet is asleep.
+      </p>
+      <div class="wrap">
+        <table>
+          <thead>
+            <tr><th>Event</th><th>Reaches</th><th>Screen on (avg / worst)</th><th>Screen off</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>New order</td><td>Vendor</td><td>~4 s / 8 s</td><td><span class="tag bad">minutes → never</span> Background timers get throttled (Chrome: about once a minute after 5 min hidden). Sleeping tablet = nothing. No push.</td></tr>
+            <tr><td>New order</td><td>Admin, Manager</td><td>~2 s / 4 s</td><td><span class="tag warn">on next focus</span></td></tr>
+            <tr><td>Accepted / Ready</td><td>Customer</td><td>~1.5 s / 3 s</td><td><span class="tag ok">push, seconds</span> If they opted in</td></tr>
+            <tr><td>Offer / Ready</td><td>Rider</td><td>~2 s / 4 s</td><td><span class="tag bad">until they open the app</span> Board paused, no push, so the RiderAlert notification can't fire either</td></tr>
+            <tr><td>Offer expired (3 min)</td><td>Other riders</td><td>~2 s / 4 s after expiry</td><td><span class="tag bad">never told</span></td></tr>
+            <tr><td>Rider accepted</td><td>Customer / Vendor</td><td>~1.5 s / 3 s · ~4 s / 8 s</td><td><span class="tag warn">on next open</span> No push to either</td></tr>
+            <tr><td>Rider GPS</td><td>Customer map</td><td>~6.5 s / 13 s old</td><td><span class="tag bad">stops</span> Locked rider phone = no web GPS</td></tr>
+            <tr><td>Picked up / Delivered</td><td>Customer</td><td>~1.5 s / 3 s</td><td><span class="tag ok">push</span></td></tr>
+            <tr><td>Customer cancels</td><td>Vendor</td><td>~4 s / 8 s</td><td><span class="tag bad">no push</span> Kitchen may keep cooking</td></tr>
+            <tr><td>Customer cancels</td><td>Rider en route</td><td>~2 s / 4 s</td><td><span class="tag bad">no push</span> Wasted trip</td></tr>
+            <tr><td>Menu / open-closed</td><td>Customer</td><td>next navigation</td><td><span class="tag ok">next load</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2>4 · Findings</h2>
+
+      <div class="finding">
+        <h3><span class="tag bad">P0</span> Vendors and riders never register for push</h3>
+        <p><code>&lt;OneSignalInit /&gt;</code> is rendered only in <code>src/app/(customer)/layout.tsx:60</code>. The
+          vendor, driver, manager and admin layouts never load the SDK, so <code>profiles.onesignal_id</code>
+          stays empty for them. <code>notifyVendorNewOrder</code>, <code>notifyVendorOrderCancelled</code>,
+          <code>notifyDriverPickupOffered</code> and <code>notifyDriverPickupReady</code> all return early
+          with nobody to send to. The exception is a vendor or rider who once used the customer app on the same
+          login. The rider APK may register natively; that code isn't in this repo, so check it.</p>
+        <p class="muted">The OneSignal keys <em>are</em> set in <code>.env.local</code> now, so the comment in
+          <code>kitchen-alert.tsx:17-23</code> ("credentials are unset") is stale.</p>
+      </div>
+
+      <div class="finding">
+        <h3><span class="tag bad">P0</span> Rider board stops polling when hidden, which also disables its alert</h3>
+        <p><code>driver-board.tsx:512</code> uses <code>&lt;AutoRefresh interval={4000} /&gt;</code> without
+          <code>whenHidden</code>. <code>RiderAlert</code> raises a system notification only when a poll brings
+          in a new job id. With the tab hidden there are no polls, so the alert built for the "phone in pocket"
+          case can't fire in that case. The vendor board already fixed this for the kitchen (line 846).</p>
+      </div>
+
+      <div class="finding">
+        <h3><span class="tag bad">P0</span> Pushes are fire-and-forget on a serverless runtime</h3>
+        <p>Every <code>notify*()</code> is called as <code>void notify…()</code>, e.g. <code>vendor-orders.ts:472,490,529</code>,
+          <code>cancel/route.ts:123-124</code>, <code>rider-dispatch.ts:472,477</code>. On Vercel, work that is still
+          running after the response is sent may be frozen or dropped. The code already knows this: dispatch
+          is <em>awaited</em> "because an un-awaited write is one a serverless runtime may abandon". Observability
+          uses <code>after()</code> for the same reason (<code>lib/obs/emit.ts:163</code>). The pushes don't, so some
+          may never leave the server.</p>
+      </div>
+
+      <div class="finding">
+        <h3><span class="tag warn">P1</span> Admin / Manager moves skip dispatch and the rider</h3>
+        <ul>
+          <li><code>overrideOrderStatus</code> (<code>admin/orders/actions.ts:131-134</code>) and manager
+            <code>advanceOrder</code> push the customer, but never call <code>dispatchOrder</code>. An order
+            an operator moves to kitchen or ready gets no rider offer.</li>
+          <li><code>assignRider</code> (<code>manager/actions.ts:105</code>) writes the assignment but sends the
+            rider nothing.</li>
+          <li>No cancel path pushes the rider. <code>cancelDeliveryForOrder</code> only updates the row.</li>
+          <li>Admin cancel doesn't reach the vendor as a push (vendor has no push id, see first finding).</li>
+        </ul>
+      </div>
+
+      <div class="finding">
+        <h3><span class="tag warn">P1</span> Offer expiry is passive</h3>
+        <p><code>EXCLUSIVE_OFFER_MS = 180 000</code> is checked only when someone reads the board
+          (<code>offerStateFor</code>). When a rider ignores an offer, nothing re-dispatches to rider #2 and nobody is
+          pushed. The order silently becomes "open" and waits for a rider who happens to look. Admin only flags it at
+          8 min (<code>admin-dispatch.ts:32</code>).</p>
+      </div>
+
+      <div class="finding">
+        <h3><span class="tag warn">P1</span> Dispatch "nearest rider" uses stale positions</h3>
+        <p><code>reportDriverLocation</code> writes only onto an <code>assigned</code>/<code>picked_up</code> delivery.
+          An idle rider reports nothing, so "nearest" means "where their last delivery ended, up to 30 min ago".
+          A rider on their first job of the day has no position and sorts last.</p>
+      </div>
+
+      <div class="finding">
+        <h3><span class="tag warn">P1</span> Confirm migration 0042 is live</h3>
+        <p>The 25 Sept bug-fix pass found <code>0042_rider_dispatch</code> unapplied in production. Without it
+          <code>writeOffer</code> returns <code>"unsupported"</code>, so there is no exclusive offer and no
+          upcoming-pickup list. Dispatch is reduced to "fastest thumb at ready". Re-check before relying on the tree above.</p>
+      </div>
+
+      <div class="finding">
+        <h3><span class="tag info">P2</span> Smaller gaps</h3>
+        <ul>
+          <li><strong>One device per user.</strong> <code>profiles.onesignal_id</code> is a single column. A vendor with
+            a counter tablet and an owner phone only gets pushes on whichever registered last.</li>
+          <li><strong>English-only push text.</strong> <code>onesignal.ts:52-53</code> sends <code>{ en }</code> only.
+            For a Hindi-first Bemetara audience, add <code>hi</code> (OneSignal picks by device language).</li>
+          <li><strong>No push to admin/manager</strong> for the "unassigned 8 min" or "vendor hasn't accepted in 3 min" alarms.</li>
+          <li><strong>Stale doc comments:</strong> <code>order-events.ts:73</code> says the vendor board polls every 4 s (it's 8 s).
+            <code>build-plan.ts:468</code> says the same.</li>
+          <li><strong>Admin dashboard</strong> (<code>/admin</code>) has no auto-refresh, so its numbers are fixed at page load.</li>
+        </ul>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2>5 · Cost of polling (rough estimate)</h2>
+      <p>
+        Every tick is one Vercel function run plus every Supabase query on that page. Assuming a modest day of
+        20 vendor tablets and 3 ops screens open 12 h, 10 riders on shift 10 h (screen on about half the time)
+        and 200 orders tracked for about 35 min each:
+      </p>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>Source</th><th>Interval</th><th>Requests / day</th></tr></thead>
+          <tbody>
+            <tr><td>Vendor boards (poll even when hidden)</td><td>8 s</td><td>~108 000</td></tr>
+            <tr><td>Customer tracking (visible ~40%)</td><td>3 s</td><td>~56 000</td></tr>
+            <tr><td>Rider boards (visible ~50%)</td><td>4 s</td><td>~45 000</td></tr>
+            <tr><td>Admin orders + manager</td><td>4 s</td><td>~32 000</td></tr>
+            <tr><td>Rider GPS writes</td><td>10 s</td><td>~24 000</td></tr>
+            <tr><td><strong>Total</strong></td><td></td><td><strong>≈ 265 000 / day · ≈ 8 M / month</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">More than 95% of these ticks find nothing new. The cost grows with open screens, not with orders.</p>
+
+      <!-- ============================================================ -->
+      <h2>6 · Suggestions, in order</h2>
+
+      <h3>Step 1: close the "screen off" gap (small changes, biggest win)</h3>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>#</th><th>Change</th><th>Where</th><th>Effort</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Mount <code>OneSignalInit</code> in the vendor, driver and manager layouts. Put an "Enable notifications" step inside <code>KitchenAlert</code> / <code>RiderAlert</code>, which already need a tap.</td><td><code>app/vendor/layout.tsx</code>, <code>app/driver/layout.tsx</code>, <code>app/manager/layout.tsx</code></td><td>S</td></tr>
+            <tr><td>2</td><td>Replace <code>void notify…()</code> with <code>after(() =&gt; notify…())</code> from <code>next/server</code></td><td>all call sites listed in finding 3</td><td>S</td></tr>
+            <tr><td>3</td><td><code>&lt;AutoRefresh interval={4000} whenHidden /&gt;</code> on the rider board</td><td><code>driver-board.tsx:512</code></td><td>XS</td></tr>
+            <tr><td>4</td><td>Call <code>dispatchOrder</code> from admin override / manager advance on kitchen and ready. Push the rider on <code>assignRider</code>. Push the rider from <code>cancelDeliveryForOrder</code> when a rider was offered or assigned.</td><td><code>admin/orders/actions.ts</code>, <code>manager/actions.ts</code>, <code>rider-dispatch.ts</code></td><td>S</td></tr>
+            <tr><td>5</td><td>Apply migration 0042 (and 0039/0048/0051) to production</td><td>Supabase</td><td>XS</td></tr>
+            <tr><td>6</td><td>Fix the stale comments (kitchen-alert, order-events, build-plan)</td><td></td><td>XS</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Step 2: make dispatch self-driving</h3>
+      <ul>
+        <li><strong>Offer sweeper.</strong> A Vercel Cron (every minute) or <code>pg_cron</code> job finds
+          <code>unassigned</code> deliveries whose offer is older than 3 min. It re-runs <code>dispatchOrder</code>
+          excluding the rider who ignored it, and pushes the next rider. After 2 misses it pushes the manager.</li>
+        <li><strong>On-duty location.</strong> Add an "On duty" toggle for riders. While on duty with no job, report
+          position every 60 s to a small <code>rider_presence</code> table. Dispatch then uses real positions and
+          can skip off-duty riders.</li>
+        <li><strong>Ops alarms by push</strong> to admin/manager: vendor hasn't accepted in 3 min, no rider in 8 min.</li>
+        <li><strong>Multi-device push:</strong> call <code>OneSignal.login(user.id)</code> and target by
+          <code>external_id</code> instead of one stored player id. Every device a person signs in on then gets the push.</li>
+        <li><strong>Hindi push copy</strong> alongside English.</li>
+      </ul>
+
+      <h3>Step 3: replace polling with Supabase Realtime (the real fix for speed and cost)</h3>
+      <p>
+        Use a <strong>"signal, then refetch"</strong> pattern. A database trigger on <code>orders</code> and
+        <code>deliveries</code> sends a tiny message ("order X changed") on a <em>private</em> Realtime broadcast
+        channel: <code>restaurant:{id}</code>, <code>rider:{id}</code>, <code>order:{id}</code>, <code>ops</code>.
+        Each screen that receives one calls the <code>router.refresh()</code> / tracking fetch it already has.
+        This keeps all data reads going through the existing, RLS-checked server code. It also avoids
+        <code>postgres_changes</code>, which would stream whole rows (customer phone, address) to
+        whoever subscribes.
+      </p>
+      <ul>
+        <li>Keep <code>AutoRefresh</code> as a <strong>30 s safety net</strong>, and on reconnect.</li>
+        <li>Rider GPS can go on the <code>order:{id}</code> channel directly. The customer map gets a
+          fresh point within about 1 s of the fix instead of 6–13 s, with no DB write per tick needed for display.</li>
+        <li>Realtime only helps while a page is open. <strong>Push (Step 1) is still what wakes a phone in a pocket.</strong>
+          The two work together.</li>
+      </ul>
+
+      <h3>Expected result</h3>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>Hop</th><th>Today</th><th>After Step 1</th><th>After Step 3</th></tr></thead>
+          <tbody>
+            <tr><td>New order → vendor (screen on)</td><td>4–8 s</td><td>4–8 s</td><td><strong>&lt; 1 s</strong></td></tr>
+            <tr><td>New order → vendor (screen off)</td><td>minutes / never</td><td><strong>push, ~2–5 s</strong></td><td>push, ~2–5 s</td></tr>
+            <tr><td>Offer → rider (screen off)</td><td>until app opened</td><td><strong>push, ~2–5 s</strong></td><td>push, ~2–5 s</td></tr>
+            <tr><td>Status → customer</td><td>1.5–3 s</td><td>1.5–3 s</td><td><strong>&lt; 1 s</strong></td></tr>
+            <tr><td>Rider GPS → customer map</td><td>6–13 s old</td><td>6–13 s old</td><td><strong>~1–5 s old</strong></td></tr>
+            <tr><td>Ignored offer → next rider</td><td>never pushed</td><td>never pushed</td><td><strong>≤ 1 min (Step 2)</strong></td></tr>
+            <tr><td>Server requests / day</td><td>~265 000</td><td>~265 000</td><td><strong>~20 000</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout green">
+        <strong>Recommendation:</strong> do Step 1 this week. It is mostly small edits, and it fixes the delays
+        that actually lose orders: vendors and riders who aren't looking at the screen. Then Step 2's offer
+        sweeper. Step 3 is worth doing before you scale past one city, or when the Vercel bill starts to matter.
+      </div>
+
+      <!-- ============================================================ -->
+      <h2>7 · Fixes applied (28 Sept 2026)</h2>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>Finding</th><th>Fix</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Vendors/riders never register for push</td><td><code>OneSignalInit</code> mounted in customer, vendor, driver, manager and admin layouts. Arming the kitchen/rider alert also subscribes the device (<code>requestPushOptIn</code>).</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>One device per user</td><td><code>OneSignal.login(user.id)</code>. The server targets <code>external_id</code> first and falls back to the stored player id. Sign-out logs the browser out of push on the next page.</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>Pushes may be dropped on Vercel</td><td>All 22 <code>void notify…()</code> calls now go through <code>deferNotify()</code>, which uses <code>after()</code> (<code>lib/notifications/defer.ts</code>).</td><td><span class="tag ok">done · 9 pushes confirmed in live test</span></td></tr>
+            <tr><td>Rider board paused when hidden</td><td><code>&lt;AutoRefresh interval={4000} whenHidden /&gt;</code></td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>Admin/manager moves skip dispatch</td><td><code>overrideOrderStatus</code> and <code>advanceOrder</code> now call <code>dispatchOrder</code> on kitchen/ready.</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>Silent manager assignment</td><td><code>assignRider</code> pushes the rider ("New delivery assigned") and the kitchen ("Rider on the way").</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>Kitchen not told a rider accepted</td><td><code>acceptDeliveryAction</code> pushes the vendor.</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>Rider not told of cancellation</td><td><code>cancelDeliveryForOrder</code> pushes the offered or carrying rider (all three cancel paths use it).</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>Offer expiry is passive; no ops alarms</td><td><code>lib/dispatch/sweep.ts</code>: re-offers a lapsed ready-order offer to the next rider (excluding the one who ignored it). Pushes admins and managers when a kitchen hasn't accepted in 3 min or a ready order has had no rider for 8 min, latched once per order. Runs about once a minute, driven by the vendor and rider board polls, plus an optional <code>/api/cron/dispatch-sweep</code> (needs <code>CRON_SECRET</code>).</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>English-only push copy</td><td>Every notification now carries <code>en</code> + <code>hi</code>.</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>Stale comments</td><td><code>kitchen-alert.tsx</code>, <code>order-events.ts</code>, <code>build-plan.ts</code> updated.</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>Migration 0042 not live</td><td>Needs applying to the production database. Not done from here.</td><td><span class="tag warn">needs you</span></td></tr>
+            <tr><td>Admin/manager push opt-in button</td><td>SDK is loaded and logged in, but the console has no "turn on alerts" button yet, so ops alarms reach only operators whose browser has already granted permission.</td><td><span class="tag warn">follow-up</span></td></tr>
+            <tr><td>Idle-rider location, Supabase Realtime</td><td>Both need new migrations (presence table; broadcast triggers and Realtime policies).</td><td><span class="tag warn">not started</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">Verified: <code>tsc --noEmit</code> clean. ESLint shows 0 errors on changed files. <code>test:driver-app</code>, <code>test:sw</code> and <code>test:obs</code> pass. <code>test:platform</code> has 2 failures in the admin-nav parser that were already failing (file untouched).</p>
+
+      <!-- ============================================================ -->
+      <h2>8 · Live test with Playwright (28 Sept 2026)</h2>
+      <p>
+        One real COD order, <code>#DBDC12FC</code> (1× Garlic Naan, ₹103, Saffron Kitchen → Berla, Bemetara),
+        run from placed to delivered with <strong>five screens open at once</strong>: customer (phone),
+        vendor (desktop board), rider (phone), admin orders (desktop) and manager (phone). Each screen was
+        watched every 200 ms for this order's card changing, and the customer's tracking responses were
+        logged as they arrived. Against the <strong>live database</strong>, on a local dev server. Dev mode
+        renders slower than production, so read the absolute numbers as upper bounds and the comparisons
+        between screens as the finding.
+      </p>
+
+      <h3>Measured: click → seen on every other screen</h3>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>Action (who clicked)</th><th>Own screen</th><th>Customer</th><th>Vendor</th><th>Rider</th><th>Admin</th><th>Manager</th></tr></thead>
+          <tbody>
+            <tr><td>Place order (customer)</td><td>4.8 s to confirmation</td><td>+4.2 s first status</td><td><strong>0.6 s</strong></td><td>—</td><td>3.7 s</td><td>1.0 s</td></tr>
+            <tr><td>Accept (vendor)</td><td><span class="tag warn">6.6 s</span></td><td>7.8 s</td><td>—</td><td><span class="tag bad">never shown</span> (push sent)</td><td>8.4 s</td><td>not tracked</td></tr>
+            <tr><td>Ready (vendor)</td><td>3.4 s</td><td>5.5 s</td><td>—</td><td>6.9 s (Accept button)</td><td>7.8 s</td><td>—</td></tr>
+            <tr><td>Accept job (rider)</td><td>4.8 s</td><td>4.7 s (rider name), 8.2 s (live GPS)</td><td><span class="tag bad">never shown</span></td><td>—</td><td>no rider shown</td><td>—</td></tr>
+            <tr><td>Picked up (rider)</td><td>5.1 s</td><td>4.1 s</td><td><span class="tag bad">stays "Ready"</span></td><td>—</td><td>4.2 s</td><td>—</td></tr>
+            <tr><td>Delivered (rider, code 5263)</td><td>3.1 s</td><td><strong>3.0 s</strong></td><td>3.8 s</td><td>—</td><td>6.5 s</td><td>4.1 s (removed)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">Pickup code (read from the vendor's "Read to the rider") and delivery code (read from the customer's screen) both worked.</p>
+
+      <h3>Server time per refresh (the other half of every delay)</h3>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>Screen / endpoint</th><th>Polled every</th><th>Median</th><th>p90</th><th>Note</th></tr></thead>
+          <tbody>
+            <tr><td><code>/admin/orders</code></td><td>4 s</td><td>2.8 s</td><td>3.5 s</td><td><span class="tag bad">busy 70% of the interval</span></td></tr>
+            <tr><td><code>/vendor</code></td><td>8 s</td><td>2.3 s</td><td>3.0 s</td><td></td></tr>
+            <tr><td><code>/manager</code></td><td>4 s</td><td>2.1 s</td><td>2.7 s</td><td></td></tr>
+            <tr><td><code>/driver</code></td><td>4 s</td><td>1.8 s</td><td>2.6 s</td><td></td></tr>
+            <tr><td><code>/api/orders/:id/tracking</code></td><td>3 s</td><td>1.7 s</td><td>2.0 s</td><td></td></tr>
+            <tr><td><code>/admin</code> dashboard</td><td>—</td><td><span class="tag bad">6.4 s</span></td><td>6.5 s</td><td>slowest page</td></tr>
+            <tr><td>Rider actions (<code>POST /driver</code>)</td><td>—</td><td>4.2 s</td><td>4.9 s</td><td>rider waits this long per tap</td></tr>
+            <tr><td>Place order (<code>POST /api/orders</code>)</td><td>—</td><td>3.7 s</td><td>—</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Push notifications during the test</h3>
+      <p>
+        <strong>9 pushes sent, all accepted by OneSignal</strong>, each within ~1 s of its action:
+        order sent + vendor new order, accepted + rider heads-up, ready + rider "ready to collect",
+        vendor "rider on the way", on the way, delivered. This confirms <code>deferNotify()</code> works.
+        Two things could not be proven from here:
+      </p>
+      <ul>
+        <li><strong>Handset delivery.</strong> OneSignal's Web setup is tied to the production domain, so every
+          localhost page logs "App not configured for web push" and no browser could subscribe. Test on the real
+          domain: arm alerts on the vendor tablet and rider phone, then place one order.</li>
+        <li><strong>Whether the vendor/rider pushes reached anyone.</strong> They have no subscription yet. The
+          sender now treats an OneSignal <code>errors</code> field as "reached nobody" and falls back to the stored
+          player id (fixed during this test).</li>
+      </ul>
+
+      <h3>UI findings (all portals crawled, phone + desktop)</h3>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>Portal</th><th>Finding</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr><td>All</td><td><strong>No Hindi anywhere</strong> except parts of the rider app. Customer, vendor, manager and admin screens are English-only, yet the audience is Hindi-first.</td><td><span class="tag bad">high</span></td></tr>
+            <tr><td>All</td><td>Minimum font 10 px on every portal (9.5 px in the console). Vendor Overview: 65 of 83 text blocks under 12 px.</td><td><span class="tag warn">med</span></td></tr>
+            <tr><td>All</td><td>Header icon buttons are 36×36 px (theme, sign-out, customer app). Customer search: 130 of 195 tap targets under 40 px. Vendor menu: 72 of 87.</td><td><span class="tag warn">med</span></td></tr>
+            <tr><td>Vendor (dark console)</td><td>The "Live orders" title, the "Alerts are off" text and the "Running behind?" text are nearly invisible (dark text on dark).</td><td><span class="tag bad">high</span></td></tr>
+            <tr><td>Admin (dark console)</td><td>The "Orders" page title is invisible, and the Value column is very faint.</td><td><span class="tag warn">med</span></td></tr>
+            <tr><td>Vendor</td><td>Duplicate badge: "● Live" next to "Live".</td><td><span class="tag info">low</span></td></tr>
+            <tr><td>Vendor</td><td>Preparing and Ready cards are collapsed by default, so "Ready" takes two taps.</td><td><span class="tag warn">med</span></td></tr>
+            <tr><td>Customer</td><td>Stuck order <code>#D8A8DA3D</code> shows the customer "27 days late · Accepted" at the top of Orders.</td><td><span class="tag bad">high</span></td></tr>
+            <tr><td>Customer</td><td>Checkout pre-selects the DEFAULT address even when it is 59.8 km outside the area, while a deliverable saved address (Berla) exists. The customer only learns on "Place order".</td><td><span class="tag warn">med</span></td></tr>
+            <tr><td>No page</td><td>Horizontal overflow, broken images or HTTP errors: none found on 60+ pages.</td><td><span class="tag ok">good</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Functionality / sync findings</h3>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>Finding</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Vendor never learns the rider's progress.</strong> No rider name after accept, and the card sits in "Ready" until delivered.</td><td>Vendor card unchanged from 25.8 s to 71.3 s</td><td><span class="tag bad">high</span></td></tr>
+            <tr><td><strong>Rider sees nothing while the food cooks.</strong> The advance "coming up" offer never appears, although its push is sent.</td><td>Rider board "(absent)" until Ready. Consistent with migration 0042 missing in production.</td><td><span class="tag bad">high</span></td></tr>
+            <tr><td><strong>COD shows "Cash pending" after delivery.</strong> The rider's screen says "CASH COLLECTED ₹103"; admin still says pending, for every delivered COD order.</td><td>Admin orders table</td><td><span class="tag bad">high</span></td></tr>
+            <tr><td>Two orders stuck in "Preparing" since 2 Sept (<code>#D8A8DA3D</code>, <code>#5AF16BC6</code>). They count as "past promise, worst 38179 min" on the admin KPIs.</td><td>Vendor, admin, manager, customer</td><td><span class="tag warn">med</span></td></tr>
+            <tr><td>Rider GPS only reports on movement. A rider standing at the shop sent 1 position in about 30 s, so the customer map soon falls back to "estimated".</td><td><code>POST /api/driver/location</code> n=1</td><td><span class="tag warn">med</span></td></tr>
+            <tr><td>A vendor's own Accept takes 6.6 s to show on their own board: the click waits for dispatch and then the page refresh.</td><td>Timeline</td><td><span class="tag warn">med</span></td></tr>
+            <tr><td>Admin sees no rider for an order in the orders table.</td><td>Row unchanged on rider accept</td><td><span class="tag info">low</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Suggestions from the live test, in order</h3>
+      <ol>
+        <li><strong>Apply migration 0042 in production.</strong> This turns on the rider's "coming up" offers, the 3-minute hold and the sweeper's re-offers.</li>
+        <li><strong>Mark COD as paid when the rider confirms delivery with cash</strong>, so admin, settlements and the cash ledger agree with the rider.</li>
+        <li><strong>Show the rider on the vendor card</strong> ("Ramesh · picked up 2 min ago"), and move picked-up orders out of "Ready".</li>
+        <li><strong>Close out stuck orders.</strong> Cancel <code>#D8A8DA3D</code> and <code>#5AF16BC6</code> and add an auto-close for orders stuck more than 24 h, so customers never see "27 days late".</li>
+        <li><strong>Fix dark-console contrast</strong> on the vendor and admin headers and alert banners. Remove the duplicate "Live" badge.</li>
+        <li><strong>Hindi across the customer, vendor and manager apps</strong>, starting with order status, checkout and the vendor board. The rider app's "English / हिंदी" pattern already works.</li>
+        <li><strong>Bigger tap targets and a 12 px text floor</strong> on phone screens. Header icons to 44 px.</li>
+        <li><strong>Checkout:</strong> auto-pick the nearest deliverable saved address, and say "outside delivery area" before the button is pressed.</li>
+        <li><strong>Rider GPS heartbeat:</strong> also send a position every 20–30 s even without movement while a delivery is active.</li>
+        <li><strong>Speed up the heaviest polls:</strong> <code>/admin/orders</code> (2.8 s every 4 s) and <code>/admin</code> (6.4 s). Then move the boards to Realtime (Step 3), which removes most of this load.</li>
+        <li><strong>Verify push on the production domain</strong> with a vendor tablet and a rider phone that have armed alerts.</li>
+      </ol>
+      <p class="muted">
+        Housekeeping: test order <code>#DBDC12FC</code> (₹103 COD, Demo Driver, Saffron Kitchen) is a real delivered
+        order in production and will appear in reports, the cash ledger and Saffron Kitchen's settlement. No
+        account data was changed; the order used the customer's existing Berla address.
+      </p>
+
+      <!-- ============================================================ -->
+      <h2>9 · Fixes for the live-test findings (28 Sept 2026)</h2>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>Problem</th><th>Fix</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Vendor never sees rider progress</td><td>Root cause: the board never adopted fresh server data for the Ready column. Ready now syncs like the other columns. The kitchen board also loads <code>on_the_way</code> orders, and each Ready card shows "Ramesh is coming to collect" or "Picked up by Ramesh · on the way". The pickup code and Cancel are hidden once the bag has left.</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>Vendor's own Accept took 6.6 s</td><td>Accept, Ready and Reject move the card immediately and roll back if the server refuses. Dispatch runs through <code>after()</code> instead of blocking the response (vendor, admin and manager paths).</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>Rider sees nothing while cooking</td><td>Needs migration <code>0042_rider_dispatch</code> applied to production.</td><td><span class="tag warn">needs DB</span></td></tr>
+            <tr><td>COD "Cash pending" after delivery</td><td>Admin shows "collected" for delivered COD orders. <code>payment_status</code> deliberately stays <code>pending</code> until the handover chain reconciles it (0047), so this changes the word, not the money or settlement math.</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>Stuck orders ("27 days late")</td><td>Customers see "Delayed · देरी — we're looking into this order" once an order is more than 3 h past its promise, not a countdown or a day count. The sweeper pushes admins and managers about any order still open 2 h after placing, once a day until it is closed.</td><td><span class="tag ok">done · #D8A8DA3D and #5AF16BC6 cancelled 28 Sept</span></td></tr>
+            <tr><td>Dark console invisible text</td><td>Root cause: <code>body</code>'s colour was resolved against the light palette and inherited as a fixed rgb. <code>.console-theme { color: var(--ink) }</code> fixes every unclassed text in both consoles, measured at rgb(232,234,237) on rgb(11,13,16). Duplicate "Live" badge removed.</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>Almost no Hindi</td><td>English · हिंदी on customer order statuses and tracking steps, checkout (Place order, Cash on delivery, area check), vendor board actions, column titles, alert banners and errors, rider alert banner, manager actions, and the lateness wording.</td><td><span class="tag ok">done (key flows)</span></td></tr>
+            <tr><td>Small tap targets / 10 px text</td><td>Header icon buttons 36 → 44 px (admin, vendor, driver, back button). Vendor Open pill ≥ 44 px tall. All 9.5–10.5 px text on phone screens raised to 11 px (38 uses in 19 files). Measured minimum is now 11 px.</td><td><span class="tag ok">done</span></td></tr>
+            <tr><td>Checkout picks an undeliverable default</td><td>When the default address is out of area and the customer hasn't picked one, checkout checks other saved addresses with the same serviceability endpoint and switches to the first deliverable one, saying so ("Home · Bemetara"). The saved default is not changed.</td><td><span class="tag ok">done · verified</span></td></tr>
+            <tr><td>Rider GPS silent when stationary</td><td>A 20 s heartbeat (<code>getCurrentPosition</code>, cached fix ≤ 15 s) while a delivery is active, inside the 45 s staleness window.</td><td><span class="tag ok">done</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">Verified: <code>tsc</code> clean. ESLint shows 0 errors. The driver-app, sw, obs, tracking-origin, eta and vendor-readiness suites pass. <code>test:platform</code> still has the same 2 admin-nav failures. In the browser: the checkout auto-pick, the stuck-order card, the dark board text colours, 44 px header buttons and the 11 px text floor were confirmed with Playwright. The vendor rider line and GPS heartbeat need an active order to see.</p>
+
+      <p class="muted" style="margin-top:40px; font-size:13px">
+        Method: static read of <code>src/</code> and <code>supabase/migrations/</code>. Intervals and paths are
+        quoted from code. Latencies are derived from those intervals, not measured on devices. Request counts
+        are estimates using the assumptions stated in section 5. The rider Android APK lives outside this repo
+        and was not reviewed.
+      </p>
+    </main>
+  </body>
+</html>

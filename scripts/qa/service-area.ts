@@ -21,6 +21,10 @@
  * `status === "out_of_range"` comparisons before, which is two copies of a rule
  * that must never disagree. See the module's own opening comment.
  *
+ * Since 28 Sept 2026 the circle is centred on Bemetara, not on each shop (the
+ * one-city launch). The fail-closed rules that remain: an unpinned ADDRESS and a
+ * shop pinned OUTSIDE the circle refuse; the 70 km order is still refused.
+ *
  * Pure functions, no I/O. Runs offline.
  *
  * Usage:
@@ -86,35 +90,50 @@ check(
   `got ${noLimitNoPin.status} — with no radius there is nothing to verify against, so a missing pin cannot fail a check that is not being made`
 );
 
-// ---------------------------------------------------------------------------
-// A radius IS set and we cannot measure. This is the fail-closed half.
-// ---------------------------------------------------------------------------
-const unpinnedShop = checkServiceArea({ shop: null, destination: DURG, radiusKm: 8 });
-check(
-  "unpinned shop with a radius set is 'unverifiable'",
-  unpinnedShop.status === "unverifiable",
-  `got ${unpinnedShop.status}`
-);
-check(
-  "unverifiable names the shop as the reason",
-  unpinnedShop.reason === "shop_unpinned",
-  `got ${unpinnedShop.reason}`
-);
-check(
-  "unpinned shop BLOCKS the order (was the 70 km bug)",
-  blocksOrder(unpinnedShop),
-  "an unmeasurable range check must refuse, not accept"
-);
-
-const unpinnedShopCoords = checkServiceArea({
-  shop: { lat: null, lng: null },
-  destination: DURG,
-  radiusKm: 8,
+const noLimitNoAddressPin = checkServiceArea({
+  shop: BEMETARA,
+  destination: null,
+  radiusKm: 0,
 });
 check(
-  "a shop row with null lat/lng counts as unpinned",
-  unpinnedShopCoords.status === "unverifiable" && blocksOrder(unpinnedShopCoords),
-  `got ${unpinnedShopCoords.status} — this is the shape the database actually returns`
+  "radius 0 still BLOCKS an address with no pin",
+  noLimitNoAddressPin.status === "unverifiable" &&
+    noLimitNoAddressPin.reason === "address_unpinned" &&
+    blocksOrder(noLimitNoAddressPin),
+  `got ${noLimitNoAddressPin.status}/${noLimitNoAddressPin.reason} — a pinless saved "Bhilai" was orderable from a Bemetara shop`
+);
+
+// ---------------------------------------------------------------------------
+// One city circle (Bemetara launch scope, 28 Sept 2026). Measured from the
+// city centre, so an unpinned shop no longer takes itself offline — but a shop
+// PINNED outside the circle still cannot take town orders.
+// ---------------------------------------------------------------------------
+const unpinnedShop = checkServiceArea({ shop: null, destination: NEARBY, radiusKm: 25 });
+check(
+  "unpinned shop, address in town: in range (city circle needs no shop pin)",
+  unpinnedShop.status === "in_range" && !blocksOrder(unpinnedShop),
+  `got ${unpinnedShop.status}`
+);
+
+const unpinnedShopFar = checkServiceArea({ shop: { lat: null, lng: null }, destination: DURG, radiusKm: 25 });
+check(
+  "unpinned shop, 70 km address: still out of range (the 70 km bug stays fixed)",
+  unpinnedShopFar.status === "out_of_range" && blocksOrder(unpinnedShopFar),
+  `got ${unpinnedShopFar.status} at ${unpinnedShopFar.distanceKm?.toFixed(1)} km`
+);
+
+const shopOutside = checkServiceArea({ shop: DURG, destination: NEARBY, radiusKm: 25 });
+check(
+  "a shop pinned outside the circle is refused, and says the shop is the reason",
+  shopOutside.status === "out_of_range" && shopOutside.reason === "shop_outside_area" && blocksOrder(shopOutside),
+  `got ${shopOutside.status}/${shopOutside.reason}`
+);
+
+const edge = checkServiceArea({ shop: BEMETARA, destination: { lat: 21.93, lng: 81.5335 }, radiusKm: 25 });
+check(
+  "~24 km from the centre is inside a 25 km circle",
+  edge.status === "in_range",
+  `got ${edge.status} at ${edge.distanceKm?.toFixed(1)} km`
 );
 
 const unpinnedAddress = checkServiceArea({
@@ -138,7 +157,7 @@ check("address with no pin blocks the order", blocksOrder(unpinnedAddress));
 // `unknown` must be gone: leaving it reachable is how the accept creeps back.
 // ---------------------------------------------------------------------------
 const everyStatus = [
-  near, far, noLimit, noLimitNoPin, unpinnedShop, unpinnedAddress,
+  near, far, noLimit, noLimitNoPin, unpinnedShop, unpinnedShopFar, shopOutside, unpinnedAddress,
 ].map((a) => a.status);
 check(
   "no case returns the old catch-all 'unknown'",
@@ -151,7 +170,7 @@ check(
 // ---------------------------------------------------------------------------
 for (const [label, area] of [
   ["out of range", far],
-  ["unpinned shop", unpinnedShop],
+  ["shop outside the circle", shopOutside],
   ["unpinned address", unpinnedAddress],
 ] as const) {
   const msg = outOfRangeMessage(area);
@@ -163,9 +182,14 @@ for (const [label, area] of [
 }
 
 check(
-  "the shop-unpinned message does not blame the customer's address",
-  !/your address|this address/i.test(outOfRangeMessage(unpinnedShop)),
-  `got: "${outOfRangeMessage(unpinnedShop)}" — the shop is the one missing a pin`
+  "the shop-outside message does not blame the customer's address",
+  !/your address|this address/i.test(outOfRangeMessage(shopOutside)),
+  `got: "${outOfRangeMessage(shopOutside)}" — the shop is the one outside the area`
+);
+check(
+  "the out-of-range message names Bemetara",
+  /Bemetara/.test(outOfRangeMessage(far)),
+  `got: "${outOfRangeMessage(far)}"`
 );
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

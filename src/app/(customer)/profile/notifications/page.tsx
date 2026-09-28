@@ -19,6 +19,7 @@ import {
 } from "@/lib/data-access/notifications-feed";
 import { shortOrderId } from "@/lib/utils/order-map";
 import { cn } from "@/lib/utils/cn";
+import { formatIst } from "@/lib/utils/ist-time";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +75,8 @@ function ago(iso: string): string {
   const days = Math.round(hours / 24);
   if (days === 1) return "Yesterday";
   if (days < 7) return `${days} days ago`;
-  return then.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  // IST: this is a server component, and the server clock is UTC.
+  return formatIst(then, { day: "numeric", month: "short" });
 }
 
 export default async function NotificationsPage() {
@@ -136,7 +138,7 @@ export default async function NotificationsPage() {
                   <span
                     className={cn(
                       "grid size-9 shrink-0 place-items-center rounded-xl",
-                      look.tone
+                      look.tone,
                     )}
                   >
                     <Icon className="size-[18px]" />

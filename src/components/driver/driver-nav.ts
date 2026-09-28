@@ -1,4 +1,5 @@
 import { Bike, ClipboardList, User } from "lucide-react";
+import type { FeatureKey } from "@/lib/features/catalog";
 
 /**
  * The courier app's three screens.
@@ -13,6 +14,8 @@ import { Bike, ClipboardList, User } from "lucide-react";
  * neither should ever be what the app opens on.
  */
 export interface DriverNavItem {
+  /** Hidden when this switch is off for the rider (Admin → Feature access). */
+  feature?: FeatureKey;
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
@@ -32,6 +35,7 @@ export const DRIVER_TABS: DriverNavItem[] = [
   },
   {
     href: "/driver/history",
+    feature: "driver.history",
     label: "History",
     icon: ClipboardList,
     tone: "blue",

@@ -255,6 +255,7 @@ function formatPlaced(iso: string): string {
     month: "short",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: "Asia/Kolkata",
   });
 }
 

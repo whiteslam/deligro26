@@ -27,7 +27,7 @@
  * Usage:
  *   npm run test:driver-app
  */
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { DRIVER_TABS } from "../../src/components/driver/driver-nav";
@@ -214,40 +214,43 @@ check(
 );
 
 // ---------------------------------------------------------------------------
-// 7. The route sheet.
+// 7. Navigate is ONE action: a hand-off to Google Maps turn-by-turn.
+//
+// It used to open an in-app route sheet — a second Google map, usually just a
+// pin, with its own "Open in Google Maps" button — positioned `absolute` inside
+// the scrolling content, so it slid under the tab bar with the job card's map
+// showing beneath it. Riders reported "two maps pop up". The sheet is gone;
+// these checks keep it from coming back by accident.
 // ---------------------------------------------------------------------------
-const sheet = read("src/components/driver/route-sheet.tsx");
 const board = read("src/components/driver/driver-board.tsx");
+const phoneUtil = read("src/lib/utils/phone.ts");
 
-// Google returns each turn as an HTML fragment. It is third-party markup and
-// never reaches the DOM — the rule does not bend because the third party is
-// reputable, since a standing innerHTML sink pointed at a response we do not
-// control is a sink either way.
-for (const [label, src] of [
-  ["route-sheet", sheet],
-  ["driver-board", board],
-] as const) {
-  check(
-    `${label}: renders no third-party HTML via dangerouslySetInnerHTML`,
-    // `dangerouslySetInnerHTML\s*=` — the JSX attribute, not the word. Both
-    // files discuss the sink in a comment explaining why they avoid it, and a
-    // check that fires on its own rationale is a check nobody can keep green.
-    !/dangerouslySetInnerHTML\s*=/.test(src),
-    "Google's html_instructions would be injected straight into the page"
-  );
-}
 check(
-  "the sheet parses instructions to text instead",
-  /DOMParser|textContent/.test(sheet),
-  "no parsing step — the turn list is either raw markup or tags-as-text"
+  "the in-app route sheet is deleted",
+  !existsSync(join(ROOT, "src/components/driver/route-sheet.tsx")),
+  "a second map surface behind Navigate is the 'two maps' bug"
 );
-
-// The escape hatch is a promise made in the design: a rider who wants voice
-// guidance must still be able to reach it, in one tap, from inside the sheet.
 check(
-  "the sheet keeps the Open in Google Maps hand-off",
-  /Open in Google Maps/.test(sheet) && /mapsUrl/.test(sheet),
-  "in-app directions replaced the hand-off instead of adding to it"
+  "the board does not import a route sheet",
+  !/RouteSheet|route-sheet/.test(board),
+  "Navigate should hand off to Google Maps, not open an in-app map first"
+);
+check(
+  "Navigate is a link to the directions URL, not an onClick",
+  /href=\{navigationUrl\}[\s\S]{0,400}\/> Navigate/.test(board),
+  "the active leg's Navigate must be a single <a href> to Google Maps"
+);
+check(
+  "the board renders no third-party HTML via dangerouslySetInnerHTML",
+  !/dangerouslySetInnerHTML\s*=/.test(board),
+  "third-party markup never reaches the DOM"
+);
+check(
+  "directions ask for two-wheeler turn-by-turn",
+  /travelmode/.test(phoneUtil) &&
+    /"two-wheeler"/.test(phoneUtil) &&
+    /dir_action/.test(phoneUtil),
+  "every rider is on two wheels and wants guidance, not a route preview"
 );
 
 // Two watches on one screen is two sets of GPS wake-ups for one answer, on a
@@ -256,31 +259,34 @@ const watches = (board.match(/watchPosition\(/g) ?? []).length;
 check(
   "the board opens exactly one geolocation watch",
   watches === 1,
-  `found ${watches} — the sheet must reuse the board's watch, not open its own`
-);
-check(
-  "the sheet opens no watch of its own",
-  !/watchPosition|getCurrentPosition/.test(sheet),
-  "it takes the rider's position as a prop from the board's existing watch"
+  `found ${watches}`
 );
 
-// One request per opening. Re-routing as the rider moves is the expensive half
-// and the half that edges toward what the Maps terms restrict.
-const routeCalls = (sheet.match(/\.route\(\{/g) ?? []).length;
+// ---------------------------------------------------------------------------
+// 8. Completing a delivery says so.
+//
+// The success path used to be `router.refresh()` alone: the job card vanished
+// and the rider could not tell "delivered" from "the app lost my job".
+// ---------------------------------------------------------------------------
 check(
-  "the sheet requests directions at most twice (TWO_WHEELER, then a DRIVING fallback)",
-  routeCalls <= 2,
-  `found ${routeCalls} route() calls`
+  "the board shows a delivered confirmation",
+  /Modal/.test(board) && /setDelivered\(completing\)/.test(board),
+  "no success popup after the delivery code is accepted"
 );
 check(
-  "the sheet freezes the origin it opened with",
-  /openedFrom/.test(sheet),
-  "an origin read live from props re-runs the effect on every GPS fix, re-billing Directions every few seconds"
+  "the confirmation repeats the cash to collect on a COD order",
+  /cashCollected/.test(board) && /Cash collected/.test(board),
+  "a COD rider should see the amount once more at the door"
 );
 check(
-  "TWO_WHEELER has a DRIVING fallback",
-  /TWO_WHEELER/.test(sheet) && /TravelMode\.DRIVING/.test(sheet),
-  "TWO_WHEELER is not served in every region; without a fallback those riders get an error over a routing preference"
+  "a thrown server action surfaces as an error, not the error boundary",
+  /advanceDeliveryAction\(orderId, code\);\s*\}\s*catch/.test(board),
+  "an offline tap at the door would replace the whole board with an error page"
+);
+check(
+  "a wrong code is announced (role=alert)",
+  /role="alert"/.test(board),
+  "the OTP error must be unmissable"
 );
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

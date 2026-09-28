@@ -10,6 +10,7 @@ import {
 import { Bell, BellOff, BellRing } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { playAlertSound } from "@/lib/alerts/tones";
+import { requestPushOptIn } from "@/components/notifications/onesignal-init";
 
 /**
  * Tells the kitchen an order has arrived.
@@ -18,9 +19,9 @@ import { playAlertSound } from "@/lib/alerts/tones";
  * `router.refresh()` that only ran while the tab was visible. A tablet on
  * another tab, asleep, or simply not being watched accumulated orders in
  * silence — a 3-minute acceptance time turning into 30, and every downstream
- * ETA the customer was promised going with it. Server-side push exists
- * (`notifyVendorNewOrder`) but routes through OneSignal, whose credentials are
- * unset, so `sendPush` returns false and raises nothing.
+ * ETA the customer was promised going with it. Server-side push
+ * (`notifyVendorNewOrder`) covers a board that isn't running at all; arming
+ * here also subscribes the device to it (`requestPushOptIn`).
  *
  * Three channels, because a kitchen defeats any one of them: a tone loud enough
  * to hear over extraction fans, a vibration for a tablet on a steel counter, and
@@ -210,6 +211,10 @@ export function KitchenAlert({
       }
     }
 
+    // Same tap subscribes this device to server push, which is what reaches
+    // it when the board isn't running at all — a sleeping screen, a closed tab.
+    requestPushOptIn();
+
     announced.current = new Set(incomingIds);
     seeded.current = true;
     lastRepeat.current = Date.now();
@@ -271,7 +276,7 @@ export function KitchenAlert({
       )}
       <p className="min-w-0 flex-1 font-medium">
         {on ? (
-          "Sound and vibration on for new orders."
+          "Sound and vibration on for new orders. / नए ऑर्डर पर आवाज़ चालू है।"
         ) : audioFailed ? (
           <>
             <span className="font-bold">
@@ -283,17 +288,17 @@ export function KitchenAlert({
         ) : (
           <>
             <span className="font-bold">Alerts are off.</span> New orders will
-            arrive silently on this device.
+            arrive silently on this device. / अलर्ट बंद हैं — नए ऑर्डर की आवाज़ नहीं आएगी।
           </>
         )}
       </p>
       {on ? (
         <Button variant="ghost" size="sm" onClick={disarm} className="shrink-0">
-          Mute
+          Mute · बंद करें
         </Button>
       ) : (
         <Button size="sm" onClick={arm} className="shrink-0">
-          <Bell className="size-4" /> Turn on alerts
+          <Bell className="size-4" /> Turn on alerts · अलर्ट चालू करें
         </Button>
       )}
     </div>

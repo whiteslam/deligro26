@@ -95,7 +95,7 @@ export function MenuAvailabilityToggle({
           {switchBtn}
         </div>
         {error ? (
-          <span className="text-[10px] font-medium text-red-500">
+          <span className="text-[11px] font-medium text-red-500">
             Couldn’t update
           </span>
         ) : null}

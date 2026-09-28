@@ -11,6 +11,7 @@ import {
   type ManagerRider,
 } from "@/lib/data-access/manager-orders";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { staffFeatureOn } from "@/lib/features/guards.server";
 
 export const metadata: Metadata = { title: "Manager · Deligro" };
 
@@ -46,6 +47,16 @@ export default async function ManagerHome() {
     }
   }
 
+  // Admin → Feature access (managers only; an admin here has everything).
+  const [canPhoneOrders, canCash, canCall] = await Promise.all([
+    staffFeatureOn("manager.phone_orders"),
+    staffFeatureOn("manager.cash"),
+    staffFeatureOn("manager.call_customer"),
+  ]);
+  // With calling off, customer numbers are not sent to the page at all —
+  // hiding the Call button alone would still ship them in the payload.
+  if (!canCall) orders = orders.map((o) => ({ ...o, customerPhone: null }));
+
   const waiting = orders.filter((o) => o.dbStatus === "placed").length;
   const unassigned = orders.filter(
     (o) => !o.rider && (o.dbStatus === "ready" || o.dbStatus === "on_the_way")
@@ -72,6 +83,7 @@ export default async function ManagerHome() {
 
       {/* Above the board, not buried in a menu: a ringing phone is the one
           thing on this screen that cannot wait for the operator to go looking. */}
+      {canPhoneOrders ? (
       <Link
         href="/manager/new-order"
         className="press mt-4 flex items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 hover:bg-surface-2 @3xl:max-w-md"
@@ -81,14 +93,16 @@ export default async function ManagerHome() {
         </span>
         <span className="min-w-0">
           <span className="block text-[15px] font-bold text-ink">
-            Take a phone order
+            Take a phone order · फ़ोन ऑर्डर लें
           </span>
           <span className="block text-xs text-muted">
-            For a customer on the line — cash on delivery
+            For a customer on the line — cash on delivery / फ़ोन पर ग्राहक — नकद भुगतान
           </span>
         </span>
       </Link>
+      ) : null}
 
+      {canCash ? (
       <Link
         href="/manager/cash"
         className="press mt-2.5 flex items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 hover:bg-surface-2"
@@ -98,13 +112,14 @@ export default async function ManagerHome() {
         </span>
         <span className="min-w-0">
           <span className="block text-[15px] font-bold text-ink">
-            Cash &amp; expenses
+            Cash &amp; expenses · नकद और खर्च
           </span>
           <span className="block text-xs text-muted">
-            Record a COD handover or a small spend
+            Record a COD handover or a small spend / नकद जमा या छोटा खर्च दर्ज करें
           </span>
         </span>
       </Link>
+      ) : null}
 
       {!isSupabaseConfigured ? (
         <p className="mt-5 rounded-xl border border-pop/40 bg-pop/10 px-3.5 py-3 text-sm font-medium text-ink">
@@ -119,10 +134,10 @@ export default async function ManagerHome() {
       ) : (
         <>
           <div className="mt-5 grid grid-cols-3 gap-2.5 @3xl:max-w-2xl">
-            <Tile label="In flight" value={orders.length} />
-            <Tile label="Awaiting kitchen" value={waiting} alert={waiting > 0} />
+            <Tile label="In flight · चालू" value={orders.length} />
+            <Tile label="Awaiting kitchen · किचन बाकी" value={waiting} alert={waiting > 0} />
             <Tile
-              label="Need a rider"
+              label="Need a rider · राइडर चाहिए"
               value={unassigned}
               alert={unassigned > 0}
             />
@@ -141,7 +156,7 @@ export default async function ManagerHome() {
       >
         <button
           type="submit"
-          className="press block w-full text-center text-sm font-semibold text-muted hover:text-ink @3xl:text-left"
+          className="press block min-h-11 w-full py-3 text-center text-sm font-semibold text-muted hover:text-ink @3xl:text-left"
         >
           Sign out
         </button>

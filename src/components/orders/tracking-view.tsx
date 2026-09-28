@@ -38,7 +38,7 @@ import {
   type UiOrder,
 } from "@/lib/utils/order-map";
 import type { OrderEta } from "@/lib/orders/eta";
-import { formatINR } from "@/lib/utils/format";
+import { CUSTOMER_LATE_CAP_MINUTES, formatINR } from "@/lib/utils/format";
 import { DEFAULT_CENTER } from "@/lib/maps/config";
 // The same helper the rider's own "Call customer" control uses. This file used
 // to carry a byte-identical private copy, which is how the two ends of one
@@ -213,6 +213,7 @@ export function TrackingView({
         method: "POST",
       });
       if (res.ok) {
+        await live.refresh();
         router.refresh();
       } else {
         const data = await res.json().catch(() => ({}));
@@ -477,7 +478,9 @@ export function TrackingView({
             {showLateness && eta ? (
               <p className="flex items-center justify-center gap-2 rounded-2xl bg-deal-soft px-3 py-2.5 text-center text-sm font-bold text-deal">
                 <Clock className="size-4 shrink-0" />
-                Running about {minutesLabel(eta.lateByMinutes)} late
+                {eta.lateByMinutes >= CUSTOMER_LATE_CAP_MINUTES
+                  ? "This order is delayed. Our team is on it — contact support if you need help. / ऑर्डर में देरी है, हमारी टीम देख रही है।"
+                  : `Running about ${minutesLabel(eta.lateByMinutes)} late / लगभग ${minutesLabel(eta.lateByMinutes)} देर`}
               </p>
             ) : null}
 
@@ -602,10 +605,10 @@ export function TrackingView({
             {displayRider && !delivered && !cancelled ? (
               <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-[var(--shadow-md)]">
                 <div className="flex items-center justify-between gap-2 bg-ink px-4 py-1.5">
-                  <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[color:var(--surface)]">
+                  <span className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[color:var(--surface)]">
                     Deligro rider
                   </span>
-                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--surface)]/70">
+                  <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[color:var(--surface)]/70">
                     <ShieldCheck className="size-3" /> Verified
                   </span>
                 </div>
@@ -663,7 +666,7 @@ export function TrackingView({
                       className="press flex shrink-0 flex-col items-center gap-1 rounded-xl bg-accent px-3.5 py-2.5 text-[var(--on-accent)] shadow-[var(--glow-accent)]"
                     >
                       <Phone className="size-5" />
-                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">
                         Call
                       </span>
                     </a>
@@ -676,7 +679,7 @@ export function TrackingView({
                       className="press flex shrink-0 flex-col items-center gap-1 rounded-xl bg-accent px-3.5 py-2.5 text-[var(--on-accent)] opacity-50 shadow-[var(--glow-accent)]"
                     >
                       <Phone className="size-5" />
-                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">
                         Call
                       </span>
                     </button>
@@ -713,8 +716,10 @@ export function TrackingView({
 
             {/* Once an order is finished — delivered or cancelled — asking for money
             back is the only thing left to do with it. Mock orders are excluded
-            because there is no row behind them to refund. */}
-            {isUuid && (delivered || cancelled) ? (
+            because there is no row behind them to refund. A cancelled order that
+            was never paid (cash on delivery) has nothing to give back, so it is
+            not offered there. */}
+            {isUuid && (delivered || (cancelled && paid)) ? (
               <RefundRequest
                 orderId={order.id}
                 orderTotal={order.total}

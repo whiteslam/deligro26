@@ -6,6 +6,7 @@ import { OrderReceipt } from "@/components/orders/order-receipt";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { getOrderForTracking } from "@/lib/orders-ui";
+import { formatIst } from "@/lib/utils/ist-time";
 
 /**
  * The receipt for one order.
@@ -30,7 +31,10 @@ export default async function OrderReceiptPage({
   if (!order) notFound();
 
   const placedOn = order.createdAt
-    ? new Date(order.createdAt).toLocaleString("en-IN", {
+    ? // IST explicitly: this page renders on the server, which runs in UTC,
+      // and an en-IN locale does not change the clock — the receipt printed
+      // 7:42 am for an order placed at 1:12 pm.
+      formatIst(order.createdAt, {
         day: "numeric",
         month: "short",
         year: "numeric",

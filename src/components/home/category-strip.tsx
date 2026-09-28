@@ -28,7 +28,7 @@ export function CategoryStrip({ categories }: { categories: Category[] }) {
               label={c.label}
             />
           </span>
-          <span className="w-full truncate text-center text-[11px] font-semibold text-ink">
+          <span className="line-clamp-2 w-full text-center text-[12px] font-semibold leading-tight text-ink">
             {c.label}
           </span>
         </Link>
