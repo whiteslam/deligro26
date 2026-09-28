@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { signOutPush } from "@/components/notifications/onesignal-init";
 import { useRouter } from "next/navigation";
 import { PortalToShell } from "@/components/shared/portal-to-shell";
 import { clearAppCaches, registerServiceWorker } from "@/lib/pwa/service-worker";
@@ -77,6 +78,10 @@ export function PwaProvider() {
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("signedout") === "1") {
       void clearAppCaches();
+      // And detach this device from the signed-out person's pushes (native
+      // app or web). Sign-in pages don't mount <OneSignalInit>, so nothing
+      // else would.
+      signOutPush();
     }
   }, []);
 

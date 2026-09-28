@@ -3,6 +3,8 @@
 import { useCallback, useState } from "react";
 import { useIsClient } from "@/lib/pwa/use-is-client";
 import { Bell, BellOff, BellRing } from "lucide-react";
+import { requestPushOptIn } from "@/components/notifications/onesignal-init";
+import { pushSupport } from "@/lib/native/bridge";
 
 /**
  * The notification opt-in control.
@@ -19,9 +21,12 @@ import { Bell, BellOff, BellRing } from "lucide-react";
 
 const APP_ID = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID ?? "";
 
-type Permission = "default" | "granted" | "denied" | "unsupported";
+type Permission = "default" | "granted" | "denied" | "unsupported" | "native" | "native-asked";
 
 function currentPermission(): Permission {
+  // Inside the Android app the WebView has no window.Notification; the
+  // permission lives with the native push plugin (src/lib/native/bridge.ts).
+  if (pushSupport() === "native") return "native";
   if (typeof window === "undefined" || !("Notification" in window)) {
     return "unsupported";
   }
@@ -37,14 +42,21 @@ export function PushOptIn() {
   const [busy, setBusy] = useState(false);
 
   const enable = useCallback(async () => {
+    if (pushSupport() === "native") {
+      // The Android prompt (or, if it was refused before, the app's settings).
+      requestPushOptIn();
+      setPermission("native-asked");
+      return;
+    }
     if (!("Notification" in window)) return;
     setBusy(true);
     try {
       const result = await Notification.requestPermission();
       setPermission(result as Permission);
-      // OneSignal picks the subscription up through its own change listener and
-      // POSTs the player id to /api/notifications/register — nothing to do here
-      // beyond letting the permission through.
+      // Subscribe explicitly rather than waiting for the SDK to notice the new
+      // permission on some later page load; its change listener then POSTs the
+      // id to /api/notifications/register (see onesignal-init.tsx).
+      if (result === "granted") requestPushOptIn();
     } catch {
       setPermission(currentPermission());
     } finally {
@@ -64,6 +76,16 @@ export function PushOptIn() {
         icon={<BellOff className="size-4" aria-hidden="true" />}
         title="Not supported on this browser"
         description="Order updates will still appear on the Orders screen whenever you open the app."
+      />
+    );
+  }
+
+  if (permission === "native-asked") {
+    return (
+      <Row
+        icon={<BellRing className="size-4 text-green" aria-hidden="true" />}
+        title="Allow notifications in the prompt"
+        description="If nothing appeared, turn them on in Android Settings → Apps → Deligro → Notifications. / सेटिंग्स में नोटिफिकेशन चालू करें।"
       />
     );
   }

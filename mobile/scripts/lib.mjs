@@ -47,6 +47,9 @@ export function capacitorConfigFor(role, baseUrl, oneSignalAppId) {
     android: {
       allowMixedContent: false,
       appendUserAgent: `DeligroApp/${role.role}`,
+      // apksigner gives a v2+ signature. Capacitor's default (jarsigner) is
+      // v1-only, which Android 11+ refuses to install for SDK 30+ targets.
+      buildOptions: { signingType: "apksigner", releaseType: "APK" },
     },
     plugins: {
       DeligroPush: { oneSignalAppId },
@@ -93,4 +96,36 @@ export function patchManifestPermissions(xml) {
   if (missing.length === 0) return xml;
   const lines = missing.map((p) => `    <uses-permission android:name="${p}" />`).join("\n");
   return xml.replace(/<\/manifest>\s*$/, `${lines}\n</manifest>\n`);
+}
+
+/**
+ * argv for `npx cap build android`, as an array so passwords are never
+ * re-parsed by a shell (quotes, %VAR%, $, backticks all survive as typed).
+ */
+export function signedBuildArgs({ keystore, storePass, keyPass, alias }) {
+  return [
+    "cap", "build", "android",
+    "--keystorepath", keystore,
+    "--keystorepass", storePass,
+    "--keystorealias", alias,
+    "--keystorealiaspass", keyPass,
+    "--androidreleasetype", "APK",
+    "--signing-type", "apksigner",
+  ];
+}
+
+/** The same argv with the two password values masked, for logging. */
+export function redactArgs(args) {
+  return args.map((a, i) =>
+    i > 0 && (args[i - 1] === "--keystorepass" || args[i - 1] === "--keystorealiaspass") ? "***" : a
+  );
+}
+
+/**
+ * The app's offline page, with Retry pointed at the role's live URL.
+ * Capacitor serves errorPath from the local www folder, so a plain reload
+ * would only reload the offline page itself.
+ */
+export function offlinePageFor(html, url) {
+  return html.replace(/location\.reload\(\)/g, `location.replace(${JSON.stringify(url)})`);
 }

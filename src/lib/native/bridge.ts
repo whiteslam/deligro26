@@ -10,7 +10,11 @@
 export interface NativePush {
   login(options: { userId: string }): Promise<void>;
   logout(): Promise<void>;
-  requestPermission(): Promise<void>;
+  /**
+   * `fallbackToSettings`: when permission was already denied, open the app's
+   * Android settings. True only for an explicit tap — never on app open.
+   */
+  requestPermission(options?: { fallbackToSettings?: boolean }): Promise<void>;
 }
 
 interface CapacitorGlobal {
@@ -18,7 +22,7 @@ interface CapacitorGlobal {
   Plugins?: Record<string, unknown>;
 }
 
-type WindowLike = { Capacitor?: CapacitorGlobal } | undefined;
+type WindowLike = { Capacitor?: CapacitorGlobal; Notification?: unknown } | undefined;
 
 function defaultWindow(): WindowLike {
   return typeof window === "undefined" ? undefined : (window as unknown as WindowLike);
@@ -36,4 +40,31 @@ export function nativePush(win: WindowLike = defaultWindow()): NativePush | null
   if (!isNativeApp(win)) return null;
   const plugin = win?.Capacitor?.Plugins?.DeligroPush as NativePush | undefined;
   return plugin && typeof plugin.login === "function" ? plugin : null;
+}
+
+/**
+ * Keep the phone's push identity in step with who is signed in.
+ *   signed in  → tie the device to the user, and ask Android 13+ once for
+ *                notification permission (quietly: no settings redirect).
+ *   signed out → detach, so a shared kitchen or rider phone stops getting
+ *                the previous person's orders.
+ */
+export async function nativeSessionSync(native: NativePush, userId: string | null): Promise<void> {
+  if (userId) {
+    await native.login({ userId });
+    await native.requestPermission({ fallbackToSettings: false });
+  } else {
+    await native.logout();
+  }
+}
+
+/**
+ * Which push path this device has. The Android WebView has no
+ * `window.Notification`, so without this check the customer app told
+ * everyone push was "not supported" and never offered the native prompt.
+ */
+export function pushSupport(win: WindowLike = defaultWindow()): "native" | "web" | "unsupported" {
+  if (nativePush(win)) return "native";
+  if (win && typeof win === "object" && "Notification" in win) return "web";
+  return "unsupported";
 }

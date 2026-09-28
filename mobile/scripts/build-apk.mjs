@@ -9,7 +9,7 @@
  * The key alias for each app is its role name (see mobile/README.md).
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,9 @@ import {
   patchMainActivity,
   patchAppGradle,
   patchManifestPermissions,
+  signedBuildArgs,
+  redactArgs,
+  offlinePageFor,
 } from "./lib.mjs";
 
 const MOBILE = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -51,8 +54,13 @@ function build(role, cfg, env) {
     join(appDir, "capacitor.config.json"),
     JSON.stringify(capacitorConfigFor(role, cfg.baseUrl, env.oneSignalAppId), null, 2) + "\n"
   );
-  copyFileSync(join(MOBILE, "native", "offline.html"), join(appDir, "www", "offline.html"));
-  copyFileSync(join(MOBILE, "native", "offline.html"), join(appDir, "www", "index.html"));
+  // Retry on the offline page goes back to this role's live URL.
+  const offline = offlinePageFor(
+    readFileSync(join(MOBILE, "native", "offline.html"), "utf8"),
+    new URL(role.path, cfg.baseUrl).toString()
+  );
+  writeFileSync(join(appDir, "www", "offline.html"), offline);
+  writeFileSync(join(appDir, "www", "index.html"), offline);
 
   // 2. The Android project, generated once.
   if (!existsSync(join(appDir, "android"))) run("npx cap add android", appDir);
@@ -80,17 +88,15 @@ function build(role, cfg, env) {
   // 5. Sync + signed release build.
   run("npx cap sync android", appDir);
   const alias = ALIAS_OVERRIDES[role.role] ?? role.role;
-  run(
-    [
-      "npx cap build android",
-      `--keystorepath "${env.keystore}"`,
-      `--keystorepass "${env.storePass}"`,
-      `--keystorealias "${alias}"`,
-      `--keystorealiaspass "${env.keyPass}"`,
-      "--androidreleasetype APK",
-    ].join(" "),
-    appDir
-  );
+  const args = signedBuildArgs({ keystore: env.keystore, storePass: env.storePass, keyPass: env.keyPass, alias });
+  // No shell: passwords are passed as argv entries, never re-parsed, and the
+  // log line masks them. The CLI's own script is run with node directly
+  // (Windows will not spawn npx.cmd without a shell).
+  const capBin = join(appDir, "node_modules", "@capacitor", "cli", "bin", "capacitor");
+  console.log(`
+$ npx ${redactArgs(args).join(" ")}   (in ${appDir})`);
+  const res = spawnSync(process.execPath, [capBin, ...args.slice(1)], { cwd: appDir, stdio: "inherit" });
+  if (res.status !== 0) throw new Error(`cap build failed for ${role.role} (exit ${res.status})`);
 
   // 6. Copy out with a checksum.
   const outDir = join(appDir, "android", "app", "build", "outputs", "apk", "release");

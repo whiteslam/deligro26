@@ -77,3 +77,35 @@ test("manifest gets location permissions exactly once", () => {
   assert.equal((twice.match(/ACCESS_FINE_LOCATION/g) ?? []).length, 1);
   assert.equal((twice.match(/ACCESS_COARSE_LOCATION/g) ?? []).length, 1);
 });
+
+// ---- final-review fixes ----
+import { offlinePageFor, signedBuildArgs, redactArgs } from "./lib.mjs";
+
+test("APKs are signed with apksigner (v2+), not jarsigner v1-only", () => {
+  const cfg = loadRoles(good);
+  const cap = capacitorConfigFor(cfg.roles[0], cfg.baseUrl, "x");
+  assert.equal(cap.android.buildOptions.signingType, "apksigner");
+  assert.equal(cap.android.buildOptions.releaseType, "APK");
+});
+
+test("signed build args pass the signing type and keep secrets as separate argv entries", () => {
+  const args = signedBuildArgs({ keystore: "C:\k s\r.jks", storePass: 'p"a%s$s', keyPass: "k`p", alias: "rider" });
+  assert.deepEqual(args.slice(0, 3), ["cap", "build", "android"]);
+  assert.ok(args.includes("--signing-type") && args[args.indexOf("--signing-type") + 1] === "apksigner");
+  assert.equal(args[args.indexOf("--keystorepass") + 1], 'p"a%s$s');
+  assert.equal(args[args.indexOf("--keystorepath") + 1], "C:\k s\r.jks");
+});
+
+test("logged build args never show the passwords", () => {
+  const args = signedBuildArgs({ keystore: "k.jks", storePass: "secret1", keyPass: "secret2", alias: "rider" });
+  const shown = redactArgs(args).join(" ");
+  assert.doesNotMatch(shown, /secret1|secret2/);
+  assert.match(shown, /--keystorepass \*\*\*/);
+});
+
+test("offline page Retry goes back to the role's live URL, not a local reload", () => {
+  const html = '<button type="button" onclick="location.reload()">Try again</button>';
+  const out = offlinePageFor(html, "https://deligrodelivery.ractrotech.com/driver");
+  assert.doesNotMatch(out, /location\.reload\(\)/);
+  assert.match(out, /location\.replace\("https:\/\/deligrodelivery\.ractrotech\.com\/driver"\)/);
+});

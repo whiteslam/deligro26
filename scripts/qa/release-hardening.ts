@@ -28,6 +28,9 @@ check("order_items guard is security invoker (definer would void the exemption)"
 check("recompute_order_total checks ownership", /function public\.recompute_order_total[\s\S]*?customer_id = auth\.uid\(\)/.test(sql));
 check("profiles.phone trigger exists", /create trigger profiles_guard_phone/.test(sql));
 check("check_rate_limit revoked from anon + authenticated", /revoke execute on function public\.check_rate_limit\(text, int, bigint\) from public, anon, authenticated/.test(sql));
+check("order_items name comes from menu_items, not the client", /new\.name\s*:=\s*m\.name/.test(sql));
+check("unavailable menu items are refused", /available/.test(sql.slice(sql.indexOf("function public.guard_order_item_insert"))));
+check("order total is recomputed after items are inserted", /after insert on public\.order_items/.test(sql) && /recompute_order_total\(/.test(sql.slice(sql.indexOf("after insert on public.order_items") - 800)));
 check("profile.ts writes phone with the service client", /createAdminClient\(\)[\s\S]*?\.update\(\{\s*phone/.test(profileTs));
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

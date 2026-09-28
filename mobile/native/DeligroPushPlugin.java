@@ -44,9 +44,15 @@ public class DeligroPushPlugin extends Plugin {
         call.resolve();
     }
 
+    /**
+     * fallbackToSettings (default false): when the user already refused, open
+     * the app's notification settings. The web app passes true only for an
+     * explicit tap, so opening the app never drags anyone into Settings.
+     */
     @PluginMethod
     public void requestPermission(PluginCall call) {
-        OneSignal.getNotifications().requestPermission(true, Continue.none());
+        boolean fallbackToSettings = Boolean.TRUE.equals(call.getBoolean("fallbackToSettings", false));
+        OneSignal.getNotifications().requestPermission(fallbackToSettings, Continue.none());
         call.resolve();
     }
 }

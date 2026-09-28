@@ -13,8 +13,9 @@
 --    lifecycle stamps cleared (0041 already pins total/discount; 0025 pins
 --    payment_status).
 -- 3. order_items INSERT by a user JWT: only into your own order while it is
---    'placed', only items from that order's restaurant, and the price is
---    re-derived from menu_items — a client-supplied price is ignored.
+--    'placed', only available items from that order's restaurant, and the
+--    price AND name are re-derived from menu_items — client values ignored.
+--    After any insert the order total is recomputed (3b).
 -- 4. recompute_order_total: only the order's customer (while 'placed'),
 --    an admin, or the service role may run it.
 -- 5. profiles.phone: changeable only by the service role / admin (the app
@@ -113,11 +114,14 @@ begin
     raise exception 'order_items: you can only add items to your own new order';
   end if;
 
-  select price, discount_price into m
+  select name, price, discount_price, available into m
     from public.menu_items
    where id = new.menu_item_id and restaurant_id = o.restaurant_id;
   if not found then
     raise exception 'order_items: item is not on this restaurant''s menu';
+  end if;
+  if m.available is not true then
+    raise exception 'order_items: item is sold out';
   end if;
 
   if new.qty is null or new.qty < 1 then
@@ -130,6 +134,8 @@ begin
       then m.price
     else m.discount_price
   end;
+  -- The kitchen reads order_items.name: it must be the dish actually priced.
+  new.name := m.name;
   return new;
 end;
 $$;
@@ -138,6 +144,28 @@ drop trigger if exists order_items_guard_insert on public.order_items;
 create trigger order_items_guard_insert
   before insert on public.order_items
   for each row execute function public.guard_order_item_insert();
+
+-- 3b. Keep the total true to the items. Without this a customer could add
+-- correctly-priced items to their own 'placed' order after checkout, and the
+-- rider would still collect (and settlement bill) the old total.
+create or replace function public.order_items_recompute_total()
+returns trigger
+language plpgsql security invoker set search_path = public as $$
+declare
+  oid uuid;
+begin
+  for oid in select distinct order_id from inserted loop
+    perform public.recompute_order_total(oid);
+  end loop;
+  return null;
+end;
+$$;
+
+drop trigger if exists order_items_recompute_total on public.order_items;
+create trigger order_items_recompute_total
+  after insert on public.order_items
+  referencing new table as inserted
+  for each statement execute function public.order_items_recompute_total();
 
 -- 4 ----------------------------------------------------------
 create or replace function public.recompute_order_total(oid uuid)

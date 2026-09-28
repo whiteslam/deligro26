@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { nativePush } from "@/lib/native/bridge";
+import { nativePush, nativeSessionSync } from "@/lib/native/bridge";
 
 /**
  * Loads the OneSignal Web SDK (v16), ties this device's subscription to the
@@ -101,68 +101,85 @@ function loadSdk(): void {
  */
 let initQueued = false;
 
-export function OneSignalInit({ userId }: { userId: string | null }) {
-  useEffect(() => {
-    // Inside the Android app: push goes through the native plugin. The web
-    // SDK cannot receive push in a WebView, so it is not loaded at all here.
-    const native = nativePush();
-    if (native) {
-      if (userId) void native.login({ userId }).catch(() => {});
-      else void native.logout().catch(() => {});
+/**
+ * Tie this device's push identity to `userId`, or detach it when null.
+ * Shared by <OneSignalInit> and the sign-out landing (signOutPush).
+ */
+export function syncPushIdentity(userId: string | null): void {
+  // Inside the Android app: push goes through the native plugin. The web
+  // SDK cannot receive push in a WebView, so it is not loaded at all here.
+  const native = nativePush();
+  if (native) {
+    void nativeSessionSync(native, userId).catch(() => {});
+    return;
+  }
+
+  if (!APP_ID || initQueued) return;
+
+  // Signed out, and this browser was never logged in: nothing to undo, so
+  // don't load a third-party SDK for an anonymous visitor.
+  if (!userId && !readLoggedIn()) return;
+
+  initQueued = true;
+  window.OneSignalDeferred = window.OneSignalDeferred ?? [];
+  window.OneSignalDeferred.push(async (OneSignal) => {
+    try {
+      await OneSignal.init({
+        appId: APP_ID,
+        allowLocalhostAsSecureOrigin: true,
+      });
+    } catch {
+      // "App not configured for web push" — the OneSignal app's Web
+      // configuration names a different site origin (every localhost and
+      // preview deploy). Nothing below can work without init; the in-app
+      // alerts and the server's player-id fallback are unaffected.
       return;
     }
 
-    if (!APP_ID || initQueued) return;
-
-    // Signed out, and this browser was never logged in: nothing to undo, so
-    // don't load a third-party SDK for an anonymous visitor.
-    if (!userId && !readLoggedIn()) return;
-
-    initQueued = true;
-    window.OneSignalDeferred = window.OneSignalDeferred ?? [];
-    window.OneSignalDeferred.push(async (OneSignal) => {
+    if (!userId) {
       try {
-        await OneSignal.init({
-          appId: APP_ID,
-          allowLocalhostAsSecureOrigin: true,
-        });
+        await OneSignal.logout();
       } catch {
-        // "App not configured for web push" — the OneSignal app's Web
-        // configuration names a different site origin (every localhost and
-        // preview deploy). Nothing below can work without init; the in-app
-        // alerts and the server's player-id fallback are unaffected.
-        return;
+        /* ignore — worst case the old alias lingers until the next login */
       }
+      writeLoggedIn(null);
+      return;
+    }
 
-      if (!userId) {
-        try {
-          await OneSignal.logout();
-        } catch {
-          /* ignore — worst case the old alias lingers until the next login */
-        }
-        writeLoggedIn(null);
-        return;
+    if (readLoggedIn() !== userId) {
+      try {
+        await OneSignal.login(userId);
+        writeLoggedIn(userId);
+      } catch {
+        /* ignore — the player-id fallback below still registers the device */
       }
+    }
 
-      if (readLoggedIn() !== userId) {
-        try {
-          await OneSignal.login(userId);
-          writeLoggedIn(userId);
-        } catch {
-          /* ignore — the player-id fallback below still registers the device */
-        }
-      }
-
-      // Persist the id now if already subscribed, and on any later change.
-      void savePlayerId(OneSignal.User.PushSubscription.id);
-      OneSignal.User.PushSubscription.addEventListener("change", (e) => {
-        void savePlayerId(e.current.id);
-      });
+    // Persist the id now if already subscribed, and on any later change.
+    void savePlayerId(OneSignal.User.PushSubscription.id);
+    OneSignal.User.PushSubscription.addEventListener("change", (e) => {
+      void savePlayerId(e.current.id);
     });
-    loadSdk();
+  });
+  loadSdk();
+}
+
+export function OneSignalInit({ userId }: { userId: string | null }) {
+  useEffect(() => {
+    syncPushIdentity(userId);
   }, [userId]);
 
   return null;
+}
+
+/**
+ * Called on the page /auth/signout lands on (`?signedout=1`, pwa-provider).
+ * Every sign-in page is outside the layouts that mount <OneSignalInit>, so
+ * without this a signed-out phone — a shared kitchen tablet, a rider's handed-on
+ * phone — kept receiving the previous person's pushes.
+ */
+export function signOutPush(): void {
+  syncPushIdentity(null);
 }
 
 /**
@@ -177,7 +194,8 @@ export function OneSignalInit({ userId }: { userId: string | null }) {
 export function requestPushOptIn(): void {
   const native = nativePush();
   if (native) {
-    void native.requestPermission().catch(() => {});
+    // An explicit tap: if permission was denied before, open Android settings.
+    void native.requestPermission({ fallbackToSettings: true }).catch(() => {});
     return;
   }
   if (!APP_ID || typeof window === "undefined") return;
