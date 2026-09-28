@@ -41,6 +41,7 @@
     "test:role-features": "npx tsx scripts/qa/role-features.ts",
     "test:release-hardening": "npx tsx scripts/qa/release-hardening.ts",
     "test:role-manifest": "npx tsx scripts/qa/role-manifest.ts",
+    "test:native-bridge": "npx tsx scripts/qa/native-bridge.ts",
     "test:zap": "bash scripts/qa/zap-baseline.sh",
     "test:qa": "bash scripts/qa/run-all.sh"
   },
