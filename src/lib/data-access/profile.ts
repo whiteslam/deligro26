@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { countFavorites } from "@/lib/data-access/favorites";
 import { checkOtp } from "@/lib/data-access/otp";
 import { toE164 } from "@/lib/auth/phone";
@@ -128,7 +129,22 @@ export async function updateProfile(input: ProfileUpdateInput): Promise<boolean>
       if (!check.ok) throw new Error("otp_invalid");
     }
 
-    patch.phone = phone;
+    // Written with the service client, after checkOtp above has proved the
+    // caller controls the number: profiles.phone is locked to the service
+    // role at the database (migration 0053), so the REST API cannot be used
+    // to claim a number without an OTP.
+    const admin = createAdminClient();
+    const { error: phoneError } = await admin
+      .from("profiles")
+      .update({ phone })
+      .eq("id", user.id);
+    if (phoneError) {
+      // profiles.phone is globally unique (0005): the number is already another
+      // account's login identity. OTP proved control of it, but it's attached
+      // elsewhere, so say so rather than 500.
+      if ((phoneError as { code?: string }).code === "23505") throw new Error("phone_taken");
+      throw phoneError;
+    }
   }
 
   if (!Object.keys(patch).length) return true;
@@ -137,16 +153,8 @@ export async function updateProfile(input: ProfileUpdateInput): Promise<boolean>
     .from("profiles")
     .update(patch)
     .eq("id", user.id);
-  if (error) {
-    // profiles.phone is globally unique (0005): this number is already another
-    // account's login identity. The RLS-scoped client can't see that row to
-    // pre-check it, so we surface the update's own unique violation instead of a
-    // 500. OTP proved control of the number, but it's still attached elsewhere.
-    if ((error as { code?: string }).code === "23505") {
-      throw new Error("phone_taken");
-    }
-    throw error;
-  }
+  // Name only by now — the phone was written above with the service client.
+  if (error) throw error;
   return true;
 }
 

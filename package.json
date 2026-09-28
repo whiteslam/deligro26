@@ -39,6 +39,7 @@
     "test:e2e": "npx tsx scripts/qa/e2e-smoke.ts",
     "test:eta": "npx tsx scripts/qa/eta-distance.ts",
     "test:role-features": "npx tsx scripts/qa/role-features.ts",
+    "test:release-hardening": "npx tsx scripts/qa/release-hardening.ts",
     "test:zap": "bash scripts/qa/zap-baseline.sh",
     "test:qa": "bash scripts/qa/run-all.sh"
   },
