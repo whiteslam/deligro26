@@ -38,6 +38,7 @@
     "test:driver-app": "npx tsx scripts/qa/driver-app.ts",
     "test:e2e": "npx tsx scripts/qa/e2e-smoke.ts",
     "test:eta": "npx tsx scripts/qa/eta-distance.ts",
+    "test:role-features": "npx tsx scripts/qa/role-features.ts",
     "test:zap": "bash scripts/qa/zap-baseline.sh",
     "test:qa": "bash scripts/qa/run-all.sh"
   },
@@ -48,7 +49,7 @@
     "@upstash/redis": "^1.38.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.23.0",
-    "next": "16.3.0",
+    "next": "16.3.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^2.15.4",
@@ -63,7 +64,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.0",
+    "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
