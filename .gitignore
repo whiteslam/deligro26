@@ -65,3 +65,15 @@ next-env.d.ts
 # snapshots of live catalog data, useful locally and not something to commit.
 scripts/ops/undo-dish-photos-*.json
 scripts/ops/deleted-menu-items-*.json
+.superpowers/
+
+# Android shells (mobile/)
+mobile/apps/*/node_modules/
+mobile/apps/*/android/app/build/
+mobile/apps/*/android/build/
+mobile/apps/*/android/.gradle/
+mobile/apps/*/android/local.properties
+mobile/dist/
+*.jks
+*.keystore
+keystore.properties

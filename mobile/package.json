@@ -1,0 +1,9 @@
+{
+  "name": "deligro-mobile",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test scripts/*.test.mjs",
+    "build:apk": "node scripts/build-apk.mjs"
+  }
+}

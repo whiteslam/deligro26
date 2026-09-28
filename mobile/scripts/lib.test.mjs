@@ -1,0 +1,79 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  loadRoles,
+  capacitorConfigFor,
+  patchMainActivity,
+  patchAppGradle,
+  patchManifestPermissions,
+} from "./lib.mjs";
+
+const good = JSON.stringify({
+  baseUrl: "https://deligrodelivery.ractrotech.com",
+  oneSignalAppId: "SET_FROM_ENV",
+  roles: [
+    { role: "rider", appId: "com.ractrotech.deligro.rider", appName: "Deligro Rider", path: "/driver", versionCode: 3, versionName: "1.0.2" },
+  ],
+});
+
+test("loadRoles accepts a valid file", () => {
+  const cfg = loadRoles(good);
+  assert.equal(cfg.roles[0].path, "/driver");
+});
+
+test("loadRoles rejects http", () => {
+  assert.throws(() => loadRoles(good.replace("https://", "http://")), /https/);
+});
+
+test("loadRoles rejects duplicate appIds", () => {
+  const dup = JSON.parse(good);
+  dup.roles.push({ ...dup.roles[0], role: "vendor" });
+  assert.throws(() => loadRoles(JSON.stringify(dup)), /duplicate/i);
+});
+
+test("loadRoles rejects a role missing a field", () => {
+  const bad = JSON.parse(good);
+  delete bad.roles[0].appName;
+  assert.throws(() => loadRoles(JSON.stringify(bad)), /appName/);
+});
+
+test("capacitor config loads the role path on the live host only", () => {
+  const cfg = loadRoles(good);
+  const cap = capacitorConfigFor(cfg.roles[0], cfg.baseUrl, "os-app-id");
+  assert.equal(cap.appId, "com.ractrotech.deligro.rider");
+  assert.equal(cap.appName, "Deligro Rider");
+  assert.equal(cap.server.url, "https://deligrodelivery.ractrotech.com/driver");
+  assert.deepEqual(cap.server.allowNavigation, ["deligrodelivery.ractrotech.com"]);
+  assert.equal(cap.server.cleartext, false);
+  assert.equal(cap.server.errorPath, "offline.html");
+  assert.equal(cap.plugins.DeligroPush.oneSignalAppId, "os-app-id");
+  assert.match(cap.android.appendUserAgent, /DeligroApp\/rider/);
+});
+
+test("customer path '/' does not produce a double slash", () => {
+  const cfg = loadRoles(good);
+  const cap = capacitorConfigFor({ ...cfg.roles[0], role: "customer", path: "/" }, cfg.baseUrl, "x");
+  assert.equal(cap.server.url, "https://deligrodelivery.ractrotech.com/");
+});
+
+test("MainActivity registers the push plugin before super.onCreate", () => {
+  const src = patchMainActivity("com.ractrotech.deligro.rider");
+  assert.match(src, /^package com\.ractrotech\.deligro\.rider;/);
+  assert.ok(src.indexOf("registerPlugin(DeligroPushPlugin.class)") < src.indexOf("super.onCreate"));
+});
+
+test("app gradle gets versions and exactly one OneSignal dependency", () => {
+  const gradle = `android {\n    defaultConfig {\n        versionCode 1\n        versionName "1.0"\n    }\n}\ndependencies {\n    implementation project(':capacitor-android')\n}\n`;
+  const once = patchAppGradle(gradle, 3, "1.0.2");
+  const twice = patchAppGradle(once, 3, "1.0.2");
+  assert.match(once, /versionCode 3/);
+  assert.match(once, /versionName "1\.0\.2"/);
+  assert.equal((twice.match(/com\.onesignal:OneSignal/g) ?? []).length, 1);
+});
+
+test("manifest gets location permissions exactly once", () => {
+  const xml = `<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />\n</manifest>\n`;
+  const twice = patchManifestPermissions(patchManifestPermissions(xml));
+  assert.equal((twice.match(/ACCESS_FINE_LOCATION/g) ?? []).length, 1);
+  assert.equal((twice.match(/ACCESS_COARSE_LOCATION/g) ?? []).length, 1);
+});

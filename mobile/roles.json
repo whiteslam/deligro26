@@ -1,0 +1,10 @@
+{
+  "baseUrl": "https://deligrodelivery.ractrotech.com",
+  "oneSignalAppId": "SET_FROM_ENV",
+  "roles": [
+    { "role": "customer", "appId": "com.ractrotech.deligro",         "appName": "Deligro",         "path": "/",        "versionCode": 1, "versionName": "1.0.0" },
+    { "role": "vendor",   "appId": "com.ractrotech.deligro.partner", "appName": "Deligro Partner", "path": "/vendor",  "versionCode": 1, "versionName": "1.0.0" },
+    { "role": "rider",    "appId": "com.ractrotech.deligro.rider",   "appName": "Deligro Rider",   "path": "/driver",  "versionCode": 1, "versionName": "1.0.0" },
+    { "role": "manager",  "appId": "com.ractrotech.deligro.manager", "appName": "Deligro Manager", "path": "/manager", "versionCode": 1, "versionName": "1.0.0" }
+  ]
+}
