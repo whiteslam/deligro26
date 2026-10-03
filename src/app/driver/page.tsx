@@ -16,7 +16,11 @@ const DEMO_BOARD: DriverBoardData = {
   // Nothing is reserved in the demo: there is no dispatch without a backend to
   // dispatch from, so every card reads as open to everyone — which is what a
   // no-backend install actually is.
-  available: AVAILABLE_JOBS.map((job) => ({ ...job, reservedForYou: false })),
+  available: AVAILABLE_JOBS.map((job) => ({
+    ...job,
+    payment: { instruction: "collect" as const, collectAmount: 302 },
+    reservedForYou: false,
+  })),
   upcoming: [],
   active: null,
   today: { trips: DRIVER_TODAY.trips },

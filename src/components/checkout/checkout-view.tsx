@@ -14,12 +14,14 @@ import {
   Bike,
   Banknote,
   CreditCard,
+  NotebookPen,
+  X,
 } from "lucide-react";
 import { useCart } from "@/stores/cart-store";
 import { ACTIVE_ORDER } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { EmptyState } from "@/components/shared/empty-state";
-import { MapPicker } from "@/components/location/map-picker";
+import { DeliveryMapScreen } from "@/components/checkout/delivery-map-screen";
 import { Button } from "@/components/ui/button";
 import { AddAddressForm } from "@/components/addresses/add-address-form";
 import { AddressPickerSheet } from "@/components/addresses/address-picker-sheet";
@@ -112,6 +114,13 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
     lat: number;
     lng: number;
   } | null>(null);
+  // The pin screen and the flat/floor/instructions sheet: both are opened from
+  // the page rather than sitting on it, which keeps checkout short.
+  const [showMap, setShowMap] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  // What the map reverse-geocoded a moved pin to — shown instead of the saved
+  // line while the two differ, so the address never describes the wrong spot.
+  const [pinLine, setPinLine] = useState<string | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
   const [pinSaved, setPinSaved] = useState(false);
 
@@ -309,8 +318,20 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
           : null,
       );
       setPinSaved(false);
+      setPinLine(null);
     }
   }
+
+  const detailsSummary = [
+    apartment,
+    floor && t(`Floor ${floor}`, `मंज़िल ${floor}`),
+    buildingName,
+    entryCode && t(`Gate ${entryCode}`, `गेट ${entryCode}`),
+    courierInstructions,
+  ]
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .filter(Boolean)
+    .join(", ");
 
   const pinMoved =
     selectedAddress &&
@@ -855,36 +876,13 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
             </>
           ) : selectedAddress ? (
             <>
-              <button
-                type="button"
-                onClick={() => setShowPicker(true)}
-                className="press flex w-full items-center gap-3 border-b border-line px-4 py-3.5 text-left"
-              >
-                <MapPin
-                  className="size-5 shrink-0 text-ink"
-                  strokeWidth={2.25}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-semibold uppercase tracking-wide text-muted">
-                    {selectedAddress.label}
-                    {selectedAddress.isDefault
-                      ? t(" · Default", " · डिफ़ॉल्ट")
-                      : ""}
-                  </span>
-                  <span className="mt-0.5 block text-[15px] font-medium leading-snug">
-                    {selectedAddress.line}
-                  </span>
-                </span>
-                <ChevronRight className="size-5 shrink-0 text-muted" />
-              </button>
-
               {autoPicked && !outOfArea ? (
                 <div className="flex items-start gap-2.5 border-b border-line bg-green-soft px-4 py-3 text-sm font-medium text-ink">
                   <MapPin className="mt-0.5 size-4 shrink-0 text-green" />
                   <span>
                     {t(
-                      `Your default address is outside this shop's delivery area, so we picked your saved “${autoPicked}” address. Tap above to change it.`,
-                      `आपका डिफ़ॉल्ट पता इस दुकान के डिलीवरी क्षेत्र से बाहर है, इसलिए आपका सेव पता “${autoPicked}” चुना गया। बदलने के लिए ऊपर दबाएं।`,
+                      `Your default address is outside this shop's delivery area, so we picked your saved “${autoPicked}” address. Tap Change below to pick another.`,
+                      `आपका डिफ़ॉल्ट पता इस दुकान के डिलीवरी क्षेत्र से बाहर है, इसलिए आपका सेव पता “${autoPicked}” चुना गया। दूसरा चुनने के लिए नीचे “बदलें” दबाएं।`,
                     )}
                   </span>
                 </div>
@@ -899,90 +897,42 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                   <span>
                     {t(
-                      "This address is not on the map yet, so we can't check we deliver there. Drop a pin below or tap “Use my location” to order.",
-                      "यह पता अभी नक्शे पर नहीं है, इसलिए हम देख नहीं पा रहे कि वहां डिलीवरी होती है या नहीं। ऑर्डर करने के लिए नीचे पिन लगाएं या “मेरी लोकेशन लें” दबाएं।",
-                    )}
+                      "This address is not on the map yet, so we can't check we deliver there.",
+                      "यह पता अभी नक्शे पर नहीं है, इसलिए हम देख नहीं पा रहे कि वहां डिलीवरी होती है या नहीं।",
+                    )}{" "}
+                    <button
+                      type="button"
+                      onClick={() => setShowMap(true)}
+                      className="press font-bold underline"
+                    >
+                      {t("Set pin", "पिन लगाएं")}
+                    </button>
                   </span>
                 </div>
               ) : null}
 
-              <div className="space-y-3 p-4">
-                <MapPicker
-                  key={selectedId}
-                  variant="checkout"
-                  initial={mapCoords}
-                  onPick={({ lat, lng }) => {
-                    setMapCoords({ lat, lng });
-                    setPinSaved(false);
-                  }}
-                />
-
-                {pinMoved ? (
-                  <button
-                    type="button"
-                    onClick={savePinToAddress}
-                    disabled={pinBusy}
-                    className="press w-full rounded-xl border border-accent bg-accent-soft py-2.5 text-sm font-bold text-accent-ink disabled:opacity-60"
-                  >
-                    {pinBusy ? (
-                      <Loader2 className="mx-auto size-4 animate-spin" />
-                    ) : pinSaved ? (
-                      t("Pin saved to address", "पिन पते में सेव हो गया")
-                    ) : (
-                      t("Save pin to this address", "इस पते में पिन सेव करें")
-                    )}
-                  </button>
-                ) : null}
-
-                <CheckoutField
-                  placeholder={t(
-                    "Apartment, flat or suite number",
-                    "मकान / फ्लैट नंबर",
-                  )}
-                  value={apartment}
-                  onChange={setApartment}
-                />
-
-                <div className="grid grid-cols-2 gap-3">
-                  <CheckoutField
-                    placeholder={t("Entry code", "गेट कोड")}
-                    value={entryCode}
-                    onChange={setEntryCode}
-                  />
-                  <CheckoutField
-                    placeholder={t("Floor", "मंज़िल")}
-                    value={floor}
-                    onChange={setFloor}
-                  />
-                </div>
-
-                <CheckoutField
-                  label={t("Building name", "बिल्डिंग का नाम")}
-                  placeholder={t("Building name", "बिल्डिंग का नाम")}
-                  value={buildingName}
-                  onChange={setBuildingName}
-                />
-
-                <CheckoutField
-                  label={t(
-                    "Instructions for the courier",
-                    "डिलीवरी वाले के लिए निर्देश",
-                  )}
-                  placeholder={t(
-                    "Instructions for the courier",
-                    "डिलीवरी वाले के लिए निर्देश",
-                  )}
-                  value={courierInstructions}
-                  onChange={setCourierInstructions}
-                />
-
-                <Link
-                  href="/profile/addresses"
-                  className="block text-center text-sm font-semibold text-accent-ink"
-                >
-                  {t("Manage saved addresses", "सेव पते बदलें")}
-                </Link>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowDetails(true)}
+                className="press flex w-full items-center gap-3 px-4 py-3.5 text-left"
+              >
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent-ink">
+                  <NotebookPen className="size-[18px]" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-bold">
+                    {t("Delivery instructions", "डिलीवरी के निर्देश")}
+                  </span>
+                  <span className="block truncate text-xs text-muted">
+                    {detailsSummary ||
+                      t(
+                        "Flat, floor, landmark. Optional.",
+                        "मकान, मंज़िल, पास की पहचान। ज़रूरी नहीं।",
+                      )}
+                  </span>
+                </span>
+                <ChevronRight className="size-5 shrink-0 text-muted" />
+              </button>
             </>
           ) : null}
         </section>
@@ -1210,6 +1160,29 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
           reads as one sheet rather than a header slab, a content slab and a
           button slab. It pays the home-indicator inset itself. */}
       <div className="screen-dock sticky bottom-0 z-20 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+        {selectedAddress && !showAddForm ? (
+          <div className="mb-3 flex items-center gap-3">
+            <MapPin
+              className="size-5 shrink-0 text-accent"
+              strokeWidth={2.25}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold">
+                {t("Delivering to", "डिलीवरी का पता")} {selectedAddress.label}
+              </p>
+              <p className="truncate text-xs text-muted">
+                {pinMoved && pinLine ? pinLine : selectedAddress.line}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowMap(true)}
+              className="press shrink-0 px-2 py-2 text-sm font-bold text-accent-ink"
+            >
+              {t("Change", "बदलें")}
+            </button>
+          </div>
+        ) : null}
         {ordersClosed ? (
           <p className="mb-2 flex items-center gap-1.5 text-center text-sm font-medium text-deal">
             <AlertTriangle className="size-4 shrink-0" />
@@ -1291,6 +1264,45 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
           )}
         </button>
       </div>
+
+      {selectedAddress ? (
+        <DeliveryMapScreen
+          open={showMap}
+          mapKey={selectedId}
+          coords={mapCoords}
+          label={selectedAddress.label}
+          line={selectedAddress.line}
+          pinLine={pinLine}
+          pinMoved={Boolean(pinMoved)}
+          pinBusy={pinBusy}
+          pinSaved={pinSaved}
+          area={serviceArea}
+          unpinned={addressUnpinned}
+          onPick={({ lat, lng, address }) => {
+            setMapCoords({ lat, lng });
+            setPinSaved(false);
+            setPinLine(address || null);
+          }}
+          onSavePin={savePinToAddress}
+          onSwitch={() => setShowPicker(true)}
+          onClose={() => setShowMap(false)}
+        />
+      ) : null}
+
+      <DetailsSheet
+        open={showDetails}
+        onClose={() => setShowDetails(false)}
+        apartment={apartment}
+        setApartment={setApartment}
+        entryCode={entryCode}
+        setEntryCode={setEntryCode}
+        floor={floor}
+        setFloor={setFloor}
+        buildingName={buildingName}
+        setBuildingName={setBuildingName}
+        courierInstructions={courierInstructions}
+        setCourierInstructions={setCourierInstructions}
+      />
 
       <AddressPickerSheet
         open={showPicker}
@@ -1521,6 +1533,135 @@ function CheckoutHeader({
         <span className="size-10 shrink-0" aria-hidden />
       )}
     </header>
+  );
+}
+
+/** Flat, floor, gate code and a note for the courier. All optional, so they
+ *  live in a sheet instead of taking half the checkout page. */
+function DetailsSheet({
+  open,
+  onClose,
+  apartment,
+  setApartment,
+  entryCode,
+  setEntryCode,
+  floor,
+  setFloor,
+  buildingName,
+  setBuildingName,
+  courierInstructions,
+  setCourierInstructions,
+}: {
+  open: boolean;
+  onClose: () => void;
+  apartment: string;
+  setApartment: (v: string) => void;
+  entryCode: string;
+  setEntryCode: (v: string) => void;
+  floor: string;
+  setFloor: (v: string) => void;
+  buildingName: string;
+  setBuildingName: (v: string) => void;
+  courierInstructions: string;
+  setCourierInstructions: (v: string) => void;
+}) {
+  const t = useT();
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <button
+        type="button"
+        aria-label={t("Close", "बंद करें")}
+        onClick={onClose}
+        className="animate-fade-in absolute inset-0 bg-ink/40"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("Delivery instructions", "डिलीवरी के निर्देश")}
+        className="bolt-sheet animate-sheet-in absolute inset-x-0 bottom-0 max-h-[88%] overflow-hidden"
+      >
+        <div className="bolt-sheet-handle" />
+        <div className="flex items-center justify-between px-5 pb-2 pt-3">
+          <h2 className="text-heading">
+            {t("Delivery instructions", "डिलीवरी के निर्देश")}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("Close", "बंद करें")}
+            className="press grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+        <div className="no-scrollbar max-h-[60vh] space-y-3 overflow-y-auto px-5 pb-3">
+          <CheckoutField
+            placeholder={t(
+              "Apartment, flat or suite number",
+              "मकान / फ्लैट नंबर",
+            )}
+            value={apartment}
+            onChange={setApartment}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <CheckoutField
+              placeholder={t("Entry code", "गेट कोड")}
+              value={entryCode}
+              onChange={setEntryCode}
+            />
+            <CheckoutField
+              placeholder={t("Floor", "मंज़िल")}
+              value={floor}
+              onChange={setFloor}
+            />
+          </div>
+          <CheckoutField
+            label={t("Building name", "बिल्डिंग का नाम")}
+            placeholder={t("Building name", "बिल्डिंग का नाम")}
+            value={buildingName}
+            onChange={setBuildingName}
+          />
+          <CheckoutField
+            label={t(
+              "Instructions for the courier",
+              "डिलीवरी वाले के लिए निर्देश",
+            )}
+            placeholder={t(
+              "Instructions for the courier",
+              "डिलीवरी वाले के लिए निर्देश",
+            )}
+            value={courierInstructions}
+            onChange={setCourierInstructions}
+          />
+          <Link
+            href="/profile/addresses"
+            className="block pt-1 text-center text-sm font-semibold text-accent-ink"
+          >
+            {t("Manage saved addresses", "सेव पते बदलें")}
+          </Link>
+        </div>
+        <div className="border-t border-line p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="press flex h-12 w-full items-center justify-center rounded-full bg-accent text-[16px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)]"
+          >
+            {t("Done", "हो गया")}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

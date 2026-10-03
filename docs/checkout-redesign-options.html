@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checkout redesign options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hind:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1317; --card:#171c22; --card2:#1f252c; --line:#2a313a;
+  --text:#f2f4f6; --mute:#8f99a5; --orange:#ff8a2a; --orange-d:#3d2412; --red:#ff6b5e; --green:#4cc38a;
+  --page:#e9e6e1; --page-text:#1c1b19; --page-mute:#6b665f;
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:Hind,system-ui,sans-serif;background:var(--page);color:var(--page-text);padding:32px 20px 64px}
+header{max-width:1280px;margin:0 auto 28px}
+h1{font-size:30px;font-weight:700;letter-spacing:-.01em}
+header p{color:var(--page-mute);max-width:70ch;margin-top:8px;font-size:16px;line-height:1.5}
+.row{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:36px}
+.opt h2{font-size:21px;font-weight:700;margin-bottom:4px}
+.opt .tag{color:var(--page-mute);font-size:15px;line-height:1.45;margin-bottom:16px;min-height:66px}
+.phone{width:340px;height:700px;margin:0 auto;border-radius:38px;background:var(--bg);color:var(--text);border:7px solid #0a0c0f;overflow:hidden;position:relative;box-shadow:0 18px 40px rgba(0,0,0,.28);display:flex;flex-direction:column;font-size:14px}
+.top{display:flex;align-items:center;justify-content:space-between;padding:16px 14px 10px}
+.top b{font-size:16px}
+.ic{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-size:15px;color:var(--text)}
+.scroll{flex:1;overflow:hidden;padding:0 14px;display:flex;flex-direction:column;gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
+.mute{color:var(--mute)} .small{font-size:12px}
+.cta{margin:10px 14px 14px;background:var(--orange);color:#1a0f05;border-radius:999px;padding:13px 18px;display:flex;justify-content:space-between;font-weight:700;font-size:16px}
+.cta.plain{justify-content:center}
+.map{background:
+  linear-gradient(90deg,transparent 48%,#cfd6dd 48% 52%,transparent 52%),
+  linear-gradient(0deg,transparent 60%,#cfd6dd 60% 64%,transparent 64%),
+  linear-gradient(35deg,transparent 40%,#d9dfe5 40% 43%,transparent 43%),#e9edf1;
+  position:relative;border-radius:12px;overflow:hidden}
+.pin{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-16px 0 0 -8px;background:var(--red);border-radius:50% 50% 50% 0;transform:rotate(-45deg)}
+.pin::after{content:"";position:absolute;inset:5px;background:#7a1d16;border-radius:50%}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:13px;background:var(--card2)}
+.chip.on{background:var(--orange-d);border-color:var(--orange);color:#ffc89a}
+.radio{display:flex;align-items:center;gap:10px;padding:11px;border-radius:12px;border:1px solid var(--line);background:var(--card)}
+.radio.on{background:var(--orange-d);border-color:#5b3a1e}
+.dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);margin-left:auto}
+.on .dot{border-color:var(--orange);background:radial-gradient(var(--orange) 45%,transparent 50%)}
+.link{color:var(--orange);font-weight:600}
+.field{background:var(--card2);border-radius:12px;padding:11px 12px;color:var(--mute)}
+.steps{display:flex;gap:6px;padding:0 14px 10px}
+.steps i{flex:1;height:4px;border-radius:4px;background:var(--line)}
+.steps i.on{background:var(--orange)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);border-radius:22px 22px 0 0;padding:12px 14px 14px}
+.grab{width:38px;height:4px;border-radius:4px;background:var(--line);margin:0 auto 10px}
+.bill div{display:flex;justify-content:space-between;padding:3px 0}
+.bill .tot{font-weight:700;font-size:15px;border-top:1px solid var(--line);margin-top:4px;padding-top:7px}
+.ok{color:var(--green);font-weight:600}
+.compare{max-width:1280px;margin:40px auto 0;background:#fff;border-radius:16px;padding:22px;overflow-x:auto}
+.compare h2{font-size:20px;margin-bottom:12px}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:15px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid #e7e3dc;vertical-align:top;line-height:1.4}
+th{font-weight:700;color:var(--page-text)} td:first-child{font-weight:600;white-space:nowrap}
+.rec{max-width:1280px;margin:18px auto 0;color:var(--page-mute);font-size:15px;line-height:1.55}
+</style>
+</head>
+<body>
+<header>
+  <h1>Checkout page — three directions</h1>
+  <p>Today the map sits open in the middle of checkout, so every scroll fights it and the order button is far from the address. In all three options the map becomes a separate, reusable <i>pin picker</i> that opens only when someone needs to move the pin. Same orange, same dark theme, same fields — only the structure changes.</p>
+</header>
+
+<div class="row">
+
+<!-- A -->
+<section class="opt">
+  <h2>A · One page, map on demand</h2>
+  <p class="tag">Everything on a single scroll. The address is a compact card with a small map thumbnail; the full map opens only when you tap “Change pin”.</p>
+  <div class="phone">
+    <div class="top"><div class="ic">‹</div><b>Saffron Kitchen</b><div class="ic">🗑</div></div>
+    <div class="scroll">
+      <div class="card">
+        <div style="display:flex;gap:10px">
+          <div class="map" style="width:78px;height:78px;flex:none"><span class="pin"></span></div>
+          <div style="min-width:0">
+            <div class="mute small">Deliver to · Home</div>
+            <div style="font-weight:600;line-height:1.3">Mohbhatta Rd, Berla, Bemetara 491335</div>
+            <div class="ok small" style="margin-top:3px">✓ 3.2 km · we deliver here</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:14px;margin-top:10px" class="small"><span class="link">Change pin</span><span class="link">Switch address</span></div>
+        <div class="field" style="margin-top:10px">Flat / floor / landmark (optional)</div>
+      </div>
+      <div class="radio on"><span>💵</span><div><b>Cash on delivery</b><div class="mute small">Pay when your order arrives</div></div><span class="dot"></span></div>
+      <div class="card" style="display:flex;align-items:center;gap:8px"><span class="mute" style="margin-right:auto">Tip the courier</span><span class="chip on">None</span><span class="chip">₹20</span><span class="chip">₹30</span></div>
+      <div class="card bill small"><div><span class="mute">Item total</span><span>₹260</span></div><div><span class="mute">Delivery</span><span>₹29</span></div><div><span class="mute">Taxes</span><span>₹13</span></div><div class="tot"><span>To pay</span><span>₹302</span></div></div>
+      <div class="link small" style="text-align:center">Have a promo code?</div>
+    </div>
+    <div class="cta"><span>Place order</span><span>₹302</span></div>
+  </div>
+</section>
+
+<!-- B -->
+<section class="opt">
+  <h2>B · Three short steps</h2>
+  <p class="tag">One decision per screen: where, how to pay, confirm. Big thumb-sized buttons, nothing to scroll past. Slowest to finish but hardest to get wrong.</p>
+  <div class="phone">
+    <div class="top"><div class="ic">‹</div><b>Where should we deliver?</b><div class="ic" style="visibility:hidden">·</div></div>
+    <div class="steps"><i class="on"></i><i></i><i></i></div>
+    <div class="scroll">
+      <div class="map" style="height:230px;border-radius:16px"><span class="pin"></span>
+        <span class="chip" style="position:absolute;right:8px;top:8px;background:#11151a;color:var(--orange)">◎ Use my location</span>
+        <span class="chip" style="position:absolute;left:50%;transform:translateX(-50%);bottom:8px;background:#11151a">Drag map to move pin</span>
+      </div>
+      <div class="card">
+        <div class="mute small">Pin is at</div>
+        <div style="font-weight:600;line-height:1.3;margin:2px 0 4px">Mohbhatta Rd, Berla, Bemetara</div>
+        <div class="ok small">✓ Inside our delivery area</div>
+      </div>
+      <div class="field">Flat, floor or landmark (optional)</div>
+      <div class="field">Note for the courier (optional)</div>
+    </div>
+    <div class="cta plain">Continue to payment</div>
+  </div>
+</section>
+
+<!-- C -->
+<section class="opt">
+  <h2>C · Saved addresses + bottom sheets</h2>
+  <p class="tag">Repeat customers pick a saved address with one tap. Map, payment and promo each live in a bottom sheet, so the main page stays short and fast. Best for repeat orders.</p>
+  <div class="phone">
+    <div class="top"><div class="ic">‹</div><b>Saffron Kitchen</b><div class="ic">🗑</div></div>
+    <div class="scroll">
+      <div style="display:flex;gap:8px"><span class="chip on">🏠 Home</span><span class="chip">💼 Work</span><span class="chip">＋ New</span></div>
+      <div class="card">
+        <div style="font-weight:600;line-height:1.3">Mohbhatta Rd, Berla, Bemetara 491335</div>
+        <div class="ok small" style="margin:3px 0 8px">✓ We deliver here · about 30 min</div>
+        <div class="link small">Edit pin and details ›</div>
+      </div>
+      <div class="card" style="display:flex;align-items:center;gap:10px"><span>💵</span><div><b>Cash on delivery</b><div class="mute small">Pay the courier</div></div><span class="link small" style="margin-left:auto">Change</span></div>
+      <div class="card" style="display:flex;align-items:center;gap:10px"><span>🛵</span><div><b>Tip: none</b><div class="mute small">100% goes to the courier</div></div><span class="link small" style="margin-left:auto">Add</span></div>
+      <div class="card" style="display:flex;align-items:center;gap:10px"><span>🏷</span><span class="mute">Have a promo code?</span><span class="link small" style="margin-left:auto">Apply</span></div>
+    </div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="bill small" style="margin-bottom:8px"><div><span class="mute">Items ₹260 · Delivery ₹29 · Taxes ₹13</span><span class="link">Details</span></div></div>
+      <div class="cta" style="margin:0"><span>Place order</span><span>₹302</span></div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<section class="compare">
+  <h2>How they compare</h2>
+  <table>
+    <tr><th></th><th>A · One page</th><th>B · Three steps</th><th>C · Saved + sheets</th></tr>
+    <tr><td>Taps to order (repeat customer)</td><td>2</td><td>4</td><td>1–2</td></tr>
+    <tr><td>Map on the page?</td><td>Small thumbnail; full map on tap</td><td>Full map, but only on step 1</td><td>Not on the page; opens in a sheet</td></tr>
+    <tr><td>Page weight / load</td><td>Light: map script loads on tap</td><td>Map loads on step 1</td><td>Lightest: map loads only when editing</td></tr>
+    <tr><td>Easiest for first-time, low-tech users</td><td>Good</td><td>Best: one question at a time</td><td>Okay: more hidden behind “Change”</td></tr>
+    <tr><td>Build effort</td><td>Smallest change</td><td>Medium: new step state and back handling</td><td>Medium: three sheets, saved-address chips</td></tr>
+    <tr><td>Reuses the map picker elsewhere</td><td>Yes</td><td>Yes</td><td>Yes: best fit, one sheet used everywhere</td></tr>
+  </table>
+</section>
+<p class="rec"><b>My pick:</b> A for launch. It is the smallest change, keeps everything visible, and answers the main complaint, the map in the way. C is the natural next step once customers have saved addresses. In every option the map is one shared “pin picker” component, which is what makes it reusable on the profile and address screens too. Copy is English because the customer app is English only right now; every string is short, so Hindi can be switched back on later.</p>
+</body>
+</html>

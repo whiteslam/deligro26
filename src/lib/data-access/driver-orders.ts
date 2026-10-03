@@ -106,6 +106,13 @@ export interface DriverActive {
 /** An order in the open pool, plus whether dispatch is holding it for this rider. */
 export interface AvailableJob extends DeliveryJob {
   /**
+   * Cash or prepaid, so an offer can say what the rider would be collecting
+   * BEFORE they accept. Same rule as the active delivery's `payment` — it comes
+   * from `paymentInstruction` — but the pickup code and the customer's number
+   * stay out of the pool: only how they're paying is needed to weigh a job.
+   */
+  payment: DriverPayment;
+  /**
    * True while this order is inside its exclusivity window and the window
    * belongs to the rider reading the board. Orders held for *somebody else* are
    * not flagged — they are simply not in the list.
@@ -412,6 +419,72 @@ function paymentInstruction(detail: ActiveOrderDetail): CashInstruction {
   return "unconfirmed";
 }
 
+/**
+ * How each open order is being paid for, in one query for the whole pool.
+ *
+ * The same probe-and-fall-back as `activeOrderDetail` (0025 may not be applied
+ * here), and the same `paymentInstruction` decides — so an offer and the active
+ * delivery it becomes can never disagree about whether to take cash. A failed
+ * read comes back as "unconfirmed" rather than throwing: a board that can't say
+ * how an order is paid is still a board.
+ */
+async function readPoolPayments(
+  supabase: AdminClient,
+  orders: OrderRow[]
+): Promise<Map<string, DriverPayment>> {
+  const out = new Map<string, DriverPayment>();
+  const fromDetail = (o: OrderRow, detail: ActiveOrderDetail): DriverPayment => {
+    const instruction = paymentInstruction(detail);
+    return {
+      instruction,
+      collectAmount: instruction === "collect" ? (o.total ?? 0) : 0,
+    };
+  };
+  if (orders.length === 0) return out;
+  const ids = orders.map((o) => o.id);
+
+  type PayRow = {
+    id: string;
+    payment_method?: PaymentMethod | null;
+    payment_status?: PaymentStatus | null;
+  };
+  const detailFor = (
+    row: PayRow | undefined,
+    paymentColumns: boolean
+  ): ActiveOrderDetail => ({
+    pickupOtp: null,
+    method: row?.payment_method ?? null,
+    status: row?.payment_status ?? null,
+    paymentColumns,
+    found: row !== undefined,
+  });
+
+  if (!columnKnownMissing(PAYMENT_COLUMNS)) {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("id, payment_method, payment_status")
+      .in("id", ids)
+      .overrideTypes<PayRow[]>();
+    if (!error) {
+      rememberColumn(PAYMENT_COLUMNS, true);
+      const byId = new Map((data ?? []).map((r) => [r.id, r]));
+      for (const o of orders) out.set(o.id, fromDetail(o, detailFor(byId.get(o.id), true)));
+      return out;
+    }
+    if (!isMissingColumn(error)) {
+      for (const o of orders) out.set(o.id, fromDetail(o, detailFor(undefined, true)));
+      return out;
+    }
+    rememberColumn(PAYMENT_COLUMNS, false);
+  }
+
+  // Before 0025: no online payment existed, so every order is cash.
+  for (const o of orders) {
+    out.set(o.id, fromDetail(o, detailFor({ id: o.id }, false)));
+  }
+  return out;
+}
+
 export async function getDriverBoard(driverId: string): Promise<DriverBoardData> {
   const supabase = createAdminClient();
 
@@ -492,14 +565,18 @@ export async function getDriverBoard(driverId: string): Promise<DriverBoardData>
   const now = Date.now();
   const offers = await readOffers(supabase, readyIds);
 
-  const available: AvailableJob[] = [];
-  for (const r of readyRows ?? []) {
-    if (takenIds.has(r.id)) continue;
-    const state = offerStateFor(driverId, offers.get(r.id), now);
+  const offered = (readyRows ?? []).filter((r) => {
+    if (takenIds.has(r.id)) return false;
     // Held for somebody else: not shown at all, rather than shown and refused.
-    if (state === "held") continue;
-    available.push({ ...toJob(r), reservedForYou: state === "mine" });
-  }
+    return offerStateFor(driverId, offers.get(r.id), now) !== "held";
+  });
+  const payments = await readPoolPayments(supabase, offered);
+
+  const available: AvailableJob[] = offered.map((r) => ({
+    ...toJob(r),
+    payment: payments.get(r.id) ?? { instruction: "unconfirmed", collectAmount: 0 },
+    reservedForYou: offerStateFor(driverId, offers.get(r.id), now) === "mine",
+  }));
   // Whatever is being held for this rider goes to the top — it is the one card
   // on the screen that will stop being theirs if they scroll past it.
   available.sort((a, b) => Number(b.reservedForYou) - Number(a.reservedForYou));

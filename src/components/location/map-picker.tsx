@@ -30,8 +30,12 @@ export function MapPicker({
 }: {
   initial?: { lat: number; lng: number } | null;
   onPick: (loc: PickedLocation) => void;
-  /** "checkout" — embedded map with Adjust pin, no search bar */
-  variant?: "form" | "checkout";
+  /**
+   * "checkout" — embedded map with Adjust pin, no search bar.
+   * "full" — fills its parent (a full-screen pin screen): search floats on top,
+   * "Use my location" sits bottom-left, clear of Google's zoom control.
+   */
+  variant?: "form" | "checkout" | "full";
 }) {
   // Also used by the vendor and admin shop-location forms, which have no
   // language provider and so read English.
@@ -193,6 +197,16 @@ export function MapPicker({
   }
 
   if (status === "error") {
+    if (variant === "full") {
+      return (
+        <div className="grid h-full place-items-center bg-surface-2 px-6 text-center text-sm text-muted">
+          {t(
+            "Map unavailable — your saved address will be used",
+            "नक्शा नहीं खुल रहा — आपका सेव किया हुआ पता इस्तेमाल होगा",
+          )}
+        </div>
+      );
+    }
     if (variant === "checkout") {
       return (
         <div className="relative overflow-hidden rounded-xl bg-surface-2">
@@ -209,6 +223,54 @@ export function MapPicker({
   }
 
   const checkout = variant === "checkout";
+
+  if (variant === "full") {
+    return (
+      <div className="relative h-full min-h-0">
+        <div ref={mapEl} className="absolute inset-0" />
+        {status === "loading" ? (
+          <div className="absolute inset-0 grid place-items-center bg-surface-2/60">
+            <Loader2 className="size-6 animate-spin text-muted" />
+          </div>
+        ) : null}
+        <div className="absolute inset-x-3 top-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+          <input
+            ref={searchEl}
+            type="text"
+            placeholder={t(
+              "Search for area, street, landmark…",
+              "मोहल्ला, गली या पास की जगह खोजें…",
+            )}
+            className="w-full rounded-xl border border-line bg-surface py-3 pl-9 pr-3 text-sm shadow-[var(--shadow-md)] outline-none focus:border-accent"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={useMyLocation}
+          disabled={locating || status !== "ready"}
+          className="press absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-surface px-3 py-2 text-sm font-semibold text-accent shadow-[var(--shadow-md)] disabled:opacity-60"
+        >
+          {locating ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <LocateFixed className="size-4" />
+          )}
+          {locating
+            ? t("Locating…", "लोकेशन ढूंढ रहे हैं…")
+            : t("Use my location", "मेरी लोकेशन लें")}
+        </button>
+        {locateError ? (
+          <p
+            role="alert"
+            className="absolute inset-x-3 bottom-16 rounded-xl bg-surface p-3 text-xs font-medium text-deal shadow-[var(--shadow-md)]"
+          >
+            {locateError}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className={checkout ? undefined : "space-y-2"}>
