@@ -10,11 +10,13 @@ import { cancelDeliveryForOrder, dispatchOrder } from "@/lib/dispatch/rider-disp
 import {
   notifyOrderCancelled,
   notifyOrderAccepted,
+  stopVendorRing,
   notifyOrderReady,
   notifyOnTheWay,
   notifyDelivered,
   notifyVendorOrderCancelled,
 } from "@/lib/notifications/order-events";
+import { vendorRingEnds } from "@/lib/alerts/ring";
 import { deferNotify } from "@/lib/notifications/defer";
 
 export interface ActionResult {
@@ -129,6 +131,8 @@ export async function overrideOrderStatus(
 
   // Same customer-facing events the vendor and rider paths fire, so an
   // overridden order is not a silent one. Fire-and-forget by contract.
+  // Support moved it out of New: the kitchen's phones stop ringing.
+  if (vendorRingEnds(current.status, status)) deferNotify(() => stopVendorRing(orderId));
   if (status === "kitchen") deferNotify(() => notifyOrderAccepted(orderId));
   else if (status === "ready") deferNotify(() => notifyOrderReady(orderId));
   else if (status === "on_the_way") deferNotify(() => notifyOnTheWay(orderId));

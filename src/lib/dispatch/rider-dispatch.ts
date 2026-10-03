@@ -7,8 +7,10 @@ import {
   notifyDriverOrderCancelled,
   notifyDriverPickupOffered,
   notifyDriverPickupReady,
+  stopRiderRing,
 } from "@/lib/notifications/order-events";
 import { deferNotify } from "@/lib/notifications/defer";
+import { staleOfferee } from "@/lib/alerts/ring";
 import {
   columnKnownMissing,
   isMissingColumn,
@@ -324,6 +326,12 @@ function one<T>(v: T | T[] | null | undefined): T | null {
  */
 type OfferOutcome = "offered" | "taken" | "unsupported";
 
+/** The outcome, and who held the offer before this write (their ring must stop). */
+interface OfferWrite {
+  outcome: OfferOutcome;
+  previousOfferee: string | null;
+}
+
 /**
  * Record the offer on the delivery row.
  *
@@ -337,17 +345,28 @@ async function writeOffer(
   orderId: string,
   driverId: string,
   now: number
-): Promise<OfferOutcome> {
-  if (columnKnownMissing(DISPATCH_COLUMNS)) return "unsupported";
+): Promise<OfferWrite> {
+  const result = (outcome: OfferOutcome, previousOfferee: string | null = null): OfferWrite => ({
+    outcome,
+    previousOfferee,
+  });
+  if (columnKnownMissing(DISPATCH_COLUMNS)) return result("unsupported");
 
   const { data: existing, error: readError } = await supabase
     .from("deliveries")
-    .select("id, status")
+    .select("id, status, offered_driver_id")
     .eq("order_id", orderId)
     .maybeSingle();
-  if (readError) throw readError;
+  if (readError) {
+    if (isMissingColumn(readError)) {
+      rememberColumn(DISPATCH_COLUMNS, false);
+      return result("unsupported");
+    }
+    throw readError;
+  }
 
-  if (existing && existing.status !== "unassigned") return "taken";
+  if (existing && existing.status !== "unassigned") return result("taken");
+  const previous = (existing?.offered_driver_id as string | null | undefined) ?? null;
 
   const offer = {
     offered_driver_id: driverId,
@@ -363,12 +382,12 @@ async function writeOffer(
     if (error) {
       if (isMissingColumn(error)) {
         rememberColumn(DISPATCH_COLUMNS, false);
-        return "unsupported";
+        return result("unsupported");
       }
       throw error;
     }
     rememberColumn(DISPATCH_COLUMNS, true);
-    return "offered";
+    return result("offered", previous);
   }
 
   const { error } = await supabase
@@ -377,15 +396,15 @@ async function writeOffer(
   if (error) {
     if (isMissingColumn(error)) {
       rememberColumn(DISPATCH_COLUMNS, false);
-      return "unsupported";
+      return result("unsupported");
     }
     // 23505: `deliveries.order_id` is unique (0001), so a rider accepted between
     // our read and our insert. They own the order now — nothing left to offer.
-    if ((error as { code?: string }).code === "23505") return "taken";
+    if ((error as { code?: string }).code === "23505") return result("taken");
     throw error;
   }
   rememberColumn(DISPATCH_COLUMNS, true);
-  return "offered";
+  return result("offered", previous);
 }
 
 /**
@@ -467,7 +486,11 @@ export async function dispatchOrder(
     });
     if (!rider) return empty;
 
-    const outcome = await writeOffer(supabase, orderId, rider.id, now);
+    const { outcome, previousOfferee } = await writeOffer(supabase, orderId, rider.id, now);
+    // Offered again to someone else (heads-up at accept, re-offer at ready):
+    // the first rider stops ringing for an order now held for the second.
+    const stale = staleOfferee(previousOfferee, rider.id);
+    if (stale) deferNotify(() => stopRiderRing(stale, orderId));
     // Somebody already has this order. Pushing "head over" at a third party
     // would send them to a shop with nothing waiting for them.
     if (outcome === "taken") return { rider, offered: false };

@@ -73,6 +73,8 @@ export interface RingSetup {
   notifications: boolean;
   fullScreen: boolean;
   batteryUnrestricted: boolean;
+  /** Build.MANUFACTURER, e.g. "Xiaomi". Absent on older 1.1.0 builds. */
+  manufacturer?: string;
 }
 
 /**
@@ -104,7 +106,14 @@ export function ringDiff(prev: string[], next: string[]): { started: string[]; s
   };
 }
 
-export type RingSetting = "notifications" | "battery" | "fullScreen";
+export type RingSetting = "notifications" | "battery" | "fullScreen" | "autostart";
+
+/**
+ * Phone makers whose own task killer stops a swiped-away app from receiving
+ * pushes unless "Autostart" is on — a setting no app can read, so it stays on
+ * the list until the user says they have done it.
+ */
+const AUTOSTART_MAKERS = ["xiaomi", "redmi", "poco", "vivo", "iqoo", "oppo", "realme", "oneplus", "tecno", "infinix", "itel"];
 
 /**
  * The settings still standing between this phone and a ring that wakes it,
@@ -113,10 +122,12 @@ export type RingSetting = "notifications" | "battery" | "fullScreen";
  * without full-screen permission (Android 14+) it rings but shows only a
  * banner over the lock screen.
  */
-export function missingRingSettings(s: RingSetup): RingSetting[] {
+export function missingRingSettings(s: RingSetup, opts: { autostartDone?: boolean } = {}): RingSetting[] {
   const out: RingSetting[] = [];
   if (!s.notifications) out.push("notifications");
   if (!s.batteryUnrestricted) out.push("battery");
   if (!s.fullScreen) out.push("fullScreen");
+  const maker = (s.manufacturer ?? "").toLowerCase();
+  if (!opts.autostartDone && AUTOSTART_MAKERS.some((m) => maker.includes(m))) out.push("autostart");
   return out;
 }

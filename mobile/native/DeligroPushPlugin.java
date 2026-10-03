@@ -54,7 +54,7 @@ public class DeligroPushPlugin extends Plugin {
     @PluginMethod
     public void logout(PluginCall call) {
         // A shared kitchen phone must not keep ringing for the last person's order.
-        RingService.stop(getContext(), "*");
+        RingService.stop(getContext(), "*", 0L);
         OneSignal.logout();
         call.resolve();
     }
@@ -80,20 +80,19 @@ public class DeligroPushPlugin extends Plugin {
             return;
         }
         Integer timeout = call.getInt("timeoutSec", 180);
-        try {
-            RingService.start(getContext(), ringId, call.getString("title", "Deligro"),
-                call.getString("body", ""), timeout == null ? 180 : timeout);
-            call.resolve();
-        } catch (Exception e) {
-            // No RingService in this app's manifest (Customer/Manager), or
-            // Android refused a foreground start: the board's own tone remains.
-            call.reject("ring unavailable: " + e.getMessage());
-        }
+        // sentAt 0: the board only starts rings for orders it can see waiting
+        // right now, so an earlier stop must not suppress it.
+        boolean ok = RingService.start(getContext(), ringId, call.getString("title", "Deligro"),
+            call.getString("body", ""), timeout == null ? 180 : timeout, 0L);
+        // Not ok: no RingService in this app's manifest (Customer/Manager), or
+        // Android refused a foreground start.
+        if (ok) call.resolve();
+        else call.reject("ring unavailable");
     }
 
     @PluginMethod
     public void stopRing(PluginCall call) {
-        RingService.stop(getContext(), call.getString("ringId", "*"));
+        RingService.stop(getContext(), call.getString("ringId", "*"), 0L);
         call.resolve();
     }
 
@@ -111,6 +110,7 @@ public class DeligroPushPlugin extends Plugin {
         out.put("fullScreen", fullScreen);
         PowerManager pm = (PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
         out.put("batteryUnrestricted", pm != null && pm.isIgnoringBatteryOptimizations(ctx.getPackageName()));
+        out.put("manufacturer", Build.MANUFACTURER);
         call.resolve(out);
     }
 
@@ -120,6 +120,11 @@ public class DeligroPushPlugin extends Plugin {
         String which = call.getString("which", "notifications");
         Uri pkg = Uri.parse("package:" + ctx.getPackageName());
         Intent i;
+        if ("autostart".equals(which)) {
+            openAutostart(ctx, pkg);
+            call.resolve();
+            return;
+        }
         if ("battery".equals(which)) {
             i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, pkg);
         } else if ("fullScreen".equals(which) && Build.VERSION.SDK_INT >= 34) {
@@ -136,5 +141,31 @@ public class DeligroPushPlugin extends Plugin {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         }
         call.resolve();
+    }
+
+    /**
+     * The maker's own Autostart screen, where one exists; otherwise the app's
+     * details page. These activities are not public API and move between OS
+     * versions, so each is tried in turn.
+     */
+    private static void openAutostart(Context ctx, Uri pkg) {
+        String[][] screens = {
+            {"com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"},
+            {"com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"},
+            {"com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager"},
+            {"com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"},
+            {"com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"},
+        };
+        for (String[] c : screens) {
+            try {
+                Intent i = new Intent().setClassName(c[0], c[1]).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i);
+                return;
+            } catch (Exception ignored) {
+                // not this maker / not this OS version
+            }
+        }
+        ctx.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
     }
 }

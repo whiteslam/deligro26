@@ -24,16 +24,24 @@ export type RingRole = "vendor" | "rider";
  */
 export const RING_TIMEOUT_SEC: Record<RingRole, number> = { vendor: 300, rider: 180 };
 
-export const RING_KEYS = { action: "ring", id: "ringId", timeout: "timeoutSec" } as const;
+export const RING_KEYS = { action: "ring", id: "ringId", timeout: "timeoutSec", sentAt: "sentAt" } as const;
 
+/**
+ * `sentAt` is the server's clock (ms). FCM does not keep messages in order, so
+ * a phone can receive a stop before its start; the app remembers the stop's
+ * `sentAt` and ignores any start sent before it. Comparing two server times
+ * means a wrong phone clock cannot silence a real order.
+ */
 export interface RingStart {
   ring: "start";
   ringId: string;
   timeoutSec: number;
+  sentAt: number;
 }
 export interface RingStop {
   ring: "stop";
   ringId: string;
+  sentAt: number;
 }
 
 export function ringId(role: RingRole, orderId: string): string {
@@ -42,9 +50,34 @@ export function ringId(role: RingRole, orderId: string): string {
 
 export function ringStartData(role: RingRole, orderId: string, timeoutSec?: number): RingStart {
   const t = Math.round(timeoutSec ?? RING_TIMEOUT_SEC[role]);
-  return { ring: "start", ringId: ringId(role, orderId), timeoutSec: Math.min(600, Math.max(1, t)) };
+  return {
+    ring: "start",
+    ringId: ringId(role, orderId),
+    timeoutSec: Math.min(600, Math.max(1, t)),
+    sentAt: Date.now(),
+  };
 }
 
 export function ringStopData(role: RingRole, orderId: string): RingStop {
-  return { ring: "stop", ringId: ringId(role, orderId) };
+  return { ring: "stop", ringId: ringId(role, orderId), sentAt: Date.now() };
+}
+
+/**
+ * Whether a status move ends the vendor's ring: anything that takes an order
+ * out of New (`placed`). Every path that moves an order — the kitchen, a
+ * manager, an admin override — asks this, so support accepting on the
+ * kitchen's behalf silences the kitchen's phone too.
+ */
+export function vendorRingEnds(from: string, to: string): boolean {
+  return from === "placed" && to !== "placed";
+}
+
+/**
+ * The rider whose ring must stop when an order is offered again: the previous
+ * offeree, if it is somebody else. A heads-up at accept and a re-offer at
+ * ready can go to two different riders; the first must not keep ringing for
+ * an order now held for the second.
+ */
+export function staleOfferee(previous: string | null | undefined, next: string): string | null {
+  return previous && previous !== next ? previous : null;
 }

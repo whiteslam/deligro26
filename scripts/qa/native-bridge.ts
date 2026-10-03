@@ -58,10 +58,15 @@ async function main() {
   check("ringDiff stops departed ids", d.stopped.join() === "a");
   const same = ringDiff(["a"], ["a"]);
   check("ringDiff with no change does nothing", same.started.length === 0 && same.stopped.length === 0);
-  const all = { notifications: true, fullScreen: true, batteryUnrestricted: true };
+  const all = { notifications: true, fullScreen: true, batteryUnrestricted: true, manufacturer: "samsung" };
   check("fully set-up phone needs nothing", missingRingSettings(all).length === 0);
   check("battery saver on is flagged", missingRingSettings({ ...all, batteryUnrestricted: false }).join() === "battery");
   check("notifications off comes first", missingRingSettings({ notifications: false, fullScreen: false, batteryUnrestricted: false }).join() === "notifications,battery,fullScreen");
+  const redmi = { ...all, manufacturer: "Xiaomi" };
+  check("Xiaomi keeps an Autostart step even with everything else fixed", missingRingSettings(redmi).join() === "autostart");
+  check("Vivo / Oppo / Realme too", ["vivo", "OPPO", "realme"].every((m) => missingRingSettings({ ...all, manufacturer: m }).includes("autostart")));
+  check("Autostart goes once acknowledged", missingRingSettings(redmi, { autostartDone: true }).length === 0);
+  check("Samsung has no Autostart step", !missingRingSettings(all).includes("autostart"));
   const first = ringDiff([], ["a", "b"]);
   check("first look rings for everything already waiting", first.started.join() === "a,b" && first.stopped.length === 0);
 

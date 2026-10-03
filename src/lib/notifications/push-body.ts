@@ -45,6 +45,12 @@ export function pushBody(
   const body: Record<string, unknown> = { app_id: appId, ...targeting };
   if (opts.silent) {
     body.content_available = true;
+    // Only the Android apps act on a data-only push. Sent to a browser, Chrome
+    // may show its own "This site has been updated in the background" notice
+    // for a push that displays nothing — exactly what a silent stop must avoid.
+    body.isAndroid = true;
+    body.isAnyWeb = false;
+    body.isIos = false;
   } else {
     body.headings = heading;
     body.contents = message;

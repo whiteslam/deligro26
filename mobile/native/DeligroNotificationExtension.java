@@ -23,11 +23,18 @@ public class DeligroNotificationExtension implements INotificationServiceExtensi
         if (ringId.isEmpty()) return;
 
         if ("start".equals(ring)) {
-            event.preventDefault(); // RingService shows its own notification
-            RingService.start(event.getContext(), ringId, n.getTitle(), n.getBody(), data.optInt("timeoutSec", 180));
+            // Suppress OneSignal's notification only once the ring is really
+            // going (RingService shows its own). If Android refused the
+            // foreground start — common on budget phones in a restricted
+            // battery bucket — the ordinary high-priority notification still
+            // shows, which is what v1.0.0 gave and far better than nothing.
+            if (RingService.start(event.getContext(), ringId, n.getTitle(), n.getBody(),
+                    data.optInt("timeoutSec", 180), data.optLong("sentAt", 0L))) {
+                event.preventDefault();
+            }
         } else if ("stop".equals(ring)) {
             event.preventDefault();
-            RingService.stop(event.getContext(), ringId);
+            RingService.stop(event.getContext(), ringId, data.optLong("sentAt", 0L));
         }
     }
 }

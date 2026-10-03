@@ -9,12 +9,14 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   notifyOrderAccepted,
+  stopVendorRing,
   notifyOrderReady,
   notifyOnTheWay,
   notifyDelivered,
   notifyDriverAssigned,
   notifyVendorRiderAssigned,
 } from "@/lib/notifications/order-events";
+import { vendorRingEnds } from "@/lib/alerts/ring";
 import { dispatchOrder } from "@/lib/dispatch/rider-dispatch";
 import { columnKnownMissing, isMissingColumn, rememberColumn } from "@/lib/data-access/schema-probe";
 import { deferNotify } from "@/lib/notifications/defer";
@@ -92,6 +94,8 @@ export async function advanceOrder(
     };
   }
 
+  // A manager moved it out of New: the kitchen's phones stop ringing.
+  if (vendorRingEnds(expected, target)) deferNotify(() => stopVendorRing(orderId));
   if (target === "kitchen") deferNotify(() => notifyOrderAccepted(orderId));
   else if (target === "ready") deferNotify(() => notifyOrderReady(orderId));
   else if (target === "on_the_way") deferNotify(() => notifyOnTheWay(orderId));

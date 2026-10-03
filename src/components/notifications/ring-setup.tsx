@@ -21,10 +21,23 @@ const LABEL: Record<RingSetting, string> = {
   notifications: "सूचनाएं चालू करें · Allow notifications",
   battery: "बैटरी सेवर से हटाएं · Remove from battery saver",
   fullScreen: "लॉक स्क्रीन पर दिखाएं · Show on lock screen",
+  autostart: "ऑटोस्टार्ट चालू करें · Turn on Autostart",
 };
+
+/** Autostart cannot be read back, so a tap on its button is taken as "done". */
+const AUTOSTART_KEY = "deligro-ring-autostart-done";
+
+function autostartDone(): boolean {
+  try {
+    return window.localStorage.getItem(AUTOSTART_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function RingSetup() {
   const [setup, setSetup] = useState<Setup | null>(null);
+  const [acked, setAcked] = useState(false);
 
   const refresh = useCallback(() => {
     const ring = nativeRing();
@@ -42,7 +55,7 @@ export function RingSetup() {
   }, [refresh]);
 
   if (!setup) return null;
-  const missing = missingRingSettings(setup);
+  const missing = missingRingSettings(setup, { autostartDone: acked || autostartDone() });
   if (missing.length === 0) return null;
 
   return (
@@ -60,16 +73,28 @@ export function RingSetup() {
           <Button
             key={which}
             className="min-h-11 justify-start"
-            onClick={() => void nativeRing()?.openRingSettings({ which }).catch(() => {})}
+            onClick={() => {
+              if (which === "autostart") {
+                try {
+                  window.localStorage.setItem(AUTOSTART_KEY, "1");
+                } catch {
+                  /* the button still opens the screen */
+                }
+                setAcked(true);
+              }
+              void nativeRing()?.openRingSettings({ which }).catch(() => {});
+            }}
           >
             {LABEL[which]}
           </Button>
         ))}
       </div>
-      <p className="mt-2 text-xs text-muted">
-        Xiaomi / Vivo / Oppo: Settings → Apps → Deligro → <b>Autostart</b> भी
-        चालू करें।
-      </p>
+      {missing.includes("autostart") ? (
+        <p className="mt-2 text-xs text-muted">
+          खुलने वाली स्क्रीन में Deligro के आगे <b>Autostart</b> चालू करें। · In
+          the screen that opens, switch Autostart on for Deligro.
+        </p>
+      ) : null}
     </div>
   );
 }

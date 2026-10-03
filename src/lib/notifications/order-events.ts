@@ -200,10 +200,15 @@ const riderRing = (orderId: string): PushOptions => ({
  * Every phone signed in to the restaurant stops ringing for this order —
  * accepted on the counter tablet silences the owner's phone too. Silent: it
  * shows nothing anywhere, including web push and APKs without the ring.
+ *
+ * Normal priority, deliberately: FCM may downgrade an app's high-priority
+ * messages when they produce no visible notification, and the ring STARTS
+ * depend on high priority. A ringing phone runs a foreground service, so a
+ * stop delivered at normal priority still lands; the open board and the
+ * ring's own timeout cover the rest.
  */
 export function stopVendorRing(orderId: string): Promise<void> {
   return notifyVendor(orderId, { en: "" }, { en: "" }, {
-    priority: 10,
     silent: true,
     data: { ...ringStopData("vendor", orderId) },
   });
@@ -211,7 +216,6 @@ export function stopVendorRing(orderId: string): Promise<void> {
 
 export function stopRiderRing(driverId: string, orderId: string): Promise<void> {
   return notifyDriver(driverId, { en: "" }, { en: "" }, {
-    priority: 10,
     silent: true,
     data: { ...ringStopData("rider", orderId) },
   });
@@ -417,6 +421,10 @@ export function notifyDriverPickupReady(
  * A manager put this rider on the order by hand. Without this the rider only
  * found out on their next board refresh — which, with the phone in a pocket,
  * is whenever they next looked.
+ *
+ * Does not ring: an assignment is an instruction, not an offer. There is no
+ * Accept step that could stop the ring, so it would ring out its full timeout
+ * whatever the rider did.
  */
 export function notifyDriverAssigned(
   driverId: string,
@@ -429,8 +437,7 @@ export function notifyDriverAssigned(
     {
       en: `You've been assigned order #${id} from ${opts.restaurantName}. Open the app for pickup details.`,
       hi: `आपको ${opts.restaurantName} का ऑर्डर #${id} दिया गया है। पिकअप की जानकारी के लिए ऐप खोलें।`,
-    },
-    riderRing(opts.orderId)
+    }
   );
 }
 
