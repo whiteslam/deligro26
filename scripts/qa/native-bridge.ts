@@ -3,7 +3,7 @@
  * and behaves exactly as before in a normal browser.
  * Usage: npx tsx scripts/qa/native-bridge.ts
  */
-import { isNativeApp, nativePush, nativeRing, nativeSessionSync, pushSupport, ringDiff } from "../../src/lib/native/bridge";
+import { isNativeApp, missingRingSettings, nativePush, nativeRing, nativeSessionSync, pushSupport, ringDiff } from "../../src/lib/native/bridge";
 
 let passed = 0;
 let failed = 0;
@@ -58,6 +58,10 @@ async function main() {
   check("ringDiff stops departed ids", d.stopped.join() === "a");
   const same = ringDiff(["a"], ["a"]);
   check("ringDiff with no change does nothing", same.started.length === 0 && same.stopped.length === 0);
+  const all = { notifications: true, fullScreen: true, batteryUnrestricted: true };
+  check("fully set-up phone needs nothing", missingRingSettings(all).length === 0);
+  check("battery saver on is flagged", missingRingSettings({ ...all, batteryUnrestricted: false }).join() === "battery");
+  check("notifications off comes first", missingRingSettings({ notifications: false, fullScreen: false, batteryUnrestricted: false }).join() === "notifications,battery,fullScreen");
   const first = ringDiff([], ["a", "b"]);
   check("first look rings for everything already waiting", first.started.join() === "a,b" && first.stopped.length === 0);
 

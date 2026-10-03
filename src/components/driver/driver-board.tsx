@@ -34,6 +34,7 @@ import type { TrackPoint } from "@/lib/tracking/rider-position";
 import { cn } from "@/lib/utils/cn";
 import { acceptDeliveryAction, advanceDeliveryAction } from "@/app/driver/actions";
 import { RiderAlert } from "@/components/driver/rider-alert";
+import { RingSetup } from "@/components/notifications/ring-setup";
 import { Modal } from "@/components/ui/confirm-dialog";
 
 /**
@@ -589,6 +590,7 @@ export function DriverBoard({
           a screen cannot put it back by accident. "Online 5.5 h" and
           "Rating 4.8 ★" went earlier: constants, identical for every driver
           forever, standing in for two things we have never tracked. */}
+      <RingSetup />
       <RiderAlert
         incomingIds={active ? [] : available.map((j) => j.id)}
         soundPreset={alertSoundPreset}

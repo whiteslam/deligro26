@@ -84,7 +84,7 @@ export interface NativeRing {
   startRing(o: { ringId: string; title: string; body: string; timeoutSec: number }): Promise<void>;
   stopRing(o: { ringId: string }): Promise<void>;
   ringSetup(): Promise<RingSetup>;
-  openRingSettings(o: { which: "notifications" | "fullScreen" | "battery" }): Promise<void>;
+  openRingSettings(o: { which: RingSetting }): Promise<void>;
 }
 
 export function nativeRing(win: WindowLike = defaultWindow()): NativeRing | null {
@@ -102,4 +102,21 @@ export function ringDiff(prev: string[], next: string[]): { started: string[]; s
     started: next.filter((id) => !before.has(id)),
     stopped: prev.filter((id) => !after.has(id)),
   };
+}
+
+export type RingSetting = "notifications" | "battery" | "fullScreen";
+
+/**
+ * The settings still standing between this phone and a ring that wakes it,
+ * most important first: with notifications off nothing works at all; with the
+ * battery saver on, budget phones kill the app and the push never arrives;
+ * without full-screen permission (Android 14+) it rings but shows only a
+ * banner over the lock screen.
+ */
+export function missingRingSettings(s: RingSetup): RingSetting[] {
+  const out: RingSetting[] = [];
+  if (!s.notifications) out.push("notifications");
+  if (!s.batteryUnrestricted) out.push("battery");
+  if (!s.fullScreen) out.push("fullScreen");
+  return out;
 }
