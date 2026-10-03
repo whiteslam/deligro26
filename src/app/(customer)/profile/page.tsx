@@ -24,7 +24,8 @@ import { ProfileAccountRows } from "@/components/profile/profile-account-rows";
 import { ProfileAvatar } from "@/components/profile/profile-avatar";
 import { SurfaceRows } from "@/components/shared/surface-switch";
 import { operatorSurfaces, surfacesForRole } from "@/lib/auth/surfaces";
-import { LanguageSwitch } from "@/components/shared/language-switch";
+// Hindi is off for now — see HINDI_ENABLED in lib/i18n/lang.ts.
+// import { LanguageSwitch } from "@/components/shared/language-switch";
 import { getLang } from "@/lib/i18n/server";
 import { pick, translator, type Bi } from "@/lib/i18n/lang";
 
@@ -255,8 +256,10 @@ export default async function ProfilePage() {
       </p>
 
       {/* Theme */}
+      {/* Hindi is off for now — see HINDI_ENABLED in lib/i18n/lang.ts.
       <SectionHead title={t("Language", "भाषा")} />
       <LanguageSwitch />
+      */}
 
       <SectionHead title={t("Theme", "थीम")} />
       <AppearanceRow />

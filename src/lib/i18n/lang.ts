@@ -21,6 +21,14 @@ export type Bi = { en: string; hi: string };
 
 export type T = (en: string, hi: string) => string;
 
+/**
+ * Hindi is switched OFF for now (owner's call, 3 Oct 2026): the app is
+ * English only and the language switch is hidden. Every screen still carries
+ * its Hindi text, so turning this back to `true` (and un-commenting the
+ * switch in profile/page.tsx) brings it back.
+ */
+export const HINDI_ENABLED = false;
+
 export const LANG_COOKIE = "deligro-lang";
 export const DEFAULT_LANG: Lang = "en";
 
@@ -28,15 +36,16 @@ export const DEFAULT_LANG: Lang = "en";
 const MAX_AGE = 60 * 60 * 24 * 365;
 
 export function parseLang(value: string | null | undefined): Lang {
+  if (!HINDI_ENABLED) return "en";
   return value === "hi" ? "hi" : value === "en" ? "en" : DEFAULT_LANG;
 }
 
 export function translator(lang: Lang): T {
-  return lang === "hi" ? (_en, hi) => hi : (en) => en;
+  return HINDI_ENABLED && lang === "hi" ? (_en, hi) => hi : (en) => en;
 }
 
 export function pick(lang: Lang, text: Bi): string {
-  return lang === "hi" ? text.hi : text.en;
+  return HINDI_ENABLED && lang === "hi" ? text.hi : text.en;
 }
 
 /** The `document.cookie` string that stores a choice. */
