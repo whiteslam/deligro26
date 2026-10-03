@@ -69,18 +69,29 @@ export async function StoreCategoryStrip({
             label={categoryLabel(lang, c)}
             empty={empty}
             icon={
-              /* Emoji, not a photograph. The Home cuisine strip moved to real
-                 pictures of food; a storefront TYPE ("Pick & Drop", "Dairy") is
-                 a category of shop, not a dish, and there is no honest single
-                 photo of one. Revisit if these ever get real shop photography
-                 behind them. */
-              <span
-                className="text-4xl"
-                role="img"
-                aria-label={categoryLabel(lang, c)}
-              >
-                {c.emoji}
-              </span>
+              /* A representative photo per storefront type, same source and
+                 size as the Home cuisine strip (images.unsplash.com, the host
+                 the CSP allows). Decorative: the label under the tile names
+                 it, so alt is empty. Emoji stays as the fallback for a
+                 category with no `image`. */
+              c.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={c.image}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="size-full object-cover"
+                />
+              ) : (
+                <span
+                  className="text-4xl"
+                  role="img"
+                  aria-label={categoryLabel(lang, c)}
+                >
+                  {c.emoji}
+                </span>
+              )
             }
           />
         );
@@ -110,7 +121,7 @@ function Tile({
     >
       <span
         className={cn(
-          "grid size-16 place-items-center rounded-xl transition-colors",
+          "grid size-16 place-items-center overflow-hidden rounded-xl transition-colors",
           active ? "bg-accent-soft ring-2 ring-accent" : "bg-surface-2",
           empty && !active && "opacity-45",
         )}

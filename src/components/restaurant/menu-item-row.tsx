@@ -43,7 +43,7 @@ export function MenuItemRow({
     <div
       className={cn(
         "relative flex gap-3.5 py-3.5 pb-5",
-        item.soldOut && "opacity-60",
+        (item.soldOut || !restaurant.open) && "opacity-60",
       )}
     >
       <button
@@ -77,7 +77,14 @@ export function MenuItemRow({
           sizes="96px"
         />
 
-        {item.soldOut ? (
+        {/* A shut kitchen is stated as such rather than offering an Add that
+            would build a basket nobody can cook — same rule as the search
+            dish card. The menu itself stays visible so people can browse. */}
+        {!restaurant.open ? (
+          <span className="absolute inset-x-0 bottom-0 rounded-b-lg bg-black/65 py-1 text-center text-[11px] font-bold uppercase tracking-wide text-white">
+            {t("Closed", "बंद")}
+          </span>
+        ) : item.soldOut ? (
           <span className="absolute inset-x-0 bottom-0 rounded-b-xl bg-ink/70 py-1 text-center text-[11px] font-bold uppercase tracking-wide text-white">
             {t("Sold out", "ख़त्म हो गया")}
           </span>

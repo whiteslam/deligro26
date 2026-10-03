@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deligro Audit — 3 Oct 2026</title>
+<style>
+:root{--bg:#fbfaf7;--card:#fff;--ink:#1d1b18;--muted:#6b665e;--line:#e6e1d8;--crit:#b4232a;--high:#c2570c;--med:#a27b00;--low:#3d6b8c;--ok:#2f7a45;--chip:#f1ede5}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151412;--card:#1e1c19;--ink:#ece8e1;--muted:#a39d93;--line:#34302a;--crit:#f0646b;--high:#f2954f;--med:#e0bd4a;--low:#7fb2d6;--ok:#6cc18a;--chip:#2a2723}}
+:root[data-theme="dark"]{--bg:#151412;--card:#1e1c19;--ink:#ece8e1;--muted:#a39d93;--line:#34302a;--crit:#f0646b;--high:#f2954f;--med:#e0bd4a;--low:#7fb2d6;--ok:#6cc18a;--chip:#2a2723}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:960px;margin:0 auto;padding:32px 16px 80px}
+h1{font-size:28px;margin:0 0 4px}h2{font-size:21px;margin:40px 0 12px;padding-top:12px;border-top:1px solid var(--line)}h3{font-size:16px;margin:0 0 6px}
+p.sub{color:var(--muted);margin:0 0 24px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.score{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.score b{display:block;font-size:26px}.score span{color:var(--muted);font-size:13px}
+.f{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--muted);border-radius:8px;padding:14px 16px;margin:10px 0}
+.f.c{border-left-color:var(--crit)}.f.h{border-left-color:var(--high)}.f.m{border-left-color:var(--med)}.f.l{border-left-color:var(--low)}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--chip);margin-right:6px}
+.c .tag{color:var(--crit)}.h .tag{color:var(--high)}.m .tag{color:var(--med)}.l .tag{color:var(--low)}
+.f p{margin:4px 0}.k{color:var(--muted);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+code{font:13px/1.4 ui-monospace,Consolas,monospace;background:var(--chip);padding:1px 5px;border-radius:4px;word-break:break-word}
+table{width:100%;border-collapse:collapse;font-size:14px;background:var(--card)}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:600}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+.ok{color:var(--ok);font-weight:600}.open{color:var(--high);font-weight:600}
+.note{background:var(--chip);border-radius:8px;padding:12px 14px;font-size:14px}
+ul{padding-left:20px}li{margin:3px 0}
+</style>
+</head>
+<body><main>
+<h1>Deligro — full project audit</h1>
+<p class="sub">3 October 2026 · read-only static audit of <code>deligro/</code> (code, 53 migrations, mobile shells). No code changed, no database touched. Prod migration status taken from the runbook: 0039, 0042, 0048, 0051, 0052 and 0053 are assumed <b>not applied</b>.</p>
+
+<div class="grid">
+<div class="score"><b>5/10</b><span>Security (DB layer)</span></div>
+<div class="score"><b>7/10</b><span>Security (app layer)</span></div>
+<div class="score"><b>3/10</b><span>Observability in practice</span></div>
+<div class="score"><b>3/10</b><span>Operability (no-code maintenance)</span></div>
+<div class="score"><b>6/10</b><span>Performance</span></div>
+<div class="score"><b>8/10</b><span>Code health (tsc ✓, lint 0 err, npm audit 0)</span></div>
+</div>
+
+<div class="note" style="margin-top:16px"><b>Do these first:</b> (1) Fix 0051's guard body, then apply 0051 → 0053 in runbook order. (2) Lock <code>obs_events_default</code>. (3) Hide <code>delivery_otp</code> from riders and vendors, and add a status-transition guard. (4) Add <code>requireRole("admin")</code> inside the admin data-access functions. (5) Make the OTP attempt counter atomic. Items 1–3 are SQL only, so they are the cheapest to fix and close the biggest gaps.</div>
+
+<h2>Critical</h2>
+<div class="f c"><span class="tag">C1</span><b>Customers can set their own item prices on prod until 0053 is applied</b>
+<p><span class="k">Where</span> <code>0001_init.sql:258-262</code> (order_items insert policy checks only ownership); the fix is <code>0053_release_hardening.sql:98-146</code>, which is unapplied.</p>
+<p><span class="k">Impact</span> Using the public publishable key, someone can insert <code>order_items</code> directly with <code>price: 1</code>, or add items to an accepted order, then call <code>recompute_order_total</code>. The rider collects ₹1 and the vendor is settled on ₹1. Before 0053, orders can also be inserted with a forged <code>status</code>, <code>channel</code> or <code>placed_by</code>.</p>
+<p><span class="k">Fix</span> Apply 0053 (after C2), then run the runbook verify queries.</p></div>
+
+<div class="f c"><span class="tag">C2</span><b>Applying 0051 as written breaks every checkout</b>
+<p><span class="k">Where</span> <code>0051_cancellation_provenance.sql:~191-226</code> redeclares <code>guard_order_update</code> as <code>security definer</code> without the <code>current_user</code> exemption. 0053's own header confirms this.</p>
+<p><span class="k">Impact</span> It brings back the 2026-08-13 incident: <code>recompute_order_total</code> is refused and checkout returns 500. The file says "safe to re-run", so re-running it after 0053 breaks prod again.</p>
+<p><span class="k">Fix</span> Before applying, edit 0051 in place so its guard body is the 0053 version. That is safe because 0051 has never run on prod.</p></div>
+
+<h2>High</h2>
+<div class="f h"><span class="tag">H1</span><b>The telemetry partition <code>obs_events_default</code> is open to anon</b>
+<p><span class="k">Where</span> Created at <code>0046_observability.sql:139</code>, but it is missing from the RLS/revoke loop at <code>:498-514</code>.</p>
+<p><span class="k">Impact</span> Anyone holding the publishable key can insert unlimited rows (filling the DB) and read telemetry: stacks and order/driver UUIDs.</p>
+<p><span class="k">Fix</span> <code>alter table public.obs_events_default enable row level security; revoke all on public.obs_events_default from anon, authenticated;</code></p></div>
+
+<div class="f h"><span class="tag">H2</span><b>Riders and vendors can read the delivery OTP and set any order status directly</b>
+<p><span class="k">Where</span> The <code>orders</code> read and update policies (<code>0001:232-253</code>) have no column grants; <code>delivery_otp</code> comes from <code>0006:51</code>; there is no transition check in the DB. The comment in <code>handover.ts:15</code> ("only the order owner can read") is wrong.</p>
+<p><span class="k">Impact</span> Using their own JWT, a rider can read the code and complete a delivery without the customer, or PATCH <code>status='delivered'</code>. A vendor can mark its own orders delivered, and those count in settlements.</p>
+<p><span class="k">Fix</span> Grant <code>orders</code> SELECT through a column allowlist that leaves out the OTPs, and serve the customer's code through a definer RPC. Add both OTPs to the locked list. Add a status-transition trigger.</p></div>
+
+<div class="f h"><span class="tag">H3</span><b>Admin data functions trust the layout's role check</b>
+<p><span class="k">Where</span> 44 <code>src/app/admin/**/page.tsx</code> files have no guard of their own. Service-role helpers rely on the layout: <code>admin-vendors.ts:587</code> says "The caller is already requireRole("admin")-gated". <code>listVendors</code> attaches plaintext vendor passwords.</p>
+<p><span class="k">Impact</span> Next.js does not re-run a layout on every navigation request, and its docs warn against layout-only auth. Exploitability is <b>unverified</b> and needs testing on staging. If it is exploitable, a customer account could read every vendor password and customer PII.</p>
+<p><span class="k">Fix</span> Put <code>await requireRole("admin")</code> at the top of every exported function in the <code>admin-*.ts</code>, <code>vendor-credentials.ts</code>, <code>cod-handovers.ts</code>, <code>operational-expenses.ts</code> and <code>employees.ts</code> modules. <code>lib/obs/read.ts</code> already does this.</p></div>
+
+<div class="f h"><span class="tag">H4</span><b>The OTP attempt counter can be raced, and there is no per-phone verify limit</b>
+<p><span class="k">Where</span> <code>src/lib/data-access/otp.ts:117-135</code> does read → compare → write <code>attempts + 1</code>. <code>api/auth/otp/verify</code> is limited per IP only (20/h).</p>
+<p><span class="k">Impact</span> Parallel guesses get past the 5-try lock. OTP signs in to <i>any</i> role, and the admin phone is committed in <code>src/lib/developers.ts:11</code>.</p>
+<p><span class="k">Fix</span> Increment atomically (<code>update … where attempts &lt; 5 returning</code>) before comparing, and add a per-phone verify limit. Do the same in <code>checkOtp</code>.</p></div>
+
+<div class="f h"><span class="tag">H5</span><b>Anon can lock any staff member out of password login (until 0053)</b>
+<p><span class="k">Where</span> <code>0027_rate_limits.sql:112</code> revokes from PUBLIC only; the keys are predictable (<code>pw-login-phone:+91…</code>). The fix is in 0053:217.</p></div>
+
+<div class="f h"><span class="tag">H6</span><b>Push identity can be hijacked</b>
+<p><span class="k">Where</span> <code>mobile/native/DeligroPushPlugin.java:31-38</code> calls <code>OneSignal.login(userId)</code> with no identity verification; the server targets <code>external_id</code> (<code>onesignal.ts:185</code>).</p>
+<p><span class="k">Impact</span> Anyone who knows a profile UUID can receive that user's pushes.</p>
+<p><span class="k">Fix</span> Turn on OneSignal Identity Verification (a server-signed JWT).</p></div>
+
+<div class="f h"><span class="tag">H7</span><b>Installed APKs never check for updates, though the docs say they do</b>
+<p><span class="k">Where</span> Nothing in <code>src/</code> calls <code>/api/app-version</code>; the user agent carries no versionCode (<code>mobile/scripts/lib.mjs:49</code>); the route only knows rider and customer.</p>
+<p><span class="k">Impact</span> A broken sideloaded build can never be pushed out or forced to update.</p></div>
+
+<div class="f h"><span class="tag">H8</span><b>Home-screen search never finds a dish (regression)</b>
+<p><span class="k">Where</span> <code>(customer)/page.tsx:19</code> loads <code>withMenu:false</code>, but <code>home-view.tsx:84</code> still indexes dishes from those menus, which are now empty.</p>
+<p><span class="k">Impact</span> Typing "paneer" on Home shows "No kitchen near you is cooking that", which is false.</p>
+<p><span class="k">Fix</span> Short term: send the Home search to <code>/search?q=</code>.</p></div>
+
+<div class="f h"><span class="tag">H9</span><b>The Observatory has almost no data to show</b>
+<p>0 of 38 <code>route.ts</code> files use <code>withObservability</code>, so there is no request timing and no 4xx/5xx visibility. pg_cron jobs exist only as commented-out SQL (<code>0046:1109-1112</code>), so rollups, alerts and retention never run. All 8 alert rules ship disabled, and alerts reach nobody. Render crashes outside /admin are only <code>console.error</code>'d (<code>app/error.tsx</code>, <code>global-error.tsx</code>, <code>manager/error.tsx</code>). Razorpay calls, dispatch and OTP verify emit no events, so their alert rules can never fire.</p></div>
+
+<h2>Medium</h2>
+<div class="f m"><span class="tag">M1</span><b>Fee and tax can be forged on a direct order insert</b>: still open after 0053 (residual noted in <code>0030:184-194</code>). Derive both in <code>recompute_order_total</code>.</div>
+<div class="f m"><span class="tag">M2</span><b>Riders can rewrite their whole <code>deliveries</code> row</b>, including <code>cod_collected_amount</code> (<code>0001:272-274</code>). Restrict UPDATE to the location columns.</div>
+<div class="f m"><span class="tag">M3</span><b>Column grants that do nothing</b>: <code>reviews</code>/<code>review_replies</code> (a customer can move a review to another shop), <code>payments</code> and <code>category_images</code>. Table-level privileges were never revoked first.</div>
+<div class="f m"><span class="tag">M4</span><b>Vendors can edit <code>rating*</code>, <code>promoted</code>, <code>sort_position</code> and payout fields</b>, which the 0034 lock does not cover.</div>
+<div class="f m"><span class="tag">M5</span><b>Customers can set their own <code>wallet_balance</code></b> (unused today; lock it before anything reads it).</div>
+<div class="f m"><span class="tag">M6</span><b>The rider can brute-force the delivery OTP</b>: a 4-digit code with 10 tries a minute and no per-order counter (<code>driver/actions.ts:49</code>).</div>
+<div class="f m"><span class="tag">M7</span><b>Write endpoints without a rate limit</b>: 3 upload routes, menu availability, avatar delete, and almost every admin, vendor and manager server action. This breaks AGENTS.md rule 6.</div>
+<div class="f m"><span class="tag">M8</span><b><code>/api/obs/client</code></b> has no body-size cap, and random messages create unlimited new issues. <b><code>/api/banners/track</code></b> doesn't validate <code>bannerId</code> or <code>placement</code>.</div>
+<div class="f m"><span class="tag">M9</span><b>The app stays degraded after a migration until restart</b>: <code>schema-probe.ts</code> and <code>flags.server.ts</code> latch "missing" for the life of the process. Add "redeploy" to the runbook.</div>
+<div class="f m"><span class="tag">M10</span><b>Missing hot indexes</b> on <code>orders(restaurant_id,status,created_at)</code>, <code>orders(customer_id,created_at)</code> and <code>deliveries(status,offered_at)</code>. RLS helpers are called per row; wrap them as <code>(select is_admin())</code>.</div>
+<div class="f m"><span class="tag">M11</span><b>Vendor analytics bucket by server time, not IST</b> (<code>vendor-earnings.ts:328,345</code>; <code>vendor-overview.ts:178</code>), so the hourly chart is shifted 5.5 h on a UTC host.</div>
+<div class="f m"><span class="tag">M12</span><b>Service-worker caches grow forever</b> (<code>SW_VERSION="v1"</code>, no entry cap). <b>Polling every 4 s</b> on rider phones even when the app is hidden. <b>Vendor recharts is loaded eagerly</b>. <b><code>/search</code> ships every menu</b>.</div>
+<div class="f m"><span class="tag">M13</span><b>Hindi-first audience, but <code>DEFAULT_LANG="en"</code></b> and <code>&lt;html lang="en"&gt;</code> is hard-coded. The kitchen and rider boards are mostly English.</div>
+<div class="f m"><span class="tag">M14</span><b>APK build is not reproducible</b> (unpinned Capacitor/OneSignal). Every role requests location permission, and riders have no background location. <code>allowBackup</code> is not disabled. Razorpay 3DS inside the WebView is untested.</div>
+<div class="f m"><span class="tag">M15</span><b>No migration ledger</b>: duplicate prefixes 0008, 0009, 0015 and 0033, and gaps at 0004 and 0038. What is applied on prod is only known from memory.</div>
+
+<h2>Low</h2>
+<div class="f l"><span class="tag">L</span><ul>
+<li>Open redirect: <code>safeNextPath</code> (<code>portals.ts:161</code>) accepts <code>/\evil.com</code>, and <code>/auth/signout</code> redirects there.</li>
+<li>Password sign-in reveals whether a number is registered (<code>(portal-auth)/actions.ts:100-108</code>).</li>
+<li><code>assignRider</code> doesn't check that the target is a driver (<code>manager/actions.ts:119</code>).</li>
+<li>The webhook maps a partial refund to a whole-order "refunded", and <code>settlePayment</code> can race and send "paid" twice.</li>
+<li><code>rate_limits</code>, <code>otp_codes</code> (which hold phone numbers) and <code>banner_events</code> are never pruned.</li>
+<li><code>bump_banner_stat</code> is still executable via PUBLIC. 0046's seeded alert rules duplicate on re-run.</li>
+<li><code>remotePatterns</code> allows any <code>*.supabase.co</code>. <code>X-Powered-By</code> is still sent. CSP keeps <code>'unsafe-inline'</code> (accepted risk).</li>
+<li>About 400 text sizes below 12px are too small for this audience. There is no Devanagari web font.</li>
+<li>Dead files: <code>src/hooks/use-vendor-shell-mode.ts</code> and <code>src/lib/pwa/native.ts</code>. <code>build-plan.ts</code> (1071 lines) ships in prod.</li>
+<li>The README is stale (English-only, COD-only, demo mode). There are two lockfiles. 11 reports sit at the repo root and could move to <code>docs/reports/</code>.</li>
+<li>Lint warnings: 5× <code>no-img-element</code>.</li>
+<li>Seeds include active Pharmacy and Pick&amp;Drop banners, which conflict with the launch scope.</li>
+</ul></div>
+
+<h2>Prior findings: status</h2>
+<div class="tw"><table>
+<tr><th>Item</th><th>Status</th><th>Evidence</th></tr>
+<tr><td>/build readable by guests</td><td class="ok">Fixed</td><td><code>build/page.tsx</code> requireRole + noindex</td></tr>
+<tr><td>Zips/WhatsApp export in git</td><td class="ok">Fixed</td><td>.gitignore; not tracked</td></tr>
+<tr><td>Live secret in two env files</td><td class="ok">Fixed</td><td>only .env.example tracked</td></tr>
+<tr><td>Whole city menu shipped</td><td class="open">Partly</td><td>/ and /stores fixed; /search still loads all (<code>search/page.tsx:13</code>)</td></tr>
+<tr><td>Realtime</td><td class="open">Open</td><td>no <code>.channel(</code> anywhere</td></tr>
+<tr><td>No &lt;h1&gt; on /, /search, /stores</td><td class="open">Open</td><td>home-view, search-view, stores</td></tr>
+<tr><td>Admin LiveBoard can't assign a rider</td><td class="open">Open (mitigated)</td><td>auto-dispatch exists</td></tr>
+<tr><td>Hindi / i18n</td><td class="open">Partly</td><td>customer app done; operator apps mostly English</td></tr>
+<tr><td>Offline banner / checkout guard</td><td class="open">Partly</td><td>banner yes; submit not blocked offline</td></tr>
+<tr><td>Recharts lazy</td><td class="open">Partly</td><td>admin yes, vendor no</td></tr>
+<tr><td>Login wall on browse pages</td><td class="open">Open</td><td><code>proxy.ts:130-134</code></td></tr>
+<tr><td>Duplicate migration prefixes</td><td class="open">Open</td><td>0008/0009/0015/0033</td></tr>
+<tr><td>Two IST calendar modules</td><td class="open">Open</td><td><code>settlements/cycle.ts</code> vs <code>utils/ist-time.ts</code></td></tr>
+<tr><td>CSP unsafe-inline</td><td class="open">Accepted risk</td><td><code>next.config.ts:26</code></td></tr>
+<tr><td>AUDIT_REPORT_3 delivery/cancel guards</td><td>Not re-verified</td><td>needs a follow-up pass</td></tr>
+</table></div>
+
+<h2>Operability gaps: what you can't do today without code or SQL</h2>
+<p>These feed the developer-portal design.</p>
+<div class="tw"><table>
+<tr><th>Area</th><th>Today</th><th>A developer portal should give</th></tr>
+<tr><td>Env &amp; build info</td><td>3 health rows; <code>.env.example</code> lists 4 of about 28 vars</td><td>Env matrix (set/unset, never values), commit, build time, Node/Next versions, Supabase ref</td></tr>
+<tr><td>Migrations</td><td>Pasted by hand; status known from memory</td><td>Per-migration status from catalog probes, plus a list of degraded features and why</td></tr>
+<tr><td>Cron / jobs</td><td>pg_cron commented out; dispatch sweep leaves no trace</td><td>Jobs table (last run, error), "run now" buttons</td></tr>
+<tr><td>Flags &amp; launch scope</td><td>Pharmacy only in SQL; no history; service-area centre hard-coded</td><td>Effective config view + every toggle + change history</td></tr>
+<tr><td>App versions</td><td>Rider/customer only; nothing checks</td><td>Release registry for all 4 APKs, min-version force update, adoption chart</td></tr>
+<tr><td>Users &amp; roles</td><td>Can't edit or disable staff/riders/customers; no session revoke</td><td>Lookup by phone/UUID, change role/status, sign out everywhere, read-only "view as"</td></tr>
+<tr><td>Audit trail</td><td>None; admin overrides record "admin", not who</td><td>Append-only <code>admin_audit</code> with before/after</td></tr>
+<tr><td>Rate limits / OTP</td><td>A locked-out customer can only be freed via SQL</td><td>Lookup + "clear lockout"; recent OTP status per phone; test SMS</td></tr>
+<tr><td>Push</td><td>No test send, no per-user log</td><td>Test push per app, subscription lookup</td></tr>
+<tr><td>Payments</td><td>Orphan count only</td><td>Webhook inbox, stuck payments, fetch status from Razorpay</td></tr>
+<tr><td>Cache</td><td>No revalidate / SW bump</td><td>Revalidate paths, bust flag cache, bump SW version</td></tr>
+<tr><td>Backups / CI / QA</td><td>Not visible; no CI</td><td>Links + last-run status</td></tr>
+</table></div>
+
+<p class="sub" style="margin-top:32px">Method: five parallel read-only passes (route/action auth, migrations/RLS, observability, performance/mobile/correctness, tooling) plus manual verification of C2, H1, H2, H3 and H4 against source. Commands run: <code>tsc --noEmit</code> (0 errors), <code>npm run lint</code> (0 errors, 5 warnings), <code>npm audit --omit=dev</code> (0 vulnerabilities).</p>
+</main></body></html>

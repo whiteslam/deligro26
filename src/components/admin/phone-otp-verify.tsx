@@ -163,7 +163,10 @@ function errorText(code?: string): string {
     case "cooldown":
       return "Please wait before resending.";
     case "too_many":
+    case "rate_limited":
       return "Too many requests. Try again later.";
+    case "daily_limit":
+      return "This number has reached today's OTP limit. Try again tomorrow.";
     case "sms_unavailable":
       return "SMS isn't available right now.";
     case "phone_taken":

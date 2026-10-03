@@ -341,7 +341,7 @@ function OrderCard({
             </p>
           ) : null}
 
-          <div className="mt-3 grid grid-cols-2 gap-2">{children}</div>
+          <div className="order-actions mt-3">{children}</div>
         </div>
       ) : null}
     </article>
@@ -921,21 +921,24 @@ export function VendorOrdersBoard({
         }
       />
 
-      {live ? (
-        <KitchenAlert
-          incomingIds={incoming.map((o) => o.id)}
-          restaurantName={restaurantName}
-          soundPreset={alertSoundPreset}
-          soundUrl={alertSoundUrl}
-        />
-      ) : null}
+      {/* The two kitchen controls: separate cards, grouped close together. */}
+      <div className="kitchen-controls">
+        {live ? (
+          <KitchenAlert
+            incomingIds={incoming.map((o) => o.id)}
+            restaurantName={restaurantName}
+            soundPreset={alertSoundPreset}
+            soundUrl={alertSoundUrl}
+          />
+        ) : null}
 
-      {live && pace?.supported && canBusy ? (
-        <KitchenBusyControl
-          extraMinutes={pace.extraMinutes}
-          until={pace.until}
-        />
-      ) : null}
+        {live && pace?.supported && canBusy ? (
+          <KitchenBusyControl
+            extraMinutes={pace.extraMinutes}
+            until={pace.until}
+          />
+        ) : null}
+      </div>
 
       {actionError ? (
         <div
@@ -953,7 +956,9 @@ export function VendorOrdersBoard({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 @3xl:grid-cols-4">
+      {/* Console only. On a phone the segmented tabs directly below carry
+          the same four counts, so this was the same numbers twice in a row. */}
+      <div className="metric-strip hidden @3xl:grid @3xl:grid-cols-4">
         <VendorMetricCard label="New" value={String(incoming.length)} />
         <VendorMetricCard label="Preparing" value={String(preparing.length)} />
         <VendorMetricCard label="Ready" value={String(ready.length)} />

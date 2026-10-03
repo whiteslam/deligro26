@@ -227,7 +227,7 @@ export function SearchView({
           sticky chrome has to out-rank them outright. z-20 here merely TIED
           with those photos, and a tie is settled by DOM order — which puts the
           scrolling list on top, so pills painted over the search field. */}
-      <div className="glass sticky top-0 z-30 px-4 pb-3 pt-3">
+      <div className="app-header sticky top-0 z-30 px-4 pb-3 pt-3">
         <div className="bolt-search">
           <Search className="size-5 shrink-0" />
           <input

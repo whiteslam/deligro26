@@ -5,7 +5,6 @@ import Link from "next/link";
 import { StatusBar } from "@/components/layout/status-bar";
 import { SplashScreen } from "@/components/shared/splash-screen";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
-import { LanguageSwitch } from "@/components/shared/language-switch";
 import { useT } from "@/components/providers/lang-provider";
 import { OtpLogin } from "@/components/auth/otp-login";
 import { continueAsGuest } from "@/lib/auth/guest-actions";
@@ -82,13 +81,7 @@ export default function LoginPage() {
         <StatusBar />
         <SplashScreen />
         {/* Below the status-bar strip, which is opaque and would otherwise
-            cover the toggle in the framed (desktop) view. The language switch
-            mirrors it on the left, so a first-time customer can pick English
-            or हिंदी before signing in. Compact buttons keep the pair ~150px
-            wide, well clear of the 40px toggle even at 360px. */}
-        <div className="absolute left-4 top-4 z-10 min-[480px]:top-[64px]">
-          <LanguageSwitch className="[&>button]:min-w-0 [&>button]:px-3 [&>button]:py-1.5" />
-        </div>
+            cover the toggle in the framed (desktop) view. */}
         <div className="absolute right-4 top-4 z-10 min-[480px]:top-[64px]">
           <ThemeToggle />
         </div>

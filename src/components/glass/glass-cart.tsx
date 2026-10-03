@@ -76,12 +76,17 @@ export function GlassCart() {
             <ChevronRight className="size-5 shrink-0" />
           </button>
 
+          {/* Clear sits on the card's top-right corner, outside it, drawn
+              small (22px) so it reads as a dismiss chip and not a second
+              action. The ::before grows the touch area up and outward only —
+              away from the bar, so a thumb aiming at "View basket" can't
+              empty the basket by accident. */}
           <button
             onClick={clear}
             aria-label={t("Clear basket", "टोकरी खाली करें")}
-            className="press tap-target grid size-9 shrink-0 place-items-center rounded-full bg-white/25"
+            className="press absolute -right-2 -top-2 grid size-[22px] place-items-center rounded-full border border-line bg-surface text-muted shadow-[var(--shadow-sm)] before:absolute before:-left-2 before:-right-3 before:-top-3 before:bottom-0 before:content-['']"
           >
-            <X className="size-4" />
+            <X className="size-3" strokeWidth={3} />
           </button>
         </div>
       )}

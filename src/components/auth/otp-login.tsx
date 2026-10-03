@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronDown, Loader2 } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronDown, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils/cn";
 import { useT } from "@/components/providers/lang-provider";
@@ -56,6 +62,13 @@ export function OtpLogin({
   const [error, setError] = useState<string | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  // A send limit the server reported (hourly, daily, or per network). Unlike
+  // the 30s cooldown it can last hours, so it is remembered across reloads —
+  // closing and reopening the app must not make it look like sending works.
+  const blockRaw = useSyncExternalStore(subscribeBlock, getBlockRaw, () => null);
+  const now = useSyncExternalStore(subscribeBlock, getClock, () => 0);
+  const block = useMemo(() => parseBlock(blockRaw), [blockRaw]);
+  const [remainingToday, setRemainingToday] = useState<number | null>(null);
   const codeRef = useRef<HTMLInputElement>(null);
 
   const onboarding = variant === "onboarding";
@@ -65,6 +78,14 @@ export function OtpLogin({
     const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
     return () => clearTimeout(timer);
   }, [cooldown]);
+
+  // Per-number limits only bind the number they were hit on; the per-network
+  // one binds every number typed on this device.
+  const blocked =
+    block && block.until > now && (block.phone === null || block.phone === phone)
+      ? block
+      : null;
+  const waitLeft = blocked ? Math.ceil((blocked.until - now) / 1000) : 0;
 
   useEffect(() => {
     if (step === "code") codeRef.current?.focus();
@@ -82,10 +103,23 @@ export function OtpLogin({
       const data = await readJson(res);
       if (!res.ok) {
         if (data.error === "cooldown") setCooldown(data.retryAfter ?? 30);
+        if (isSendLimit(data.error) && data.retryAfter) {
+          const next: SendBlock = {
+            kind: data.error,
+            until: Date.now() + data.retryAfter * 1000,
+            phone: data.error === "rate_limited" ? null : phone,
+          };
+          saveBlock(next);
+          setError(null);
+          return;
+        }
         setError(errorText(t, data.error));
         return;
       }
       setDevCode(data.devCode ?? null);
+      setRemainingToday(
+        typeof data.remainingToday === "number" ? data.remainingToday : null,
+      );
       setCooldown(30);
       setStep("code");
     } catch {
@@ -150,6 +184,14 @@ export function OtpLogin({
   const ctaClass =
     "press flex h-12 w-full items-center justify-center gap-2 rounded-full bg-accent text-[16px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:opacity-50";
 
+  const limitNotice = blocked ? (
+    <LimitNotice>{limitText(t, blocked)}</LimitNotice>
+  ) : null;
+  const waitLabel = t(
+    `Try again in ${waitText(waitLeft, "en")}`,
+    `${waitText(waitLeft, "hi")} बाद कोशिश करें`,
+  );
+
   // ---- Phone step ----
   if (step === "phone") {
     const field = (
@@ -190,11 +232,13 @@ export function OtpLogin({
     const cta = (
       <button
         onClick={requestCode}
-        disabled={busy || !phone}
+        disabled={busy || !phone || !!blocked}
         className={ctaClass}
       >
         {busy ? (
           <Loader2 className="size-5 animate-spin" />
+        ) : blocked ? (
+          waitLabel
         ) : (
           t("Continue", "आगे बढ़ें")
         )}
@@ -210,6 +254,7 @@ export function OtpLogin({
             </h1>
             <p className="mt-1.5 text-sm text-muted">{sub}</p>
             <div className="mt-6">{field}</div>
+            {limitNotice}
             {error ? <ValidationError>{error}</ValidationError> : null}
           </div>
           <div className="mt-auto space-y-4 pt-8">
@@ -228,6 +273,7 @@ export function OtpLogin({
         </h1>
         <p className="mt-1.5 text-center text-sm text-muted">{sub}</p>
         <div className="mt-6">{field}</div>
+        {limitNotice}
         {error ? <ValidationError>{error}</ValidationError> : null}
         <div className="mt-4">{cta}</div>
         {terms}
@@ -304,18 +350,37 @@ export function OtpLogin({
     <div className="mt-4 text-center text-sm">
       <button
         className="font-bold text-accent-ink disabled:text-muted"
-        disabled={cooldown > 0 || busy}
+        disabled={cooldown > 0 || busy || !!blocked}
         onClick={requestCode}
       >
-        {cooldown > 0
-          ? t(
-              `Resend OTP in ${cooldown}s`,
-              `${cooldown} सेकंड में दोबारा भेजें`,
-            )
-          : t("Resend OTP", "ओटीपी दोबारा भेजें")}
+        {blocked
+          ? waitLabel
+          : cooldown > 0
+            ? t(
+                `Resend OTP in ${cooldown}s`,
+                `${cooldown} सेकंड में दोबारा भेजें`,
+              )
+            : t("Resend OTP", "ओटीपी दोबारा भेजें")}
       </button>
     </div>
   );
+
+  // Heads-up before the daily cap bites, so the last few sends aren't wasted
+  // on impatient taps. Hidden once the cap is hit — the red notice says it all.
+  const remainingHint =
+    !blocked && remainingToday !== null && remainingToday <= 2 ? (
+      <p className="mt-3 rounded-xl bg-pop/20 px-3 py-2 text-center text-[13px] font-semibold text-pop-ink">
+        {remainingToday === 0
+          ? t(
+              "That was your last OTP for today.",
+              "यह आज का आपका आख़िरी ओटीपी था।",
+            )
+          : t(
+              `${remainingToday} more OTP ${remainingToday === 1 ? "request" : "requests"} left today.`,
+              `आज आप ${remainingToday} और ओटीपी माँग सकते हैं।`,
+            )}
+      </p>
+    ) : null;
 
   const verifyCta = (
     <button
@@ -342,6 +407,8 @@ export function OtpLogin({
           <p className="mt-1.5 text-sm text-muted">{codeSent}</p>
           {codeBoxes}
           {devHint}
+          {remainingHint}
+          {limitNotice}
           {error ? <ValidationError>{error}</ValidationError> : null}
         </div>
         <div className="mt-auto space-y-1 pt-8">
@@ -362,6 +429,8 @@ export function OtpLogin({
       <p className="mt-1.5 text-sm text-muted">{codeSent}</p>
       {codeBoxes}
       {devHint}
+      {remainingHint}
+      {limitNotice}
       {error ? <ValidationError>{error}</ValidationError> : null}
       <div className="mt-4">{verifyCta}</div>
       {resend}
@@ -378,21 +447,175 @@ function ValidationError({ children }: { children: React.ReactNode }) {
   );
 }
 
-async function readJson(res: Response): Promise<{
+/**
+ * A send limit reached — red, with an icon, and louder than a typo message:
+ * this one means "stop pressing the button", not "fix the field".
+ */
+function LimitNotice({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      role="alert"
+      className="mt-3 flex items-start gap-2 rounded-xl border border-deal/40 bg-deal-soft px-3 py-2.5 text-left text-sm font-semibold text-deal"
+    >
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+type SendLimit = "too_many" | "daily_limit" | "rate_limited";
+
+interface SendBlock {
+  kind: SendLimit;
+  /** Epoch ms when sending is allowed again. */
+  until: number;
+  /** The number it binds, or null for the per-network limit. */
+  phone: string | null;
+}
+
+function isSendLimit(code?: string): code is SendLimit {
+  return code === "too_many" || code === "daily_limit" || code === "rate_limited";
+}
+
+/* ------------------------------------------------------------
+   The remembered block, as an external store.
+
+   `useSyncExternalStore` rather than state set inside an effect — the same
+   choice, for the same reasons, as the console's `Ago` clock: localStorage is
+   an external source, the server has no answer (so it renders "not blocked"
+   and hydration matches), and the countdown needs a clock that ticks.
+   ------------------------------------------------------------ */
+
+const BLOCK_KEY = "deligro.otp-block";
+const listeners = new Set<() => void>();
+let timer: ReturnType<typeof setInterval> | null = null;
+/** undefined = storage not read yet this page load. */
+let blockRaw: string | null | undefined;
+let clock = 0;
+
+function parseBlock(raw: string | null): SendBlock | null {
+  if (!raw) return null;
+  try {
+    const b = JSON.parse(raw) as SendBlock;
+    return isSendLimit(b.kind) && typeof b.until === "number" ? b : null;
+  } catch {
+    return null;
+  }
+}
+
+function notify(): void {
+  for (const listener of listeners) listener();
+}
+
+function getBlockRaw(): string | null {
+  if (blockRaw === undefined) {
+    try {
+      blockRaw = localStorage.getItem(BLOCK_KEY);
+    } catch {
+      blockRaw = null;
+    }
+    clock = Date.now();
+    // Drop one that ran out while the app was closed.
+    const b = parseBlock(blockRaw);
+    if (blockRaw && (!b || b.until <= clock)) {
+      blockRaw = null;
+      try {
+        localStorage.removeItem(BLOCK_KEY);
+      } catch {}
+    }
+  }
+  return blockRaw;
+}
+
+function getClock(): number {
+  getBlockRaw();
+  return clock;
+}
+
+function subscribeBlock(onChange: () => void): () => void {
+  listeners.add(onChange);
+  if (!timer) {
+    // Moves only while a block is live, so an unblocked login screen does not
+    // re-render every second for nothing.
+    timer = setInterval(() => {
+      if (!blockRaw) return;
+      clock = Date.now();
+      const b = parseBlock(blockRaw);
+      if (!b || b.until <= clock) saveBlock(null);
+      else notify();
+    }, 1000);
+  }
+  return () => {
+    listeners.delete(onChange);
+    if (listeners.size === 0 && timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+  };
+}
+
+function saveBlock(block: SendBlock | null): void {
+  blockRaw = block ? JSON.stringify(block) : null;
+  clock = Date.now();
+  try {
+    if (blockRaw) localStorage.setItem(BLOCK_KEY, blockRaw);
+    else localStorage.removeItem(BLOCK_KEY);
+  } catch {
+    // Private mode / storage off: the block still holds for this visit, and the
+    // server enforces it regardless.
+  }
+  notify();
+}
+
+/** "4:30 pm" in India time — the clock the user's phone is showing. */
+function clockText(epochMs: number): string {
+  return new Intl.DateTimeFormat("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Kolkata",
+  }).format(epochMs);
+}
+
+/** A short wait for the button: "35s", "12 min", "1 h 20 min". */
+function waitText(totalSeconds: number, lang: "en" | "hi"): string {
+  const s = Math.max(0, totalSeconds);
+  if (s < 60) return lang === "hi" ? `${s} सेकंड` : `${s}s`;
+  const mins = Math.ceil(s / 60);
+  if (mins < 60) return lang === "hi" ? `${mins} मिनट` : `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (lang === "hi") return m ? `${h} घंटे ${m} मिनट` : `${h} घंटे`;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+function limitText(t: T, block: SendBlock): string {
+  if (block.kind === "daily_limit") {
+    return t(
+      "You've reached today's OTP limit. Please try again tomorrow.",
+      "आज के ओटीपी की सीमा पूरी हो गई। कल फिर से कोशिश करें।",
+    );
+  }
+  const at = clockText(block.until);
+  return t(
+    `Too many OTP requests. Please try again after ${at}.`,
+    `बहुत ज़्यादा ओटीपी माँगे गए। ${at} के बाद फिर से कोशिश करें।`,
+  );
+}
+
+interface OtpResponse {
   error?: string;
   retryAfter?: number;
   devCode?: string;
   tokenHash?: string;
-}> {
+  remainingToday?: number;
+}
+
+async function readJson(res: Response): Promise<OtpResponse> {
   const text = await res.text();
   if (!text) return { error: res.ok ? undefined : "server_error" };
   try {
-    return JSON.parse(text) as {
-      error?: string;
-      retryAfter?: number;
-      devCode?: string;
-      tokenHash?: string;
-    };
+    return JSON.parse(text) as OtpResponse;
   } catch {
     return { error: "server_error" };
   }
@@ -421,6 +644,11 @@ function errorText(t: T, code?: string): string {
       return t(
         "Please wait a moment before resending.",
         "दोबारा भेजने से पहले थोड़ा रुकें।",
+      );
+    case "daily_limit":
+      return t(
+        "You've reached today's OTP limit. Please try again tomorrow.",
+        "आज के ओटीपी की सीमा पूरी हो गई। कल फिर से कोशिश करें।",
       );
     case "too_many":
     case "rate_limited":

@@ -261,44 +261,43 @@ export function KitchenAlert({
 
   if (!supported) return null;
 
+  // One compact row: status dot-icon, a two-line label, one small action.
+  // This was a full-width red panel with a paragraph of bilingual copy and a
+  // button as wide as the screen — the loudest thing on the page for what is a
+  // single on/off setting. The red is now confined to the icon.
+  const title = on
+    ? "Alerts on · अलर्ट चालू"
+    : audioFailed
+      ? "Couldn't start the alert sound"
+      : "Alerts off · अलर्ट बंद";
+  const detail = on
+    ? "Sound and vibration for new orders."
+    : audioFailed
+      ? "Try again, or use another device."
+      : "New orders will arrive silently.";
+
   return (
-    <div
-      className={
-        on
-          ? "flex items-center gap-3 rounded-xl border border-green/30 bg-green/10 px-3 py-2.5 text-sm"
-          : "flex items-center gap-3 rounded-xl border border-deal/30 bg-deal-soft px-3 py-2.5 text-sm"
-      }
-    >
-      {on ? (
-        <BellRing className="size-4 shrink-0 text-green" />
-      ) : (
-        <BellOff className="size-4 shrink-0 text-deal" />
-      )}
-      <p className="min-w-0 flex-1 font-medium">
-        {on ? (
-          "Sound and vibration on for new orders. / नए ऑर्डर पर आवाज़ चालू है।"
-        ) : audioFailed ? (
-          <>
-            <span className="font-bold">
-              This browser wouldn&apos;t start the alert sound.
-            </span>{" "}
-            New orders will arrive silently — try again, or use another device
-            for the kitchen display.
-          </>
-        ) : (
-          <>
-            <span className="font-bold">Alerts are off.</span> New orders will
-            arrive silently on this device. / अलर्ट बंद हैं — नए ऑर्डर की आवाज़ नहीं आएगी।
-          </>
-        )}
+    <div className="flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2.5">
+      <span
+        className={
+          on
+            ? "grid size-8 shrink-0 place-items-center rounded-full bg-green/10 text-green"
+            : "grid size-8 shrink-0 place-items-center rounded-full bg-deal-soft text-deal"
+        }
+      >
+        {on ? <BellRing className="size-4" /> : <BellOff className="size-4" />}
+      </span>
+      <p className="min-w-0 flex-1 leading-tight">
+        <span className="block text-sm font-bold">{title}</span>
+        <span className="mt-0.5 block text-xs text-muted">{detail}</span>
       </p>
       {on ? (
         <Button variant="ghost" size="sm" onClick={disarm} className="shrink-0">
-          Mute · बंद करें
+          Mute
         </Button>
       ) : (
         <Button size="sm" onClick={arm} className="shrink-0">
-          <Bell className="size-4" /> Turn on alerts · अलर्ट चालू करें
+          <Bell className="size-4" /> Turn on
         </Button>
       )}
     </div>

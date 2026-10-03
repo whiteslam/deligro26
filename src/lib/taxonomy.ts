@@ -214,25 +214,46 @@ export const HOME_CATEGORIES: Category[] = HOME_CATEGORY_IDS.map((id) => {
  * `lib/store-categories.ts`.
  */
 export const STORE_CATEGORIES: StoreCategory[] = [
-  { id: "bakery", label: "Bakery", emoji: "🥐", tags: ["Bakery", "Desserts"] },
-  { id: "dairy", label: "Dairy", emoji: "🥛", tags: ["Dairy"] },
+  {
+    id: "bakery",
+    label: "Bakery",
+    emoji: "🥐",
+    image: unsplashTile("photo-1555507036-ab1f4038808a"),
+    tags: ["Bakery", "Desserts"],
+  },
+  {
+    id: "dairy",
+    label: "Dairy",
+    emoji: "🥛",
+    image: unsplashTile("photo-1550583724-b2692b85b150"),
+    tags: ["Dairy"],
+  },
   {
     id: "groceries",
     label: "Groceries",
     emoji: "🛒",
+    image: unsplashTile("photo-1542838132-92c53300491e"),
     tags: ["Groceries", "Kirana"],
   },
-  { id: "pick-drop", label: "Pick & Drop", emoji: "🛵", tags: ["Pick & Drop"] },
+  {
+    id: "pick-drop",
+    label: "Pick & Drop",
+    emoji: "🛵",
+    image: unsplashTile("photo-1558981806-ec527fa84c39"),
+    tags: ["Pick & Drop"],
+  },
   {
     id: "raw-meat",
     label: "Raw Meat",
     emoji: "🍗",
+    image: unsplashTile("photo-1607623814075-e51df1bdc82f"),
     tags: ["Raw Meat", "Meat", "Fish"],
   },
   {
     id: "chowpaty",
     label: "Chowpaty",
     emoji: "🍧",
+    image: unsplashTile("photo-1606491956689-2ea866880c84"),
     tags: ["Chowpaty", "Street Food", "Chaat"],
   },
 ];

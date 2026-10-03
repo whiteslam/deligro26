@@ -145,15 +145,17 @@ function ItemSheetInner() {
 
           <button
             onClick={commit}
-            disabled={item.soldOut}
+            disabled={item.soldOut || !restaurant.open}
             className="press flex h-12 flex-1 items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:opacity-50"
           >
             <span>
-              {item.soldOut
-                ? t("Sold out", "ख़त्म हो गया")
-                : t("Add", "जोड़ें")}
+              {!restaurant.open
+                ? t("Closed", "बंद")
+                : item.soldOut
+                  ? t("Sold out", "ख़त्म हो गया")
+                  : t("Add", "जोड़ें")}
             </span>
-            {!item.soldOut ? (
+            {!item.soldOut && restaurant.open ? (
               <span>
                 <ItemPrice item={item} qty={qty} />
               </span>

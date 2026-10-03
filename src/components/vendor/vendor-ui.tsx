@@ -51,6 +51,11 @@ export function VendorHero({
       description={subtitle}
       leading={leading}
       actions={action}
+      // Plain on a phone too. The console already drops the card at 768px
+      // (`.admin-hero` in globals.css); in the phone frame it stayed a
+      // bordered, glowing panel, which made the page title one more box in a
+      // column of boxes. A title is not a card.
+      className="vendor-hero-flat"
       status={
         live || tag || badge ? (
           <span className="flex flex-wrap items-center gap-2">

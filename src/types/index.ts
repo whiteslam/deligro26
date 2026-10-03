@@ -107,14 +107,16 @@ export interface Category {
  * Deliberately no longer `extends Category`. It shared a shape by coincidence,
  * and the coincidence ended when food categories gained photographs: a cuisine
  * has an obvious picture (a plate of biryani), a category of SHOP does not —
- * there is no honest single photo of "Pick & Drop". These tiles stay emoji, and
- * saying so in the type stops the next change to one silently demanding
- * something of the other.
+ * there is no honest single photo of "Pick & Drop". So `image` here is a
+ * representative stock photo (bread for Bakery, a produce aisle for Groceries),
+ * optional, with the emoji kept as the fallback when it is absent.
  */
 export interface StoreCategory {
   id: string;
   label: string;
   emoji: string;
+  /** Square tile photo. Optional — the tile falls back to `emoji`. */
+  image?: string;
   tags: string[];
 }
 

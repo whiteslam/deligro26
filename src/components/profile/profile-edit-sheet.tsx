@@ -67,7 +67,14 @@ export function ProfileEditSheet({
         setError(
           data.error === "invalid_phone"
             ? t("Enter a valid phone number.", "सही फ़ोन नंबर डालें।")
-            : data.error === "cooldown" || data.error === "too_many"
+            : data.error === "daily_limit"
+              ? t(
+                  "This number has reached today's OTP limit. Try again tomorrow.",
+                  "इस नंबर पर आज के ओटीपी की सीमा पूरी हो गई। कल फिर कोशिश करें।",
+                )
+            : data.error === "cooldown" ||
+                data.error === "too_many" ||
+                data.error === "rate_limited"
               ? t(
                   "Too many codes requested. Wait a moment and try again.",
                   "बहुत बार कोड मांगा गया। थोड़ा रुककर फिर कोशिश करें।",

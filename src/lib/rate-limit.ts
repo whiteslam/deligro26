@@ -61,10 +61,14 @@ export function clientIp(request: Request): string {
   return request.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
-/** 429 with the Retry-After the limiter computed. */
+/**
+ * 429 with the Retry-After the limiter computed — in the header for HTTP
+ * clients, and in the body for our own screens, which tell the user when to
+ * come back rather than a bare "try later".
+ */
 export function tooManyRequests(result: RateLimitResult): Response {
   return Response.json(
-    { error: "rate_limited" },
+    { error: "rate_limited", retryAfter: result.retryAfter },
     { status: 429, headers: { "Retry-After": String(result.retryAfter) } }
   );
 }

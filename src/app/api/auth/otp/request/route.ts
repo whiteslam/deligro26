@@ -37,7 +37,13 @@ export async function POST(request: Request) {
     const result = await createOtp(phone);
     if (!result.ok) {
       const status =
-        result.error === "cooldown" || result.error === "too_many" ? 429 : 400;
+        result.error === "cooldown" ||
+        result.error === "too_many" ||
+        result.error === "daily_limit"
+          ? 429
+          : result.error === "db_error"
+            ? 500
+            : 400;
       return NextResponse.json(
         { error: result.error, retryAfter: result.retryAfter },
         { status }
@@ -69,6 +75,7 @@ export async function POST(request: Request) {
       sent: sms.sent,
       devMode: sms.devMode,
       devCode,
+      remainingToday: result.remainingToday,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -60,25 +60,36 @@ export function KitchenBusyControl({
           : "rounded-xl border border-line bg-surface px-3 py-2.5"
       }
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Timer
-          className={busy ? "size-4 shrink-0 text-deal" : "size-4 shrink-0 text-muted"}
-        />
-        <p className="min-w-0 flex-1 text-sm font-medium">
+      <div className="flex items-center gap-3">
+        <span
+          className={
+            busy
+              ? "grid size-8 shrink-0 place-items-center rounded-full bg-deal/15 text-deal"
+              : "grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-muted"
+          }
+        >
+          <Timer className="size-4" />
+        </span>
+        <p className="min-w-0 flex-1 leading-tight">
           {busy ? (
             <>
-              Quoting <span className="font-bold">+{extraMinutes} min</span> to
-              customers until{" "}
-              {new Date(until).toLocaleTimeString("en-IN", {
-                hour: "numeric",
-                minute: "2-digit",
-              })}
-              .
+              <span className="block text-sm font-bold">
+                Quoting +{extraMinutes} min
+              </span>
+              <span className="mt-0.5 block text-xs text-muted">
+                Until{" "}
+                {new Date(until).toLocaleTimeString("en-IN", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </span>
             </>
           ) : (
             <>
-              Running behind? Add time to what customers are quoted, for the next
-              hour.
+              <span className="block text-sm font-bold">Running behind?</span>
+              <span className="mt-0.5 block text-xs text-muted">
+                Add minutes to quotes for an hour.
+              </span>
             </>
           )}
         </p>
@@ -91,6 +102,7 @@ export function KitchenBusyControl({
               variant={busy && extraMinutes === m ? "primary" : "outline"}
               disabled={pending}
               onClick={() => apply(m)}
+              className="tap-target h-8 px-2.5 text-xs"
             >
               +{m}
             </Button>

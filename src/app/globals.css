@@ -536,7 +536,7 @@ button.card:active {
   gap: 10px;
   /* Unlayered on purpose, so it beats a Tailwind `bottom-*` utility on the same
      element whatever the specificity — utilities live in @layer utilities. */
-  bottom: calc(var(--tabbar-h) + 10px);
+  bottom: calc(var(--tabbar-h) + 18px);
   border-radius: 11px;
   background: var(--accent);
   padding: 11px 14px;
@@ -684,7 +684,7 @@ button.card:active {
 /* The install card sits above the basket bar when both show (below), so the
    room needed is whichever reaches higher — not the two added together. */
 .app-shell:has(.bolt-basket-bar) .app-scroll::after {
-  height: max(var(--install-inset, 0px), 76px);
+  height: max(var(--install-inset, 0px), 84px);
 }
 
 /* The install card floats over the tab bar; with the basket bar also showing,
@@ -694,7 +694,7 @@ button.card:active {
   bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
 }
 .app-shell:has(.bolt-basket-bar) .install-card {
-  bottom: calc(5.5rem + 72px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(5.5rem + 80px + env(safe-area-inset-bottom, 0px));
 }
 .app-scroll:has(.owns-bottom)::after {
   height: 0;
@@ -2160,6 +2160,66 @@ a.c-metric:hover {
     display: none;
   }
 }
+/* The vendor page title is plain at every width, not only in the console.
+   `.admin-hero` drops its card at 768px; in the phone frame it stayed a
+   bordered, glowing panel — one more box in a column of boxes. Unlayered and
+   two classes deep so it beats `.admin-hero` and the utilities on the element. */
+.admin-hero.vendor-hero-flat {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible;
+}
+.vendor-hero-flat > .vendor-hero-glow {
+  display: none;
+}
+
+/* The kitchen's two controls (alerts, running-behind): two cards of their own,
+   kept close together so they read as a pair rather than as two page sections.
+   The page column's own gap is 20px; this is 8px. */
+.kitchen-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kitchen-controls:empty {
+  display: none;
+}
+
+/* Four figures as one strip with rules between them, rather than four
+   separate bordered cards in a row. */
+.metric-strip {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-block);
+  background: var(--surface);
+}
+.metric-strip > .vendor-metric {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+}
+.metric-strip > .vendor-metric + .vendor-metric {
+  border-left: 1px solid var(--line);
+}
+
+/* An order card's action row. Was a fixed two-column grid, which in a narrow
+   kanban column broke "Reject · मना करें" across two lines inside its button.
+   Now the buttons share the row when both fit and stack when they don't; the
+   label never wraps. */
+.order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.order-actions > * {
+  flex: 1 1 8.5rem;
+  white-space: nowrap;
+}
+
 .vendor-metric {
   border-radius: var(--radius-block);
   border: 1px solid var(--line);

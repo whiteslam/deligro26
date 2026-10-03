@@ -44,6 +44,10 @@ echo "═══ 9/16 Delivery estimates vs distance ═══"
 npx tsx scripts/qa/eta-distance.ts
 
 echo ""
+echo "═══ 9b/16 OTP send limits ═══"
+npx tsx scripts/qa/otp-limits.ts
+
+echo ""
 echo "═══ 10/16 Delivery area fails closed ═══"
 npx tsx scripts/qa/service-area.ts
 

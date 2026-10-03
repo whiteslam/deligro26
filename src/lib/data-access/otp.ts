@@ -2,6 +2,7 @@ import "server-only";
 import { randomInt, scryptSync, timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAccountByPhone } from "@/lib/auth/customer-account";
+import { checkOtpLimits, otpLookbackStart } from "@/lib/auth/otp-limits";
 
 /**
  * Server-side OTP lifecycle. All queries use the service-role client (the
@@ -12,8 +13,6 @@ import { resolveAccountByPhone } from "@/lib/auth/customer-account";
 
 const CODE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_ATTEMPTS = 5;
-const RESEND_COOLDOWN_MS = 30 * 1000;
-const MAX_PER_HOUR = 6;
 
 /**
  * The pepper is the only secret in the code hash: with it, a leaked
@@ -66,6 +65,7 @@ export interface RequestResult {
   code?: string; // only returned in dev mode (no SMS provider)
   error?: string;
   retryAfter?: number; // seconds
+  remainingToday?: number; // sends left today after this one
 }
 
 /** Create + persist a fresh 6-digit code for this phone (with rate limits). */
@@ -73,22 +73,21 @@ export async function createOtp(phone: string): Promise<RequestResult> {
   const supabase = createAdminClient();
   const now = Date.now();
 
-  // Rate limit: cooldown + hourly cap.
-  const { data: recent } = await supabase
+  // Rate limit: cooldown, hourly cap and daily cap — see lib/auth/otp-limits.
+  const { data: recent, error: readError } = await supabase
     .from("otp_codes")
     .select("created_at")
     .eq("phone", phone)
-    .gte("created_at", new Date(now - 60 * 60 * 1000).toISOString())
-    .order("created_at", { ascending: false });
+    .gte("created_at", new Date(otpLookbackStart(now)).toISOString());
+  // Fail closed: if we can't count the sends, we can't enforce the caps.
+  if (readError) return { ok: false, error: "db_error" };
 
-  if (recent && recent.length > 0) {
-    const last = new Date(recent[0].created_at).getTime();
-    if (now - last < RESEND_COOLDOWN_MS) {
-      return { ok: false, error: "cooldown", retryAfter: Math.ceil((RESEND_COOLDOWN_MS - (now - last)) / 1000) };
-    }
-    if (recent.length >= MAX_PER_HOUR) {
-      return { ok: false, error: "too_many", retryAfter: 3600 };
-    }
+  const verdict = checkOtpLimits(
+    (recent ?? []).map((r) => new Date(r.created_at).getTime()),
+    now
+  );
+  if (!verdict.ok) {
+    return { ok: false, error: verdict.error, retryAfter: verdict.retryAfter };
   }
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
@@ -99,7 +98,7 @@ export async function createOtp(phone: string): Promise<RequestResult> {
   });
   if (error) return { ok: false, error: "db_error" };
 
-  return { ok: true, code };
+  return { ok: true, code, remainingToday: verdict.remainingToday };
 }
 
 export interface VerifyResult {
