@@ -1,5 +1,6 @@
 import "server-only";
 import { recordProvider } from "@/lib/obs/emit";
+import { pushBody, type PushOptions, type PushText } from "./push-body";
 
 /**
  * OneSignal push — server-side sender.
@@ -23,22 +24,7 @@ export const isPushConfigured = APP_ID.length > 0 && REST_KEY.length > 0;
 
 const ENDPOINT = "https://onesignal.com/api/v1/notifications";
 
-export interface PushOptions {
-  /** Deep-link opened when the notification is tapped (e.g. /orders/<id>). */
-  url?: string;
-  /** Arbitrary payload delivered with the push. */
-  data?: Record<string, unknown>;
-}
-
-/**
- * Notification copy. OneSignal requires `en` and picks the entry matching the
- * device language, so a Hindi phone reads `hi` and everything else falls back
- * to English. Most of this app's customers, riders and kitchens are Hindi-first.
- */
-export interface PushText {
-  en: string;
-  hi?: string;
-}
+export type { PushOptions, PushText };
 
 function localized(text: string | PushText): PushText {
   return typeof text === "string" ? { en: text } : text;
@@ -79,15 +65,7 @@ async function createNotification(
   targetKind: "external_id" | "player_id",
   count: number
 ): Promise<boolean> {
-  const body: Record<string, unknown> = {
-    app_id: APP_ID,
-    ...targeting,
-    headings: heading,
-    contents: message,
-  };
-  if (CHANNEL_ID) body.android_channel_id = CHANNEL_ID;
-  if (opts.url) body.url = opts.url;
-  if (opts.data) body.data = opts.data;
+  const body = pushBody(APP_ID, targeting, heading, message, opts, CHANNEL_ID);
 
   // Fire-and-forget still has to be observable. Before this, a push that
   // OneSignal rejected and a push that was never attempted looked identical

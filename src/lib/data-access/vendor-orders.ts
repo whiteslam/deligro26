@@ -13,6 +13,7 @@ import {
   notifyOrderAccepted,
   notifyOrderCancelled,
   notifyOrderReady,
+  stopVendorRing,
 } from "@/lib/notifications/order-events";
 import { queueRefundForOrder } from "@/lib/data-access/refunds";
 import { cancelOrderRow } from "@/lib/data-access/order-cancellation";
@@ -535,6 +536,8 @@ async function announceKitchenTransition(
 ): Promise<void> {
   if (status === "kitchen") {
     deferNotify(() => notifyOrderAccepted(orderId, restaurantName));
+    // Accepted: every phone on the restaurant account stops ringing.
+    deferNotify(() => stopVendorRing(orderId));
     // And the other half of the acceptance, which nobody used to be told: a
     // rider. Orders only ever surfaced to couriers at `ready`, i.e. once the
     // food was already on the pass, so every road leg began from a standing
@@ -592,6 +595,8 @@ async function announceKitchenTransition(
   await cancelDeliveryForOrder(orderId);
 
   deferNotify(() => notifyOrderCancelled(orderId, { byVendor: true, refundQueued }));
+  // Rejected: stop the ring too.
+  deferNotify(() => stopVendorRing(orderId));
 }
 
 /**
