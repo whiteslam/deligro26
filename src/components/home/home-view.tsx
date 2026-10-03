@@ -21,6 +21,7 @@ import { PromoBannerCarousel } from "@/components/home/promo-banner-carousel";
 import { DishCard } from "@/components/search/dish-card";
 import { RestaurantCard } from "@/components/shared/restaurant-card";
 import { EmptyState } from "@/components/shared/empty-state";
+import { useT } from "@/components/providers/lang-provider";
 
 /** How much of the answer the home field shows before handing off to /search. */
 const HOME_DISH_LIMIT = 8;
@@ -54,6 +55,7 @@ export function HomeView({
    */
   rotationSeed?: string;
 }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const typed = deferredQuery.trim();
@@ -86,23 +88,23 @@ export function HomeView({
   // was distance-aware and the food results were not.
   const ctx = useMemo<RankContext>(
     () => ({ origin, rotationSeed }),
-    [origin, rotationSeed]
+    [origin, rotationSeed],
   );
 
   const dishes = useMemo(
     () => (typed ? searchDishes(index, typed, {}, "relevance", ctx) : []),
-    [index, typed, ctx]
+    [index, typed, ctx],
   );
 
   const shops = useMemo(
     () => (typed ? groupByShop(dishes, restaurants, typed) : []),
-    [dishes, restaurants, typed]
+    [dishes, restaurants, typed],
   );
 
   // Typed "Safron", found Saffron Kitchen — say so, as the search tab does.
   const correction = useMemo(
     () => (typed ? searchCorrection(index, typed, dishes) : null),
-    [index, typed, dishes]
+    [index, typed, dishes],
   );
 
   return (
@@ -116,22 +118,27 @@ export function HomeView({
       {searching ? (
         <div className="px-4 pt-3">
           <p className="text-sm font-medium text-muted">
-            {dishes.length} {dishes.length === 1 ? "dish" : "dishes"} ·{" "}
-            {shops.length}{" "}
-            {shops.length === 1 ? "restaurant" : "restaurants"} for &ldquo;
-            {query.trim()}&rdquo;
+            {t(
+              `${dishes.length} ${dishes.length === 1 ? "dish" : "dishes"} · ${shops.length} ${shops.length === 1 ? "restaurant" : "restaurants"} for “${query.trim()}”`,
+              `“${query.trim()}” के लिए ${dishes.length} व्यंजन · ${shops.length} रेस्टोरेंट`,
+            )}
           </p>
 
           {correction ? (
             <p className="mt-1 text-[13px] font-medium leading-snug text-muted">
-              Showing results for{" "}
-              <span className="font-bold text-ink">&ldquo;{correction}&rdquo;</span>
+              {t("Showing results for", "इसके नतीजे दिखा रहे हैं:")}{" "}
+              <span className="font-bold text-ink">
+                &ldquo;{correction}&rdquo;
+              </span>
             </p>
           ) : null}
 
           {dishes[0]?.partial ? (
             <p className="mt-1 text-[13px] font-medium leading-snug text-muted">
-              Nothing is called that exactly — these are the closest dishes.
+              {t(
+                "Nothing is called that exactly — these are the closest dishes.",
+                "ठीक इस नाम का कुछ नहीं मिला — ये सबसे मिलते-जुलते व्यंजन हैं।",
+              )}
             </p>
           ) : null}
 
@@ -147,7 +154,10 @@ export function HomeView({
                   href={`/search?q=${encodeURIComponent(query.trim())}`}
                   className="press bolt-section-link mt-1 inline-flex"
                 >
-                  See all {dishes.length} dishes{" "}
+                  {t(
+                    `See all ${dishes.length} dishes`,
+                    `सभी ${dishes.length} व्यंजन देखें`,
+                  )}{" "}
                   <ChevronRight className="size-4" />
                 </Link>
               ) : null}
@@ -156,7 +166,9 @@ export function HomeView({
 
           {shops.length ? (
             <section className="mt-6 space-y-3">
-              <h2 className="text-heading">Restaurants serving this</h2>
+              <h2 className="text-heading">
+                {t("Restaurants serving this", "ये बनाने वाले रेस्टोरेंट")}
+              </h2>
               <div className="space-y-4">
                 {shops.slice(0, HOME_SHOP_LIMIT).map((shop) => (
                   <RestaurantCard
@@ -172,8 +184,14 @@ export function HomeView({
             <EmptyState
               className="mt-6"
               icon={<Search className="size-7" />}
-              title={`Nothing called “${query.trim()}” yet`}
-              description="No kitchen near you is cooking that right now. Try a shorter word — “paneer” finds more than “paneer tikka masala”."
+              title={t(
+                `Nothing called “${query.trim()}” yet`,
+                `“${query.trim()}” अभी नहीं मिला`,
+              )}
+              description={t(
+                "No kitchen near you is cooking that right now. Try a shorter word — “paneer” finds more than “paneer tikka masala”.",
+                "अभी पास में कोई रसोई यह नहीं बना रही। छोटा शब्द लिखकर देखें — “पनीर” लिखने से “पनीर टिक्का मसाला” से ज़्यादा मिलेगा।",
+              )}
             />
           ) : null}
         </div>
@@ -186,14 +204,23 @@ export function HomeView({
           ) : null}
 
           <section className="space-y-3">
-            <h2 className="px-4 text-heading">Categories · श्रेणियाँ</h2>
+            <h2 className="px-4 text-heading">
+              {t("Categories", "श्रेणियाँ")}
+            </h2>
             <CategoryStrip categories={categories} />
           </section>
 
-          <Section title="Popular right now · अभी लोकप्रिय" href="/search">
+          <Section
+            title={t("Popular right now", "अभी लोकप्रिय")}
+            href="/search"
+          >
             <div className="no-scrollbar flex gap-4 overflow-x-auto px-4">
               {popular.map((r) => (
-                <RestaurantCard key={r.slug} restaurant={r} variant="carousel" />
+                <RestaurantCard
+                  key={r.slug}
+                  restaurant={r}
+                  variant="carousel"
+                />
               ))}
             </div>
           </Section>
@@ -209,8 +236,10 @@ export function HomeView({
             <div className="mx-4 flex items-start gap-2.5 rounded-2xl border border-deal/30 bg-deal-soft px-3 py-2.5 text-sm font-medium text-deal">
               <TriangleAlert className="mt-0.5 size-4 shrink-0" />
               <span>
-                We couldn&apos;t load stores just now — this is a problem on our
-                side, not an empty neighbourhood. Pull to refresh in a moment.
+                {t(
+                  "We couldn't load stores just now — this is a problem on our side, not an empty neighbourhood. Pull to refresh in a moment.",
+                  "अभी दुकानें नहीं दिख पाईं — गड़बड़ी हमारी तरफ़ से है, आपके इलाके में दुकानें हैं। थोड़ी देर बाद नीचे खींचकर फिर देखें।",
+                )}
               </span>
             </div>
           ) : null}
@@ -218,13 +247,20 @@ export function HomeView({
           <section className="space-y-3">
             <div className="bolt-section-head px-4">
               <div>
-                <h2 className="text-heading">Restaurants near you · पास के रेस्टोरेंट</h2>
+                <h2 className="text-heading">
+                  {t("Restaurants near you", "पास के रेस्टोरेंट")}
+                </h2>
                 <p className="text-xs font-medium text-muted">
-                  {anyPinned ? "Nearest first" : "Fastest delivery first"}
+                  {anyPinned
+                    ? t("Nearest first", "सबसे पास वाले पहले")
+                    : t(
+                        "Fastest delivery first",
+                        "सबसे जल्दी डिलीवरी वाले पहले",
+                      )}
                 </p>
               </div>
               <Link href="/search" className="bolt-section-link">
-                See all <ChevronRight className="size-4" />
+                {t("See all", "सभी देखें")} <ChevronRight className="size-4" />
               </Link>
             </div>
 
@@ -236,7 +272,7 @@ export function HomeView({
           </section>
 
           <p className="px-4 pb-2 pt-2 text-center text-xs text-muted">
-            Freshly made, delivered warm.
+            {t("Freshly made, delivered warm.", "ताज़ा बना, गरम पहुंचाया।")}
           </p>
         </div>
       )}
@@ -253,12 +289,13 @@ function Section({
   href: string;
   children: React.ReactNode;
 }) {
+  const t = useT();
   return (
     <section className="space-y-3">
       <div className="bolt-section-head px-4">
         <h2 className="text-heading">{title}</h2>
         <Link href={href} className="bolt-section-link">
-          See all <ChevronRight className="size-4" />
+          {t("See all", "सभी देखें")} <ChevronRight className="size-4" />
         </Link>
       </div>
       {children}

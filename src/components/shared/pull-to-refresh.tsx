@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, ArrowDown } from "lucide-react";
 import { PortalToShell } from "@/components/shared/portal-to-shell";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 /** How far the finger has to travel before letting go actually refreshes. */
 const THRESHOLD = 68;
@@ -34,6 +35,7 @@ const SLOP = 6;
 export function PullToRefresh() {
   const anchor = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [pull, setPull] = useState(0);
 
@@ -129,7 +131,7 @@ export function PullToRefresh() {
           aria-live="polite"
           className={cn(
             "pointer-events-none fixed inset-x-0 z-40 flex justify-center transition-opacity",
-            visible ? "opacity-100" : "opacity-0"
+            visible ? "opacity-100" : "opacity-0",
           )}
           style={{
             top: `calc(var(--status-h) + ${busy ? 12 : Math.max(0, pull - 28)}px)`,
@@ -139,17 +141,19 @@ export function PullToRefresh() {
             {busy ? (
               <>
                 <Loader2 className="size-3.5 animate-spin" />
-                Refreshing
+                {t("Refreshing", "रिफ़्रेश हो रहा है")}
               </>
             ) : (
               <>
                 <ArrowDown
                   className={cn(
                     "size-3.5 transition-transform",
-                    armed && "rotate-180"
+                    armed && "rotate-180",
                   )}
                 />
-                {armed ? "Release to refresh" : "Pull to refresh"}
+                {armed
+                  ? t("Release to refresh", "रिफ़्रेश के लिए छोड़ें")
+                  : t("Pull to refresh", "रिफ़्रेश के लिए नीचे खींचें")}
               </>
             )}
           </span>

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronDown, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
+import type { T } from "@/lib/i18n/lang";
 
 type Step = "phone" | "code";
 type Variant = "card" | "onboarding";
@@ -26,8 +28,8 @@ const CODE_LEN = 6;
  */
 export function OtpLogin({
   next = "/",
-  heading = "Log in to continue",
-  sub = "We'll text you a one-time code.",
+  heading: headingProp,
+  sub: subProp,
   variant = "card",
   footer,
 }: {
@@ -39,6 +41,14 @@ export function OtpLogin({
   footer?: React.ReactNode;
 }) {
   const router = useRouter();
+  // Customer screens sit inside LangProvider; operator screens don't, and get
+  // English from the context default.
+  const t = useT();
+  const heading =
+    headingProp ?? t("Log in to continue", "जारी रखने के लिए लॉग इन करें");
+  const sub =
+    subProp ??
+    t("We'll text you a one-time code.", "हम आपको एक ओटीपी भेजेंगे।");
   const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -52,8 +62,8 @@ export function OtpLogin({
 
   useEffect(() => {
     if (cooldown <= 0) return;
-    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
   }, [cooldown]);
 
   useEffect(() => {
@@ -72,14 +82,19 @@ export function OtpLogin({
       const data = await readJson(res);
       if (!res.ok) {
         if (data.error === "cooldown") setCooldown(data.retryAfter ?? 30);
-        setError(errorText(data.error));
+        setError(errorText(t, data.error));
         return;
       }
       setDevCode(data.devCode ?? null);
       setCooldown(30);
       setStep("code");
     } catch {
-      setError("Network error — please try again.");
+      setError(
+        t(
+          "Network error — please try again.",
+          "नेटवर्क में दिक्कत है — फिर से कोशिश करें।",
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -96,7 +111,7 @@ export function OtpLogin({
       });
       const data = await readJson(res);
       if (!res.ok || !data.tokenHash) {
-        setError(errorText(data.error));
+        setError(errorText(t, data.error));
         return;
       }
 
@@ -106,7 +121,12 @@ export function OtpLogin({
         type: "email",
       });
       if (sErr) {
-        setError("Could not start your session. Try again.");
+        setError(
+          t(
+            "Could not sign you in. Try again.",
+            "लॉग इन नहीं हो पाया। फिर से कोशिश करें।",
+          ),
+        );
         return;
       }
 
@@ -116,7 +136,12 @@ export function OtpLogin({
       router.push(next);
       router.refresh();
     } catch {
-      setError("Network error — please try again.");
+      setError(
+        t(
+          "Network error — please try again.",
+          "नेटवर्क में दिक्कत है — फिर से कोशिश करें।",
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -142,7 +167,7 @@ export function OtpLogin({
           onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
           onKeyDown={(e) => e.key === "Enter" && phone && requestCode()}
           className="h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface-2 px-3.5 text-[14px] font-semibold outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-          placeholder="Phone number"
+          placeholder={t("Mobile number", "मोबाइल नंबर")}
           autoFocus={onboarding}
         />
       </div>
@@ -152,17 +177,27 @@ export function OtpLogin({
       <p
         className={cn(
           "text-xs leading-relaxed text-muted",
-          onboarding ? "text-left" : "mt-5 text-center"
+          onboarding ? "text-left" : "mt-5 text-center",
         )}
       >
-        By continuing you agree to Deligro&apos;s Terms &amp; Conditions and
-        Privacy Policy. We&apos;ll text you a one-time code.
+        {t(
+          "By continuing you agree to Deligro's Terms & Conditions and Privacy Policy. We'll text you a one-time code.",
+          "आगे बढ़ने पर आप हमारी शर्तें और प्राइवेसी पॉलिसी मानते हैं। हम आपको एक ओटीपी भेजेंगे।",
+        )}
       </p>
     );
 
     const cta = (
-      <button onClick={requestCode} disabled={busy || !phone} className={ctaClass}>
-        {busy ? <Loader2 className="size-5 animate-spin" /> : "Continue"}
+      <button
+        onClick={requestCode}
+        disabled={busy || !phone}
+        className={ctaClass}
+      >
+        {busy ? (
+          <Loader2 className="size-5 animate-spin" />
+        ) : (
+          t("Continue", "आगे बढ़ें")
+        )}
       </button>
     );
 
@@ -170,7 +205,9 @@ export function OtpLogin({
       return (
         <div className="flex min-h-full w-full flex-col">
           <div className="mt-2">
-            <h1 className="text-[23px] font-extrabold tracking-tight">{heading}</h1>
+            <h1 className="text-[23px] font-extrabold tracking-tight">
+              {heading}
+            </h1>
             <p className="mt-1.5 text-sm text-muted">{sub}</p>
             <div className="mt-6">{field}</div>
             {error ? <ValidationError>{error}</ValidationError> : null}
@@ -199,6 +236,11 @@ export function OtpLogin({
   }
 
   // ---- Code step ----
+  const codeHeading = t("Enter the OTP", "ओटीपी डालें");
+  const codeSent = t(
+    `We sent an OTP to +91 ${phone}`,
+    `+91 ${phone} पर ओटीपी भेजा गया है`,
+  );
   const codeBoxes = (
     <div className="relative mt-6">
       <input
@@ -213,7 +255,7 @@ export function OtpLogin({
           e.key === "Enter" && code.length === CODE_LEN && verifyCode()
         }
         className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-        aria-label="Enter 6-digit code"
+        aria-label={t("Enter 6-digit OTP", "6 अंकों का ओटीपी डालें")}
       />
       <div className="flex gap-2">
         {Array.from({ length: CODE_LEN }).map((_, i) => {
@@ -226,7 +268,7 @@ export function OtpLogin({
               className={cn(
                 "grid h-12 flex-1 place-items-center rounded-xl text-xl font-extrabold tabular-nums transition-colors",
                 code[i] ? "border border-line bg-surface" : "bg-surface-2",
-                active && "border-2 border-ink bg-surface"
+                active && "border-2 border-ink bg-surface",
               )}
             >
               {code[i] ?? ""}
@@ -244,7 +286,7 @@ export function OtpLogin({
         setCode("");
         setError(null);
       }}
-      aria-label="Change number"
+      aria-label={t("Change number", "नंबर बदलें")}
       className="press -ml-1 mb-3 grid size-9 place-items-center rounded-full text-ink"
     >
       <ChevronLeft className="size-6" />
@@ -253,7 +295,7 @@ export function OtpLogin({
 
   const devHint = devCode ? (
     <p className="mt-3 rounded-xl bg-surface-2 px-3 py-2 text-center text-xs text-muted">
-      Dev mode — your code is{" "}
+      {t("Dev mode — your code is", "डेव मोड — आपका ओटीपी है")}{" "}
       <span className="text-data font-bold text-ink">{devCode}</span>
     </p>
   ) : null;
@@ -265,7 +307,12 @@ export function OtpLogin({
         disabled={cooldown > 0 || busy}
         onClick={requestCode}
       >
-        {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+        {cooldown > 0
+          ? t(
+              `Resend OTP in ${cooldown}s`,
+              `${cooldown} सेकंड में दोबारा भेजें`,
+            )
+          : t("Resend OTP", "ओटीपी दोबारा भेजें")}
       </button>
     </div>
   );
@@ -276,7 +323,11 @@ export function OtpLogin({
       disabled={busy || code.length !== CODE_LEN}
       className={ctaClass}
     >
-      {busy ? <Loader2 className="size-5 animate-spin" /> : "Verify & continue"}
+      {busy ? (
+        <Loader2 className="size-5 animate-spin" />
+      ) : (
+        t("Verify & continue", "जाँचें और आगे बढ़ें")
+      )}
     </button>
   );
 
@@ -286,11 +337,9 @@ export function OtpLogin({
         <div className="mt-2">
           {back}
           <h1 className="text-[23px] font-extrabold tracking-tight">
-            Enter the code
+            {codeHeading}
           </h1>
-          <p className="mt-1.5 text-sm text-muted">
-            A code was sent to +91 {phone}
-          </p>
+          <p className="mt-1.5 text-sm text-muted">{codeSent}</p>
           {codeBoxes}
           {devHint}
           {error ? <ValidationError>{error}</ValidationError> : null}
@@ -308,9 +357,9 @@ export function OtpLogin({
     <div key="code" className="animate-slide-up w-full max-w-sm">
       {back}
       <h1 className="text-[23px] font-extrabold tracking-tight">
-        Enter the code
+        {codeHeading}
       </h1>
-      <p className="mt-1.5 text-sm text-muted">A code was sent to +91 {phone}</p>
+      <p className="mt-1.5 text-sm text-muted">{codeSent}</p>
       {codeBoxes}
       {devHint}
       {error ? <ValidationError>{error}</ValidationError> : null}
@@ -349,28 +398,52 @@ async function readJson(res: Response): Promise<{
   }
 }
 
-function errorText(code?: string): string {
+function errorText(t: T, code?: string): string {
   switch (code) {
     case "invalid_phone":
-      return "Enter a valid mobile number.";
+      return t("Enter a valid mobile number.", "सही मोबाइल नंबर डालें।");
     case "invalid":
-      return "That code isn't right. Try again.";
+      return t(
+        "That OTP isn't right. Try again.",
+        "ओटीपी गलत है। फिर से डालें।",
+      );
     case "expired":
-      return "Code expired — request a new one.";
+      return t(
+        "OTP expired — request a new one.",
+        "ओटीपी की समय सीमा खत्म हो गई — नया ओटीपी मँगाएँ।",
+      );
     case "locked":
-      return "Too many tries. Request a new code.";
+      return t(
+        "Too many tries. Request a new OTP.",
+        "बहुत बार गलत ओटीपी डाला गया। नया ओटीपी मँगाएँ।",
+      );
     case "cooldown":
-      return "Please wait a moment before resending.";
+      return t(
+        "Please wait a moment before resending.",
+        "दोबारा भेजने से पहले थोड़ा रुकें।",
+      );
     case "too_many":
     case "rate_limited":
-      return "Too many requests. Try again later.";
+      return t(
+        "Too many requests. Try again later.",
+        "बहुत ज़्यादा कोशिशें हो गईं। थोड़ी देर बाद कोशिश करें।",
+      );
     case "sms_unavailable":
     case "otp_misconfigured":
     case "backend_not_configured":
-      return "Sign-in is temporarily unavailable. Please try again later.";
+      return t(
+        "Sign-in is temporarily unavailable. Please try again later.",
+        "अभी लॉग इन नहीं हो पा रहा। थोड़ी देर बाद कोशिश करें।",
+      );
     case "server_error":
-      return "Server error — please try again.";
+      return t(
+        "Server error — please try again.",
+        "सर्वर में दिक्कत है — फिर से कोशिश करें।",
+      );
     default:
-      return "Something went wrong. Please try again.";
+      return t(
+        "Something went wrong. Please try again.",
+        "कुछ गड़बड़ हो गई। फिर से कोशिश करें।",
+      );
   }
 }

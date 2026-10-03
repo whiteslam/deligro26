@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { CategoryIcon } from "./category-icon";
 import type { Category } from "@/types";
+import { categoryLabel } from "@/lib/taxonomy";
+import { useLang } from "@/components/providers/lang-provider";
 
 /**
  * The Home cuisine strip.
@@ -11,6 +15,7 @@ import type { Category } from "@/types";
  * it lays them out.
  */
 export function CategoryStrip({ categories }: { categories: Category[] }) {
+  const { lang } = useLang();
   return (
     <div className="no-scrollbar flex gap-2 overflow-x-auto px-4">
       {categories.map((c) => (
@@ -25,11 +30,11 @@ export function CategoryStrip({ categories }: { categories: Category[] }) {
               image={c.image}
               tint={c.tint}
               emoji={c.emoji}
-              label={c.label}
+              label={categoryLabel(lang, c)}
             />
           </span>
           <span className="line-clamp-2 w-full text-center text-[12px] font-semibold leading-tight text-ink">
-            {c.label}
+            {categoryLabel(lang, c)}
           </span>
         </Link>
       ))}

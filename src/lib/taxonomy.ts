@@ -1,5 +1,48 @@
 import { findFoodCategory } from "@/lib/search/dishes";
+import { pick, type Lang } from "@/lib/i18n/lang";
 import type { Category, StoreCategory } from "@/types";
+
+/**
+ * Hindi names for the food and store categories, keyed by id.
+ *
+ * Kept beside the taxonomies rather than as a `hi` field on each record so the
+ * English `label` — which admin screens and search also read — is untouched.
+ * The customer app renders `categoryLabel(lang, c)`.
+ */
+const CATEGORY_HI: Record<string, string> = {
+  // Food (FOOD_CATEGORIES in lib/search/dishes.ts)
+  thali: "थाली",
+  biryani: "बिरयानी",
+  momos: "मोमोज़",
+  snacks: "समोसा और चाट",
+  pizza: "पिज़्ज़ा",
+  burgers: "बर्गर",
+  rolls: "रोल",
+  chinese: "चाइनीज़",
+  south: "साउथ इंडियन",
+  paratha: "पराठा और रोटी",
+  chicken: "चिकन और तंदूरी",
+  egg: "अंडा",
+  healthy: "हेल्दी",
+  desserts: "मिठाई",
+  icecream: "आइसक्रीम",
+  beverages: "पेय",
+  // Stores (STORE_CATEGORIES below)
+  bakery: "बेकरी",
+  dairy: "डेयरी",
+  groceries: "किराना",
+  "pick-drop": "पिक और ड्रॉप",
+  "raw-meat": "कच्चा मांस",
+  chowpaty: "चौपाटी",
+};
+
+/** A category's name in the customer's language; English if no Hindi is set. */
+export function categoryLabel(
+  lang: Lang,
+  c: { id: string; label: string },
+): string {
+  return pick(lang, { en: c.label, hi: CATEGORY_HI[c.id] ?? c.label });
+}
 
 /**
  * The product's live taxonomies — the cuisine strip on Home and the storefront
@@ -149,7 +192,7 @@ export const HOME_CATEGORIES: Category[] = HOME_CATEGORY_IDS.map((id) => {
   const food = findFoodCategory(id);
   if (!food) {
     throw new Error(
-      `taxonomy: home category "${id}" has no FOOD_CATEGORIES entry, so its chip would link to a search that ignores it.`
+      `taxonomy: home category "${id}" has no FOOD_CATEGORIES entry, so its chip would link to a search that ignores it.`,
     );
   }
   return {
@@ -173,8 +216,23 @@ export const HOME_CATEGORIES: Category[] = HOME_CATEGORY_IDS.map((id) => {
 export const STORE_CATEGORIES: StoreCategory[] = [
   { id: "bakery", label: "Bakery", emoji: "🥐", tags: ["Bakery", "Desserts"] },
   { id: "dairy", label: "Dairy", emoji: "🥛", tags: ["Dairy"] },
-  { id: "groceries", label: "Groceries", emoji: "🛒", tags: ["Groceries", "Kirana"] },
+  {
+    id: "groceries",
+    label: "Groceries",
+    emoji: "🛒",
+    tags: ["Groceries", "Kirana"],
+  },
   { id: "pick-drop", label: "Pick & Drop", emoji: "🛵", tags: ["Pick & Drop"] },
-  { id: "raw-meat", label: "Raw Meat", emoji: "🍗", tags: ["Raw Meat", "Meat", "Fish"] },
-  { id: "chowpaty", label: "Chowpaty", emoji: "🍧", tags: ["Chowpaty", "Street Food", "Chaat"] },
+  {
+    id: "raw-meat",
+    label: "Raw Meat",
+    emoji: "🍗",
+    tags: ["Raw Meat", "Meat", "Fish"],
+  },
+  {
+    id: "chowpaty",
+    label: "Chowpaty",
+    emoji: "🍧",
+    tags: ["Chowpaty", "Street Food", "Chaat"],
+  },
 ];

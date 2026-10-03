@@ -8,6 +8,7 @@ import { useItemSheet } from "@/stores/item-sheet-store";
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { VegMark } from "@/components/shared/veg-mark";
 import { ItemPrice } from "@/components/shared/item-price";
+import { useT } from "@/components/providers/lang-provider";
 
 /**
  * Bolt-style product detail popup. Mounted once at app-shell level so it
@@ -26,6 +27,7 @@ function ItemSheetInner() {
   const item = useItemSheet((s) => s.item)!;
   const restaurant = useItemSheet((s) => s.restaurant)!;
   const onClose = useItemSheet((s) => s.close);
+  const t = useT();
 
   const request = useCartSwitch((s) => s.request);
   const lines = useCart((s) => s.lines);
@@ -34,7 +36,7 @@ function ItemSheetInner() {
   // menus, so another shop's quantity is not this dish's quantity.
   const inCart =
     cartSlug === restaurant.slug
-      ? lines.find((l) => l.itemId === item.id)?.qty ?? 0
+      ? (lines.find((l) => l.itemId === item.id)?.qty ?? 0)
       : 0;
 
   const [qty, setLocalQty] = useState(Math.max(inCart, 1));
@@ -65,7 +67,7 @@ function ItemSheetInner() {
   return (
     <div className="absolute inset-0 z-50">
       <button
-        aria-label="Close"
+        aria-label={t("Close", "बंद करें")}
         onClick={onClose}
         className="animate-fade-in absolute inset-0 bg-ink/40"
       />
@@ -90,7 +92,7 @@ function ItemSheetInner() {
             />
             <button
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t("Close", "बंद करें")}
               className="press absolute right-4 top-4 grid size-9 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
             >
               <X className="size-5" />
@@ -100,7 +102,7 @@ function ItemSheetInner() {
           <div className="px-5 pb-5 pt-4">
             {item.bestseller || item.popular ? (
               <span className="pill-pop mb-2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
-                Popular
+                {t("Popular", "लोकप्रिय")}
               </span>
             ) : null}
 
@@ -124,7 +126,7 @@ function ItemSheetInner() {
           <div className="flex h-12 shrink-0 items-center gap-1 rounded-full border border-line px-1">
             <button
               onClick={() => setLocalQty((q) => Math.max(1, q - 1))}
-              aria-label="Remove one"
+              aria-label={t("Remove one", "एक कम करें")}
               className="tap-target press grid size-11 place-items-center rounded-full text-ink hover:bg-surface-2"
             >
               <Minus className="size-5" strokeWidth={2.5} />
@@ -134,7 +136,7 @@ function ItemSheetInner() {
             </span>
             <button
               onClick={() => setLocalQty((q) => q + 1)}
-              aria-label="Add one"
+              aria-label={t("Add one", "एक और जोड़ें")}
               className="tap-target press grid size-11 place-items-center rounded-full text-ink hover:bg-surface-2"
             >
               <Plus className="size-5" strokeWidth={2.5} />
@@ -146,7 +148,11 @@ function ItemSheetInner() {
             disabled={item.soldOut}
             className="press flex h-12 flex-1 items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:opacity-50"
           >
-            <span>{item.soldOut ? "Sold out" : "Add"}</span>
+            <span>
+              {item.soldOut
+                ? t("Sold out", "ख़त्म हो गया")
+                : t("Add", "जोड़ें")}
+            </span>
             {!item.soldOut ? (
               <span>
                 <ItemPrice item={item} qty={qty} />

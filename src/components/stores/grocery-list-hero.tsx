@@ -6,6 +6,8 @@ import {
   useGroceryHistory,
   type GroceryListEntry,
 } from "@/stores/grocery-history-store";
+import { useLang } from "@/components/providers/lang-provider";
+import type { Lang } from "@/lib/i18n/lang";
 
 /**
  * "Order groceries" — three separate ways to reach the shop, all over WhatsApp,
@@ -41,16 +43,33 @@ const WA_GREEN = "#25D366";
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MON = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
-/** e.g. "Tue 16Jul26" */
-function formatDate(ts: number) {
+/** e.g. "Tue 16Jul26"; in Hindi the locale's own short form. */
+function formatDate(ts: number, lang: Lang) {
   const d = new Date(ts);
+  if (lang === "hi") {
+    return d.toLocaleDateString("hi-IN", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+  }
   const day = String(d.getDate()).padStart(2, "0");
   return `${DOW[d.getDay()]} ${day}${MON[d.getMonth()]}${String(
-    d.getFullYear()
+    d.getFullYear(),
   ).slice(-2)}`;
 }
 
@@ -59,7 +78,12 @@ type SavedAddress = { label: string; line: string } | null;
 /** Official WhatsApp glyph. */
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={className}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+      className={className}
+    >
       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.885-9.885 9.885M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.359.101 11.892c0 2.096.549 4.142 1.595 5.945L0 24l6.335-1.652a11.882 11.882 0 005.71 1.454h.006c6.585 0 11.946-5.359 11.949-11.893a11.821 11.821 0 00-3.487-8.46" />
     </svg>
   );
@@ -73,6 +97,7 @@ export function GroceryListHero({
   /** `platform_settings.support_whatsapp`. Falls back when blank. */
   whatsappNumber?: string;
 }) {
+  const { lang, t } = useLang();
   const waNumber = toWaNumber(whatsappNumber);
   const [note, setNote] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
@@ -133,7 +158,12 @@ export function GroceryListHero({
       }
     }
     openWhatsApp(message);
-    setNotice("WhatsApp opened with your list — attach the photo you selected.");
+    setNotice(
+      t(
+        "WhatsApp opened with your list — attach the photo you selected.",
+        "व्हाट्सऐप खुल गया — अब अपनी चुनी हुई फ़ोटो जोड़ें।",
+      ),
+    );
   }
 
   // Feature 3 — just start a chat.
@@ -144,11 +174,21 @@ export function GroceryListHero({
   function pickPhoto(file: File | null) {
     if (!file) return;
     if (!OK_TYPES.includes(file.type)) {
-      setError("Please pick a JPG, PNG, or WebP image.");
+      setError(
+        t(
+          "Please pick a JPG, PNG, or WebP image.",
+          "कृपया जेपीजी, पीएनजी या वेबपी फ़ोटो चुनें।",
+        ),
+      );
       return;
     }
     if (file.size > MAX_BYTES) {
-      setError("That image is over 5 MB — try a smaller one.");
+      setError(
+        t(
+          "That image is over 5 MB — try a smaller one.",
+          "यह फ़ोटो 5 MB से बड़ी है — छोटी फ़ोटो चुनें।",
+        ),
+      );
       return;
     }
     setError(null);
@@ -171,13 +211,16 @@ export function GroceryListHero({
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-[11px] font-bold uppercase tracking-wide">
-              <ShoppingBag className="size-3.5" /> Groceries
+              <ShoppingBag className="size-3.5" /> {t("Groceries", "किराना")}
             </span>
             <h2 className="mt-3 text-[24px] font-extrabold leading-tight tracking-tight">
-              Order groceries
+              {t("Order groceries", "किराना मंगाएं")}
             </h2>
             <p className="mt-1.5 text-[13.5px] font-medium leading-snug text-white/90">
-              No time to browse? Send us your list and we shop it for you.
+              {t(
+                "No time to browse? Send us your list and we shop it for you.",
+                "समय नहीं है? अपनी सूची भेजें, हम सामान लेकर आएंगे।",
+              )}
             </p>
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -193,13 +236,16 @@ export function GroceryListHero({
         {/* Feature 1 — write a list */}
         <div className="mt-4 rounded-2xl bg-surface p-3.5 shadow-sm">
           <p className="text-[13px] font-bold text-ink">
-            Write your list
+            {t("Write your list", "अपनी सूची लिखें")}
           </p>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={5}
-            placeholder="e.g. 2kg atta, 1 dozen eggs, Amul butter 500g, 1L milk…"
+            placeholder={t(
+              "e.g. 2kg atta, 1 dozen eggs, Amul butter 500g, 1L milk…",
+              "जैसे: 2 किलो आटा, 1 दर्जन अंडे, अमूल मक्खन 500 ग्राम, 1 लीटर दूध…",
+            )}
             className="mt-2 min-h-[130px] w-full resize-none rounded-xl bg-surface-2 p-3.5 text-[14px] leading-relaxed text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[#25D366]"
           />
           <button
@@ -209,14 +255,15 @@ export function GroceryListHero({
             style={{ backgroundColor: WA_GREEN }}
             className="press mt-2.5 flex w-full items-center justify-center gap-2 rounded-full py-3 text-[14px] font-bold text-white shadow-sm transition disabled:opacity-45"
           >
-            <WhatsAppIcon className="size-[18px]" /> Send list on WhatsApp
+            <WhatsAppIcon className="size-[18px]" />{" "}
+            {t("Send list on WhatsApp", "सूची व्हाट्सऐप पर भेजें")}
           </button>
         </div>
 
         {/* Feature 2 — upload a photo */}
         <div className="mt-3 rounded-2xl bg-surface p-3.5 shadow-sm">
           <p className="text-[13px] font-bold text-ink">
-            Or upload a photo of your list
+            {t("Or upload a photo of your list", "या अपनी सूची की फ़ोटो भेजें")}
           </p>
 
           <input
@@ -233,16 +280,16 @@ export function GroceryListHero({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={preview}
-                alt="Your grocery list"
+                alt={t("Your grocery list", "आपकी किराना सूची")}
                 className="size-14 shrink-0 rounded-lg object-cover"
               />
               <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">
-                Photo attached
+                {t("Photo attached", "फ़ोटो जुड़ गई")}
               </span>
               <button
                 type="button"
                 onClick={clearPhoto}
-                aria-label="Remove photo"
+                aria-label={t("Remove photo", "फ़ोटो हटाएं")}
                 className="press grid size-8 shrink-0 place-items-center rounded-full bg-line text-ink"
               >
                 <X className="size-4" />
@@ -254,7 +301,8 @@ export function GroceryListHero({
               onClick={() => fileRef.current?.click()}
               className="press mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line py-4 text-[13.5px] font-semibold text-muted"
             >
-              <ImagePlus className="size-[18px]" /> Choose a photo
+              <ImagePlus className="size-[18px]" />{" "}
+              {t("Choose a photo", "फ़ोटो चुनें")}
             </button>
           )}
 
@@ -271,7 +319,8 @@ export function GroceryListHero({
             style={{ backgroundColor: WA_GREEN }}
             className="press mt-2.5 flex w-full items-center justify-center gap-2 rounded-full py-3 text-[14px] font-bold text-white shadow-sm transition disabled:opacity-45"
           >
-            <WhatsAppIcon className="size-[18px]" /> Send photo on WhatsApp
+            <WhatsAppIcon className="size-[18px]" />{" "}
+            {t("Send photo on WhatsApp", "फ़ोटो व्हाट्सऐप पर भेजें")}
           </button>
           {notice ? (
             <p className="mt-2 text-[12.5px] font-medium text-muted">
@@ -287,14 +336,15 @@ export function GroceryListHero({
           style={{ color: WA_GREEN }}
           className="press mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-surface py-3 text-[14px] font-extrabold shadow-sm"
         >
-          <WhatsAppIcon className="size-[18px]" /> Chat with us on WhatsApp
+          <WhatsAppIcon className="size-[18px]" />{" "}
+          {t("Chat with us on WhatsApp", "व्हाट्सऐप पर हमसे बात करें")}
         </button>
 
         {/* Reorder history — past typed lists, one tap to send again */}
         {history.length > 0 ? (
           <div className="mt-5">
             <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-white/70">
-              Recent lists
+              {t("Recent lists", "पिछली सूचियां")}
             </p>
             <ul className="mt-2 space-y-2">
               {history.map((h) => (
@@ -302,19 +352,23 @@ export function GroceryListHero({
                   <button
                     type="button"
                     onClick={() => reorder(h)}
-                    aria-label={`Reorder list from ${formatDate(h.ts)}`}
+                    aria-label={t(
+                      `Reorder list from ${formatDate(h.ts, lang)}`,
+                      `${formatDate(h.ts, lang)} की सूची फिर से भेजें`,
+                    )}
                     className="press flex w-full items-center gap-3 rounded-2xl bg-white/15 p-3 text-left"
                   >
                     <div className="min-w-0 flex-1">
                       <span className="text-[11px] font-bold text-white/70">
-                        {formatDate(h.ts)}
+                        {formatDate(h.ts, lang)}
                       </span>
                       <p className="truncate text-[13px] font-medium text-white">
                         {h.text}
                       </p>
                     </div>
                     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-[12px] font-bold text-[#c56a00]">
-                      <RotateCcw className="size-3.5" /> Reorder
+                      <RotateCcw className="size-3.5" />{" "}
+                      {t("Reorder", "फिर से मंगाएं")}
                     </span>
                   </button>
                 </li>

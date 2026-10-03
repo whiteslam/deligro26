@@ -11,6 +11,7 @@ import { ShopDistance } from "@/components/shared/shop-distance";
 import { formatEta, formatINR } from "@/lib/utils/format";
 import { useChargesConfig } from "@/components/providers/charges-config-provider";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 /**
  * Bolt-style discovery card.
@@ -33,6 +34,7 @@ export function RestaurantCard({
   const r = restaurant;
   const carousel = variant === "carousel";
   const { deliveryFee } = useChargesConfig();
+  const t = useT();
 
   return (
     <Link
@@ -40,7 +42,7 @@ export function RestaurantCard({
       className={cn(
         "press block",
         carousel ? "w-[240px] shrink-0" : "w-full",
-        !r.open && "opacity-60"
+        !r.open && "opacity-60",
       )}
     >
       <div className="relative overflow-hidden rounded-2xl">
@@ -69,7 +71,7 @@ export function RestaurantCard({
             behind. */}
         {!r.open ? (
           <span className="absolute bottom-2.5 right-2.5 rounded-full bg-ink px-2.5 py-1 text-xs font-semibold text-white">
-            Closed
+            {t("Closed", "बंद")}
           </span>
         ) : null}
         {/* Temporarily hidden — rating star not needed right now
@@ -99,7 +101,7 @@ export function RestaurantCard({
                 then disagreed with: `priceTier * 20` (priceTier is the ₹/₹₹/₹₹₹
                 cost-for-two indicator, never a fee), and then the pricing.ts
                 default — right until the first time an admin changed it. */}
-            {deliveryFee === 0 ? "Free" : formatINR(deliveryFee)}
+            {deliveryFee === 0 ? t("Free", "फ़्री") : formatINR(deliveryFee)}
           </span>
           <span className="text-line">•</span>
           {/* Already includes any live busy bump (see mapRestaurant). Labelled
@@ -108,12 +110,12 @@ export function RestaurantCard({
           <span
             className={cn(
               "inline-flex items-center gap-1",
-              r.busy && "font-semibold text-deal"
+              r.busy && "font-semibold text-deal",
             )}
           >
             <Clock className="size-4" />
             {formatEta(r.etaMin, r.etaMax)}
-            {r.busy ? " · Busy" : ""}
+            {r.busy ? t(" · Busy", " · व्यस्त") : ""}
           </span>
           <ShopDistance shop={r} />
         </div>

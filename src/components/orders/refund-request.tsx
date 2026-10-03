@@ -6,6 +6,7 @@ import { Check, Loader2, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PortalToShell } from "@/components/shared/portal-to-shell";
 import { formatINR } from "@/lib/utils/format";
+import { useT } from "@/components/providers/lang-provider";
 
 /**
  * "Request a refund" on a finished order.
@@ -31,6 +32,7 @@ export function RefundRequest({
   paid: boolean;
 }) {
   const router = useRouter();
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -69,14 +71,26 @@ export function RefundRequest({
 
       setError(
         res.status === 429
-          ? "Too many requests. Wait a moment and try again."
+          ? t(
+              "Too many requests. Wait a moment and try again.",
+              "बहुत ज़्यादा कोशिशें हुईं। थोड़ा रुककर फिर कोशिश करें।",
+            )
           : data.error === "invalid_state"
-            ? "Refunds can only be requested once an order is delivered or cancelled."
+            ? t(
+                "Refunds can only be requested once an order is delivered or cancelled.",
+                "रिफ़ंड तभी माँग सकते हैं जब ऑर्डर डिलीवर या कैंसिल हो चुका हो।",
+              )
             : data.error === "not_found"
-              ? "We couldn't find this order."
+              ? t("We couldn't find this order.", "यह ऑर्डर नहीं मिला।")
               : data.error === "unauthorized"
-                ? "Your session expired. Sign in and try again."
-                : "Couldn't send the request. Try again.",
+                ? t(
+                    "Your session expired. Sign in and try again.",
+                    "आपका सेशन खत्म हो गया। लॉग इन करके फिर कोशिश करें।",
+                  )
+                : t(
+                    "Couldn't send the request. Try again.",
+                    "रिक्वेस्ट नहीं भेज पाए। फिर कोशिश करें।",
+                  ),
       );
     } finally {
       setBusy(false);
@@ -87,7 +101,10 @@ export function RefundRequest({
     return (
       <p className="flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-muted">
         <Check className="size-4 text-green" />
-        Refund requested · we&apos;re reviewing it
+        {t(
+          "Refund requested · we're reviewing it",
+          "रिफ़ंड माँगा गया · हम इसे देख रहे हैं",
+        )}
       </p>
     );
   }
@@ -99,7 +116,8 @@ export function RefundRequest({
         onClick={() => setOpen(true)}
         className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-ink"
       >
-        <RotateCcw className="size-4" /> Request a refund
+        <RotateCcw className="size-4" />{" "}
+        {t("Request a refund", "रिफ़ंड माँगें")}
       </button>
 
       {open ? (
@@ -115,7 +133,7 @@ export function RefundRequest({
           <div className="fixed inset-0 z-50">
             <button
               type="button"
-              aria-label="Close"
+              aria-label={t("Close", "बंद करें")}
               onClick={() => setOpen(false)}
               className="animate-fade-in absolute inset-0 bg-ink/40"
             />
@@ -127,7 +145,7 @@ export function RefundRequest({
             >
               <div className="mb-3 flex items-center justify-between">
                 <h2 id="refund-request-title" className="text-heading">
-                  Request a refund
+                  {t("Request a refund", "रिफ़ंड माँगें")}
                 </h2>
                 <button
                   type="button"
@@ -139,21 +157,30 @@ export function RefundRequest({
               </div>
 
               <p className="text-sm leading-relaxed text-muted">
-                We&apos;ll review your request for the full order —{" "}
+                {t(
+                  "We'll review your request for the full order —",
+                  "हम पूरे ऑर्डर के लिए आपकी रिक्वेस्ट देखेंगे —",
+                )}{" "}
                 <span className="text-data font-semibold text-ink">
                   {formatINR(orderTotal)}
                 </span>
                 .{" "}
                 {paid
-                  ? "If it's approved the money goes back to however you paid."
-                  : "This order was paid in cash, so an approved refund is settled by our team directly rather than through the app."}
+                  ? t(
+                      "If it's approved the money goes back to however you paid.",
+                      "मंज़ूरी मिलने पर पैसे उसी तरीके से वापस आएँगे जिससे आपने भुगतान किया था।",
+                    )
+                  : t(
+                      "This order was paid in cash, so an approved refund is settled by our team directly rather than through the app.",
+                      "इस ऑर्डर का भुगतान नकद हुआ था, इसलिए मंज़ूर रिफ़ंड ऐप से नहीं, सीधे हमारी टीम देगी।",
+                    )}
               </p>
 
               <label
                 htmlFor="refund-reason"
                 className="mt-4 block text-xs font-semibold text-muted"
               >
-                What went wrong?
+                {t("What went wrong?", "क्या गड़बड़ हुई?")}
               </label>
               <textarea
                 id="refund-reason"
@@ -161,7 +188,10 @@ export function RefundRequest({
                 onChange={(e) => setReason(e.target.value)}
                 maxLength={500}
                 rows={3}
-                placeholder="Missing items, food arrived cold, never delivered…"
+                placeholder={t(
+                  "Missing items, food arrived cold, never delivered…",
+                  "सामान कम आया, खाना ठंडा था, डिलीवरी नहीं हुई…",
+                )}
                 className="mt-1.5 w-full resize-none rounded-xl bg-surface-2 px-3.5 py-3 text-base outline-none focus:ring-2 focus:ring-accent/30"
               />
 
@@ -175,7 +205,7 @@ export function RefundRequest({
                 {busy ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
-                  "Send request"
+                  t("Send request", "रिक्वेस्ट भेजें")
                 )}
               </Button>
             </div>

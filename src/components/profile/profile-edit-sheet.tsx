@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/components/providers/lang-provider";
 
 export function ProfileEditSheet({
   open,
@@ -17,6 +18,7 @@ export function ProfileEditSheet({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const t = useT();
   const [draft, setDraft] = useState(value);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +45,12 @@ export function ProfileEditSheet({
 
   if (!open) return null;
 
-  const title = field === "name" ? "Edit name" : "Edit phone";
-  const placeholder = field === "name" ? "Your full name" : "+91 98765 43210";
+  const title =
+    field === "name"
+      ? t("Edit name", "नाम बदलें")
+      : t("Edit phone", "फ़ोन नंबर बदलें");
+  const placeholder =
+    field === "name" ? t("Your full name", "आपका पूरा नाम") : "+91 98765 43210";
 
   /** Ask the server to text a code to the number being claimed. */
   async function requestCode() {
@@ -60,10 +66,16 @@ export function ProfileEditSheet({
       if (!res.ok) {
         setError(
           data.error === "invalid_phone"
-            ? "Enter a valid phone number."
+            ? t("Enter a valid phone number.", "सही फ़ोन नंबर डालें।")
             : data.error === "cooldown" || data.error === "too_many"
-              ? "Too many codes requested. Wait a moment and try again."
-              : "Couldn't send a code. Try again."
+              ? t(
+                  "Too many codes requested. Wait a moment and try again.",
+                  "बहुत बार कोड मांगा गया। थोड़ा रुककर फिर कोशिश करें।",
+                )
+              : t(
+                  "Couldn't send a code. Try again.",
+                  "कोड नहीं भेज पाए। फिर कोशिश करें।",
+                ),
         );
         return;
       }
@@ -83,7 +95,7 @@ export function ProfileEditSheet({
         body: JSON.stringify(
           field === "name"
             ? { fullName: draft }
-            : { phone: draft, phoneOtp: otp || undefined }
+            : { phone: draft, phoneOtp: otp || undefined },
         ),
       });
       const data = await res.json().catch(() => ({}));
@@ -97,12 +109,21 @@ export function ProfileEditSheet({
         }
         setError(
           data.error === "invalid_phone"
-            ? "Enter a valid phone number."
+            ? t("Enter a valid phone number.", "सही फ़ोन नंबर डालें।")
             : data.error === "otp_invalid"
-              ? "That code isn't right. Check it and try again."
+              ? t(
+                  "That code isn't right. Check it and try again.",
+                  "यह कोड सही नहीं है। जांचकर फिर कोशिश करें।",
+                )
               : data.error === "phone_taken"
-                ? "This number is already linked to another account. Sign in to that account, or use a different number."
-                : "Could not save. Try again."
+                ? t(
+                    "This number is already linked to another account. Sign in to that account, or use a different number.",
+                    "यह नंबर पहले से किसी दूसरे खाते से जुड़ा है। उस खाते से लॉग इन करें, या दूसरा नंबर डालें।",
+                  )
+                : t(
+                    "Could not save. Try again.",
+                    "सेव नहीं हो पाया। फिर कोशिश करें।",
+                  ),
         );
         return;
       }
@@ -117,7 +138,7 @@ export function ProfileEditSheet({
     <div className="fixed inset-0 z-50">
       <button
         type="button"
-        aria-label="Close"
+        aria-label={t("Close", "बंद करें")}
         onClick={onClose}
         className="absolute inset-0 bg-ink/40"
       />
@@ -154,8 +175,14 @@ export function ProfileEditSheet({
 
         {otpSent ? (
           <div className="mt-3 space-y-1.5">
-            <label htmlFor="phone-otp" className="text-xs font-semibold text-muted">
-              Enter the 6-digit code sent to {draft}
+            <label
+              htmlFor="phone-otp"
+              className="text-xs font-semibold text-muted"
+            >
+              {t(
+                `Enter the 6-digit code sent to ${draft}`,
+                `${draft} पर भेजा गया 6 अंकों का कोड डालें`,
+              )}
             </label>
             <input
               id="phone-otp"
@@ -174,7 +201,7 @@ export function ProfileEditSheet({
               disabled={busy}
               className="press text-xs font-bold text-accent disabled:opacity-50"
             >
-              Resend code
+              {t("Resend code", "कोड फिर से भेजें")}
             </button>
           </div>
         ) : null}
@@ -188,9 +215,9 @@ export function ProfileEditSheet({
           {busy ? (
             <Loader2 className="size-4 animate-spin" />
           ) : otpSent ? (
-            "Verify & save"
+            t("Verify & save", "जांचें और सेव करें")
           ) : (
-            "Save"
+            t("Save", "सेव करें")
           )}
         </Button>
       </div>

@@ -7,6 +7,7 @@ import { isMapsConfigured, DEFAULT_CENTER } from "@/lib/maps/config";
 import type { TrackPoint } from "@/lib/tracking/rider-position";
 import { pointAlongPath, progressAlongLine } from "@/lib/tracking/route-path";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 /** What one Directions lookup told us about the trip. */
 export interface RoadRoute {
@@ -71,6 +72,7 @@ export function TrackingMap({
    */
   bottomInset?: number;
 }) {
+  const t = useT();
   const mapEl = useRef<HTMLDivElement>(null);
   const mapObj = useRef<google.maps.Map | null>(null);
   const restaurantMarker = useRef<google.maps.Marker | null>(null);
@@ -88,7 +90,7 @@ export function TrackingMap({
   /** The courier pan is idempotent: same fix, same inset, no second pan. */
   const panKey = useRef<string | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
-    isMapsConfigured ? "loading" : "error"
+    isMapsConfigured ? "loading" : "error",
   );
   /**
    * The road geometry, once Directions has answered. Null means we are drawing
@@ -132,7 +134,7 @@ export function TrackingMap({
           restaurantMarker.current = new google.maps.Marker({
             map,
             position: restaurant,
-            title: "Restaurant",
+            title: t("Restaurant", "रेस्टोरेंट"),
           });
           routeLine.current = new google.maps.Polyline({
             map,
@@ -146,14 +148,14 @@ export function TrackingMap({
         destMarker.current = new google.maps.Marker({
           map,
           position: destination,
-          title: "Your location",
+          title: t("Your location", "आपकी लोकेशन"),
         });
 
         if (showRider && rider) {
           riderMarker.current = new google.maps.Marker({
             map,
             position: rider,
-            title: "Courier",
+            title: t("Courier", "राइडर"),
             icon: {
               path: google.maps.SymbolPath.CIRCLE,
               scale: 10,
@@ -283,7 +285,7 @@ export function TrackingMap({
         riderMarker.current = new google.maps.Marker({
           map: mapObj.current,
           position: riderPoint,
-          title: "Courier",
+          title: t("Courier", "राइडर"),
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
             scale: 10,
@@ -320,6 +322,7 @@ export function TrackingMap({
     status,
     routePath,
     bottomInset,
+    t,
   ]);
 
   /**
@@ -361,7 +364,7 @@ export function TrackingMap({
     <div
       className={cn(
         "relative w-full overflow-hidden bg-surface-2",
-        className ?? "h-56"
+        className ?? "h-56",
       )}
     >
       <div ref={mapEl} className="h-full w-full" />
@@ -380,7 +383,10 @@ export function TrackingMap({
           style={{ bottom: bottomInset }}
           className="absolute inset-x-0 bg-surface/85 px-3 py-1.5 text-[11px] font-medium leading-snug text-muted"
         >
-          Road route unavailable — the line is direct, not along roads.
+          {t(
+            "Road route unavailable — the line is direct, not along roads.",
+            "सड़क का रास्ता नहीं मिला — यह सीधी लाइन है, सड़क के रास्ते नहीं।",
+          )}
         </p>
       ) : null}
     </div>
@@ -393,7 +399,7 @@ function fitBounds(
   destination: TrackPoint,
   rider: TrackPoint | null,
   routePath?: TrackPoint[] | null,
-  bottomInset = 0
+  bottomInset = 0,
 ) {
   const bounds = new google.maps.LatLngBounds();
   // An unpinned shop contributes nothing to the box — the destination and any
@@ -479,6 +485,7 @@ function TrackingMapFallback({
   className?: string;
   bottomInset?: number;
 }) {
+  const t = useT();
   const courier = showRider && rider ? rider : null;
   const place = placer([
     ...(restaurant ? [restaurant] : []),
@@ -495,7 +502,7 @@ function TrackingMapFallback({
     <div
       className={cn(
         "relative overflow-hidden bg-[linear-gradient(135deg,#e6f4ec,#eef1f2)]",
-        className ?? "h-56"
+        className ?? "h-56",
       )}
     >
       {/* The schematic is laid out in percentages, so it is confined to the
@@ -527,21 +534,21 @@ function TrackingMapFallback({
         </svg>
 
         {shop ? (
-          <Marker at={shop} label="Restaurant">
+          <Marker at={shop} label={t("Restaurant", "रेस्टोरेंट")}>
             <span className="grid size-7 place-items-center rounded-full bg-surface text-ink ring-4 ring-white/70">
               <Store className="size-3.5" />
             </span>
           </Marker>
         ) : null}
 
-        <Marker at={home} label="Your location">
+        <Marker at={home} label={t("Your location", "आपकी लोकेशन")}>
           <span className="grid size-7 place-items-center rounded-full bg-ink text-bg ring-4 ring-white/70">
             <span className="size-2 rounded-full bg-bg" />
           </span>
         </Marker>
 
         {bike ? (
-          <Marker at={bike} label="Courier">
+          <Marker at={bike} label={t("Courier", "राइडर")}>
             <span className="grid size-8 place-items-center rounded-full bg-accent text-[var(--on-accent)] ring-4 ring-white/70">
               <Bike className="size-4" />
             </span>
@@ -553,7 +560,10 @@ function TrackingMapFallback({
         style={{ bottom: bottomInset }}
         className="absolute inset-x-0 bg-surface/85 px-3 py-1.5 text-[11px] font-medium leading-snug text-muted"
       >
-        No map available — positions shown in a straight line, not along roads.
+        {t(
+          "No map available — positions shown in a straight line, not along roads.",
+          "मैप उपलब्ध नहीं है — जगहें सीधी लाइन में दिखाई गई हैं, सड़क के रास्ते नहीं।",
+        )}
       </p>
     </div>
   );

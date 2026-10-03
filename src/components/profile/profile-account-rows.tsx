@@ -4,9 +4,11 @@ import { useState } from "react";
 import { Phone, User } from "lucide-react";
 import type { ProfileSummary } from "@/lib/data-access/profile";
 import { ProfileEditSheet } from "@/components/profile/profile-edit-sheet";
+import { useT } from "@/components/providers/lang-provider";
 
 export function ProfileAccountRows({ summary }: { summary: ProfileSummary }) {
   const [editField, setEditField] = useState<"name" | "phone" | null>(null);
+  const t = useT();
 
   return (
     <div className="relative">
@@ -28,7 +30,7 @@ export function ProfileAccountRows({ summary }: { summary: ProfileSummary }) {
           <EditRow
             icon={<Phone className="size-[18px]" />}
             tone="bg-green/12 text-green"
-            value="Add phone number"
+            value={t("Add phone number", "फ़ोन नंबर जोड़ें")}
             muted
             onEdit={() => setEditField("phone")}
           />
@@ -64,6 +66,7 @@ function EditRow({
   onEdit: () => void;
   muted?: boolean;
 }) {
+  const t = useT();
   return (
     <button
       type="button"
@@ -82,7 +85,9 @@ function EditRow({
       >
         {value}
       </span>
-      <span className="text-sm font-bold text-accent-ink">Edit</span>
+      <span className="text-sm font-bold text-accent-ink">
+        {t("Edit", "बदलें")}
+      </span>
     </button>
   );
 }

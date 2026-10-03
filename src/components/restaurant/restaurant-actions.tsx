@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Heart, Loader2, Search, Share } from "lucide-react";
 import { useMenuSearch } from "@/stores/menu-search-store";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 /**
  * The three circular controls on the restaurant hero. They were decorative
@@ -28,6 +29,7 @@ export function RestaurantActions({
   signedIn: boolean;
 }) {
   const router = useRouter();
+  const t = useT();
   const [favorite, setFavorite] = useState(initialFavorite);
   const [busy, setBusy] = useState(false);
   const [shared, setShared] = useState(false);
@@ -42,11 +44,11 @@ export function RestaurantActions({
 
   useEffect(() => {
     if (!shared && !error) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       setShared(false);
       setError(null);
     }, 2200);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [shared, error]);
 
   async function toggleFavorite() {
@@ -67,13 +69,20 @@ export function RestaurantActions({
       });
       if (!res.ok) {
         setFavorite(!next); // roll back
-        setError(res.status === 401 ? "Sign in to save favourites." : "Couldn't save that.");
+        setError(
+          res.status === 401
+            ? t(
+                "Sign in to save favourites.",
+                "पसंदीदा सेव करने के लिए लॉग इन करें।",
+              )
+            : t("Couldn't save that.", "सेव नहीं हो पाया।"),
+        );
         return;
       }
       router.refresh(); // keep the Profile tab's count honest
     } catch {
       setFavorite(!next);
-      setError("Couldn't save that.");
+      setError(t("Couldn't save that.", "सेव नहीं हो पाया।"));
     } finally {
       setBusy(false);
     }
@@ -97,7 +106,7 @@ export function RestaurantActions({
       await navigator.clipboard.writeText(url);
       setShared(true);
     } catch {
-      setError("Couldn't copy the link.");
+      setError(t("Couldn't copy the link.", "लिंक कॉपी नहीं हो पाया।"));
     }
   }
 
@@ -109,33 +118,49 @@ export function RestaurantActions({
           onClick={toggleFavorite}
           disabled={busy}
           aria-pressed={favorite}
-          aria-label={favorite ? `Remove ${name} from favourites` : `Save ${name} to favourites`}
+          aria-label={
+            favorite
+              ? t(
+                  `Remove ${name} from favourites`,
+                  `${name} को पसंदीदा से हटाएं`,
+                )
+              : t(
+                  `Save ${name} to favourites`,
+                  `${name} को पसंदीदा में सेव करें`,
+                )
+          }
           className="press grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
         >
           {busy ? (
             <Loader2 className="size-5 animate-spin" />
           ) : (
-            <Heart className={cn("size-5", favorite && "fill-deal text-deal")} />
+            <Heart
+              className={cn("size-5", favorite && "fill-deal text-deal")}
+            />
           )}
         </button>
 
         <button
           type="button"
           onClick={share}
-          aria-label={`Share ${name}`}
+          aria-label={t(`Share ${name}`, `${name} शेयर करें`)}
           className="press grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
         >
-          {shared ? <Check className="size-5 text-green" /> : <Share className="size-5" />}
+          {shared ? (
+            <Check className="size-5 text-green" />
+          ) : (
+            <Share className="size-5" />
+          )}
         </button>
 
         <button
           type="button"
           onClick={toggleSearch}
           aria-pressed={searchOpen}
-          aria-label="Search this menu"
+          aria-label={t("Search this menu", "इस मेन्यू में खोजें")}
           className={cn(
             "press grid size-10 place-items-center rounded-full shadow-[var(--shadow-md)]",
-            searchOpen ? "bg-ink text-bg" : "bg-surface text-ink"
+            searchOpen ? "bg-ink text-bg" : "bg-surface text-ink",
           )}
         >
           <Search className="size-5" />
@@ -147,7 +172,7 @@ export function RestaurantActions({
           role="status"
           className="rounded-full bg-ink/85 px-3 py-1 text-[12px] font-semibold text-bg"
         >
-          {error ?? "Link copied"}
+          {error ?? t("Link copied", "लिंक कॉपी हो गया")}
         </span>
       ) : null}
     </div>

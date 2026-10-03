@@ -6,8 +6,15 @@ import { MapPicker } from "@/components/location/map-picker";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 import type { AddressInput } from "@/hooks/use-saved-addresses";
+import { useLang } from "@/components/providers/lang-provider";
+import { pick, type Bi } from "@/lib/i18n/lang";
 
-const LABELS = ["Home", "Work", "Other"] as const;
+// `value` is what gets saved (and what operators read); `text` is the chip.
+const LABELS: { value: string; text: Bi }[] = [
+  { value: "Home", text: { en: "Home", hi: "घर" } },
+  { value: "Work", text: { en: "Work", hi: "काम" } },
+  { value: "Other", text: { en: "Other", hi: "अन्य" } },
+];
 
 export function AddAddressForm({
   onSave,
@@ -18,17 +25,18 @@ export function AddAddressForm({
   onCancel?: () => void;
   compact?: boolean;
 }) {
+  const { lang, t } = useLang();
   const [label, setLabel] = useState<string>("Home");
   const [line, setLine] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
-    null
+    null,
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit() {
     if (line.trim().length < 6) {
-      setError("Enter a complete street address.");
+      setError(t("Enter a complete street address.", "पूरा पता लिखें।"));
       return;
     }
     setError(null);
@@ -41,7 +49,12 @@ export function AddAddressForm({
         lng: coords?.lng ?? null,
       });
     } catch {
-      setError("Could not save address. Try again.");
+      setError(
+        t(
+          "Could not save address. Try again.",
+          "पता सेव नहीं हो पाया। फिर से कोशिश करें।",
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -61,17 +74,17 @@ export function AddAddressForm({
       <div className="flex flex-wrap gap-2">
         {LABELS.map((l) => (
           <button
-            key={l}
+            key={l.value}
             type="button"
-            onClick={() => setLabel(l)}
+            onClick={() => setLabel(l.value)}
             className={cn(
               "press rounded-full border px-3 py-1.5 text-xs font-semibold",
-              label === l
+              label === l.value
                 ? "border-accent bg-accent-soft text-accent-ink"
-                : "border-line text-muted"
+                : "border-line text-muted",
             )}
           >
-            {l}
+            {pick(lang, l.text)}
           </button>
         ))}
       </div>
@@ -80,7 +93,10 @@ export function AddAddressForm({
         value={line}
         onChange={(e) => setLine(e.target.value)}
         rows={2}
-        placeholder="Flat / house no, street, area, city, pincode"
+        placeholder={t(
+          "Flat / house no, street, area, city, pincode",
+          "मकान नंबर, गली, मोहल्ला, शहर, पिनकोड",
+        )}
         className="w-full resize-none rounded-xl bg-surface-2 px-3.5 py-3 text-[15px] outline-none placeholder:text-muted focus:ring-2 focus:ring-accent/30"
       />
 
@@ -92,7 +108,11 @@ export function AddAddressForm({
           disabled={busy || line.trim().length < 6}
           onClick={handleSubmit}
         >
-          {busy ? <Loader2 className="size-4 animate-spin" /> : "Save address"}
+          {busy ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            t("Save address", "पता सेव करें")
+          )}
         </Button>
         {onCancel ? (
           <button
@@ -100,7 +120,7 @@ export function AddAddressForm({
             onClick={onCancel}
             className="press px-3 text-sm font-semibold text-muted"
           >
-            Cancel
+            {t("Cancel", "रद्द करें")}
           </button>
         ) : null}
       </div>

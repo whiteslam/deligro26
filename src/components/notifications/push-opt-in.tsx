@@ -5,6 +5,7 @@ import { useIsClient } from "@/lib/pwa/use-is-client";
 import { Bell, BellOff, BellRing } from "lucide-react";
 import { requestPushOptIn } from "@/components/notifications/onesignal-init";
 import { pushSupport } from "@/lib/native/bridge";
+import { useT } from "@/components/providers/lang-provider";
 
 /**
  * The notification opt-in control.
@@ -21,7 +22,8 @@ import { pushSupport } from "@/lib/native/bridge";
 
 const APP_ID = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID ?? "";
 
-type Permission = "default" | "granted" | "denied" | "unsupported" | "native" | "native-asked";
+type Permission =
+  "default" | "granted" | "denied" | "unsupported" | "native" | "native-asked";
 
 function currentPermission(): Permission {
   // Inside the Android app the WebView has no window.Notification; the
@@ -40,6 +42,7 @@ export function PushOptIn() {
   const [permission, setPermission] = useState<Permission>(currentPermission);
   const isClient = useIsClient();
   const [busy, setBusy] = useState(false);
+  const t = useT();
 
   const enable = useCallback(async () => {
     if (pushSupport() === "native") {
@@ -74,8 +77,14 @@ export function PushOptIn() {
     return (
       <Row
         icon={<BellOff className="size-4" aria-hidden="true" />}
-        title="Not supported on this browser"
-        description="Order updates will still appear on the Orders screen whenever you open the app."
+        title={t(
+          "Not supported on this browser",
+          "इस ब्राउज़र में यह सुविधा नहीं है",
+        )}
+        description={t(
+          "Order updates will still appear on the Orders screen whenever you open the app.",
+          "ऐप खोलने पर ऑर्डर की जानकारी ऑर्डर वाले पेज पर फिर भी दिखेगी।",
+        )}
       />
     );
   }
@@ -84,8 +93,14 @@ export function PushOptIn() {
     return (
       <Row
         icon={<BellRing className="size-4 text-green" aria-hidden="true" />}
-        title="Allow notifications in the prompt"
-        description="If nothing appeared, turn them on in Android Settings → Apps → Deligro → Notifications. / सेटिंग्स में नोटिफिकेशन चालू करें।"
+        title={t(
+          "Allow notifications in the prompt",
+          "पूछे जाने पर नोटिफ़िकेशन की अनुमति दें",
+        )}
+        description={t(
+          "If nothing appeared, turn them on in Android Settings → Apps → Deligro → Notifications.",
+          "अगर कुछ नहीं दिखा, तो फ़ोन की सेटिंग → ऐप्स → Deligro → नोटिफ़िकेशन में जाकर चालू करें।",
+        )}
       />
     );
   }
@@ -94,8 +109,11 @@ export function PushOptIn() {
     return (
       <Row
         icon={<BellRing className="size-4 text-green" aria-hidden="true" />}
-        title="Order updates are on"
-        description="We'll notify you when a shop accepts your order and when your rider is on the way. Turn them off in your browser or device settings."
+        title={t("Order updates are on", "ऑर्डर की सूचनाएं चालू हैं")}
+        description={t(
+          "We'll notify you when a shop accepts your order and when your rider is on the way. Turn them off in your browser or device settings.",
+          "दुकान के ऑर्डर लेने पर और राइडर के निकलने पर हम आपको बताएंगे। बंद करने के लिए ब्राउज़र या फ़ोन की सेटिंग में जाएं।",
+        )}
       />
     );
   }
@@ -104,8 +122,11 @@ export function PushOptIn() {
     return (
       <Row
         icon={<BellOff className="size-4" aria-hidden="true" />}
-        title="Notifications are blocked"
-        description="Your browser is blocking them for this site. You can allow them again from the padlock or site-settings menu in the address bar."
+        title={t("Notifications are blocked", "नोटिफ़िकेशन बंद हैं")}
+        description={t(
+          "Your browser is blocking them for this site. You can allow them again from the padlock or site-settings menu in the address bar.",
+          "आपका ब्राउज़र इस साइट के नोटिफ़िकेशन रोक रहा है। पता लिखने वाली जगह पर ताले के निशान या साइट सेटिंग से फिर चालू कर सकते हैं।",
+        )}
       />
     );
   }
@@ -118,11 +139,13 @@ export function PushOptIn() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold text-ink">
-            Get notified about your order
+            {t("Get notified about your order", "अपने ऑर्डर की सूचना पाएं")}
           </p>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">
-            One notification when the kitchen accepts, one when your rider sets
-            off, one on delivery. Nothing else — no offers, no marketing.
+            {t(
+              "One notification when the kitchen accepts, one when your rider sets off, one on delivery. Nothing else — no offers, no marketing.",
+              "एक सूचना जब रसोई ऑर्डर ले, एक जब राइडर निकले, और एक डिलीवरी पर। इसके अलावा कुछ नहीं — कोई ऑफ़र या विज्ञापन नहीं।",
+            )}
           </p>
           <button
             type="button"
@@ -130,7 +153,9 @@ export function PushOptIn() {
             disabled={busy}
             className="press mt-2.5 inline-flex rounded-lg bg-ink px-3 py-1.5 text-xs font-semibold text-[color:var(--surface)] disabled:opacity-50"
           >
-            {busy ? "Waiting…" : "Turn on notifications"}
+            {busy
+              ? t("Waiting…", "रुकिए…")
+              : t("Turn on notifications", "नोटिफ़िकेशन चालू करें")}
           </button>
         </div>
       </div>
@@ -152,7 +177,9 @@ function Row({
       <span className="mt-0.5 text-muted">{icon}</span>
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-semibold text-ink">{title}</p>
-        <p className="mt-0.5 text-xs leading-relaxed text-muted">{description}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted">
+          {description}
+        </p>
       </div>
     </div>
   );

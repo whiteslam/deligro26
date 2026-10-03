@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CloudOff, Wifi } from "lucide-react";
+import type { T } from "@/lib/i18n/lang";
 
 /**
  * The connection pill.
@@ -20,6 +21,7 @@ export function ConnectionStatus({
   online,
   slow,
   recoveredAt,
+  t,
 }: {
   online: boolean;
   slow: boolean;
@@ -27,6 +29,8 @@ export function ConnectionStatus({
    *  remounts this component on each one (see its `key`), which is what resets
    *  the timer below without a setState in an effect body. */
   recoveredAt: number;
+  /** From PwaProvider, which sits above the customer app's LangProvider. */
+  t: T;
 }) {
   const [showRecovered, setShowRecovered] = useState(recoveredAt > 0);
 
@@ -59,12 +63,14 @@ export function ConnectionStatus({
         {online ? (
           <>
             <Wifi className="size-3.5" aria-hidden="true" />
-            Back online
+            {t("Back online", "इंटरनेट वापस आ गया")}
           </>
         ) : (
           <>
             <CloudOff className="size-3.5" aria-hidden="true" />
-            {slow ? "Very weak connection" : "No connection"}
+            {slow
+              ? t("Very weak connection", "इंटरनेट बहुत कमज़ोर है")
+              : t("No connection", "इंटरनेट नहीं है")}
           </>
         )}
       </span>

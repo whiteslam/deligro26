@@ -4,6 +4,7 @@ import { TriangleAlert } from "lucide-react";
 import { useReorderReview } from "@/stores/reorder-review-store";
 import { useUI } from "@/stores/ui-store";
 import { formatINR } from "@/lib/utils/format";
+import { useT } from "@/components/providers/lang-provider";
 
 /**
  * "A few things changed since you last ordered this." Mounted once at
@@ -15,6 +16,7 @@ export function ReorderReviewDialog() {
   const confirm = useReorderReview((s) => s.confirm);
   const cancel = useReorderReview((s) => s.cancel);
   const openCart = useUI((s) => s.openCart);
+  const t = useT();
 
   if (!pending) return null;
 
@@ -29,7 +31,7 @@ export function ReorderReviewDialog() {
       className="absolute inset-0 z-[60]"
     >
       <button
-        aria-label="Cancel"
+        aria-label={t("Cancel", "रद्द करें")}
         onClick={cancel}
         className="animate-fade-in absolute inset-0 bg-ink/40"
       />
@@ -43,19 +45,23 @@ export function ReorderReviewDialog() {
             id="reorder-review-title"
             className="mt-3 text-[19px] font-extrabold leading-tight tracking-tight"
           >
-            A few things changed
+            {t("A few things changed", "कुछ चीज़ें बदल गई हैं")}
           </h2>
 
           <div className="mx-auto mt-2 max-w-[19rem] space-y-1.5 text-left text-sm leading-relaxed text-muted">
             {removed.map((name) => (
               <p key={`removed-${name}`}>
-                <span className="font-semibold text-ink">{name}</span> isn&apos;t
-                available right now — left out of your basket.
+                <span className="font-semibold text-ink">{name}</span>
+                {t(
+                  " isn't available right now — left out of your basket.",
+                  " अभी उपलब्ध नहीं है — इसे टोकरी में नहीं जोड़ा गया।",
+                )}
               </p>
             ))}
             {repriced.map((r) => (
               <p key={`repriced-${r.name}`}>
-                <span className="font-semibold text-ink">{r.name}</span> is now{" "}
+                <span className="font-semibold text-ink">{r.name}</span>
+                {t(" is now ", " अब ")}
                 {formatINR(r.newPrice)}{" "}
                 <span className="line-through">{formatINR(r.oldPrice)}</span>
               </p>
@@ -68,7 +74,7 @@ export function ReorderReviewDialog() {
               onClick={cancel}
               className="press h-12 flex-1 rounded-full border border-line bg-surface text-[15px] font-bold text-ink"
             >
-              Cancel
+              {t("Cancel", "रद्द करें")}
             </button>
             <button
               type="button"
@@ -79,7 +85,9 @@ export function ReorderReviewDialog() {
               }}
               className="press h-12 flex-1 rounded-full bg-accent text-[15px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:opacity-40"
             >
-              {nothingLeft ? "Nothing left to order" : "Continue"}
+              {nothingLeft
+                ? t("Nothing left to order", "ऑर्डर करने को कुछ नहीं बचा")
+                : t("Continue", "आगे बढ़ें")}
             </button>
           </div>
         </div>

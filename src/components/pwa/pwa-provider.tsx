@@ -2,15 +2,35 @@
 
 import { useEffect, useState } from "react";
 import { signOutPush } from "@/components/notifications/onesignal-init";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { PortalToShell } from "@/components/shared/portal-to-shell";
-import { clearAppCaches, registerServiceWorker } from "@/lib/pwa/service-worker";
+import {
+  clearAppCaches,
+  registerServiceWorker,
+} from "@/lib/pwa/service-worker";
 import { useIsClient } from "@/lib/pwa/use-is-client";
 import { useConnection } from "@/lib/pwa/use-connection";
 import { useInstall } from "@/lib/pwa/use-install";
 import { ConnectionStatus } from "@/components/pwa/connection-status";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { UpdateBanner } from "@/components/pwa/update-banner";
+import { LANG_COOKIE, parseLang, translator, type Lang } from "@/lib/i18n/lang";
+
+/**
+ * The customer app's routes. This provider sits in the root layout, above the
+ * customer LangProvider, so it reads the language cookie itself — and only on
+ * these paths: the operator consoles are not translated, and a customer's
+ * Hindi choice on a shared phone must not leak into them.
+ */
+const CUSTOMER_PATH =
+  /^\/(?:$|(?:checkout|location|orders|profile|restaurant|search|stores|login)(?:\/|$))/;
+
+function cookieLang(): Lang {
+  const match = document.cookie.match(
+    new RegExp(`(?:^|; )${LANG_COOKIE}=([^;]*)`),
+  );
+  return parseLang(match?.[1]);
+}
 
 /**
  * The one place the PWA layer is wired in. Mounted once from the root layout,
@@ -29,6 +49,7 @@ import { UpdateBanner } from "@/components/pwa/update-banner";
  */
 export function PwaProvider() {
   const router = useRouter();
+  const pathname = usePathname();
 
   const { online, slow, recoveredAt } = useConnection();
   const install = useInstall();
@@ -91,6 +112,7 @@ export function PwaProvider() {
   if (!isClient) return null;
 
   const showUpdate = registration !== null && !updateDismissed;
+  const t = translator(CUSTOMER_PATH.test(pathname) ? cookieLang() : "en");
 
   return (
     <PortalToShell>
@@ -102,12 +124,14 @@ export function PwaProvider() {
         online={online}
         slow={slow}
         recoveredAt={recoveredAt}
+        t={t}
       />
 
       {showUpdate ? (
         <UpdateBanner
           registration={registration}
           onDismiss={() => setUpdateDismissed(true)}
+          t={t}
         />
       ) : null}
 
@@ -119,6 +143,7 @@ export function PwaProvider() {
           manual={install.needsManualSteps}
           onInstall={() => void install.promptInstall()}
           onDismiss={install.dismiss}
+          t={t}
         />
       ) : null}
     </PortalToShell>

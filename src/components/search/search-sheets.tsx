@@ -4,6 +4,9 @@ import { Check, X } from "lucide-react";
 import { FOOD_CATEGORIES, type DishSort } from "@/lib/search/dishes";
 import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
+import { pick, type Bi, type Lang } from "@/lib/i18n/lang";
+import { categoryLabel } from "@/lib/taxonomy";
+import { useLang, useT } from "@/components/providers/lang-provider";
 
 /**
  * Where the search controls went.
@@ -34,45 +37,74 @@ export const BUDGET_PRICE = 200;
 
 /** The groups, in the order somebody narrows a food search. */
 const FILTER_GROUPS: {
-  heading: string;
-  options: { id: string; label: string }[];
+  heading: Bi;
+  options: { id: string; label: Bi }[];
 }[] = [
-  { heading: "Dietary", options: [{ id: "veg", label: "Pure Veg" }] },
   {
-    heading: "Price & speed",
+    heading: { en: "Dietary", hi: "खान-पान" },
+    options: [{ id: "veg", label: { en: "Pure Veg", hi: "शुद्ध शाकाहारी" } }],
+  },
+  {
+    heading: { en: "Price & speed", hi: "दाम और समय" },
     options: [
-      { id: "cheap", label: `Under ${formatINR(BUDGET_PRICE)}` },
-      { id: "fast", label: "Under 25 min" },
+      {
+        id: "cheap",
+        label: {
+          en: `Under ${formatINR(BUDGET_PRICE)}`,
+          hi: `${formatINR(BUDGET_PRICE)} से कम`,
+        },
+      },
+      { id: "fast", label: { en: "Under 25 min", hi: "25 मिनट से कम" } },
     ],
   },
   {
-    heading: "Worth a look",
+    heading: { en: "Worth a look", hi: "ज़रूर देखें" },
     options: [
-      { id: "popular", label: "Bestsellers" },
-      { id: "rating", label: "Rating 4.5+" },
-      { id: "offers", label: "Offers" },
+      {
+        id: "popular",
+        label: { en: "Bestsellers", hi: "सबसे ज़्यादा बिकने वाले" },
+      },
+      { id: "rating", label: { en: "Rating 4.5+", hi: "रेटिंग 4.5+" } },
+      { id: "offers", label: { en: "Offers", hi: "ऑफ़र" } },
     ],
   },
 ];
 
 /** Label for an id, for the removable tokens on the screen behind. */
-export function filterLabel(id: string): string {
+export function filterLabel(id: string, lang: Lang): string {
   for (const g of FILTER_GROUPS) {
     const hit = g.options.find((o) => o.id === id);
-    if (hit) return hit.label;
+    if (hit) return pick(lang, hit.label);
   }
   return id;
 }
 
-export const SORTS: { id: DishSort; label: string; hint: string }[] = [
-  { id: "relevance", label: "Best match", hint: "What fits your search" },
-  { id: "price", label: "Price", hint: "Cheapest first" },
-  { id: "eta", label: "Fastest", hint: "Shortest delivery time" },
-  { id: "rating", label: "Top rated", hint: "Best-reviewed kitchens" },
+export const SORTS: { id: DishSort; label: Bi; hint: Bi }[] = [
+  {
+    id: "relevance",
+    label: { en: "Best match", hi: "सबसे सही" },
+    hint: { en: "What fits your search", hi: "आपकी खोज से सबसे मेल खाते" },
+  },
+  {
+    id: "price",
+    label: { en: "Price", hi: "दाम" },
+    hint: { en: "Cheapest first", hi: "सबसे सस्ते पहले" },
+  },
+  {
+    id: "eta",
+    label: { en: "Fastest", hi: "सबसे जल्दी" },
+    hint: { en: "Shortest delivery time", hi: "सबसे कम डिलीवरी समय" },
+  },
+  {
+    id: "rating",
+    label: { en: "Top rated", hi: "सबसे अच्छी रेटिंग" },
+    hint: { en: "Best-reviewed kitchens", hi: "सबसे अच्छे रिव्यू वाली रसोई" },
+  },
 ];
 
-export function sortLabel(sort: DishSort): string {
-  return SORTS.find((s) => s.id === sort)?.label ?? "Best match";
+export function sortLabel(sort: DishSort, lang: Lang): string {
+  const hit = SORTS.find((s) => s.id === sort);
+  return hit ? pick(lang, hit.label) : pick(lang, SORTS[0].label);
 }
 
 /** The sheet chrome both of these share. `fixed`, so it covers the phone. */
@@ -89,11 +121,12 @@ function Sheet({
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
+  const t = useT();
   return (
     <div className="fixed inset-0 z-50">
       <button
         type="button"
-        aria-label="Close"
+        aria-label={t("Close", "बंद करें")}
         onClick={onClose}
         className="animate-fade-in absolute inset-0 bg-ink/40"
       />
@@ -109,7 +142,7 @@ function Sheet({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("Close", "बंद करें")}
             className="press grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
           >
             <X className="size-5" />
@@ -132,7 +165,7 @@ export function SearchFilterSheet({
   chips,
   category,
   resultCount,
-  resultNoun,
+  resultKind,
   onToggleChip,
   onSetCategory,
   onClearAll,
@@ -141,19 +174,31 @@ export function SearchFilterSheet({
   chips: Set<string>;
   category: string | null;
   resultCount: number;
-  /** "dish" / "restaurant" — whichever tab is open behind the sheet. */
-  resultNoun: string;
+  /** Whichever tab is open behind the sheet. */
+  resultKind: "dish" | "restaurant";
   onToggleChip: (id: string) => void;
   onSetCategory: (id: string | null) => void;
   onClearAll: () => void;
   onClose: () => void;
 }) {
+  const { lang, t } = useLang();
   const active = chips.size + (category ? 1 : 0);
+  const one = resultCount === 1;
+  const showLabel =
+    resultKind === "dish"
+      ? t(
+          `Show ${resultCount} ${one ? "dish" : "dishes"}`,
+          `${resultCount} व्यंजन दिखाएं`,
+        )
+      : t(
+          `Show ${resultCount} ${one ? "restaurant" : "restaurants"}`,
+          `${resultCount} रेस्टोरेंट दिखाएं`,
+        );
 
   return (
     <Sheet
-      label="Filter results"
-      title="Filters"
+      label={t("Filter results", "नतीजे छांटें")}
+      title={t("Filters", "फ़िल्टर")}
       onClose={onClose}
       footer={
         <div className="flex items-center gap-3">
@@ -163,7 +208,7 @@ export function SearchFilterSheet({
             disabled={active === 0}
             className="press shrink-0 rounded-full border border-line bg-surface px-4 py-3 text-sm font-bold text-ink disabled:opacity-40"
           >
-            Clear all
+            {t("Clear all", "सब हटाएं")}
           </button>
           <button
             type="button"
@@ -173,16 +218,15 @@ export function SearchFilterSheet({
             {/* The count is live, because the list behind this sheet is too.
                 It answers "will this leave me anything?" before the sheet is
                 even closed. */}
-            Show {resultCount}{" "}
-            {resultCount === 1 ? resultNoun : `${resultNoun}s`}
+            {showLabel}
           </button>
         </div>
       }
     >
       {FILTER_GROUPS.map((group) => (
-        <section key={group.heading} className="border-b border-line py-3.5">
+        <section key={group.heading.en} className="border-b border-line py-3.5">
           <h3 className="text-[12px] font-bold uppercase tracking-[0.08em] text-muted">
-            {group.heading}
+            {pick(lang, group.heading)}
           </h3>
           <div className="mt-2.5 flex flex-wrap gap-2">
             {group.options.map((o) => (
@@ -193,10 +237,10 @@ export function SearchFilterSheet({
                 aria-pressed={chips.has(o.id)}
                 className={cn(
                   "press bolt-chip",
-                  chips.has(o.id) && "bolt-chip-on"
+                  chips.has(o.id) && "bolt-chip-on",
                 )}
               >
-                {o.label}
+                {pick(lang, o.label)}
               </button>
             ))}
           </div>
@@ -205,11 +249,11 @@ export function SearchFilterSheet({
 
       <section className="py-3.5">
         <h3 className="flex items-baseline gap-2 text-[12px] font-bold uppercase tracking-[0.08em] text-muted">
-          Category
+          {t("Category", "श्रेणी")}
           {/* Said out loud, because the shape does not say it: every other
               control in this sheet is a toggle and this one is a choice. */}
           <span className="font-medium normal-case tracking-normal">
-            pick one
+            {t("pick one", "कोई एक चुनें")}
           </span>
         </h3>
         <div className="mt-2.5 flex flex-wrap gap-2 pb-2">
@@ -221,10 +265,10 @@ export function SearchFilterSheet({
               aria-pressed={category === c.id}
               className={cn(
                 "press bolt-chip",
-                category === c.id && "bolt-chip-on"
+                category === c.id && "bolt-chip-on",
               )}
             >
-              {c.label}
+              {categoryLabel(lang, c)}
             </button>
           ))}
         </div>
@@ -242,8 +286,13 @@ export function SearchSortSheet({
   onPick: (sort: DishSort) => void;
   onClose: () => void;
 }) {
+  const { lang, t } = useLang();
   return (
-    <Sheet label="Sort results" title="Sort by" onClose={onClose}>
+    <Sheet
+      label={t("Sort results", "नतीजों का क्रम")}
+      title={t("Sort by", "क्रम चुनें")}
+      onClose={onClose}
+    >
       <ul className="divide-y divide-line pb-3">
         {SORTS.map((s) => {
           const on = s.id === sort;
@@ -262,13 +311,13 @@ export function SearchSortSheet({
                   <span
                     className={cn(
                       "block text-[15px]",
-                      on ? "font-extrabold" : "font-semibold"
+                      on ? "font-extrabold" : "font-semibold",
                     )}
                   >
-                    {s.label}
+                    {pick(lang, s.label)}
                   </span>
                   <span className="mt-0.5 block text-[13px] text-muted">
-                    {s.hint}
+                    {pick(lang, s.hint)}
                   </span>
                 </span>
                 {on ? (

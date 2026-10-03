@@ -11,6 +11,8 @@ import {
 } from "@/lib/data-access/orders";
 import { recordDomain } from "@/lib/obs/emit";
 import { obsRequestContext } from "@/lib/obs/request";
+import { getLang } from "@/lib/i18n/server";
+import { translator } from "@/lib/i18n/lang";
 
 function mapCreateError(message: string) {
   // Coupon refusals are the customer's to act on — retry without the code, or
@@ -60,7 +62,7 @@ export async function GET() {
   if (!isSupabaseConfigured) {
     return NextResponse.json(
       { error: "backend_not_configured" },
-      { status: 503 }
+      { status: 503 },
     );
   }
 
@@ -76,7 +78,7 @@ export async function GET() {
   if (!limit.ok) {
     return NextResponse.json(
       { error: "rate_limited" },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
     );
   }
 
@@ -93,7 +95,7 @@ export async function POST(request: Request) {
   if (!isSupabaseConfigured) {
     return NextResponse.json(
       { error: "backend_not_configured" },
-      { status: 503 }
+      { status: 503 },
     );
   }
 
@@ -109,7 +111,7 @@ export async function POST(request: Request) {
   if (!limit.ok) {
     return NextResponse.json(
       { error: "rate_limited" },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
     );
   }
 
@@ -134,9 +136,12 @@ export async function POST(request: Request) {
   // that announces it. The webhook cannot carry this header, so it rejoins the
   // trace through `payments.provider_order_id`.
   const obs = { ...(await obsRequestContext()), actorId: user.id };
+  // The customer's language, for the refusal sentences returned below.
+  const lang = await getLang();
+  const t = translator(lang);
 
   try {
-    const order = await createOrder(body);
+    const order = await createOrder(body, lang);
     // The series `volume_drop` alerts on. Its absence is the signal — an
     // ordering platform that stops creating orders produces no errors at all,
     // which is why "nothing is wrong" and "nothing is happening" have to be
@@ -167,7 +172,7 @@ export async function POST(request: Request) {
       });
       return NextResponse.json(
         { error: err.reason, message: err.customerMessage },
-        { status: 400 }
+        { status: 400 },
       );
     }
     // Same shape, same reason: the maintenance message, the configured minimum
@@ -181,7 +186,7 @@ export async function POST(request: Request) {
       });
       return NextResponse.json(
         { error: err.reason, message: err.customerMessage },
-        { status: err.reason === "orders_paused" ? 503 : 400 }
+        { status: err.reason === "orders_paused" ? 503 : 400 },
       );
     }
     // Postgres 42501 is the row-level security refusal. It is not a server
@@ -203,15 +208,17 @@ export async function POST(request: Request) {
         "order.refused",
         "warn",
         "Order refused by row-level security — the account is not a customer",
-        { ...obs, attrs: { reason: "not_a_customer", code: "42501" } }
+        { ...obs, attrs: { reason: "not_a_customer", code: "42501" } },
       );
       return NextResponse.json(
         {
           error: "not_a_customer",
-          message:
+          message: t(
             "This account can't place orders. Sign in with your customer account and try again.",
+            "इस अकाउंट से ऑर्डर नहीं हो सकता। अपने ग्राहक अकाउंट से लॉगिन करके फिर कोशिश करें।",
+          ),
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
     const message = err instanceof Error ? err.message : "server_error";
@@ -228,14 +235,25 @@ export async function POST(request: Request) {
       // the only trace of WHY was a console line in a serverless log that
       // expires within the hour. The console.error stays for local development,
       // where it is the fastest signal; the telemetry is what survives.
-      console.error("[orders] order refused, unmapped:", JSON.stringify(err), err);
+      console.error(
+        "[orders] order refused, unmapped:",
+        JSON.stringify(err),
+        err,
+      );
       recordDomain(
         "order.created",
         "error",
         "Order creation failed with an unmapped error",
-        { ...obs, attrs: { reason: "unmapped", itemCount: body.lines.length }, error: err }
+        {
+          ...obs,
+          attrs: { reason: "unmapped", itemCount: body.lines.length },
+          error: err,
+        },
       );
     }
-    return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+    return NextResponse.json(
+      { error: mapped.error },
+      { status: mapped.status },
+    );
   }
 }

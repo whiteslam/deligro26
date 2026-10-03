@@ -1,5 +1,6 @@
 "use client";
 
+import type { Bi } from "@/lib/i18n/lang";
 import { create } from "zustand";
 import { reverseGeocode } from "@/lib/utils/geocode";
 import { PINNED_LOCATION } from "@/lib/location/pinned";
@@ -38,7 +39,8 @@ interface LocationState {
    * weeks-old measurement as a live one.
    */
   coordsAgeMs: number | null;
-  error: string | null;
+  /** In both languages; the screen picks the customer's. */
+  error: Bi | null;
   askOpen: boolean; // in-app permission explainer visibility
   blocked: boolean; // device/browser refused — only Settings can undo it
 
@@ -117,7 +119,10 @@ function saveCache(data: {
   coords: Coords | null;
 }) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, at: Date.now() }));
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ ...data, at: Date.now() }),
+    );
   } catch {}
 }
 
@@ -190,8 +195,14 @@ export const useLocation = create<LocationState>((set, get) => ({
         status: "unsupported",
         error:
           unavailable === "insecure"
-            ? "Location needs a secure (https) connection on this device."
-            : "This device can't share its location.",
+            ? {
+                en: "Location needs a secure (https) connection on this device.",
+                hi: "इस डिवाइस पर लोकेशन के लिए सुरक्षित (https) कनेक्शन चाहिए।",
+              }
+            : {
+                en: "This device can't share its location.",
+                hi: "यह डिवाइस अपनी लोकेशन नहीं बता सकता।",
+              },
       });
       return;
     }
@@ -211,7 +222,10 @@ export const useLocation = create<LocationState>((set, get) => ({
       set({
         status: "denied",
         blocked: true,
-        error: "Location is blocked for Deligro in your device settings.",
+        error: {
+          en: "Location is blocked for Deligro in your device settings.",
+          hi: "आपके फ़ोन की सेटिंग में Deligro के लिए लोकेशन बंद है।",
+        },
       });
       return;
     }
@@ -253,8 +267,14 @@ export const useLocation = create<LocationState>((set, get) => ({
         status: "unsupported",
         error:
           unavailable === "insecure"
-            ? "Location needs a secure (https) connection on this device."
-            : "This device can't share its location.",
+            ? {
+                en: "Location needs a secure (https) connection on this device.",
+                hi: "इस डिवाइस पर लोकेशन के लिए सुरक्षित (https) कनेक्शन चाहिए।",
+              }
+            : {
+                en: "This device can't share its location.",
+                hi: "यह डिवाइस अपनी लोकेशन नहीं बता सकता।",
+              },
       });
       return;
     }
@@ -313,7 +333,10 @@ export const useLocation = create<LocationState>((set, get) => ({
       if (!best) {
         set({
           status: "idle",
-          error: "Your device took too long to find you. Try again.",
+          error: {
+            en: "Your device took too long to find you. Try again.",
+            hi: "आपकी लोकेशन मिलने में बहुत देर लगी। फिर से कोशिश करें।",
+          },
         });
         return;
       }
@@ -328,8 +351,10 @@ export const useLocation = create<LocationState>((set, get) => ({
           // was a stale cached fix, a coarse reading is no reason to promote it
           // to "current".
           status: get().coords ? get().status : "idle",
-          error:
-            "We couldn't pinpoint you accurately. Pick your area for the right shops.",
+          error: {
+            en: "We couldn't pinpoint you accurately. Pick your area for the right shops.",
+            hi: "आपकी सही लोकेशन नहीं मिली। सही दुकानों के लिए अपना इलाका चुनें।",
+          },
         });
         return;
       }
@@ -361,10 +386,19 @@ export const useLocation = create<LocationState>((set, get) => ({
         // transient timeout shouldn't throw a sheet in the user's face.
         askOpen: denied,
         error: denied
-          ? "Location is blocked for Deligro, so your phone won't ask again. Turn it on with the steps below, or pick an address manually."
+          ? {
+              en: "Location is blocked for Deligro, so your phone won't ask again. Turn it on with the steps below, or pick an address manually.",
+              hi: "Deligro के लिए लोकेशन बंद है, इसलिए फ़ोन दोबारा नहीं पूछेगा। नीचे दिए तरीके से चालू करें, या खुद पता चुनें।",
+            }
           : timedOut
-            ? "Your device took too long to find you. Try again."
-            : "Couldn't get your location. Please try again.",
+            ? {
+                en: "Your device took too long to find you. Try again.",
+                hi: "आपकी लोकेशन मिलने में बहुत देर लगी। फिर से कोशिश करें।",
+              }
+            : {
+                en: "Couldn't get your location. Please try again.",
+                hi: "आपकी लोकेशन नहीं मिल पाई। कृपया फिर से कोशिश करें।",
+              },
       });
     };
 

@@ -17,6 +17,8 @@ import { useSavedAddresses } from "@/hooks/use-saved-addresses";
 import { isMapsConfigured } from "@/lib/maps/config";
 import { loadGoogleMaps } from "@/lib/maps/loader";
 import { locationSettingsSteps } from "@/lib/location/permission-help";
+import { useLang } from "@/components/providers/lang-provider";
+import { pick } from "@/lib/i18n/lang";
 
 /**
  * Delivery-location picker.
@@ -31,6 +33,7 @@ import { locationSettingsSteps } from "@/lib/location/permission-help";
  */
 export default function LocationPage() {
   const router = useRouter();
+  const { lang, t } = useLang();
 
   const status = useLocation((s) => s.status);
   const label = useLocation((s) => s.label);
@@ -62,7 +65,10 @@ export default function LocationPage() {
           const loc = place.geometry?.location;
           if (!loc) return;
           setPlace({
-            label: place.name ?? place.formatted_address ?? "Selected location",
+            label:
+              place.name ??
+              place.formatted_address ??
+              t("Selected location", "चुनी गई जगह"),
             sublabel: place.formatted_address ?? null,
             coords: { lat: loc.lat(), lng: loc.lng() },
           });
@@ -76,12 +82,13 @@ export default function LocationPage() {
     return () => {
       cancelled = true;
     };
-  }, [router, setPlace]);
+  }, [router, setPlace, t]);
 
   // Leave as soon as the device gives us a fix.
   const detectedRef = useRef(status);
   useEffect(() => {
-    if (detectedRef.current === "loading" && status === "granted") router.back();
+    if (detectedRef.current === "loading" && status === "granted")
+      router.back();
     detectedRef.current = status;
   }, [status, router]);
 
@@ -107,13 +114,13 @@ export default function LocationPage() {
         <button
           type="button"
           onClick={() => router.back()}
-          aria-label="Back"
+          aria-label={t("Back", "वापस")}
           className="press grid size-10 shrink-0 place-items-center rounded-full bg-surface-2 text-ink"
         >
           <ChevronLeft className="size-5" />
         </button>
         <h1 className="min-w-0 flex-1 text-[17px] font-extrabold tracking-tight">
-          Delivery location
+          {t("Delivery location", "डिलीवरी की जगह")}
         </h1>
       </header>
 
@@ -123,8 +130,14 @@ export default function LocationPage() {
           <input
             ref={searchEl}
             type="search"
-            placeholder="Search for an area, street or landmark"
-            aria-label="Search for a delivery location"
+            placeholder={t(
+              "Search for an area, street or landmark",
+              "मोहल्ला, गली या पास की जगह खोजें",
+            )}
+            aria-label={t(
+              "Search for a delivery location",
+              "डिलीवरी की जगह खोजें",
+            )}
           />
         </div>
 
@@ -144,12 +157,14 @@ export default function LocationPage() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[15px] font-bold text-accent-ink">
-                {detecting ? "Locating…" : "Use my current location"}
+                {detecting
+                  ? t("Locating…", "लोकेशन ढूंढ रहे हैं…")
+                  : t("Use my current location", "मेरी अभी की लोकेशन लें")}
               </span>
               <span className="mt-0.5 block truncate text-[13px] text-muted">
                 {status === "granted" && label
                   ? label
-                  : "Detected from your device"}
+                  : t("Detected from your device", "आपके फ़ोन से पता चलेगी")}
               </span>
             </span>
           </button>
@@ -161,7 +176,9 @@ export default function LocationPage() {
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-ink">
               <Plus className="size-5" />
             </span>
-            <span className="text-[15px] font-bold">Add a new address</span>
+            <span className="text-[15px] font-bold">
+              {t("Add a new address", "नया पता जोड़ें")}
+            </span>
           </Link>
         </div>
 
@@ -180,9 +197,12 @@ export default function LocationPage() {
             >
               <RotateCw className="mt-0.5 size-4 shrink-0" />
               <span>
-                {error}
+                {pick(lang, error)}
                 <span className="mt-1 block text-[13px] font-bold underline">
-                  Tap here to try again
+                  {t(
+                    "Tap here to try again",
+                    "फिर से कोशिश करने के लिए यहां दबाएं",
+                  )}
                 </span>
               </span>
             </button>
@@ -190,10 +210,10 @@ export default function LocationPage() {
             {blocked ? (
               <div className="mt-3 border-t border-line pt-3">
                 <p className="text-[13px] font-bold text-ink">
-                  How to turn location on:
+                  {t("How to turn location on:", "लोकेशन कैसे चालू करें:")}
                 </p>
                 <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-[13px] leading-snug text-ink">
-                  {locationSettingsSteps().map((step) => (
+                  {locationSettingsSteps(lang).map((step) => (
                     <li key={step}>{step}</li>
                   ))}
                 </ol>
@@ -202,7 +222,7 @@ export default function LocationPage() {
                   onClick={() => window.location.reload()}
                   className="press mt-3 w-full rounded-full border border-accent py-2 text-[14px] font-bold text-accent-ink"
                 >
-                  Reload page
+                  {t("Reload page", "पेज फिर से खोलें")}
                 </button>
               </div>
             ) : null}
@@ -210,16 +230,20 @@ export default function LocationPage() {
         ) : null}
 
         <h2 className="pb-1 pt-6 text-[13px] font-bold uppercase tracking-[0.08em] text-muted">
-          Saved addresses
+          {t("Saved addresses", "सेव पते")}
         </h2>
 
         {loading ? (
           <p className="flex items-center gap-2 py-6 text-sm text-muted">
-            <LoaderCircle className="size-4 animate-spin" /> Loading addresses…
+            <LoaderCircle className="size-4 animate-spin" />{" "}
+            {t("Loading addresses…", "पते लोड हो रहे हैं…")}
           </p>
         ) : addresses.length === 0 ? (
           <p className="py-6 text-sm text-muted">
-            Nothing saved yet. Add an address and it&rsquo;ll show up here.
+            {t(
+              "Nothing saved yet. Add an address and it’ll show up here.",
+              "अभी कोई पता सेव नहीं है। पता जोड़ें, वह यहां दिखेगा।",
+            )}
           </p>
         ) : (
           <ul className="divide-y divide-line">
@@ -244,7 +268,7 @@ export default function LocationPage() {
                       {a.label}
                       {a.isDefault ? (
                         <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-muted">
-                          Default
+                          {t("Default", "डिफ़ॉल्ट")}
                         </span>
                       ) : null}
                     </span>

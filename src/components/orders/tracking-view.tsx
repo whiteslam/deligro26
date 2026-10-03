@@ -45,10 +45,12 @@ import { DEFAULT_CENTER } from "@/lib/maps/config";
 // phone call end up disagreeing about what counts as a dialable number.
 import { callablePhone } from "@/lib/utils/phone";
 import { cn } from "@/lib/utils/cn";
+import type { T } from "@/lib/i18n/lang";
+import { useLang } from "@/components/providers/lang-provider";
 
 /** "1 minute" / "12 minutes" — the lateness line reads as a sentence. */
-function minutesLabel(n: number): string {
-  return `${n} minute${n === 1 ? "" : "s"}`;
+function minutesLabel(n: number, t: T): string {
+  return t(`${n} minute${n === 1 ? "" : "s"}`, `${n} मिनट`);
 }
 
 /**
@@ -60,15 +62,19 @@ function minutesLabel(n: number): string {
  * online payment had failed that the bill was settled the moment it was marked
  * delivered.
  */
-function totalLabel(order: UiOrder, delivered: boolean): string {
-  if (order.paymentStatus === "refunded") return "Total refunded";
-  if (isOrderPaid(order)) return "Total paid";
+function totalLabel(order: UiOrder, delivered: boolean, t: T): string {
+  if (order.paymentStatus === "refunded")
+    return t("Total refunded", "कुल रकम वापस की गई");
+  if (isOrderPaid(order)) return t("Total paid", "कुल भुगतान हो गया");
   // Online and not marked paid means the money has not landed, whatever the
   // delivery state claims — only a verified signature moves `payment_status`.
-  if (order.paymentMethod === "online") return "Total (online, unpaid)";
+  if (order.paymentMethod === "online")
+    return t("Total (online, unpaid)", "कुल (ऑनलाइन, भुगतान बाकी)");
   // Cash, or a database before 0025 where cash was the only option. Handed over
   // at the door, so it is owed until the order is delivered and settled after.
-  return delivered ? "Total paid (Cash)" : "Total (Cash)";
+  return delivered
+    ? t("Total paid (Cash)", "कुल भुगतान हो गया (नकद)")
+    : t("Total (Cash)", "कुल (नकद)");
 }
 
 export function TrackingView({
@@ -85,6 +91,7 @@ export function TrackingView({
   initialEta?: OrderEta | null;
 }) {
   const router = useRouter();
+  const { lang, t } = useLang();
   const params = useSearchParams();
   const justPlaced = params.get("placed") === "1";
   const [toast, setToast] = useState(justPlaced);
@@ -113,10 +120,13 @@ export function TrackingView({
   const displayStatus = isUuid ? live.status : order.status;
   const displayRider = isUuid ? (live.rider ?? order.rider) : order.rider;
 
-  const steps = trackingSteps({
-    restaurantName: order.restaurantName,
-    riderName: displayRider?.name,
-  });
+  const steps = trackingSteps(
+    {
+      restaurantName: order.restaurantName,
+      riderName: displayRider?.name,
+    },
+    lang,
+  );
   const current = statusIndex(displayStatus);
   const delivered = displayStatus === "DELIVERED";
   const cancelled = displayStatus === "CANCELLED";
@@ -158,7 +168,7 @@ export function TrackingView({
       lat: DEFAULT_CENTER.lat + 0.012,
       lng: DEFAULT_CENTER.lng - 0.008,
     }),
-    []
+    [],
   );
   const mockDestination = DEFAULT_CENTER;
 
@@ -201,8 +211,8 @@ export function TrackingView({
 
   useEffect(() => {
     if (!justPlaced) return;
-    const t = window.setTimeout(() => setToast(false), 2600);
-    return () => window.clearTimeout(t);
+    const timer = window.setTimeout(() => setToast(false), 2600);
+    return () => window.clearTimeout(timer);
   }, [justPlaced]);
 
   async function cancelOrder() {
@@ -219,8 +229,14 @@ export function TrackingView({
         const data = await res.json().catch(() => ({}));
         setCancelMsg(
           data.error === "too_late"
-            ? "The kitchen already started — can't cancel now."
-            : "Could not cancel. Try again."
+            ? t(
+                "The kitchen already started — can't cancel now.",
+                "किचन में खाना बनना शुरू हो गया है — अब कैंसिल नहीं हो सकता।",
+              )
+            : t(
+                "Could not cancel. Try again.",
+                "कैंसिल नहीं हो पाया। फिर कोशिश करें।",
+              ),
         );
       }
     } finally {
@@ -293,21 +309,21 @@ export function TrackingView({
   const initialSnap = delivered || cancelled ? 0 : SHEET_DEFAULT_SNAP;
 
   const headline = delivered
-    ? "Delivered"
+    ? t("Delivered", "डिलीवर हो गया")
     : cancelled
-      ? "Cancelled"
+      ? t("Cancelled", "कैंसिल हो गया")
       : estimateUnmeasured
-        ? "Not available"
+        ? t("Not available", "पता नहीं")
         : minutesRemaining !== null
           ? minutesRemaining > 0
-            ? `${minutesRemaining} min`
-            : "Arriving now"
+            ? t(`${minutesRemaining} min`, `${minutesRemaining} मिनट`)
+            : t("Arriving now", "बस पहुँच रहा है")
           : order.etaMinutes
-            ? `~${order.etaMinutes} min`
-            : "Arriving";
+            ? t(`~${order.etaMinutes} min`, `~${order.etaMinutes} मिनट`)
+            : t("Arriving", "आ रहा है");
 
   const showLateness = !delivered && !cancelled && Boolean(eta?.late);
-  const cancelNote = cancelled ? cancellationNote(order) : null;
+  const cancelNote = cancelled ? cancellationNote(order, lang) : null;
 
   return (
     /*
@@ -330,12 +346,17 @@ export function TrackingView({
           <span className="grid size-6 place-items-center rounded-full bg-green text-[var(--on-green)]">
             <Check className="size-4" strokeWidth={3} />
           </span>
-          <span className="text-sm font-bold">Order placed</span>
+          <span className="text-sm font-bold">
+            {t("Order placed", "ऑर्डर हो गया")}
+          </span>
         </div>
       ) : null}
 
       <PageHeader
-        title={`Order ${shortOrderId(order.id)}`}
+        title={t(
+          `Order ${shortOrderId(order.id)}`,
+          `ऑर्डर ${shortOrderId(order.id)}`,
+        )}
         subtitle={order.restaurantName}
         className="shrink-0"
       />
@@ -384,7 +405,7 @@ export function TrackingView({
               <div className="flex items-center justify-between gap-3 border-b border-line px-4 pb-2.5 pt-0.5">
                 <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-muted">
                   <ShieldCheck className="size-3.5 shrink-0" />
-                  Delivery code
+                  {t("Delivery code", "डिलीवरी कोड")}
                 </span>
                 <span className="text-data shrink-0 text-[22px] font-extrabold leading-none tracking-[0.22em] text-ink">
                   {deliveryOtp}
@@ -405,20 +426,26 @@ export function TrackingView({
                 <span>
                   {live.health.unauthorized ? (
                     <>
-                      You&apos;ve been signed out, so this has stopped updating.{" "}
+                      {t(
+                        "You've been signed out, so this has stopped updating.",
+                        "आप लॉग आउट हो गए हैं, इसलिए अपडेट रुक गए हैं।",
+                      )}{" "}
                       <Link href="/login" className="underline">
-                        Sign in
+                        {t("Sign in", "लॉग इन करें")}
                       </Link>{" "}
-                      to see live progress.
+                      {t("to see live progress.", "ताकि लाइव जानकारी दिखे।")}
                     </>
                   ) : (
                     <>
-                      Not updating right now — showing the last status we
-                      received
                       {live.health.ageMs !== null
-                        ? `, about ${Math.max(1, Math.round(live.health.ageMs / 60000))} min ago`
-                        : ""}
-                      . We&apos;ll reconnect automatically.
+                        ? t(
+                            `Not updating right now — showing the last status we received, about ${Math.max(1, Math.round(live.health.ageMs / 60000))} min ago. We'll reconnect automatically.`,
+                            `अभी अपडेट नहीं हो रहा — लगभग ${Math.max(1, Math.round(live.health.ageMs / 60000))} मिनट पहले मिली आखिरी जानकारी दिखा रहे हैं। हम अपने आप फिर से जुड़ जाएँगे।`,
+                          )
+                        : t(
+                            "Not updating right now — showing the last status we received. We'll reconnect automatically.",
+                            "अभी अपडेट नहीं हो रहा — आखिरी मिली जानकारी दिखा रहे हैं। हम अपने आप फिर से जुड़ जाएँगे।",
+                          )}
                     </>
                   )}
                 </span>
@@ -428,18 +455,21 @@ export function TrackingView({
             <div className="text-center">
               <p className="text-sm text-muted">
                 {delivered
-                  ? "Your order was delivered"
+                  ? t("Your order was delivered", "आपका ऑर्डर डिलीवर हो गया")
                   : cancelled
-                    ? "This order was cancelled"
+                    ? t("This order was cancelled", "यह ऑर्डर कैंसिल हो गया")
                     : estimateUnmeasured
-                      ? "Delivery time"
-                      : "Estimated time of delivery"}
+                      ? t("Delivery time", "डिलीवरी का समय")
+                      : t(
+                          "Estimated time of delivery",
+                          "डिलीवरी का अनुमानित समय",
+                        )}
               </p>
               <p
                 className={cn(
                   "text-[40px] font-extrabold leading-none tracking-tight",
                   delivered && "text-green",
-                  cancelled && "text-deal"
+                  cancelled && "text-deal",
                 )}
               >
                 {headline}
@@ -453,8 +483,14 @@ export function TrackingView({
               {roadRoute && !delivered && !cancelled ? (
                 <p className="text-xs font-medium text-muted">
                   {roadRoute.km < 1
-                    ? `${Math.round(roadRoute.km * 1000)} m by road`
-                    : `${roadRoute.km.toFixed(1)} km by road`}
+                    ? t(
+                        `${Math.round(roadRoute.km * 1000)} m by road`,
+                        `सड़क से ${Math.round(roadRoute.km * 1000)} मीटर`,
+                      )
+                    : t(
+                        `${roadRoute.km.toFixed(1)} km by road`,
+                        `सड़क से ${roadRoute.km.toFixed(1)} किमी`,
+                      )}
                 </p>
               ) : null}
 
@@ -466,8 +502,14 @@ export function TrackingView({
               {estimateUnmeasured && !delivered && !cancelled ? (
                 <p className="mx-auto mt-1 max-w-[34ch] text-xs font-medium leading-snug text-muted">
                   {order.restaurantName
-                    ? `${order.restaurantName} hasn't set its location yet, so we can't work out how long the trip takes.`
-                    : "This shop hasn't set its location yet, so we can't work out how long the trip takes."}
+                    ? t(
+                        `${order.restaurantName} hasn't set its location yet, so we can't work out how long the trip takes.`,
+                        `${order.restaurantName} ने अभी अपनी लोकेशन नहीं डाली है, इसलिए हम नहीं बता सकते कि पहुँचने में कितना समय लगेगा।`,
+                      )
+                    : t(
+                        "This shop hasn't set its location yet, so we can't work out how long the trip takes.",
+                        "इस दुकान ने अभी अपनी लोकेशन नहीं डाली है, इसलिए हम नहीं बता सकते कि पहुँचने में कितना समय लगेगा।",
+                      )}
                 </p>
               ) : null}
             </div>
@@ -479,8 +521,14 @@ export function TrackingView({
               <p className="flex items-center justify-center gap-2 rounded-2xl bg-deal-soft px-3 py-2.5 text-center text-sm font-bold text-deal">
                 <Clock className="size-4 shrink-0" />
                 {eta.lateByMinutes >= CUSTOMER_LATE_CAP_MINUTES
-                  ? "This order is delayed. Our team is on it — contact support if you need help. / ऑर्डर में देरी है, हमारी टीम देख रही है।"
-                  : `Running about ${minutesLabel(eta.lateByMinutes)} late / लगभग ${minutesLabel(eta.lateByMinutes)} देर`}
+                  ? t(
+                      "This order is delayed. Our team is on it — contact support if you need help.",
+                      "ऑर्डर में देरी है, हमारी टीम देख रही है — मदद चाहिए तो सपोर्ट से बात करें।",
+                    )
+                  : t(
+                      `Running about ${minutesLabel(eta.lateByMinutes, t)} late`,
+                      `लगभग ${minutesLabel(eta.lateByMinutes, t)} की देरी`,
+                    )}
               </p>
             ) : null}
 
@@ -488,8 +536,11 @@ export function TrackingView({
               <div className="rounded-2xl bg-green-soft p-5 text-center">
                 <p className="text-[15px] font-bold">
                   {rated
-                    ? "Thanks for rating!"
-                    : "Hope it was delicious. How was it?"}
+                    ? t("Thanks for rating!", "रेटिंग देने के लिए धन्यवाद!")
+                    : t(
+                        "Hope it was delicious. How was it?",
+                        "उम्मीद है खाना अच्छा लगा। कैसा था?",
+                      )}
                 </p>
                 <div className="mt-3 flex justify-center gap-2">
                   {[1, 2, 3, 4, 5].map((n) => (
@@ -497,13 +548,16 @@ export function TrackingView({
                       key={n}
                       disabled={rateBusy || rated || !isUuid}
                       onClick={() => submitRating(n)}
-                      aria-label={`Rate ${n} star${n > 1 ? "s" : ""}`}
+                      aria-label={t(
+                        `Rate ${n} star${n > 1 ? "s" : ""}`,
+                        `${n} स्टार दें`,
+                      )}
                       className="press grid size-11 place-items-center rounded-full bg-surface disabled:opacity-100"
                     >
                       <Star
                         className={cn(
                           "size-5",
-                          n <= rating ? "fill-pop text-pop" : "text-muted"
+                          n <= rating ? "fill-pop text-pop" : "text-muted",
                         )}
                       />
                     </button>
@@ -541,7 +595,7 @@ export function TrackingView({
                             done &&
                               "border-green bg-green text-[var(--on-green)]",
                             active && "border-green bg-surface",
-                            !done && !active && "border-line bg-surface"
+                            !done && !active && "border-line bg-surface",
                           )}
                         >
                           {done ? (
@@ -554,7 +608,7 @@ export function TrackingView({
                           <span
                             className={cn(
                               "my-1 w-0.5 flex-1 rounded-full",
-                              done ? "bg-green" : "bg-line"
+                              done ? "bg-green" : "bg-line",
                             )}
                             style={{ minHeight: 26 }}
                           />
@@ -564,7 +618,7 @@ export function TrackingView({
                         <p
                           className={cn(
                             "text-[15px] font-bold leading-tight",
-                            !done && !active && "text-muted"
+                            !done && !active && "text-muted",
                           )}
                         >
                           {step.title}
@@ -588,8 +642,10 @@ export function TrackingView({
               <p className="flex items-start gap-2 rounded-2xl bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-muted">
                 <Navigation className="mt-0.5 size-3.5 shrink-0" />
                 <span>
-                  The courier pin is an estimate along the route — this rider
-                  isn&apos;t sharing a live location.
+                  {t(
+                    "The courier pin is an estimate along the route — this rider isn't sharing a live location.",
+                    "राइडर का निशान रास्ते के हिसाब से अंदाज़ा है — यह राइडर अपनी लाइव लोकेशन शेयर नहीं कर रहा।",
+                  )}
                 </span>
               </p>
             ) : null}
@@ -606,10 +662,11 @@ export function TrackingView({
               <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-[var(--shadow-md)]">
                 <div className="flex items-center justify-between gap-2 bg-ink px-4 py-1.5">
                   <span className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[color:var(--surface)]">
-                    Deligro rider
+                    {t("Deligro rider", "Deligro राइडर")}
                   </span>
                   <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[color:var(--surface)]/70">
-                    <ShieldCheck className="size-3" /> Verified
+                    <ShieldCheck className="size-3" />{" "}
+                    {t("Verified", "सत्यापित")}
                   </span>
                 </div>
 
@@ -628,7 +685,7 @@ export function TrackingView({
                     rather than a matter of trusting whoever turned up. */}
                     {displayRider.id ? (
                       <p className="text-data mt-0.5 text-[11px] font-bold tracking-[0.12em] text-muted">
-                        ID {displayRider.id}
+                        {t("ID", "आईडी")} {displayRider.id}
                       </p>
                     ) : null}
                     {/* Only shown when we actually know it. Every rider used to be
@@ -647,7 +704,10 @@ export function TrackingView({
                       </p>
                     ) : (
                       <p className="mt-1 text-xs text-muted">
-                        Bringing your order to the door
+                        {t(
+                          "Bringing your order to the door",
+                          "आपका ऑर्डर घर तक ला रहे हैं",
+                        )}
                       </p>
                     )}
                   </div>
@@ -662,25 +722,31 @@ export function TrackingView({
                   {riderTel ? (
                     <a
                       href={`tel:${riderTel}`}
-                      aria-label={`Call ${displayRider.name}`}
+                      aria-label={t(
+                        `Call ${displayRider.name}`,
+                        `${displayRider.name} को कॉल करें`,
+                      )}
                       className="press flex shrink-0 flex-col items-center gap-1 rounded-xl bg-accent px-3.5 py-2.5 text-[var(--on-accent)] shadow-[var(--glow-accent)]"
                     >
                       <Phone className="size-5" />
                       <span className="text-[11px] font-bold uppercase tracking-wider">
-                        Call
+                        {t("Call", "कॉल")}
                       </span>
                     </a>
                   ) : (
                     <button
                       type="button"
-                      aria-label="Call rider"
+                      aria-label={t("Call rider", "राइडर को कॉल करें")}
                       disabled
-                      title="No phone number recorded for this rider"
+                      title={t(
+                        "No phone number recorded for this rider",
+                        "इस राइडर का फ़ोन नंबर नहीं है",
+                      )}
                       className="press flex shrink-0 flex-col items-center gap-1 rounded-xl bg-accent px-3.5 py-2.5 text-[var(--on-accent)] opacity-50 shadow-[var(--glow-accent)]"
                     >
                       <Phone className="size-5" />
                       <span className="text-[11px] font-bold uppercase tracking-wider">
-                        Call
+                        {t("Call", "कॉल")}
                       </span>
                     </button>
                   )}
@@ -690,7 +756,7 @@ export function TrackingView({
 
             <div className="card p-4">
               <h2 className="mb-3 text-[17px] font-extrabold tracking-tight">
-                Order {shortOrderId(order.id)}
+                {t("Order", "ऑर्डर")} {shortOrderId(order.id)}
               </h2>
               <ul className="space-y-2 text-sm">
                 {order.lines.map((l) => (
@@ -706,7 +772,7 @@ export function TrackingView({
               </ul>
               <div className="mt-3 flex justify-between border-t border-line pt-3">
                 <span className="font-extrabold">
-                  {totalLabel(order, delivered)}
+                  {totalLabel(order, delivered, t)}
                 </span>
                 <span className="text-data text-base font-extrabold">
                   {formatINR(order.total)}
@@ -739,7 +805,7 @@ export function TrackingView({
                   ) : (
                     <XCircle className="size-4" />
                   )}
-                  Cancel order
+                  {t("Cancel order", "ऑर्डर कैंसिल करें")}
                 </button>
                 {cancelMsg ? (
                   <p className="rounded-xl bg-deal-soft px-3 py-2 text-center text-sm font-medium text-deal">
@@ -758,7 +824,8 @@ export function TrackingView({
                 href={`/orders/${order.id}/receipt`}
                 className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-ink"
               >
-                <ReceiptText className="size-4" /> View receipt
+                <ReceiptText className="size-4" />{" "}
+                {t("View receipt", "रसीद देखें")}
               </Link>
             ) : null}
 
@@ -766,7 +833,8 @@ export function TrackingView({
               href={`/profile/help?order=${encodeURIComponent(order.id)}`}
               className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-ink"
             >
-              <CircleHelp className="size-4" /> Get help with this order
+              <CircleHelp className="size-4" />{" "}
+              {t("Get help with this order", "इस ऑर्डर के लिए मदद लें")}
             </Link>
           </div>
         </TrackingSheet>
@@ -778,7 +846,7 @@ export function TrackingView({
         <div className="fixed inset-0 z-50">
           <button
             type="button"
-            aria-label="Dismiss"
+            aria-label={t("Dismiss", "बंद करें")}
             onClick={() => setShowCancelConfirm(false)}
             className="animate-fade-in absolute inset-0 bg-ink/40"
           />
@@ -792,10 +860,13 @@ export function TrackingView({
               id="cancel-order-title"
               className="text-center text-[17px] font-extrabold tracking-tight"
             >
-              Cancel order?
+              {t("Cancel order?", "ऑर्डर कैंसिल करें?")}
             </h2>
             <p className="mt-2 text-center text-sm leading-relaxed text-muted">
-              Do you want to cancel your order? This can&apos;t be undone.
+              {t(
+                "Do you want to cancel your order? This can't be undone.",
+                "क्या आप अपना ऑर्डर कैंसिल करना चाहते हैं? यह वापस नहीं होगा।",
+              )}
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <button
@@ -804,7 +875,7 @@ export function TrackingView({
                 disabled={cancelBusy}
                 className="press rounded-full border border-line bg-surface py-3 text-sm font-bold text-ink disabled:opacity-60"
               >
-                No
+                {t("No", "नहीं")}
               </button>
               <button
                 type="button"
@@ -815,7 +886,7 @@ export function TrackingView({
                 disabled={cancelBusy}
                 className="press rounded-full bg-deal py-3 text-sm font-bold text-[var(--on-deal)] disabled:opacity-60"
               >
-                Yes, cancel
+                {t("Yes, cancel", "हाँ, कैंसिल करें")}
               </button>
             </div>
           </div>

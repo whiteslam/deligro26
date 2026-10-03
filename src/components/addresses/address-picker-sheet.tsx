@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Check, MapPin, Plus, X } from "lucide-react";
 import type { SavedAddress } from "@/hooks/use-saved-addresses";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 export function AddressPickerSheet({
   open,
@@ -20,6 +21,7 @@ export function AddressPickerSheet({
   onClose: () => void;
   onAddNew: () => void;
 }) {
+  const t = useT();
   // Escape closes it, like every other sheet a keyboard can reach.
   useEffect(() => {
     if (!open) return;
@@ -40,23 +42,25 @@ export function AddressPickerSheet({
     <div className="fixed inset-0 z-50">
       <button
         type="button"
-        aria-label="Close"
+        aria-label={t("Close", "बंद करें")}
         onClick={onClose}
         className="animate-fade-in absolute inset-0 bg-ink/40"
       />
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Choose delivery address"
+        aria-label={t("Choose delivery address", "डिलीवरी का पता चुनें")}
         className="bolt-sheet animate-sheet-in absolute inset-x-0 bottom-0 max-h-[78%] overflow-hidden"
       >
         <div className="bolt-sheet-handle" />
         <div className="flex items-center justify-between px-5 pb-2 pt-3">
-          <h2 className="text-heading">Delivery address</h2>
+          <h2 className="text-heading">
+            {t("Delivery address", "डिलीवरी का पता")}
+          </h2>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("Close", "बंद करें")}
             className="press grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
           >
             <X className="size-5" />
@@ -80,7 +84,9 @@ export function AddressPickerSheet({
                     <span
                       className={cn(
                         "mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg",
-                        on ? "bg-accent text-[var(--on-accent)]" : "bg-surface-2 text-muted"
+                        on
+                          ? "bg-accent text-[var(--on-accent)]"
+                          : "bg-surface-2 text-muted",
                       )}
                     >
                       <MapPin className="size-[18px]" />
@@ -90,7 +96,7 @@ export function AddressPickerSheet({
                         {a.label}
                         {a.isDefault ? (
                           <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-muted">
-                            Default
+                            {t("Default", "डिफ़ॉल्ट")}
                           </span>
                         ) : null}
                       </span>
@@ -117,7 +123,8 @@ export function AddressPickerSheet({
             }}
             className="press flex w-full items-center justify-center gap-2 rounded-full border border-dashed border-line bg-surface py-3.5 text-sm font-bold text-accent-ink"
           >
-            <Plus className="size-4" /> Add a new address
+            <Plus className="size-4" />{" "}
+            {t("Add a new address", "नया पता जोड़ें")}
           </button>
         </div>
       </div>

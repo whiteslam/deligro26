@@ -41,8 +41,11 @@ import {
   codLimitHint,
   DEFAULT_PAYMENT_RULES,
   paymentAvailability,
+  type PaymentAvailability,
   type VendorPaymentRules,
 } from "@/lib/payments/cod-rules";
+import { useLang, useT } from "@/components/providers/lang-provider";
+import type { T } from "@/lib/i18n/lang";
 import type { PaymentMethod } from "@/types";
 
 type CheckoutStatus = "ready" | "processing" | "paying" | "placed";
@@ -66,6 +69,7 @@ export interface CheckoutConfig {
 
 export function CheckoutView({ config }: { config: CheckoutConfig }) {
   const router = useRouter();
+  const { lang, t } = useLang();
   const lines = useCart((s) => s.lines);
   const restaurantSlug = useCart((s) => s.restaurantSlug);
   const restaurantName = useCart((s) => s.restaurantName);
@@ -104,9 +108,10 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   // no Cancel in that state — so that case is derived rather than stored: state
   // that duplicates a fact already in `addresses` can only drift from it.
   const [addFormRequested, setAddFormRequested] = useState(false);
-  const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(
-    null
-  );
+  const [mapCoords, setMapCoords] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
   const [pinSaved, setPinSaved] = useState(false);
 
@@ -150,14 +155,24 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
 
   if (coupon && coupon.pricedAt !== subtotal) {
     setCoupon(null);
-    setCouponError("Your basket changed — apply the code again.");
+    setCouponError(
+      t(
+        "Your basket changed — apply the code again.",
+        "आपकी टोकरी बदल गई है — कोड फिर से लगाएं।",
+      ),
+    );
   } else if (coupon && coupon.pricedFor !== restaurantSlug) {
     // Switching restaurants empties the basket, so this is nearly always
     // caught by the subtotal check above — nearly, because two shops can
     // total the same. A code scoped to the shop it was priced for would
     // otherwise be shown as applied at a shop that will refuse it.
     setCoupon(null);
-    setCouponError("You're ordering from a different restaurant — apply the code again.");
+    setCouponError(
+      t(
+        "You're ordering from a different restaurant — apply the code again.",
+        "आप दूसरे रेस्टोरेंट से ऑर्डर कर रहे हैं — कोड फिर से लगाएं।",
+      ),
+    );
   }
 
   const discount = coupon?.discount ?? 0;
@@ -180,7 +195,9 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   useEffect(() => {
     if (!restaurantSlug || !isSupabaseConfigured) return;
     let live = true;
-    fetch(`/api/restaurants/${encodeURIComponent(restaurantSlug)}/payment-options`)
+    fetch(
+      `/api/restaurants/${encodeURIComponent(restaurantSlug)}/payment-options`,
+    )
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { rules?: VendorPaymentRules } | null) => {
         if (live && d?.rules) setVendorRules(d.rules);
@@ -197,14 +214,25 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   // coupon, including delivery and tax. That is the cash the rider collects.
   const availability = paymentAvailability(vendorRules, payTotal);
   const codHint = codLimitHint(vendorRules, payTotal);
+  // The same facts as `availability.notice` / `codHint`, in the customer's
+  // language. The rules decide; these only word the outcome.
+  const codLimit = formatINR(Math.max(0, Math.round(vendorRules.codMaxOrder)));
+  const paymentNotice = paymentNoticeText(availability, codLimit, t);
+  const codHintText = codHint
+    ? t(
+        `Cash on delivery is available up to ${codLimit}.`,
+        `${codLimit} तक कैश ऑन डिलीवरी उपलब्ध है।`,
+      )
+    : null;
 
   // The selection is a request; this is what it resolves to. Deriving it (rather
   // than "fixing" paymentMethod in an effect) is what stops the basket crossing
   // the cash ceiling and leaving a stale COD selection behind: add one more
   // item and the order becomes an online one on the same render.
-  const payOnline = availability.online && !availability.cod
-    ? true
-    : availability.online && paymentMethod === "online";
+  const payOnline =
+    availability.online && !availability.cod
+      ? true
+      : availability.online && paymentMethod === "online";
 
   const applyCoupon = async () => {
     const code = couponInput.trim();
@@ -213,7 +241,9 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
     // checkout only renders with a basket — but the request would be rejected
     // as invalid input rather than saying why.
     if (!restaurantSlug) {
-      setCouponError("Add something to your basket first.");
+      setCouponError(
+        t("Add something to your basket first.", "पहले टोकरी में कुछ जोड़ें।"),
+      );
       return;
     }
     setCouponBusy(true);
@@ -226,7 +256,7 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        setCouponError(couponMessage(data.error, data.minOrder));
+        setCouponError(couponMessage(t, data.error, data.minOrder));
         return;
       }
       setCoupon({
@@ -237,7 +267,12 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
       });
       setCouponInput("");
     } catch {
-      setCouponError("Couldn't check that code. Try again.");
+      setCouponError(
+        t(
+          "Couldn't check that code. Try again.",
+          "कोड जांच नहीं पाए। फिर से कोशिश करें।",
+        ),
+      );
     } finally {
       setCouponBusy(false);
     }
@@ -271,7 +306,7 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
       setMapCoords(
         selectedAddress.lat != null && selectedAddress.lng != null
           ? { lat: selectedAddress.lat, lng: selectedAddress.lng }
-          : null
+          : null,
       );
       setPinSaved(false);
     }
@@ -280,7 +315,8 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   const pinMoved =
     selectedAddress &&
     mapCoords &&
-    (selectedAddress.lat !== mapCoords.lat || selectedAddress.lng !== mapCoords.lng);
+    (selectedAddress.lat !== mapCoords.lat ||
+      selectedAddress.lng !== mapCoords.lng);
 
   // Is this pin inside the shop's delivery area?
   //
@@ -316,7 +352,7 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
       lng: String(mapCoords.lng),
     });
     fetch(
-      `/api/restaurants/${encodeURIComponent(restaurantSlug)}/serviceability?${query}`
+      `/api/restaurants/${encodeURIComponent(restaurantSlug)}/serviceability?${query}`,
     )
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { area?: ServiceArea } | null) => {
@@ -364,15 +400,18 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
     if (userPickedAddress.current) return;
     autoPickTried.current = true;
     const others = addresses.filter(
-      (a) => a.id !== selectedAddress?.id && a.lat != null && a.lng != null
+      (a) => a.id !== selectedAddress?.id && a.lat != null && a.lng != null,
     );
     if (others.length === 0) return;
     let live = true;
     void (async () => {
       for (const a of others) {
-        const query = new URLSearchParams({ lat: String(a.lat), lng: String(a.lng) });
+        const query = new URLSearchParams({
+          lat: String(a.lat),
+          lng: String(a.lng),
+        });
         const d = (await fetch(
-          `/api/restaurants/${encodeURIComponent(restaurantSlug)}/serviceability?${query}`
+          `/api/restaurants/${encodeURIComponent(restaurantSlug)}/serviceability?${query}`,
         )
           .then((r) => (r.ok ? r.json() : null))
           .catch(() => null)) as { area?: ServiceArea } | null;
@@ -389,7 +428,13 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
     return () => {
       live = false;
     };
-  }, [outOfArea, restaurantSlug, addresses, selectedAddress?.id, setSelectedId]);
+  }, [
+    outOfArea,
+    restaurantSlug,
+    addresses,
+    selectedAddress?.id,
+    setSelectedId,
+  ]);
   // An address with no pin is not "far away" — it is unmeasurable, and the fix
   // is one the customer can act on, so that is what the notice asks for.
   //
@@ -425,7 +470,12 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
       });
       setPinSaved(true);
     } catch {
-      setError("Could not save pin to your address.");
+      setError(
+        t(
+          "Could not save pin to your address.",
+          "पिन आपके पते में सेव नहीं हो पाया।",
+        ),
+      );
     } finally {
       setPinBusy(false);
     }
@@ -461,8 +511,14 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
     if (!openRes.ok || !handoff.keyId || !handoff.providerOrderId) {
       setError(
         handoff.error === "payments_unavailable"
-          ? "Online payment isn't available right now — your order is saved, pay cash on delivery or retry from your orders."
-          : "Couldn't start the payment. Your order is saved — you can retry from your orders."
+          ? t(
+              "Online payment isn't available right now — your order is saved, pay cash on delivery or retry from your orders.",
+              "अभी ऑनलाइन भुगतान उपलब्ध नहीं है — आपका ऑर्डर सेव है, डिलीवरी पर नकद दें या ‘मेरे ऑर्डर’ से फिर कोशिश करें।",
+            )
+          : t(
+              "Couldn't start the payment. Your order is saved — you can retry from your orders.",
+              "भुगतान शुरू नहीं हो पाया। आपका ऑर्डर सेव है — ‘मेरे ऑर्डर’ से फिर कोशिश कर सकते हैं।",
+            ),
       );
       return false;
     }
@@ -473,7 +529,10 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
       amountPaise: handoff.amountPaise ?? 0,
       currency: handoff.currency ?? "INR",
       name: restaurantName ?? "Deligro",
-      description: `Order ${orderId.slice(0, 8)}`,
+      description: t(
+        `Order ${orderId.slice(0, 8)}`,
+        `ऑर्डर ${orderId.slice(0, 8)}`,
+      ),
     });
 
     const verifyRes = await fetch("/api/payments/razorpay/verify", {
@@ -491,7 +550,10 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
       // The money may still have left their account — Razorpay's webhook is the
       // authority and will settle it. Say so rather than claiming failure.
       setError(
-        "We couldn't confirm the payment yet. If you were charged, your order will update shortly."
+        t(
+          "We couldn't confirm the payment yet. If you were charged, your order will update shortly.",
+          "भुगतान अभी पक्का नहीं हो पाया। अगर पैसे कट गए हैं, तो आपका ऑर्डर जल्द अपडेट हो जाएगा।",
+        ),
       );
       return false;
     }
@@ -505,34 +567,50 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
     if (ordersClosed) {
       setError(
         config.maintenanceMessage.trim() ||
-          "We're not accepting orders right now. Please try again shortly."
+          t(
+            "We're not accepting orders right now. Please try again shortly.",
+            "अभी ऑर्डर नहीं लिए जा रहे हैं। कृपया थोड़ी देर बाद कोशिश करें।",
+          ),
       );
       return;
     }
     if (belowMinimum) {
       setError(
-        `Add ${formatINR(shortBy)} more to reach the ${formatINR(
-          config.minOrder
-        )} minimum order.`
+        t(
+          `Add ${formatINR(shortBy)} more to reach the ${formatINR(
+            config.minOrder,
+          )} minimum order.`,
+          `कम से कम ${formatINR(config.minOrder)} का ऑर्डर ज़रूरी है — ${formatINR(
+            shortBy,
+          )} का और जोड़ें।`,
+        ),
       );
       return;
     }
     if (availability.notice && !availability.cod && !availability.online) {
-      setError(availability.notice);
+      setError(paymentNotice ?? availability.notice);
       return;
     }
     if (outOfArea && serviceArea) {
-      setError(outOfRangeMessage(serviceArea));
+      setError(outOfRangeMessage(serviceArea, lang));
       return;
     }
     if (addressUnpinned) {
       setError(
-        "Put your address on the map first — drop a pin or tap \"Use my location\"."
+        t(
+          'Put your address on the map first — drop a pin or tap "Use my location".',
+          'पहले अपना पता नक्शे पर लगाएं — पिन लगाएं या "मेरी लोकेशन लें" दबाएं।',
+        ),
       );
       return;
     }
     if (!selectedAddress) {
-      setError("Add a delivery address to continue.");
+      setError(
+        t(
+          "Add a delivery address to continue.",
+          "आगे बढ़ने के लिए डिलीवरी का पता जोड़ें।",
+        ),
+      );
       setAddFormRequested(true);
       return;
     }
@@ -541,7 +619,12 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
 
     if (isSupabaseConfigured) {
       if (!restaurantSlug) {
-        setError("Missing restaurant — go back and add items again.");
+        setError(
+          t(
+            "Missing restaurant — go back and add items again.",
+            "रेस्टोरेंट नहीं मिला — वापस जाकर आइटम फिर से जोड़ें।",
+          ),
+        );
         setStatus("ready");
         return;
       }
@@ -600,8 +683,13 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
           if (data.error?.startsWith("coupon_")) {
             const reason = data.error.slice("coupon_".length);
             setCoupon(null);
-            setCouponError(couponMessage(reason, config.minOrder));
-            setError("Your promo code was refused. Check the total and try again.");
+            setCouponError(couponMessage(t, reason, config.minOrder));
+            setError(
+              t(
+                "Your promo code was refused. Check the total and try again.",
+                "आपका कूपन कोड नहीं लगा। कुल रकम देखकर फिर से कोशिश करें।",
+              ),
+            );
             setStatus("ready");
             return;
           }
@@ -615,12 +703,24 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
           }
           setError(
             data.error === "invalid_items"
-              ? "Something in your cart is no longer available."
+              ? t(
+                  "Something in your cart is no longer available.",
+                  "आपकी टोकरी का कोई आइटम अब उपलब्ध नहीं है।",
+                )
               : data.error === "tip_unsupported"
-                ? "Tipping isn't available right now — set the tip to “No tip” to place your order."
+                ? t(
+                    "Tipping isn't available right now — set the tip to “No tip” to place your order.",
+                    "अभी टिप देने की सुविधा नहीं है — ऑर्डर करने के लिए “कोई टिप नहीं” चुनें।",
+                  )
                 : data.error === "online_payments_unavailable"
-                  ? "Online payment isn't available yet — switch to Cash on delivery to place your order."
-                  : "Could not place the order. Try again."
+                  ? t(
+                      "Online payment isn't available yet — switch to Cash on delivery to place your order.",
+                      "ऑनलाइन भुगतान अभी उपलब्ध नहीं है — ऑर्डर करने के लिए कैश ऑन डिलीवरी चुनें।",
+                    )
+                  : t(
+                      "Could not place the order. Try again.",
+                      "ऑर्डर नहीं हो पाया। फिर से कोशिश करें।",
+                    ),
           );
           setStatus("ready");
           return;
@@ -641,8 +741,14 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
           } catch (err) {
             setError(
               err instanceof RazorpayDismissedError
-                ? "Payment cancelled — your order is saved and unpaid. Retry from your orders."
-                : "The payment didn't go through. Your order is saved — you can retry from your orders."
+                ? t(
+                    "Payment cancelled — your order is saved and unpaid. Retry from your orders.",
+                    "भुगतान रद्द हो गया — आपका ऑर्डर सेव है, पर भुगतान बाकी है। ‘मेरे ऑर्डर’ से फिर कोशिश करें।",
+                  )
+                : t(
+                    "The payment didn't go through. Your order is saved — you can retry from your orders.",
+                    "भुगतान नहीं हो पाया। आपका ऑर्डर सेव है — ‘मेरे ऑर्डर’ से फिर कोशिश कर सकते हैं।",
+                  ),
             );
             setStatus("ready");
             return;
@@ -654,7 +760,12 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
         router.push(`/orders/${data.order.id}?placed=1`);
         return;
       } catch {
-        setError("Network error — check your connection and try again.");
+        setError(
+          t(
+            "Network error — check your connection and try again.",
+            "नेटवर्क की दिक्कत — इंटरनेट देखकर फिर से कोशिश करें।",
+          ),
+        );
         setStatus("ready");
         return;
       }
@@ -677,15 +788,21 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   if (lines.length === 0 && status !== "placed") {
     return (
       <>
-        <CheckoutHeader title="Checkout" onBack={() => router.back()} />
+        <CheckoutHeader
+          title={t("Checkout", "ऑर्डर पूरा करें")}
+          onBack={() => router.back()}
+        />
         <EmptyState
           className="mt-10"
           icon={<ShoppingBag className="size-7" />}
-          title="Your cart is empty"
-          description="Add a few dishes and they'll show up here, ready to check out."
+          title={t("Your cart is empty", "आपकी टोकरी खाली है")}
+          description={t(
+            "Add a few dishes and they'll show up here, ready to check out.",
+            "कुछ खाना जोड़ें, वह यहां दिखेगा और आप ऑर्डर कर पाएंगे।",
+          )}
           action={
             <Link href="/">
-              <Button>Browse restaurants</Button>
+              <Button>{t("Browse restaurants", "रेस्टोरेंट देखें")}</Button>
             </Link>
           }
         />
@@ -696,7 +813,7 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
   return (
     <div className="relative flex min-h-full flex-1 flex-col">
       <CheckoutHeader
-        title={restaurantName ?? "Checkout"}
+        title={restaurantName ?? t("Checkout", "ऑर्डर पूरा करें")}
         onBack={() => router.back()}
         onClear={clearCart}
       />
@@ -705,16 +822,22 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
         <section className="card overflow-hidden">
           {addrLoading ? (
             <p className="flex items-center gap-2 p-4 text-sm text-muted">
-              <Loader2 className="size-4 animate-spin" /> Loading your addresses…
+              <Loader2 className="size-4 animate-spin" />{" "}
+              {t("Loading your addresses…", "आपके पते लोड हो रहे हैं…")}
             </p>
           ) : showAddForm ? (
             <>
               <div className="border-b border-line px-4 py-3">
                 <h2 className="text-[15px] font-bold">
-                  {addresses.length ? "Add delivery address" : "Set delivery address"}
+                  {addresses.length
+                    ? t("Add delivery address", "डिलीवरी का पता जोड़ें")
+                    : t("Set delivery address", "डिलीवरी का पता डालें")}
                 </h2>
                 <p className="mt-0.5 text-xs text-muted">
-                  Search on the map or enter your full address.
+                  {t(
+                    "Search on the map or enter your full address.",
+                    "नक्शे पर खोजें या अपना पूरा पता लिखें।",
+                  )}
                 </p>
               </div>
               <AddAddressForm
@@ -737,11 +860,16 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
                 onClick={() => setShowPicker(true)}
                 className="press flex w-full items-center gap-3 border-b border-line px-4 py-3.5 text-left"
               >
-                <MapPin className="size-5 shrink-0 text-ink" strokeWidth={2.25} />
+                <MapPin
+                  className="size-5 shrink-0 text-ink"
+                  strokeWidth={2.25}
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-semibold uppercase tracking-wide text-muted">
                     {selectedAddress.label}
-                    {selectedAddress.isDefault ? " · Default" : ""}
+                    {selectedAddress.isDefault
+                      ? t(" · Default", " · डिफ़ॉल्ट")
+                      : ""}
                   </span>
                   <span className="mt-0.5 block text-[15px] font-medium leading-snug">
                     {selectedAddress.line}
@@ -754,25 +882,26 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
                 <div className="flex items-start gap-2.5 border-b border-line bg-green-soft px-4 py-3 text-sm font-medium text-ink">
                   <MapPin className="mt-0.5 size-4 shrink-0 text-green" />
                   <span>
-                    Your default address is outside this shop&apos;s delivery
-                    area, so we picked your saved &ldquo;{autoPicked}&rdquo;
-                    address. Tap above to change it. / आपका डिफ़ॉल्ट पता
-                    डिलीवरी क्षेत्र से बाहर है, इसलिए दूसरा सेव पता चुना गया।
+                    {t(
+                      `Your default address is outside this shop's delivery area, so we picked your saved “${autoPicked}” address. Tap above to change it.`,
+                      `आपका डिफ़ॉल्ट पता इस दुकान के डिलीवरी क्षेत्र से बाहर है, इसलिए आपका सेव पता “${autoPicked}” चुना गया। बदलने के लिए ऊपर दबाएं।`,
+                    )}
                   </span>
                 </div>
               ) : null}
               {outOfArea && serviceArea ? (
                 <div className="flex items-start gap-2.5 border-b border-line bg-deal-soft px-4 py-3 text-sm font-medium text-deal">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                  <span>{outOfRangeMessage(serviceArea)}</span>
+                  <span>{outOfRangeMessage(serviceArea, lang)}</span>
                 </div>
               ) : addressUnpinned ? (
                 <div className="flex items-start gap-2.5 border-b border-line bg-deal-soft px-4 py-3 text-sm font-medium text-deal">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                   <span>
-                    This address is not on the map yet, so we can&apos;t check
-                    we deliver there. Drop a pin below or tap &ldquo;Use my
-                    location&rdquo; to order.
+                    {t(
+                      "This address is not on the map yet, so we can't check we deliver there. Drop a pin below or tap “Use my location” to order.",
+                      "यह पता अभी नक्शे पर नहीं है, इसलिए हम देख नहीं पा रहे कि वहां डिलीवरी होती है या नहीं। ऑर्डर करने के लिए नीचे पिन लगाएं या “मेरी लोकेशन लें” दबाएं।",
+                    )}
                   </span>
                 </div>
               ) : null}
@@ -798,42 +927,51 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
                     {pinBusy ? (
                       <Loader2 className="mx-auto size-4 animate-spin" />
                     ) : pinSaved ? (
-                      "Pin saved to address"
+                      t("Pin saved to address", "पिन पते में सेव हो गया")
                     ) : (
-                      "Save pin to this address"
+                      t("Save pin to this address", "इस पते में पिन सेव करें")
                     )}
                   </button>
                 ) : null}
 
                 <CheckoutField
-                  placeholder="Apartment, flat or suite number"
+                  placeholder={t(
+                    "Apartment, flat or suite number",
+                    "मकान / फ्लैट नंबर",
+                  )}
                   value={apartment}
                   onChange={setApartment}
                 />
 
                 <div className="grid grid-cols-2 gap-3">
                   <CheckoutField
-                    placeholder="Entry code"
+                    placeholder={t("Entry code", "गेट कोड")}
                     value={entryCode}
                     onChange={setEntryCode}
                   />
                   <CheckoutField
-                    placeholder="Floor"
+                    placeholder={t("Floor", "मंज़िल")}
                     value={floor}
                     onChange={setFloor}
                   />
                 </div>
 
                 <CheckoutField
-                  label="Building name"
-                  placeholder="Building name"
+                  label={t("Building name", "बिल्डिंग का नाम")}
+                  placeholder={t("Building name", "बिल्डिंग का नाम")}
                   value={buildingName}
                   onChange={setBuildingName}
                 />
 
                 <CheckoutField
-                  label="Instructions for the courier"
-                  placeholder="Instructions for the courier"
+                  label={t(
+                    "Instructions for the courier",
+                    "डिलीवरी वाले के लिए निर्देश",
+                  )}
+                  placeholder={t(
+                    "Instructions for the courier",
+                    "डिलीवरी वाले के लिए निर्देश",
+                  )}
                   value={courierInstructions}
                   onChange={setCourierInstructions}
                 />
@@ -842,7 +980,7 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
                   href="/profile/addresses"
                   className="block text-center text-sm font-semibold text-accent-ink"
                 >
-                  Manage saved addresses
+                  {t("Manage saved addresses", "सेव पते बदलें")}
                 </Link>
               </div>
             </>
@@ -851,15 +989,27 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
 
         <section className="card overflow-hidden">
           <div className="border-b border-line px-4 py-3">
-            <h2 className="text-[15px] font-bold">Payment</h2>
+            <h2 className="text-[15px] font-bold">{t("Payment", "भुगतान")}</h2>
             <p className="mt-0.5 text-xs text-muted">
               {availability.cod && availability.online
-                ? "Pay now by UPI or card, or pay the courier on delivery."
+                ? t(
+                    "Pay now by UPI or card, or pay the courier on delivery.",
+                    "अभी UPI या कार्ड से भुगतान करें, या डिलीवरी पर नकद दें।",
+                  )
                 : availability.online
-                  ? "Pay now by UPI, card, netbanking or wallet."
+                  ? t(
+                      "Pay now by UPI, card, netbanking or wallet.",
+                      "अभी UPI, कार्ड, नेटबैंकिंग या वॉलेट से भुगतान करें।",
+                    )
                   : availability.cod
-                    ? "Pay the courier in cash when your order arrives."
-                    : "Payment is not available for this shop right now."}
+                    ? t(
+                        "Pay the courier in cash when your order arrives.",
+                        "ऑर्डर आने पर डिलीवरी वाले को नकद दें।",
+                      )
+                    : t(
+                        "Payment is not available for this shop right now.",
+                        "इस दुकान पर अभी भुगतान की सुविधा नहीं है।",
+                      )}
             </p>
           </div>
           <div className="space-y-2 p-4">
@@ -867,16 +1017,23 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
                 what to do, not what went wrong. */}
             {availability.notice ? (
               <p className="rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-[13px] font-medium leading-snug text-accent-ink">
-                {availability.notice}
+                {paymentNotice}
               </p>
             ) : null}
             <PaymentOption
               icon={<Banknote className="size-5" />}
-              label="Cash on delivery · नकद भुगतान"
+              label={t("Cash on delivery", "डिलीवरी पर नकद")}
               desc={
                 availability.codRefusal === "over_limit"
-                  ? "Not available for this amount."
-                  : codHint ?? "Pay the courier when your order arrives."
+                  ? t(
+                      "Not available for this amount.",
+                      "इस रकम के लिए उपलब्ध नहीं।",
+                    )
+                  : (codHintText ??
+                    t(
+                      "Pay the courier when your order arrives.",
+                      "ऑर्डर आने पर डिलीवरी वाले को भुगतान करें।",
+                    ))
               }
               selected={availability.cod && !payOnline}
               // Genuinely disabled, not merely styled that way — and the order
@@ -884,25 +1041,28 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
               disabled={!availability.cod}
               badge={
                 availability.codRefusal === "over_limit"
-                  ? "Over cash limit"
+                  ? t("Over cash limit", "नकद सीमा से ज़्यादा")
                   : availability.codRefusal === "cod_off"
-                    ? "Not accepted"
+                    ? t("Not accepted", "नहीं लेते")
                     : undefined
               }
               onSelect={() => setPaymentMethod("cod")}
             />
             <PaymentOption
               icon={<CreditCard className="size-5" />}
-              label="Pay online"
-              desc="UPI, cards, netbanking and wallets."
+              label={t("Pay online", "ऑनलाइन भुगतान")}
+              desc={t(
+                "UPI, cards, netbanking and wallets.",
+                "UPI, कार्ड, नेटबैंकिंग और वॉलेट।",
+              )}
               selected={payOnline}
               disabled={!availability.online}
               badge={
                 availability.online
                   ? undefined
                   : config.onlinePayments
-                    ? "Not accepted"
-                    : "Available soon"
+                    ? t("Not accepted", "नहीं लेते")
+                    : t("Available soon", "जल्द आ रहा है")
               }
               onSelect={() => setPaymentMethod("online")}
             />
@@ -916,33 +1076,37 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
             </div>
             <div className="min-w-0 flex-1 pt-1">
               <h2 className="text-[17px] font-extrabold tracking-tight">
-                Tip the courier?
+                {t("Tip the courier?", "डिलीवरी वाले को टिप दें?")}
               </h2>
               <p className="mt-1 text-sm leading-snug text-muted">
-                The courier will get 100% of your tip. You can cancel the tip
-                later.
+                {t(
+                  "The courier will get 100% of your tip. You can cancel the tip later.",
+                  "पूरी टिप डिलीवरी वाले को मिलेगी। आप बाद में टिप रद्द कर सकते हैं।",
+                )}
               </p>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            {TIP_OPTIONS.map((t) => (
+            {TIP_OPTIONS.map((amount) => (
               <button
-                key={t}
+                key={amount}
                 type="button"
-                onClick={() => setTip(t)}
+                onClick={() => setTip(amount)}
                 className={cn(
                   "press bolt-chip min-w-[72px] justify-center",
-                  tip === t && "bolt-chip-on"
+                  tip === amount && "bolt-chip-on",
                 )}
               >
-                {t === 0 ? "No tip" : formatINR(t)}
+                {amount === 0 ? t("No tip", "कोई टिप नहीं") : formatINR(amount)}
               </button>
             ))}
           </div>
         </section>
 
         <section className="card p-4">
-          <h2 className="text-[15px] font-bold">Have a code?</h2>
+          <h2 className="text-[15px] font-bold">
+            {t("Have a code?", "कूपन कोड है?")}
+          </h2>
           {coupon ? (
             <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-green-soft px-3.5 py-3">
               <div className="min-w-0">
@@ -950,7 +1114,10 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
                   {coupon.code}
                 </p>
                 <p className="text-xs text-muted">
-                  {formatINR(coupon.discount)} off your food
+                  {t(
+                    `${formatINR(coupon.discount)} off your food`,
+                    `खाने पर ${formatINR(coupon.discount)} की छूट`,
+                  )}
                 </p>
               </div>
               <button
@@ -961,7 +1128,7 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
                 }}
                 className="press shrink-0 text-sm font-semibold text-muted hover:text-ink"
               >
-                Remove
+                {t("Remove", "हटाएं")}
               </button>
             </div>
           ) : (
@@ -975,11 +1142,11 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
                     void applyCoupon();
                   }
                 }}
-                placeholder="Promo code"
+                placeholder={t("Promo code", "कूपन कोड")}
                 autoCapitalize="characters"
                 autoComplete="off"
                 spellCheck={false}
-                aria-label="Promo code"
+                aria-label={t("Promo code", "कूपन कोड")}
                 className="text-data min-w-0 flex-1 rounded-xl bg-surface-2 px-3.5 py-3 text-[15px] uppercase tracking-wide text-ink outline-none focus:ring-2 focus:ring-accent/30"
               />
               <Button
@@ -988,8 +1155,10 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
                 disabled={couponBusy || !couponInput.trim()}
                 className="shrink-0"
               >
-                {couponBusy ? <Loader2 className="size-4 animate-spin" /> : null}
-                Apply
+                {couponBusy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
+                {t("Apply", "लगाएं")}
               </Button>
             </div>
           )}
@@ -1001,24 +1170,32 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
               come *off* it — a discount the customer cannot see applied is
               indistinguishable from one that silently didn't. */}
           <div className="mt-4 space-y-1 border-t border-line pt-3 text-sm">
-            <BillRow label="Item total" value={charges.subtotal} />
             <BillRow
-              label="Delivery"
+              label={t("Item total", "आइटम का कुल")}
+              value={charges.subtotal}
+            />
+            <BillRow
+              label={t("Delivery", "डिलीवरी")}
               value={charges.deliveryFee}
               free={charges.deliveryFee === 0}
             />
-            <BillRow label="Taxes" value={charges.taxes} />
+            <BillRow label={t("Taxes", "टैक्स")} value={charges.taxes} />
             {charges.tip > 0 ? (
-              <BillRow label="Courier tip" value={charges.tip} />
+              <BillRow
+                label={t("Courier tip", "डिलीवरी वाले की टिप")}
+                value={charges.tip}
+              />
             ) : null}
             {discount > 0 ? (
               <div className="flex justify-between font-medium text-green">
-                <span>Discount · {coupon?.code}</span>
+                <span>
+                  {t("Discount", "छूट")} · {coupon?.code}
+                </span>
                 <span className="text-data">−{formatINR(discount)}</span>
               </div>
             ) : null}
             <div className="flex justify-between pt-1.5 text-[15px] font-bold text-ink">
-              <span>To pay</span>
+              <span>{t("To pay", "कुल भुगतान")}</span>
               <span className="text-data">{formatINR(payTotal)}</span>
             </div>
           </div>
@@ -1037,27 +1214,41 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
           <p className="mb-2 flex items-center gap-1.5 text-center text-sm font-medium text-deal">
             <AlertTriangle className="size-4 shrink-0" />
             {config.maintenanceMessage.trim() ||
-              "We're not accepting orders right now."}
+              t(
+                "We're not accepting orders right now.",
+                "अभी ऑर्डर नहीं लिए जा रहे हैं।",
+              )}
           </p>
         ) : belowMinimum ? (
           <p className="mb-2 text-center text-sm font-medium text-muted">
-            Add {formatINR(shortBy)} more to reach the{" "}
-            {formatINR(config.minOrder)} minimum.
+            {t(
+              `Add ${formatINR(shortBy)} more to reach the ${formatINR(config.minOrder)} minimum.`,
+              `कम से कम ${formatINR(config.minOrder)} का ऑर्डर ज़रूरी है — ${formatINR(shortBy)} का और जोड़ें।`,
+            )}
           </p>
         ) : availability.noMethod ? (
           <p className="mb-2 flex items-center gap-1.5 text-center text-sm font-medium text-deal">
             <AlertTriangle className="size-4 shrink-0" />
-            This shop cannot take payment right now.
+            {t(
+              "This shop cannot take payment right now.",
+              "यह दुकान अभी भुगतान नहीं ले पा रही है।",
+            )}
           </p>
         ) : outOfArea ? (
           <p className="mb-2 flex items-center justify-center gap-1.5 text-center text-sm font-medium text-deal">
             <AlertTriangle className="size-4 shrink-0" />
-            We don&apos;t deliver to this address.
+            {t(
+              "We don't deliver to this address.",
+              "इस पते पर हम डिलीवरी नहीं करते।",
+            )}
           </p>
         ) : addressUnpinned ? (
           <p className="mb-2 flex items-center justify-center gap-1.5 text-center text-sm font-medium text-deal">
             <AlertTriangle className="size-4 shrink-0" />
-            Set your address on the map to order.
+            {t(
+              "Set your address on the map to order.",
+              "ऑर्डर करने के लिए अपना पता नक्शे पर लगाएं।",
+            )}
           </p>
         ) : null}
         <button
@@ -1067,23 +1258,34 @@ export function CheckoutView({ config }: { config: CheckoutConfig }) {
         >
           {status === "processing" ? (
             <span className="mx-auto flex items-center gap-2">
-              <Loader2 className="size-5 animate-spin" /> Placing order…
+              <Loader2 className="size-5 animate-spin" />{" "}
+              {t("Placing order…", "ऑर्डर हो रहा है…")}
             </span>
           ) : status === "paying" ? (
             <span className="mx-auto flex items-center gap-2">
-              <Loader2 className="size-5 animate-spin" /> Waiting for payment…
+              <Loader2 className="size-5 animate-spin" />{" "}
+              {t("Waiting for payment…", "भुगतान का इंतज़ार…")}
             </span>
           ) : ordersClosed ? (
-            <span className="mx-auto">Orders paused</span>
+            <span className="mx-auto">
+              {t("Orders paused", "ऑर्डर अभी बंद हैं")}
+            </span>
           ) : outOfArea ? (
-            <span className="mx-auto">Outside delivery area</span>
+            <span className="mx-auto">
+              {t("Outside delivery area", "डिलीवरी क्षेत्र से बाहर")}
+            </span>
           ) : areaPending ? (
             <span className="mx-auto flex items-center gap-2">
-              <Loader2 className="size-5 animate-spin" /> Checking delivery area… / जांच हो रही है
+              <Loader2 className="size-5 animate-spin" />{" "}
+              {t("Checking delivery area…", "डिलीवरी क्षेत्र जांच रहे हैं…")}
             </span>
           ) : (
             <>
-              <span>{payOnline ? "Pay & place order · भुगतान करें" : "Place order · ऑर्डर करें"}</span>
+              <span>
+                {payOnline
+                  ? t("Pay & place order", "भुगतान करें और ऑर्डर करें")
+                  : t("Place order", "ऑर्डर करें")}
+              </span>
               <span>{formatINR(payTotal)}</span>
             </>
           )}
@@ -1118,41 +1320,99 @@ function BillRow({
   value: number;
   free?: boolean;
 }) {
+  const t = useT();
   return (
     <div className="flex justify-between text-muted">
       <span>{label}</span>
       <span className={cn("text-data", free && "text-green")}>
-        {free ? "Free" : formatINR(value)}
+        {free ? t("Free", "मुफ़्त") : formatINR(value)}
       </span>
     </div>
   );
 }
 
-function couponMessage(error?: string, minOrder?: number): string {
+function couponMessage(t: T, error?: string, minOrder?: number): string {
   switch (error) {
     case "invalid":
-      return "That code isn't recognised.";
+      return t("That code isn't recognised.", "यह कोड सही नहीं है।");
     case "expired":
-      return "That code has expired.";
+      return t("That code has expired.", "इस कोड की तारीख निकल गई है।");
     case "min_order":
       return minOrder
-        ? `Spend ${formatINR(minOrder)} on food to use this code.`
-        : "Your basket is below this code's minimum.";
+        ? t(
+            `Spend ${formatINR(minOrder)} on food to use this code.`,
+            `यह कोड लगाने के लिए ${formatINR(minOrder)} का खाना लें।`,
+          )
+        : t(
+            "Your basket is below this code's minimum.",
+            "आपकी टोकरी इस कोड की न्यूनतम रकम से कम है।",
+          );
     case "wrong_restaurant":
-      return "That code doesn't work at this restaurant.";
+      return t(
+        "That code doesn't work at this restaurant.",
+        "यह कोड इस रेस्टोरेंट पर नहीं चलता।",
+      );
     case "already_used":
-      return "You've already used this code.";
+      return t(
+        "You've already used this code.",
+        "आप यह कोड पहले ही इस्तेमाल कर चुके हैं।",
+      );
     case "exhausted":
-      return "This code has been fully claimed.";
+      return t(
+        "This code has been fully claimed.",
+        "यह कोड अब खत्म हो चुका है।",
+      );
     case "already_applied":
-      return "A code is already applied to this order.";
+      return t(
+        "A code is already applied to this order.",
+        "इस ऑर्डर पर पहले से एक कोड लगा है।",
+      );
     case "order_not_open":
-      return "This order has moved on — the code can't be added now.";
+      return t(
+        "This order has moved on — the code can't be added now.",
+        "यह ऑर्डर आगे बढ़ चुका है — अब कोड नहीं लग सकता।",
+      );
     case "empty":
-      return "Enter a code first.";
+      return t("Enter a code first.", "पहले कोड लिखें।");
     default:
-      return "That code couldn't be applied.";
+      return t("That code couldn't be applied.", "यह कोड नहीं लग पाया।");
   }
+}
+
+/**
+ * `availability.notice`, worded in the customer's language. The rules in
+ * cod-rules.ts decide whether there is a notice at all; this only says it.
+ */
+function paymentNoticeText(
+  availability: PaymentAvailability,
+  codLimit: string,
+  t: T,
+): string | null {
+  if (!availability.notice) return null;
+  if (!availability.cod && !availability.online) {
+    return t(
+      "This shop cannot take payment right now. Please try again a little later.",
+      "यह दुकान अभी भुगतान नहीं ले पा रही है। थोड़ी देर बाद फिर कोशिश करें।",
+    );
+  }
+  if (availability.codRefusal === "over_limit") {
+    return availability.online
+      ? t(
+          `Orders above ${codLimit} must be paid online.`,
+          `${codLimit} से ज़्यादा के ऑर्डर का भुगतान ऑनलाइन करना होगा।`,
+        )
+      : t(
+          `This shop takes cash only up to ${codLimit}. Remove a few items to place this order.`,
+          `यह दुकान ${codLimit} तक ही नकद लेती है। ऑर्डर करने के लिए कुछ आइटम हटाएं।`,
+        );
+  }
+  if (availability.codRefusal === "cod_off") {
+    return t(
+      "This shop takes online payment only.",
+      "यह दुकान सिर्फ़ ऑनलाइन भुगतान लेती है।",
+    );
+  }
+  return availability.notice;
 }
 
 function PaymentOption({
@@ -1181,7 +1441,7 @@ function PaymentOption({
           : "cursor-pointer",
         selected && !disabled
           ? "border-accent bg-accent-soft"
-          : "border-line bg-surface-2"
+          : "border-line bg-surface-2",
       )}
     >
       <input
@@ -1195,7 +1455,7 @@ function PaymentOption({
       <span
         className={cn(
           "mt-0.5 shrink-0",
-          selected && !disabled ? "text-accent-ink" : "text-muted"
+          selected && !disabled ? "text-accent-ink" : "text-muted",
         )}
         aria-hidden
       >
@@ -1215,7 +1475,7 @@ function PaymentOption({
       <span
         className={cn(
           "mt-1 grid size-[18px] shrink-0 place-items-center rounded-full border-2",
-          selected && !disabled ? "border-accent" : "border-line"
+          selected && !disabled ? "border-accent" : "border-line",
         )}
         aria-hidden
       >
@@ -1236,11 +1496,12 @@ function CheckoutHeader({
   onBack: () => void;
   onClear?: () => void;
 }) {
+  const t = useT();
   return (
     <header className="app-header sticky top-0 z-20 flex items-center gap-3 px-4 py-3">
       <button
         onClick={onBack}
-        aria-label="Go back"
+        aria-label={t("Go back", "वापस जाएं")}
         className="press grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
       >
         <ChevronLeft className="size-5" />
@@ -1251,7 +1512,7 @@ function CheckoutHeader({
       {onClear ? (
         <button
           onClick={onClear}
-          aria-label="Clear cart"
+          aria-label={t("Clear cart", "टोकरी खाली करें")}
           className="press grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
         >
           <Trash2 className="size-[18px]" />

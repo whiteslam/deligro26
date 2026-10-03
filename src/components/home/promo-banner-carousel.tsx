@@ -7,18 +7,23 @@ import type { Banner } from "@/types";
 import { bannerHref, bannerIsExternal } from "@/lib/banner-href";
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 const MIN_MS = 3000;
 const MAX_MS = 8000;
 
 /** Fire-and-forget analytics ping. Never blocks or throws into the UI. */
-function track(bannerId: string, kind: "impression" | "click", placement: string) {
+function track(
+  bannerId: string,
+  kind: "impression" | "click",
+  placement: string,
+) {
   const body = JSON.stringify({ bannerId, kind, placement });
   try {
     if (typeof navigator !== "undefined" && "sendBeacon" in navigator) {
       navigator.sendBeacon(
         "/api/banners/track",
-        new Blob([body], { type: "application/json" })
+        new Blob([body], { type: "application/json" }),
       );
       return;
     }
@@ -56,6 +61,7 @@ export function PromoBannerCarousel({
   /** Set false for admin previews — renders identically, records nothing. */
   analytics?: boolean;
 }) {
+  const t = useT();
   const scroller = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   // Suspends auto-advance while the user is touching or hovering the carousel.
@@ -73,7 +79,7 @@ export function PromoBannerCarousel({
       impressed.current.add(b.id);
       track(b.id, "impression", placement);
     },
-    [banners, placement, analytics]
+    [banners, placement, analytics],
   );
 
   // Derive the active index from scroll position — keeps dots in sync with a
@@ -155,11 +161,14 @@ export function PromoBannerCarousel({
               <button
                 key={b.id}
                 type="button"
-                aria-label={`Go to slide ${i + 1}`}
+                aria-label={t(
+                  `Go to slide ${i + 1}`,
+                  `स्लाइड ${i + 1} पर जाएं`,
+                )}
                 onClick={() => goTo(i)}
                 className={cn(
                   "pointer-events-auto h-1.5 rounded-full bg-white/60 transition-all duration-300",
-                  i === index ? "w-5 bg-white" : "w-1.5"
+                  i === index ? "w-5 bg-white" : "w-1.5",
                 )}
               />
             ))}
@@ -182,6 +191,7 @@ function BannerSlide({
   const href = bannerHref(banner);
   const external = bannerIsExternal(banner);
   const sponsored = banner.kind === "sponsored";
+  const t = useT();
 
   return (
     <div className="w-full shrink-0 snap-start snap-always">
@@ -211,7 +221,8 @@ function BannerSlide({
 
         {sponsored ? (
           <span className="absolute right-3 top-3 rounded-full bg-black/45 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.06em] text-white/90 backdrop-blur-sm">
-            Sponsored{banner.sponsorName ? ` · ${banner.sponsorName}` : ""}
+            {t("Sponsored", "प्रायोजित")}
+            {banner.sponsorName ? ` · ${banner.sponsorName}` : ""}
           </span>
         ) : null}
 

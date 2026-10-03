@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, Loader2, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
 const MAX_DIM = 512; // avatars never render larger than this
@@ -31,6 +32,7 @@ export function ProfileAvatar({
   readOnly?: boolean;
 }) {
   const router = useRouter();
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [sheet, setSheet] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -58,7 +60,12 @@ export function ProfileAvatar({
     try {
       const upload = await toSquareJpeg(file);
       if (!upload) {
-        setError("That image format isn't supported. Try a JPG or PNG.");
+        setError(
+          t(
+            "That image format isn't supported. Try a JPG or PNG.",
+            "यह फ़ोटो फ़ॉर्मेट नहीं चलता। जेपीजी या पीएनजी फ़ोटो चुनें।",
+          ),
+        );
         setPreview(null);
         return;
       }
@@ -71,10 +78,19 @@ export function ProfileAvatar({
       if (!res.ok) {
         setError(
           data.error === "too_large"
-            ? "That photo is too large (5 MB max)."
+            ? t(
+                "That photo is too large (5 MB max).",
+                "फ़ोटो बहुत बड़ी है (ज़्यादा से ज़्यादा 5 MB)।",
+              )
             : data.error === "invalid_type"
-              ? "That image format isn't supported. Try a JPG or PNG."
-              : "Could not upload the photo. Try again."
+              ? t(
+                  "That image format isn't supported. Try a JPG or PNG.",
+                  "यह फ़ोटो फ़ॉर्मेट नहीं चलता। जेपीजी या पीएनजी फ़ोटो चुनें।",
+                )
+              : t(
+                  "Could not upload the photo. Try again.",
+                  "फ़ोटो अपलोड नहीं हो पाई। फिर कोशिश करें।",
+                ),
         );
         setPreview(null);
         return;
@@ -82,7 +98,12 @@ export function ProfileAvatar({
 
       router.refresh();
     } catch {
-      setError("Could not upload the photo. Try again.");
+      setError(
+        t(
+          "Could not upload the photo. Try again.",
+          "फ़ोटो अपलोड नहीं हो पाई। फिर कोशिश करें।",
+        ),
+      );
       setPreview(null);
     } finally {
       setBusy(false);
@@ -97,13 +118,23 @@ export function ProfileAvatar({
     try {
       const res = await fetch("/api/profile/avatar", { method: "DELETE" });
       if (!res.ok) {
-        setError("Could not remove the photo. Try again.");
+        setError(
+          t(
+            "Could not remove the photo. Try again.",
+            "फ़ोटो हटाई नहीं जा सकी। फिर कोशिश करें।",
+          ),
+        );
         return;
       }
       setPreview(null);
       router.refresh();
     } catch {
-      setError("Could not remove the photo. Try again.");
+      setError(
+        t(
+          "Could not remove the photo. Try again.",
+          "फ़ोटो हटाई नहीं जा सकी। फिर कोशिश करें।",
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -119,7 +150,14 @@ export function ProfileAvatar({
           else pick();
         }}
         disabled={busy || readOnly}
-        aria-label={avatarUrl ? "Change or remove profile photo" : "Add a profile photo"}
+        aria-label={
+          avatarUrl
+            ? t(
+                "Change or remove profile photo",
+                "प्रोफ़ाइल फ़ोटो बदलें या हटाएं",
+              )
+            : t("Add a profile photo", "प्रोफ़ाइल फ़ोटो लगाएं")
+        }
         className="press relative shrink-0 rounded-full"
       >
         <span
@@ -127,7 +165,7 @@ export function ProfileAvatar({
             "grid size-16 place-items-center overflow-hidden rounded-full bg-accent-soft text-[19px] font-extrabold text-accent-ink",
             // Golden ring for the boss — gold token + a soft gold glow.
             developer &&
-              "ring-2 ring-pop ring-offset-2 ring-offset-bg shadow-[0_0_14px_-2px_var(--pop)]"
+              "ring-2 ring-pop ring-offset-2 ring-offset-bg shadow-[0_0_14px_-2px_var(--pop)]",
           )}
         >
           {shown ? (
@@ -164,7 +202,7 @@ export function ProfileAvatar({
         <div className="fixed inset-0 z-50">
           <button
             type="button"
-            aria-label="Close"
+            aria-label={t("Close", "बंद करें")}
             onClick={() => setSheet(false)}
             className="absolute inset-0 bg-ink/40"
           />
@@ -174,7 +212,9 @@ export function ProfileAvatar({
             className="bolt-sheet animate-sheet-in absolute inset-x-0 bottom-0 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-heading">Profile photo</h2>
+              <h2 className="text-heading">
+                {t("Profile photo", "प्रोफ़ाइल फ़ोटो")}
+              </h2>
               <button
                 type="button"
                 onClick={() => setSheet(false)}
@@ -191,7 +231,7 @@ export function ProfileAvatar({
               >
                 <ImagePlus className="size-5 shrink-0 text-ink" />
                 <span className="flex-1 text-[15px] font-medium">
-                  Choose a new photo
+                  {t("Choose a new photo", "नई फ़ोटो चुनें")}
                 </span>
               </button>
               <button
@@ -201,7 +241,7 @@ export function ProfileAvatar({
               >
                 <Trash2 className="size-5 shrink-0" />
                 <span className="flex-1 text-[15px] font-medium">
-                  Remove photo
+                  {t("Remove photo", "फ़ोटो हटाएं")}
                 </span>
               </button>
             </div>
@@ -243,12 +283,12 @@ async function toSquareJpeg(file: File): Promise<File | null> {
     0,
     0,
     size,
-    size
+    size,
   );
   bitmap.close();
 
   const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", 0.85)
+    canvas.toBlob(resolve, "image/jpeg", 0.85),
   );
   if (!blob) return null;
 

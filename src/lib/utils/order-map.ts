@@ -1,6 +1,7 @@
 import type { Order, OrderStatus, PaymentMethod, PaymentStatus } from "@/types";
 import type { Order as DbOrder } from "@/lib/data-access/orders";
 import { formatIst, istDateKey, istDaysBetween } from "@/lib/utils/ist-time";
+import { translator, type Lang } from "@/lib/i18n/lang";
 
 /**
  * One row per `order_status` value — no folding.
@@ -30,21 +31,28 @@ export function dbStatusToUi(status: string): OrderStatus {
   return DB_TO_UI[status] ?? "PLACED";
 }
 
-export function formatOrderPlacedAt(iso: string): string {
+export function formatOrderPlacedAt(iso: string, lang: Lang = "en"): string {
   // Every part of this label is computed in IST, not the runtime's zone. It is
   // built on the server (UTC on Vercel), so the time used to read 5h30m early
   // and "Today"/"Yesterday" flipped at 5:30 am IST instead of midnight.
   const date = new Date(iso);
   const now = new Date();
-  const time = formatIst(date, { hour: "numeric", minute: "2-digit" });
+  const t = translator(lang);
+  // The customer app may be in Hindi; operator screens call this without a
+  // language and keep the en-IN labels.
+  const fmt = (options: Intl.DateTimeFormatOptions) =>
+    lang === "hi"
+      ? date.toLocaleString("hi-IN", { ...options, timeZone: "Asia/Kolkata" })
+      : formatIst(date, options);
+  const time = fmt({ hour: "numeric", minute: "2-digit" });
   const days = istDaysBetween(date, now);
 
-  if (days === 0) return `Today, ${time}`;
-  if (days === 1) return `Yesterday, ${time}`;
+  if (days === 0) return t(`Today, ${time}`, `आज, ${time}`);
+  if (days === 1) return t(`Yesterday, ${time}`, `कल, ${time}`);
 
   // Inside the week a weekday is the fastest thing to read.
   if (days < 7) {
-    return formatIst(date, {
+    return fmt({
       weekday: "short",
       hour: "numeric",
       minute: "2-digit",
@@ -57,7 +65,7 @@ export function formatOrderPlacedAt(iso: string): string {
   // tell apart or date. Older rows get a real date, and the year once it is not
   // this one.
   const sameYear = istDateKey(date).slice(0, 4) === istDateKey(now).slice(0, 4);
-  const day = formatIst(date, {
+  const day = fmt({
     day: "numeric",
     month: "short",
     ...(sameYear ? {} : { year: "numeric" }),
@@ -145,25 +153,49 @@ function asCancelledBy(v: string | null | undefined): CancelledBy | null {
  * that case rather than guess, because the guess people reach for ("cancelled
  * by the restaurant") is the accusation.
  */
-export function cancellationNote(order: {
-  cancelledBy?: CancelledBy | null;
-  cancellationReason?: string | null;
-}): { who: string; reason?: string } | null {
+export function cancellationNote(
+  order: {
+    cancelledBy?: CancelledBy | null;
+    cancellationReason?: string | null;
+  },
+  lang: Lang = "en",
+): { who: string; reason?: string } | null {
+  const t = translator(lang);
   const reason = order.cancellationReason?.trim() || undefined;
   switch (order.cancelledBy) {
     case "customer":
-      return { who: "You cancelled this order", reason };
+      return {
+        who: t("You cancelled this order", "आपने यह ऑर्डर कैंसिल किया"),
+        reason,
+      };
     case "vendor":
-      return { who: "The restaurant could not take this order", reason };
+      return {
+        who: t(
+          "The restaurant could not take this order",
+          "रेस्टोरेंट यह ऑर्डर नहीं ले सका",
+        ),
+        reason,
+      };
     case "manager":
     case "admin":
-      return { who: "Cancelled by Deligro support", reason };
+      return {
+        who: t("Cancelled by Deligro support", "Deligro सपोर्ट ने कैंसिल किया"),
+        reason,
+      };
     case "system":
-      return { who: "Cancelled automatically", reason };
+      return {
+        who: t("Cancelled automatically", "अपने आप कैंसिल हो गया"),
+        reason,
+      };
     default:
       // A reason with no party is still worth showing — it is the sentence
       // somebody actually wrote — but it cannot be attributed to anyone.
-      return reason ? { who: "This order was cancelled", reason } : null;
+      return reason
+        ? {
+            who: t("This order was cancelled", "यह ऑर्डर कैंसिल हो गया"),
+            reason,
+          }
+        : null;
   }
 }
 

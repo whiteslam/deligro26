@@ -3,6 +3,7 @@
 import { useLocation } from "@/stores/location-store";
 import { PINNED_LOCATION } from "@/lib/location/pinned";
 import { distanceToShop, formatDistance } from "@/lib/geo/distance";
+import { useT } from "@/components/providers/lang-provider";
 
 /**
  * Only the pin. `distanceKm` used to be declared here too, described as the
@@ -44,12 +45,22 @@ export function useShopDistance(shop: Shop): string | null {
 export function ShopDistance({ shop }: { shop: Shop }) {
   const distance = useShopDistance(shop);
   const stale = useLocation((s) => s.status === "stale");
+  const t = useT();
   if (!distance) return null;
 
   return (
     <>
       <span className="text-line">•</span>
-      <span title={stale ? "Measured from your last known location" : undefined}>
+      <span
+        title={
+          stale
+            ? t(
+                "Measured from your last known location",
+                "आपकी पिछली पता चली लोकेशन से नापा गया",
+              )
+            : undefined
+        }
+      >
         {stale ? "~" : ""}
         {distance}
       </span>

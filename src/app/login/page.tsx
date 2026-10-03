@@ -5,6 +5,8 @@ import Link from "next/link";
 import { StatusBar } from "@/components/layout/status-bar";
 import { SplashScreen } from "@/components/shared/splash-screen";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { LanguageSwitch } from "@/components/shared/language-switch";
+import { useT } from "@/components/providers/lang-provider";
 import { OtpLogin } from "@/components/auth/otp-login";
 import { continueAsGuest } from "@/lib/auth/guest-actions";
 import { customerLanding } from "@/lib/auth/portals";
@@ -22,6 +24,7 @@ import { useSearchParams } from "next/navigation";
  */
 function LoginForm() {
   const params = useSearchParams();
+  const t = useT();
   // Where the app itself should open. A `next` set by the proxy (bounced from
   // /checkout, /orders, …) still wins, so people land where they were headed —
   // unless it points into an operator portal, which needs that portal's door.
@@ -39,8 +42,8 @@ function LoginForm() {
     <div className="w-full max-w-sm">
       <OtpLogin
         next={next}
-        heading="Sign in"
-        sub="Deligro · order in minutes"
+        heading={t("Sign in", "लॉग इन करें")}
+        sub={"Deligro · " + t("order in minutes", "मिनटों में ऑर्डर करें")}
       />
 
       {showGuest ? (
@@ -49,17 +52,23 @@ function LoginForm() {
             type="submit"
             className="press mt-4 block w-full text-center text-sm font-semibold text-muted hover:text-ink"
           >
-            Browse as guest
+            {t("Browse as guest", "गेस्ट की तरह देखें")}
           </button>
         </form>
       ) : null}
 
       <p className="mt-6 text-center text-xs leading-relaxed text-muted">
-        OTP login is rate-limited per phone number.
+        {t(
+          "OTP login is rate-limited per phone number.",
+          "एक मोबाइल नंबर पर सीमित बार ही ओटीपी भेजा जा सकता है।",
+        )}
         <br />
-        Restaurant, manager, driver or admin?{" "}
+        {t(
+          "Restaurant, manager, driver or admin?",
+          "रेस्टोरेंट, मैनेजर, ड्राइवर या एडमिन?",
+        )}{" "}
         <Link href="/portals" className="font-semibold hover:text-ink">
-          Portal sign-in
+          {t("Portal sign-in", "पोर्टल लॉग इन")}
         </Link>
       </p>
     </div>
@@ -73,7 +82,13 @@ export default function LoginPage() {
         <StatusBar />
         <SplashScreen />
         {/* Below the status-bar strip, which is opaque and would otherwise
-            cover the toggle in the framed (desktop) view. */}
+            cover the toggle in the framed (desktop) view. The language switch
+            mirrors it on the left, so a first-time customer can pick English
+            or हिंदी before signing in. Compact buttons keep the pair ~150px
+            wide, well clear of the 40px toggle even at 360px. */}
+        <div className="absolute left-4 top-4 z-10 min-[480px]:top-[64px]">
+          <LanguageSwitch className="[&>button]:min-w-0 [&>button]:px-3 [&>button]:py-1.5" />
+        </div>
         <div className="absolute right-4 top-4 z-10 min-[480px]:top-[64px]">
           <ThemeToggle />
         </div>

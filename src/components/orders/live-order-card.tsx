@@ -11,6 +11,7 @@ import {
   formatINR,
 } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
+import { translator, type Lang } from "@/lib/i18n/lang";
 
 /**
  * The order that is actually happening, as the anchor of the screen.
@@ -28,14 +29,21 @@ import { cn } from "@/lib/utils/cn";
 export function LiveOrderCard({
   order,
   eta,
+  lang,
 }: {
   order: UiOrder;
   eta?: OrderEta | null;
+  /** Rendered by the server page, which reads the customer's language. */
+  lang: Lang;
 }) {
-  const steps = trackingSteps({
-    restaurantName: order.restaurantName,
-    riderName: order.rider?.name,
-  });
+  const t = translator(lang);
+  const steps = trackingSteps(
+    {
+      restaurantName: order.restaurantName,
+      riderName: order.rider?.name,
+    },
+    lang,
+  );
   const current = statusIndex(order.status);
   const step = steps[Math.min(current, steps.length - 1)];
 
@@ -50,25 +58,26 @@ export function LiveOrderCard({
   // Far past its promise, any countdown is fiction: "115 min" sat next to
   // "Delayed" on an order that had been open for 27 days. Say what we know.
   const stuck =
-    Boolean(eta?.late) && (eta?.lateByMinutes ?? 0) >= CUSTOMER_LATE_CAP_MINUTES;
+    Boolean(eta?.late) &&
+    (eta?.lateByMinutes ?? 0) >= CUSTOMER_LATE_CAP_MINUTES;
   const headline = stuck
-    ? "Delayed · देरी"
+    ? t("Delayed", "देरी हो रही है")
     : unmeasured
-    ? "On its way"
-    : minutes !== null
-      ? minutes > 0
-        ? `${minutes} min`
-        : "Arriving now"
-      : order.etaMinutes
-        ? `~${order.etaMinutes} min`
-        : "On its way";
+      ? t("On its way", "रास्ते में है")
+      : minutes !== null
+        ? minutes > 0
+          ? t(`${minutes} min`, `${minutes} मिनट`)
+          : t("Arriving now", "बस पहुँच रहा है")
+        : order.etaMinutes
+          ? t(`~${order.etaMinutes} min`, `~${order.etaMinutes} मिनट`)
+          : t("On its way", "रास्ते में है");
   const caption = stuck
-    ? "We're looking into this order"
+    ? t("We're looking into this order", "हम इस ऑर्डर को देख रहे हैं")
     : unmeasured
-    ? "We can't estimate this one"
-    : minutes !== null || order.etaMinutes
-      ? "Estimated arrival"
-      : "Tracking live";
+      ? t("We can't estimate this one", "इसका समय अभी नहीं बता सकते")
+      : minutes !== null || order.etaMinutes
+        ? t("Estimated arrival", "पहुँचने का अनुमानित समय")
+        : t("Tracking live", "लाइव ट्रैक हो रहा है");
 
   return (
     <Link
@@ -110,7 +119,7 @@ export function LiveOrderCard({
         {eta?.late && !stuck ? (
           <span className="flex shrink-0 items-center gap-1 rounded-full bg-deal-soft px-2.5 py-1 text-[11px] font-bold text-deal">
             <Clock className="size-3" />
-            {formatCustomerLateness(eta.lateByMinutes)}
+            {formatCustomerLateness(eta.lateByMinutes, lang)}
           </span>
         ) : null}
       </div>
@@ -125,7 +134,7 @@ export function LiveOrderCard({
               key={s.key}
               className={cn(
                 "h-1 flex-1 rounded-full",
-                i <= current ? "bg-green" : "bg-line"
+                i <= current ? "bg-green" : "bg-line",
               )}
             />
           ))}

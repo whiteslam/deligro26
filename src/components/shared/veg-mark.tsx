@@ -1,4 +1,7 @@
+"use client";
+
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 /**
  * The familiar veg / non-veg square used across Indian food apps.
@@ -14,16 +17,19 @@ export function VegMark({
   veg?: boolean;
   className?: string;
 }) {
+  const t = useT();
   if (typeof veg !== "boolean") return null;
 
   const color = veg ? "var(--green)" : "var(--accent)";
   return (
     <span
-      aria-label={veg ? "Vegetarian" : "Non-vegetarian"}
+      aria-label={
+        veg ? t("Vegetarian", "शाकाहारी") : t("Non-vegetarian", "मांसाहारी")
+      }
       className={cn(
         "inline-grid place-items-center rounded-[3px] border",
         "size-[14px] shrink-0",
-        className
+        className,
       )}
       style={{ borderColor: color }}
     >

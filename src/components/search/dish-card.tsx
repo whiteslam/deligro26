@@ -12,6 +12,7 @@ import { ShopDistance } from "@/components/shared/shop-distance";
 import { ItemPrice } from "@/components/shared/item-price";
 import { formatEta, formatRating, isRated } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 /**
  * A search result that is a *dish*, not a restaurant.
@@ -23,6 +24,7 @@ import { cn } from "@/lib/utils/cn";
  */
 export function DishCard({ hit }: { hit: DishHit }) {
   const { item, restaurant } = hit;
+  const t = useT();
 
   const lines = useCart((s) => s.lines);
   const cartSlug = useCart((s) => s.restaurantSlug);
@@ -35,13 +37,18 @@ export function DishCard({ hit }: { hit: DishHit }) {
   // one id and the other shop's quantity would otherwise show up here.
   const qty =
     cartSlug === restaurant.slug
-      ? lines.find((l) => l.itemId === item.id)?.qty ?? 0
+      ? (lines.find((l) => l.itemId === item.id)?.qty ?? 0)
       : 0;
 
   const unavailable = item.soldOut || !restaurant.open;
 
   return (
-    <div className={cn("relative flex gap-3.5 py-3.5 pb-5", unavailable && "opacity-60")}>
+    <div
+      className={cn(
+        "relative flex gap-3.5 py-3.5 pb-5",
+        unavailable && "opacity-60",
+      )}
+    >
       <div className="flex min-w-0 flex-1 flex-col items-start">
         <button
           type="button"
@@ -50,7 +57,7 @@ export function DishCard({ hit }: { hit: DishHit }) {
         >
           {item.popular || item.bestseller ? (
             <span className="pill-pop mb-1.5 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
-              Popular
+              {t("Popular", "लोकप्रिय")}
             </span>
           ) : null}
           <div className="flex items-center gap-1.5">
@@ -78,14 +85,17 @@ export function DishCard({ hit }: { hit: DishHit }) {
               </span>
             ) : (
               <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-muted">
-                New
+                {t("New", "नया")}
               </span>
             )}
           </span>
           <span className="mt-0.5 flex items-center gap-2 text-[12px] font-medium text-muted">
             <span className="inline-flex items-center gap-1">
               <Clock className="size-3.5" />
-              {formatEta(restaurant.etaMin, restaurant.etaMax)}
+              {t(
+                formatEta(restaurant.etaMin, restaurant.etaMax),
+                `${restaurant.etaMin}–${restaurant.etaMax} मिनट`,
+              )}
             </span>
             <ShopDistance shop={restaurant} />
           </span>
@@ -110,11 +120,11 @@ export function DishCard({ hit }: { hit: DishHit }) {
             would build a basket nobody can cook. */}
         {!restaurant.open ? (
           <span className="absolute inset-x-0 bottom-0 rounded-b-lg bg-ink/70 py-1 text-center text-[11px] font-bold uppercase tracking-wide text-white">
-            Closed
+            {t("Closed", "बंद")}
           </span>
         ) : item.soldOut ? (
           <span className="absolute inset-x-0 bottom-0 rounded-b-lg bg-ink/70 py-1 text-center text-[11px] font-bold uppercase tracking-wide text-white">
-            Sold out
+            {t("Sold out", "स्टॉक खत्म")}
           </span>
         ) : qty === 0 ? (
           <button
@@ -122,17 +132,20 @@ export function DishCard({ hit }: { hit: DishHit }) {
             onClick={() =>
               request(item, { slug: restaurant.slug, name: restaurant.name })
             }
-            aria-label={`Add ${item.name} from ${restaurant.name}`}
+            aria-label={t(
+              `Add ${item.name} from ${restaurant.name}`,
+              `${restaurant.name} से ${item.name} जोड़ें`,
+            )}
             className="tap-target press bolt-add"
           >
-            Add
+            {t("Add", "जोड़ें")}
           </button>
         ) : (
           <div className="bolt-add-qty">
             <button
               type="button"
               onClick={() => setQty(item.id, qty - 1)}
-              aria-label="Remove one"
+              aria-label={t("Remove one", "एक कम करें")}
               className="tap-target grid size-7 place-items-center rounded-md hover:bg-white/15"
             >
               <Minus className="size-4" strokeWidth={2.75} />
@@ -143,7 +156,7 @@ export function DishCard({ hit }: { hit: DishHit }) {
             <button
               type="button"
               onClick={() => setQty(item.id, qty + 1)}
-              aria-label="Add one"
+              aria-label={t("Add one", "एक और जोड़ें")}
               className="tap-target grid size-7 place-items-center rounded-md hover:bg-white/15"
             >
               <Plus className="size-4" strokeWidth={2.75} />

@@ -1,11 +1,16 @@
+"use client";
+
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import type { Order } from "@/types";
 import { STATUS_META } from "@/lib/utils/order-status";
+import { pick } from "@/lib/i18n/lang";
+import { useLang } from "@/components/providers/lang-provider";
 import { PhotoTile } from "@/components/shared/photo-tile";
 
 /** Bolt-style ongoing-order card — a calm white row with a live green dot. */
 export function ActiveOrderStrip({ order }: { order: Order | null }) {
+  const { lang, t } = useLang();
   if (!order) return null;
 
   const meta = STATUS_META[order.status];
@@ -28,7 +33,7 @@ export function ActiveOrderStrip({ order }: { order: Order | null }) {
       <div className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 text-[13px] font-bold text-green">
           <span className="inline-block size-2 animate-pulse rounded-full bg-green" />
-          Ongoing order · {meta.label}
+          {t("Ongoing order", "चालू ऑर्डर")} · {pick(lang, meta)}
         </span>
         <p className="mt-0.5 truncate text-[15px] font-extrabold tracking-tight">
           {order.restaurantName}

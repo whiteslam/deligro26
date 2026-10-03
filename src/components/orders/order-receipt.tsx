@@ -4,6 +4,7 @@ import { Printer } from "lucide-react";
 import type { UiOrder } from "@/lib/utils/order-map";
 import { shortOrderId } from "@/lib/utils/order-map";
 import { formatINR } from "@/lib/utils/format";
+import { useT } from "@/components/providers/lang-provider";
 
 /**
  * What the customer paid, itemised, on a page that survives leaving the screen.
@@ -30,13 +31,14 @@ export function OrderReceipt({
    */
   placedOn: string;
 }) {
+  const t = useT();
   const charges = order.charges;
   const paidWith =
     order.paymentMethod === "online"
       ? order.paymentStatus === "paid"
-        ? "Paid online"
-        : "Online payment"
-      : "Cash on delivery";
+        ? t("Paid online", "ऑनलाइन भुगतान हो गया")
+        : t("Online payment", "ऑनलाइन भुगतान")
+      : t("Cash on delivery", "डिलीवरी पर नकद");
 
   return (
     <div className="admin-measure mx-auto px-4 pb-8">
@@ -47,7 +49,7 @@ export function OrderReceipt({
               Deligro
             </p>
             <h1 className="mt-1 text-[22px] font-extrabold tracking-tight">
-              Receipt
+              {t("Receipt", "रसीद")}
             </h1>
           </div>
           <div className="text-right">
@@ -60,12 +62,14 @@ export function OrderReceipt({
 
         <dl className="mt-4 space-y-1.5 border-t border-line pt-4 text-[13px]">
           <div className="flex justify-between gap-4">
-            <dt className="text-muted">Restaurant</dt>
+            <dt className="text-muted">{t("Restaurant", "रेस्टोरेंट")}</dt>
             <dd className="text-right font-semibold">{order.restaurantName}</dd>
           </div>
           {order.address?.line ? (
             <div className="flex justify-between gap-4">
-              <dt className="shrink-0 text-muted">Delivered to</dt>
+              <dt className="shrink-0 text-muted">
+                {t("Delivered to", "डिलीवरी का पता")}
+              </dt>
               <dd className="text-right font-semibold">
                 {order.address.label ? `${order.address.label} — ` : ""}
                 {order.address.line}
@@ -73,7 +77,7 @@ export function OrderReceipt({
             </div>
           ) : null}
           <div className="flex justify-between gap-4">
-            <dt className="text-muted">Payment</dt>
+            <dt className="text-muted">{t("Payment", "भुगतान")}</dt>
             <dd className="text-right font-semibold">{paidWith}</dd>
           </div>
         </dl>
@@ -81,9 +85,13 @@ export function OrderReceipt({
         <table className="mt-5 w-full text-[14px]">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-[0.06em] text-muted">
-              <th className="pb-2 text-left font-bold">Item</th>
-              <th className="pb-2 text-right font-bold">Qty</th>
-              <th className="pb-2 text-right font-bold">Amount</th>
+              <th className="pb-2 text-left font-bold">{t("Item", "आइटम")}</th>
+              <th className="pb-2 text-right font-bold">
+                {t("Qty", "मात्रा")}
+              </th>
+              <th className="pb-2 text-right font-bold">
+                {t("Amount", "रकम")}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -105,35 +113,47 @@ export function OrderReceipt({
             inventing the parts. */}
         {charges ? (
           <dl className="mt-4 space-y-1.5 text-[14px]">
-            <Row label="Subtotal" value={charges.subtotal} />
+            <Row label={t("Subtotal", "कुल सामान")} value={charges.subtotal} />
             {charges.discount > 0 ? (
               <Row
                 label={
                   charges.couponCode
-                    ? `Discount (${charges.couponCode})`
-                    : "Discount"
+                    ? t(
+                        `Discount (${charges.couponCode})`,
+                        `छूट (${charges.couponCode})`,
+                      )
+                    : t("Discount", "छूट")
                 }
                 value={-charges.discount}
               />
             ) : null}
-            <Row label="Delivery" value={charges.deliveryFee} />
-            {charges.tax > 0 ? <Row label="Taxes" value={charges.tax} /> : null}
+            <Row label={t("Delivery", "डिलीवरी")} value={charges.deliveryFee} />
+            {charges.tax > 0 ? (
+              <Row label={t("Taxes", "टैक्स")} value={charges.tax} />
+            ) : null}
             {charges.tip > 0 ? (
-              <Row label="Tip for the rider" value={charges.tip} />
+              <Row
+                label={t("Tip for the rider", "राइडर के लिए टिप")}
+                value={charges.tip}
+              />
             ) : null}
           </dl>
         ) : null}
 
         <div className="mt-3 flex justify-between border-t border-line pt-3">
-          <span className="text-[15px] font-extrabold">Total</span>
+          <span className="text-[15px] font-extrabold">
+            {t("Total", "कुल")}
+          </span>
           <span className="text-data text-[17px] font-extrabold">
             {formatINR(order.total)}
           </span>
         </div>
 
         <p className="mt-5 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
-          This is a customer receipt for an order placed through Deligro. Prices
-          are in Indian rupees and include any taxes shown above.
+          {t(
+            "This is a customer receipt for an order placed through Deligro. Prices are in Indian rupees and include any taxes shown above.",
+            "यह Deligro से किए गए ऑर्डर की ग्राहक रसीद है। सभी दाम भारतीय रुपये में हैं और ऊपर दिखाए गए टैक्स इनमें शामिल हैं।",
+          )}
         </p>
       </div>
 
@@ -144,7 +164,7 @@ export function OrderReceipt({
         className="press mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-accent py-3.5 text-sm font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)]"
       >
         <Printer className="size-4" />
-        Print or save as PDF
+        {t("Print or save as PDF", "प्रिंट करें या पीडीएफ़ सेव करें")}
       </button>
     </div>
   );

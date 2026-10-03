@@ -10,6 +10,8 @@ import { getOrdersPageData } from "@/lib/orders-ui";
 import { getOrderEta } from "@/lib/data-access/order-tracking";
 import { requireUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { getLang } from "@/lib/i18n/server";
+import { translator } from "@/lib/i18n/lang";
 
 /**
  * Slower than the 3s poll on /orders/[id]. That screen is someone watching their
@@ -24,6 +26,8 @@ export default async function OrdersPage() {
   // Order history is per-account — guests are bounced to /login by the proxy;
   // this backstops it server-side.
   await requireUser();
+  const lang = await getLang();
+  const t = translator(lang);
   const { active, past, ok, hasMore } = await getOrdersPageData();
   const hasOrders = Boolean(active) || past.length > 0;
 
@@ -51,7 +55,9 @@ export default async function OrdersPage() {
       <PullToRefresh />
 
       <div className="glass sticky top-0 z-20 px-4 pb-3 pt-5">
-        <h1 className="text-[23px] font-extrabold tracking-tight">Orders</h1>
+        <h1 className="text-[23px] font-extrabold tracking-tight">
+          {t("Orders", "ऑर्डर")}
+        </h1>
       </div>
 
       {hasOrders ? (
@@ -60,9 +66,9 @@ export default async function OrdersPage() {
             <section>
               <h2 className="mb-2 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
                 <span className="size-1.5 animate-pulse rounded-full bg-green" />
-                Happening now
+                {t("Happening now", "अभी चल रहा है")}
               </h2>
-              <LiveOrderCard order={active} eta={eta} />
+              <LiveOrderCard order={active} eta={eta} lang={lang} />
             </section>
           ) : null}
 
@@ -78,11 +84,14 @@ export default async function OrdersPage() {
           className="mt-12"
           icon={<TriangleAlert className="size-7" />}
           tone="violet"
-          title="Couldn't load your orders"
-          description="This is a problem on our side, not a sign that anything is missing. Your orders are safe — try again in a moment."
+          title={t("Couldn't load your orders", "आपके ऑर्डर लोड नहीं हो पाए")}
+          description={t(
+            "This is a problem on our side, not a sign that anything is missing. Your orders are safe — try again in a moment.",
+            "यह हमारी तरफ़ की दिक्कत है, कुछ भी गायब नहीं हुआ है। आपके ऑर्डर सुरक्षित हैं — थोड़ी देर में फिर कोशिश करें।",
+          )}
           action={
             <Link href="/orders">
-              <Button>Try again</Button>
+              <Button>{t("Try again", "फिर कोशिश करें")}</Button>
             </Link>
           }
         />
@@ -91,11 +100,16 @@ export default async function OrdersPage() {
           className="mt-12"
           icon={<ReceiptText className="size-7" />}
           tone="violet"
-          title="No orders yet"
-          description="Your orders will appear here — track live and reorder in a tap."
+          title={t("No orders yet", "अभी तक कोई ऑर्डर नहीं")}
+          description={t(
+            "Your orders will appear here — track live and reorder in a tap.",
+            "आपके ऑर्डर यहाँ दिखेंगे — लाइव ट्रैक करें और एक टैप में दोबारा मँगाएँ।",
+          )}
           action={
             <Link href="/">
-              <Button>Find something to eat</Button>
+              <Button>
+                {t("Find something to eat", "कुछ खाने को ढूँढें")}
+              </Button>
             </Link>
           }
         />

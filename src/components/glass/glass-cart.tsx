@@ -12,11 +12,13 @@ import { formatINR } from "@/lib/utils/format";
 import { computeChargesWith } from "@/lib/pricing";
 import { useChargesConfig } from "@/components/providers/charges-config-provider";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 const HIDDEN_ON = ["/checkout"];
 
 export function GlassCart() {
   const pathname = usePathname();
+  const t = useT();
 
   const lines = useCart((s) => s.lines);
   const restaurantName = useCart((s) => s.restaurantName);
@@ -65,7 +67,7 @@ export function GlassCart() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-bold">
-                View basket · टोकरी देखें
+                {t("View basket", "टोकरी देखें")}
               </span>
               <span className="block truncate text-xs font-semibold">
                 {restaurantName} · {formatINR(subtotal)}
@@ -76,7 +78,7 @@ export function GlassCart() {
 
           <button
             onClick={clear}
-            aria-label="Clear basket"
+            aria-label={t("Clear basket", "टोकरी खाली करें")}
             className="press tap-target grid size-9 shrink-0 place-items-center rounded-full bg-white/25"
           >
             <X className="size-4" />
@@ -87,7 +89,7 @@ export function GlassCart() {
       {cartOpen && (
         <div className="absolute inset-0 z-40">
           <button
-            aria-label="Close basket"
+            aria-label={t("Close basket", "टोकरी बंद करें")}
             onClick={closeCart}
             className="animate-fade-in absolute inset-0 bg-ink/40"
           />
@@ -95,12 +97,14 @@ export function GlassCart() {
             <div className="bolt-sheet-handle" />
             <div className="flex items-center justify-between px-5 pb-2 pt-3">
               <div>
-                <h2 className="text-heading">Your basket</h2>
+                <h2 className="text-heading">
+                  {t("Your basket", "आपकी टोकरी")}
+                </h2>
                 <p className="text-sm text-muted">{restaurantName}</p>
               </div>
               <button
                 onClick={closeCart}
-                aria-label="Close"
+                aria-label={t("Close", "बंद करें")}
                 className="press grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
               >
                 <X className="size-5" />
@@ -114,7 +118,8 @@ export function GlassCart() {
                   onClick={() => closeCart()}
                   className="bolt-section-link"
                 >
-                  Add more items <ChevronRight className="size-4" />
+                  {t("Add more items", "और सामान जोड़ें")}{" "}
+                  <ChevronRight className="size-4" />
                 </Link>
               </div>
             ) : null}
@@ -122,10 +127,7 @@ export function GlassCart() {
             <div className="no-scrollbar max-h-[42vh] overflow-y-auto px-5">
               <ul className="divide-y divide-line">
                 {lines.map((l) => (
-                  <li
-                    key={l.itemId}
-                    className="flex items-center gap-3 py-3.5"
-                  >
+                  <li key={l.itemId} className="flex items-center gap-3 py-3.5">
                     <VegMark veg={l.veg} className="mt-0.5" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[15px] font-semibold">
@@ -150,17 +152,29 @@ export function GlassCart() {
               </ul>
 
               <div className="mt-1 space-y-2 border-t border-dashed border-line py-4 text-[15px]">
-                <Row label="Subtotal" value={formatINR(subtotal)} muted />
+                <Row
+                  label={t("Subtotal", "सामान का दाम")}
+                  value={formatINR(subtotal)}
+                  muted
+                />
                 {/* "Free", not "₹0" — a basket that has cleared the admin's
                     free-delivery threshold is the one case this row exists to
                     tell the customer about. */}
                 <Row
-                  label="Delivery"
-                  value={deliveryFee === 0 ? "Free" : formatINR(deliveryFee)}
+                  label={t("Delivery", "डिलीवरी")}
+                  value={
+                    deliveryFee === 0
+                      ? t("Free", "मुफ़्त")
+                      : formatINR(deliveryFee)
+                  }
                   muted
                 />
-                <Row label="Taxes" value={formatINR(taxes)} muted />
-                <Row label="Total" value={formatINR(total)} bold />
+                <Row
+                  label={t("Taxes", "टैक्स")}
+                  value={formatINR(taxes)}
+                  muted
+                />
+                <Row label={t("Total", "कुल")} value={formatINR(total)} bold />
               </div>
             </div>
 
@@ -170,7 +184,7 @@ export function GlassCart() {
                 onClick={() => closeCart()}
                 className="press flex h-12 items-center justify-between rounded-full bg-accent px-5 font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)]"
               >
-                <span>Go to checkout</span>
+                <span>{t("Go to checkout", "ऑर्डर करने जाएं")}</span>
                 <span className="flex items-center gap-1">
                   {formatINR(total)} <ChevronRight className="size-5" />
                 </span>
@@ -203,7 +217,7 @@ function Row({
         className={cn(
           "text-data",
           muted && "text-muted",
-          bold && "text-base font-bold"
+          bold && "text-base font-bold",
         )}
       >
         {value}

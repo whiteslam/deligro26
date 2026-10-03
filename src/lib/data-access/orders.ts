@@ -29,6 +29,7 @@ import {
 } from "@/lib/data-access/schema-probe";
 import type { PaymentMethod, PaymentStatus } from "@/types";
 import { deferNotify } from "@/lib/notifications/defer";
+import { translator, type Lang } from "@/lib/i18n/lang";
 
 /**
  * Secure data access for orders. Every query here runs through the anon key,
@@ -124,7 +125,7 @@ interface QueryResult<T> {
  * and after the first probe the retry cost is gone.
  */
 async function selectOrders<T>(
-  run: (columns: string) => PromiseLike<QueryResult<T>>
+  run: (columns: string) => PromiseLike<QueryResult<T>>,
 ): Promise<T | null> {
   const flags: SelectFlags = {
     tip: !columnKnownMissing(TIP_COLUMN),
@@ -248,11 +249,32 @@ export class PaymentRefused extends Error {
   readonly customerMessage: string;
   constructor(
     public readonly reason: PaymentRefusalCode,
-    rules: VendorPaymentRules
+    rules: VendorPaymentRules,
+    lang?: Lang,
   ) {
     super(reason);
     this.name = "PaymentRefused";
-    this.customerMessage = refusalMessage(reason, rules);
+    this.customerMessage =
+      lang === "hi"
+        ? hindiRefusalMessage(reason, rules)
+        : refusalMessage(reason, rules);
+  }
+}
+
+/** `refusalMessage`, in Hindi, for a customer who reads the app in Hindi. */
+function hindiRefusalMessage(
+  code: PaymentRefusalCode,
+  rules: VendorPaymentRules,
+): string {
+  switch (code) {
+    case "cod_limit_exceeded":
+      return `${formatINR(Math.round(rules.codMaxOrder))} से ज़्यादा के ऑर्डर का भुगतान ऑनलाइन करना होगा।`;
+    case "cod_not_available":
+      return "यह दुकान सिर्फ़ ऑनलाइन भुगतान लेती है।";
+    case "online_not_available":
+      return "इस दुकान पर ऑनलाइन भुगतान नहीं है — कृपया डिलीवरी पर नकद दें।";
+    case "no_payment_method":
+      return "यह दुकान अभी भुगतान नहीं ले पा रही है। थोड़ी देर बाद फिर कोशिश करें।";
   }
 }
 
@@ -272,7 +294,7 @@ export class OrderRefused extends Error {
   readonly customerMessage: string;
   constructor(
     public readonly reason: OrderRefusalCode,
-    customerMessage: string
+    customerMessage: string,
   ) {
     super(reason);
     this.name = "OrderRefused";
@@ -280,8 +302,17 @@ export class OrderRefused extends Error {
   }
 }
 
-/** Place an order — prices validated server-side from menu_items, never trusted from client. */
-export async function createOrder(input: CreateOrderInput): Promise<Order> {
+/**
+ * Place an order — prices validated server-side from menu_items, never trusted from client.
+ *
+ * `lang` is the customer's language, for the refusal sentences they will read.
+ * Without it they are English (the out-of-area one is English / Hindi).
+ */
+export async function createOrder(
+  input: CreateOrderInput,
+  lang?: Lang,
+): Promise<Order> {
+  const t = translator(lang ?? "en");
   const supabase = await createClient();
   const {
     data: { user },
@@ -326,7 +357,10 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     throw new OrderRefused(
       "orders_paused",
       settings.maintenanceMessage.trim() ||
-        "We're not accepting orders right now. Please try again shortly."
+        t(
+          "We're not accepting orders right now. Please try again shortly.",
+          "अभी ऑर्डर नहीं लिए जा रहे हैं। कृपया थोड़ी देर बाद कोशिश करें।",
+        ),
     );
   }
 
@@ -356,7 +390,10 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     radiusKm: settings.deliveryRadiusKm,
   });
   if (blocksOrder(area)) {
-    throw new OrderRefused("outside_delivery_area", outOfRangeMessage(area));
+    throw new OrderRefused(
+      "outside_delivery_area",
+      outOfRangeMessage(area, lang),
+    );
   }
 
   const externalIds = [...new Set(input.lines.map((l) => l.itemId))];
@@ -384,9 +421,14 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   if (settings.minOrder > 0 && itemSubtotal < settings.minOrder) {
     throw new OrderRefused(
       "below_minimum",
-      `Orders start at ${formatINR(settings.minOrder)} — add ${formatINR(
-        settings.minOrder - itemSubtotal
-      )} more to place this one.`
+      t(
+        `Orders start at ${formatINR(settings.minOrder)} — add ${formatINR(
+          settings.minOrder - itemSubtotal,
+        )} more to place this one.`,
+        `कम से कम ${formatINR(settings.minOrder)} का ऑर्डर ज़रूरी है — ${formatINR(
+          settings.minOrder - itemSubtotal,
+        )} का और जोड़ें।`,
+      ),
     );
   }
 
@@ -400,7 +442,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
       freeDeliveryThreshold: settings.freeDeliveryThreshold,
     },
     itemSubtotal,
-    input.tip ?? 0
+    input.tip ?? 0,
   );
 
   // The client may ASK to pay online; whether that is on offer is the server's
@@ -430,7 +472,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     const preview = await evaluateCoupon(
       wantsCoupon,
       itemSubtotal,
-      restaurant.id
+      restaurant.id,
     );
     if (!preview.ok) throw new CouponRejected(preview.error as CouponFailure);
     previewDiscount = Math.max(0, Math.round(preview.discount ?? 0));
@@ -443,7 +485,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const rules = await getVendorPaymentRules(restaurant.id);
   const payable = Math.max(0, charges.total - previewDiscount);
   const refusal = refusePayment(rules, paymentMethod, payable);
-  if (refusal) throw new PaymentRefused(refusal, rules);
+  if (refusal) throw new PaymentRefused(refusal, rules, lang);
 
   const base: Record<string, unknown> = {
     customer_id: user.id,
@@ -461,7 +503,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const insertOrder = (
     withTip: boolean,
     withPayment: boolean,
-    withIdempotency: boolean
+    withIdempotency: boolean,
   ) =>
     supabase
       .from("orders")
@@ -483,7 +525,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   let { data: order, error: orderError } = await insertOrder(
     withTip,
     withPayment,
-    withIdempotency
+    withIdempotency,
   );
 
   if (orderError && isMissingColumn(orderError) && withIdempotency) {
@@ -494,7 +536,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     ({ data: order, error: orderError } = await insertOrder(
       withTip,
       withPayment,
-      false
+      false,
     ));
   }
 
@@ -508,7 +550,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     ({ data: order, error: orderError } = await insertOrder(
       withTip,
       false,
-      withIdempotency
+      withIdempotency,
     ));
   }
 
@@ -523,7 +565,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     ({ data: order, error: orderError } = await insertOrder(
       false,
       withPayment,
-      withIdempotency
+      withIdempotency,
     ));
   }
 
@@ -582,7 +624,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     const result = applied as { ok?: boolean } | null;
     if (!result?.ok) {
       console.warn(
-        `[orders] coupon ${wantsCoupon} passed pre-check but was refused for order ${order.id}`
+        `[orders] coupon ${wantsCoupon} passed pre-check but was refused for order ${order.id}`,
       );
     }
   }
@@ -621,7 +663,7 @@ export async function getOrderById(id: string): Promise<Order | null> {
       .select(columns)
       .eq("id", id)
       .maybeSingle()
-      .overrideTypes<Record<string, unknown>>()
+      .overrideTypes<Record<string, unknown>>(),
   );
 
   if (!data) return null;
@@ -643,7 +685,7 @@ export async function listVisibleOrders(): Promise<Order[]> {
       .from("orders")
       .select(columns)
       .order("created_at", { ascending: false })
-      .overrideTypes<Record<string, unknown>[]>()
+      .overrideTypes<Record<string, unknown>[]>(),
   );
 
   return (data ?? []).map((row) => {
@@ -682,7 +724,7 @@ export async function listMyOrders(
      */
     before?: string;
     limit?: number;
-  } = {}
+  } = {},
 ): Promise<Order[]> {
   const supabase = await createClient();
   const {

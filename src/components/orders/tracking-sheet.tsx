@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 /**
  * Where the sheet's top edge can come to rest, as a fraction of the stage it is
@@ -81,9 +82,10 @@ export function TrackingSheet({
    */
   onRestTop?: (top: number) => void;
 }) {
+  const t = useT();
   const snapTops = useMemo(
     () => SHEET_SNAPS.map((f) => Math.round(stageHeight * f)),
-    [stageHeight]
+    [stageHeight],
   );
   const measured = stageHeight > 0;
 
@@ -130,7 +132,7 @@ export function TrackingSheet({
       }
       goTo(nearest);
     },
-    [goTo, snap]
+    [goTo, snap],
   );
 
   useEffect(() => {
@@ -232,8 +234,8 @@ export function TrackingSheet({
         clamp(
           startTop + (e.touches[0].clientY - startY),
           tops[0],
-          tops[tops.length - 1]
-        )
+          tops[tops.length - 1],
+        ),
       );
     };
 
@@ -269,14 +271,16 @@ export function TrackingSheet({
       className={cn(
         "bolt-sheet absolute inset-x-0 top-0 flex h-full flex-col",
         dragTop === null &&
-          "transition-transform duration-300 ease-out motion-reduce:transition-none"
+          "transition-transform duration-300 ease-out motion-reduce:transition-none",
       )}
       style={{ transform: `translate3d(0, ${offset}, 0)` }}
     >
       <button
         type="button"
         aria-label={
-          snap === 0 ? "Collapse order details" : "Expand order details"
+          snap === 0
+            ? t("Collapse order details", "ऑर्डर की जानकारी छोटी करें")
+            : t("Expand order details", "ऑर्डर की जानकारी बड़ी करें")
         }
         aria-expanded={snap === 0}
         onPointerDown={onPointerDown}

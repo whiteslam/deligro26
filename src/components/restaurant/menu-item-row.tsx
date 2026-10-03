@@ -9,6 +9,7 @@ import { VegMark } from "@/components/shared/veg-mark";
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { ItemPrice } from "@/components/shared/item-price";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 export function MenuItemRow({
   item,
@@ -22,12 +23,13 @@ export function MenuItemRow({
   const setQty = useCart((s) => s.setQty);
   const request = useCartSwitch((s) => s.request);
   const openSheet = useItemSheet((s) => s.open);
+  const t = useT();
 
   // Menu item ids are unique within a menu, not across the catalog — so the
   // quantity only counts when the basket belongs to this restaurant.
   const qty =
     cartSlug === restaurant.slug
-      ? lines.find((l) => l.itemId === item.id)?.qty ?? 0
+      ? (lines.find((l) => l.itemId === item.id)?.qty ?? 0)
       : 0;
   const ref = { slug: restaurant.slug, name: restaurant.name };
 
@@ -38,7 +40,12 @@ export function MenuItemRow({
   };
 
   return (
-    <div className={cn("relative flex gap-3.5 py-3.5 pb-5", item.soldOut && "opacity-60")}>
+    <div
+      className={cn(
+        "relative flex gap-3.5 py-3.5 pb-5",
+        item.soldOut && "opacity-60",
+      )}
+    >
       <button
         type="button"
         onClick={() => openSheet(item, restaurant)}
@@ -46,7 +53,7 @@ export function MenuItemRow({
       >
         {item.bestseller || item.popular ? (
           <span className="pill-pop mb-1.5 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
-            Popular
+            {t("Popular", "लोकप्रिय")}
           </span>
         ) : null}
         <div className="flex items-center gap-1.5">
@@ -72,16 +79,16 @@ export function MenuItemRow({
 
         {item.soldOut ? (
           <span className="absolute inset-x-0 bottom-0 rounded-b-xl bg-ink/70 py-1 text-center text-[11px] font-bold uppercase tracking-wide text-white">
-            Sold out
+            {t("Sold out", "ख़त्म हो गया")}
           </span>
         ) : qty === 0 ? (
           <button
             type="button"
             onClick={handleAdd}
-            aria-label={`Add ${item.name}`}
+            aria-label={t(`Add ${item.name}`, `${item.name} जोड़ें`)}
             className="tap-target press bolt-add"
           >
-            Add
+            {t("Add", "जोड़ें")}
           </button>
         ) : (
           <div className="bolt-add-qty">
@@ -91,7 +98,7 @@ export function MenuItemRow({
                 e.stopPropagation();
                 setQty(item.id, qty - 1);
               }}
-              aria-label="Remove one"
+              aria-label={t("Remove one", "एक कम करें")}
               className="tap-target grid size-7 place-items-center rounded-md hover:bg-white/15"
             >
               <Minus className="size-4" strokeWidth={2.75} />
@@ -105,7 +112,7 @@ export function MenuItemRow({
                 e.stopPropagation();
                 setQty(item.id, qty + 1);
               }}
-              aria-label="Add one"
+              aria-label={t("Add one", "एक और जोड़ें")}
               className="tap-target grid size-7 place-items-center rounded-md hover:bg-white/15"
             >
               <Plus className="size-4" strokeWidth={2.75} />

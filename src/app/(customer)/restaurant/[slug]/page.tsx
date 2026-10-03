@@ -25,6 +25,7 @@ import { isFavorite } from "@/lib/data-access/favorites";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { JsonLd } from "@/components/shared/json-ld";
 import { SITE_URL } from "@/lib/site";
+import { getT } from "@/lib/i18n/server";
 
 export async function generateStaticParams() {
   if (isSupabaseConfigured) return [];
@@ -83,10 +84,11 @@ export default async function RestaurantPage({
   // None of these three depend on each other's result, so they run as one
   // parallel batch rather than waiting for `getRestaurant` before starting
   // the other two.
-  const [r, profile, favorite] = await Promise.all([
+  const [r, profile, favorite, t] = await Promise.all([
     getRestaurant(slug),
     getProfile(),
     isSupabaseConfigured ? isFavorite(slug) : Promise.resolve(false),
+    getT(),
   ]);
   if (!r) notFound();
 
@@ -144,7 +146,7 @@ export default async function RestaurantPage({
 
         <Link
           href="/"
-          aria-label="Back"
+          aria-label={t("Back", "वापस")}
           className="press absolute left-4 top-[calc(var(--status-h)+1rem)] grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
         >
           <ChevronLeft className="size-5" />
@@ -163,7 +165,7 @@ export default async function RestaurantPage({
             {r.name}
           </h1>
           <span className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-white/90">
-            More info <ChevronRight className="size-4" />
+            {t("More info", "और जानकारी")} <ChevronRight className="size-4" />
           </span>
         </div>
       </div>
@@ -218,11 +220,14 @@ export default async function RestaurantPage({
                 when it says so. */}
             <span className="flex min-w-0 flex-col leading-tight">
               <span className="text-sm font-bold text-ink">
-                Not taking orders right now
+                {t("Not taking orders right now", "अभी ऑर्डर नहीं ले रहे")}
               </span>
               <span className="mt-0.5 inline-flex items-center gap-1 text-[12px] text-muted">
                 <Clock className="size-3.5" />
-                This shop reopens when they&apos;re ready — try again a bit later.
+                {t(
+                  "This shop reopens when they're ready — try again a bit later.",
+                  "दुकान तैयार होने पर फिर खुलेगी — थोड़ी देर बाद फिर कोशिश करें।",
+                )}
               </span>
             </span>
           </div>

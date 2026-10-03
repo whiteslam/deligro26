@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { LayoutGrid } from "lucide-react";
-import { STORE_CATEGORIES } from "@/lib/taxonomy";
+import { STORE_CATEGORIES, categoryLabel } from "@/lib/taxonomy";
+import { getLang } from "@/lib/i18n/server";
+import { translator } from "@/lib/i18n/lang";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -13,7 +15,7 @@ import { cn } from "@/lib/utils/cn";
  * and this component is rendered from a server page that already knows. It
  * defaults to the full list so demo/mock callers are unaffected.
  */
-export function StoreCategoryStrip({
+export async function StoreCategoryStrip({
   active,
   categories = STORE_CATEGORIES,
   counts,
@@ -28,6 +30,8 @@ export function StoreCategoryStrip({
    */
   counts?: Map<string, { shops: number; hasOwnScreen: boolean }>;
 }) {
+  const lang = await getLang();
+  const t = translator(lang);
   return (
     /*
      * `py-1 -my-1` is not spacing, it is the fix for a clipped ring.
@@ -43,7 +47,7 @@ export function StoreCategoryStrip({
       <Tile
         href="/stores"
         active={!active}
-        label="All stores"
+        label={t("All stores", "सभी दुकानें")}
         icon={
           <LayoutGrid
             className={cn("size-7", !active ? "text-accent-ink" : "text-ink")}
@@ -62,7 +66,7 @@ export function StoreCategoryStrip({
             key={c.id}
             href={isActive ? "/stores" : `/stores?category=${c.id}`}
             active={isActive}
-            label={c.label}
+            label={categoryLabel(lang, c)}
             empty={empty}
             icon={
               /* Emoji, not a photograph. The Home cuisine strip moved to real
@@ -70,7 +74,11 @@ export function StoreCategoryStrip({
                  a category of shop, not a dish, and there is no honest single
                  photo of one. Revisit if these ever get real shop photography
                  behind them. */
-              <span className="text-4xl" role="img" aria-label={c.label}>
+              <span
+                className="text-4xl"
+                role="img"
+                aria-label={categoryLabel(lang, c)}
+              >
                 {c.emoji}
               </span>
             }
@@ -104,7 +112,7 @@ function Tile({
         className={cn(
           "grid size-16 place-items-center rounded-xl transition-colors",
           active ? "bg-accent-soft ring-2 ring-accent" : "bg-surface-2",
-          empty && !active && "opacity-45"
+          empty && !active && "opacity-45",
         )}
       >
         {icon}
@@ -122,7 +130,7 @@ function Tile({
       <span
         className={cn(
           "line-clamp-2 min-h-[2.1em] w-full text-center text-[11px] font-semibold leading-tight",
-          active ? "text-accent-ink" : empty ? "text-muted" : "text-ink"
+          active ? "text-accent-ink" : empty ? "text-muted" : "text-ink",
         )}
       >
         {label}

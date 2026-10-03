@@ -13,12 +13,12 @@ const OPTIONS: { lang: Lang; label: string }[] = [
 
 /** English / हिंदी. Used in Profile and on the login screen. */
 export function LanguageSwitch({ className }: { className?: string }) {
-  const { lang, setLang } = useLang();
+  const { lang, setLang, t } = useLang();
 
   return (
     <div
       role="radiogroup"
-      aria-label="Language / भाषा"
+      aria-label={t("Language", "भाषा")}
       className={cn("inline-flex rounded-full border border-line bg-surface p-1", className)}
     >
       {OPTIONS.map((o) => {

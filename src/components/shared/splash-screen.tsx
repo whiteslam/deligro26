@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/components/providers/lang-provider";
 
 /**
  * Has the splash already played during this page load? Module-level, so it
@@ -24,6 +25,7 @@ export function SplashScreen() {
   // First mount this load → visible; any later mount (client nav) → skip.
   const [visible, setVisible] = useState(!played);
   const [hiding, setHiding] = useState(false);
+  const t = useT();
 
   useEffect(() => {
     if (!visible) return;
@@ -43,7 +45,10 @@ export function SplashScreen() {
       className="splash"
       data-hiding={hiding}
       role="status"
-      aria-label="Deligro — all in one delivery app"
+      aria-label={t(
+        "Deligro — all in one delivery app",
+        "Deligro — सब कुछ एक ही डिलीवरी ऐप में",
+      )}
     >
       <div className="splash-brand">
         {/* eslint-disable-next-line @next/next/no-img-element */}

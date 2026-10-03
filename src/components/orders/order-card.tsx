@@ -10,6 +10,7 @@ import { useReorderReview } from "@/stores/reorder-review-store";
 import { STATUS_META } from "@/lib/utils/order-status";
 import {
   cancellationNote,
+  formatOrderPlacedAt,
   isOrderPaid,
   type UiOrder,
 } from "@/lib/utils/order-map";
@@ -21,6 +22,8 @@ import {
 import { PhotoTile } from "@/components/shared/photo-tile";
 import { formatINR } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
+import { pick, translator, type Lang } from "@/lib/i18n/lang";
+import { useLang } from "@/components/providers/lang-provider";
 
 /**
  * What was in the order, in the space of one line.
@@ -30,16 +33,20 @@ import { cn } from "@/lib/utils/cn";
  * lines. The items were already on the row — fetched, in memory, and never
  * shown — and they are the only thing that tells two orders apart.
  */
-export function orderItemsSummary(order: Order): string {
+export function orderItemsSummary(order: Order, lang: Lang = "en"): string {
+  const t = translator(lang);
   const [first, ...rest] = order.lines;
   if (!first) return "";
   const head = first.qty > 1 ? `${first.qty}× ${first.name}` : first.name;
-  return rest.length ? `${head} +${rest.length} more` : head;
+  return rest.length
+    ? t(`${head} +${rest.length} more`, `${head} +${rest.length} और`)
+    : head;
 }
 
 /** One finished order: what it was, when, what it cost, and how to repeat it. */
 export function OrderCard({ order }: { order: UiOrder }) {
   const router = useRouter();
+  const { lang, t } = useLang();
   const reorder = useCart((s) => s.reorder);
   const openCart = useUI((s) => s.openCart);
   const showReorderReview = useReorderReview((s) => s.show);
@@ -47,7 +54,10 @@ export function OrderCard({ order }: { order: UiOrder }) {
 
   const meta = STATUS_META[order.status];
   const cancelled = order.status === "CANCELLED";
-  const items = orderItemsSummary(order);
+  const items = orderItemsSummary(order, lang);
+  const placedAt = order.createdAt
+    ? formatOrderPlacedAt(order.createdAt, lang)
+    : order.placedAt;
 
   /**
    * Cancelled, and the money is still ours to give back.
@@ -66,7 +76,7 @@ export function OrderCard({ order }: { order: UiOrder }) {
    * the guess anybody would reach for ("the restaurant cancelled it") is an
    * accusation.
    */
-  const why = cancelled ? cancellationNote(order) : null;
+  const why = cancelled ? cancellationNote(order, lang) : null;
 
   const handleReorder = async () => {
     const restaurant = {
@@ -77,7 +87,7 @@ export function OrderCard({ order }: { order: UiOrder }) {
     setReordering(true);
     try {
       const res = await fetch(
-        `/api/restaurants/${encodeURIComponent(restaurant.slug)}/menu-prices`
+        `/api/restaurants/${encodeURIComponent(restaurant.slug)}/menu-prices`,
       );
       const data = (await res.json().catch(() => null)) as {
         ok?: boolean;
@@ -129,24 +139,26 @@ export function OrderCard({ order }: { order: UiOrder }) {
             </span>
           </div>
           {items ? (
-            <p className="mt-0.5 line-clamp-2 text-[13px] text-ink/75">{items}</p>
+            <p className="mt-0.5 line-clamp-2 text-[13px] text-ink/75">
+              {items}
+            </p>
           ) : null}
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 truncate text-[12px] text-muted">
             <span
               className={cn(
                 "font-semibold",
-                cancelled ? "text-deal" : "text-green"
+                cancelled ? "text-deal" : "text-green",
               )}
             >
-              {meta.label}
+              {pick(lang, meta)}
             </span>
             <span aria-hidden>·</span>
-            <span>{order.placedAt}</span>
+            <span>{placedAt}</span>
             {owesRefund ? (
               <>
                 <span aria-hidden>·</span>
                 <span className="font-semibold text-pop">
-                  Refund not issued
+                  {t("Refund not issued", "रिफ़ंड अभी नहीं हुआ")}
                 </span>
               </>
             ) : null}
@@ -172,7 +184,7 @@ export function OrderCard({ order }: { order: UiOrder }) {
         ) : (
           <RotateCcw className="size-4" />
         )}
-        Again
+        {t("Again", "फिर से")}
       </button>
     </div>
   );

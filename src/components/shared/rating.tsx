@@ -1,6 +1,9 @@
+"use client";
+
 import { Star } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatCount, formatRating, isRated } from "@/lib/utils/format";
+import { useT } from "@/components/providers/lang-provider";
 
 export function RatingPill({
   rating,
@@ -14,6 +17,7 @@ export function RatingPill({
   /** "inline" = green text (in listings); "chip" = solid dark capsule for photo overlays (Bolt style). */
   variant?: "inline" | "chip";
 }) {
+  const t = useT();
   // Unreviewed is its own answer. Without this the pill renders "★ 0.0" for
   // every shop nobody has rated — see `isRated`. `count` is optional here, so
   // a caller that passes none is taken at its word that the rating is real.
@@ -24,10 +28,10 @@ export function RatingPill({
           variant === "chip"
             ? "rating-chip"
             : "inline-flex items-center text-data font-bold text-muted",
-          className
+          className,
         )}
       >
-        New
+        {t("New", "नया")}
       </span>
     );
   }
@@ -48,7 +52,7 @@ export function RatingPill({
     <span
       className={cn(
         "inline-flex items-center gap-1 text-data font-bold text-accent-ink",
-        className
+        className,
       )}
     >
       <Star className="size-3.5 fill-accent text-accent" />

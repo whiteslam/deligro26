@@ -8,9 +8,14 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { POPULARITY_WINDOW_DAYS } from "@/lib/popularity";
 import { useMenuSearch } from "@/stores/menu-search-store";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 export function RestaurantMenu({ restaurant }: { restaurant: Restaurant }) {
   const [active, setActive] = useState(restaurant.categories[0]);
+  const t = useT();
+  // "Popular" is the one tab the app builds itself; every other category is
+  // the kitchen's own name for it.
+  const label = (c: string) => (c === "Popular" ? t("Popular", "लोकप्रिय") : c);
 
   const open = useMenuSearch((s) => s.open);
   const query = useMenuSearch((s) => s.query);
@@ -37,7 +42,7 @@ export function RestaurantMenu({ restaurant }: { restaurant: Restaurant }) {
       (m) =>
         m.name.toLowerCase().includes(q) ||
         m.description.toLowerCase().includes(q) ||
-        m.category.toLowerCase().includes(q)
+        m.category.toLowerCase().includes(q),
     );
   }, [searching, q, restaurant.menu]);
 
@@ -66,10 +71,10 @@ export function RestaurantMenu({ restaurant }: { restaurant: Restaurant }) {
               }}
               className={cn(
                 "press relative shrink-0 whitespace-nowrap py-3 text-[14px] transition-colors",
-                on ? "font-extrabold text-ink" : "font-semibold text-muted"
+                on ? "font-extrabold text-ink" : "font-semibold text-muted",
               )}
             >
-              {c}
+              {label(c)}
               {on ? (
                 <span className="absolute inset-x-0 -bottom-px h-[3px] rounded-full bg-ink" />
               ) : null}
@@ -87,13 +92,19 @@ export function RestaurantMenu({ restaurant }: { restaurant: Restaurant }) {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Search ${restaurant.name}'s menu`}
-              aria-label={`Search ${restaurant.name}'s menu`}
+              placeholder={t(
+                `Search ${restaurant.name}'s menu`,
+                `${restaurant.name} का मेन्यू खोजें`,
+              )}
+              aria-label={t(
+                `Search ${restaurant.name}'s menu`,
+                `${restaurant.name} का मेन्यू खोजें`,
+              )}
             />
             <button
               type="button"
               onClick={close}
-              aria-label="Close menu search"
+              aria-label={t("Close menu search", "मेन्यू खोज बंद करें")}
               className="press grid size-6 shrink-0 place-items-center rounded-full bg-surface text-muted"
             >
               <X className="size-4" />
@@ -106,27 +117,40 @@ export function RestaurantMenu({ restaurant }: { restaurant: Restaurant }) {
         {searching ? (
           <>
             <h2 className="pb-1 pt-4 text-[20px] font-extrabold tracking-tight">
-              {results.length} {results.length === 1 ? "dish" : "dishes"}
+              {t(
+                `${results.length} ${results.length === 1 ? "dish" : "dishes"}`,
+                `${results.length} डिश`,
+              )}
             </h2>
             {results.length ? (
               <div className="divide-y divide-line">
                 {results.map((item) => (
-                  <MenuItemRow key={item.id} item={item} restaurant={restaurant} />
+                  <MenuItemRow
+                    key={item.id}
+                    item={item}
+                    restaurant={restaurant}
+                  />
                 ))}
               </div>
             ) : (
               <EmptyState
                 className="py-10"
                 icon={<Search className="size-7" />}
-                title="Nothing on this menu matches"
-                description={`No dish here is called "${query.trim()}". Try a shorter word.`}
+                title={t(
+                  "Nothing on this menu matches",
+                  "इस मेन्यू में ऐसा कुछ नहीं मिला",
+                )}
+                description={t(
+                  `No dish here is called "${query.trim()}". Try a shorter word.`,
+                  `यहाँ "${query.trim()}" नाम की कोई डिश नहीं है। छोटा शब्द लिखकर देखें।`,
+                )}
               />
             )}
           </>
         ) : (
           <>
             <h2 className="pb-1 pt-4 text-[20px] font-extrabold tracking-tight">
-              {active}
+              {label(active)}
             </h2>
 
             {/* Popular is the one tab nobody assembled by hand, so it's the one
@@ -134,14 +158,24 @@ export function RestaurantMenu({ restaurant }: { restaurant: Restaurant }) {
             {active === "Popular" ? (
               <p className="pb-2 text-[13px] font-medium leading-snug text-muted">
                 {restaurant.popularBasis === "orders"
-                  ? `The dishes ordered most here in the last ${POPULARITY_WINDOW_DAYS} days. Updates automatically as orders come in.`
-                  : "Hand-picked by the kitchen — there aren't enough orders yet to rank this menu by what sells."}
+                  ? t(
+                      `The dishes ordered most here in the last ${POPULARITY_WINDOW_DAYS} days. Updates automatically as orders come in.`,
+                      `पिछले ${POPULARITY_WINDOW_DAYS} दिनों में यहाँ सबसे ज़्यादा मंगाई गई डिश। नए ऑर्डर आने पर अपने आप बदलती है।`,
+                    )
+                  : t(
+                      "Hand-picked by the kitchen — there aren't enough orders yet to rank this menu by what sells.",
+                      "रसोई ने ख़ुद चुनी हैं — अभी इतने ऑर्डर नहीं आए कि बिक्री से क्रम बनाया जा सके।",
+                    )}
               </p>
             ) : null}
 
             <div className="divide-y divide-line">
               {items.map((item) => (
-                <MenuItemRow key={item.id} item={item} restaurant={restaurant} />
+                <MenuItemRow
+                  key={item.id}
+                  item={item}
+                  restaurant={restaurant}
+                />
               ))}
             </div>
           </>

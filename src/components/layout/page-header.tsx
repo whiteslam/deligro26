@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/components/providers/lang-provider";
 
 export function PageHeader({
   title,
@@ -18,6 +19,7 @@ export function PageHeader({
   className?: string;
 }) {
   const router = useRouter();
+  const t = useT();
   return (
     <header
       className={cn(
@@ -27,12 +29,12 @@ export function PageHeader({
         // too low and the feed shows through the gap above it.
         "sticky top-0 z-20 flex items-center gap-3 px-4 py-3",
         transparent ? "bg-transparent" : "glass",
-        className
+        className,
       )}
     >
       <button
         onClick={() => router.back()}
-        aria-label="Go back"
+        aria-label={t("Go back", "वापस जाएं")}
         className="grid size-11 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
       >
         <ChevronLeft className="size-5" />

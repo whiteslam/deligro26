@@ -6,6 +6,8 @@ import { OrderCard } from "@/components/orders/order-card";
 import { formatIst, istDateKey } from "@/lib/utils/ist-time";
 import type { UiOrder } from "@/lib/utils/order-map";
 import { cn } from "@/lib/utils/cn";
+import { pick, translator, type Bi, type Lang } from "@/lib/i18n/lang";
+import { useLang } from "@/components/providers/lang-provider";
 
 /**
  * Below this there is nothing to find, so the search box is chrome. Filters
@@ -16,10 +18,10 @@ const SEARCH_FROM = 6;
 
 type Filter = "all" | "delivered" | "cancelled";
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "delivered", label: "Delivered" },
-  { key: "cancelled", label: "Cancelled" },
+const FILTERS: { key: Filter; label: Bi }[] = [
+  { key: "all", label: { en: "All", hi: "सभी" } },
+  { key: "delivered", label: { en: "Delivered", hi: "डिलीवर हुए" } },
+  { key: "cancelled", label: { en: "Cancelled", hi: "कैंसिल हुए" } },
 ];
 
 /**
@@ -28,21 +30,25 @@ const FILTERS: { key: Filter; label: string }[] = [
  * Mock orders (no backend) carry no `createdAt`, only a human `placedAt`
  * label — they group under "Earlier" rather than being dated by guesswork.
  */
-function monthKey(order: UiOrder): string {
-  if (!order.createdAt) return "Earlier";
+function monthKey(order: UiOrder, lang: Lang): string {
+  const t = translator(lang);
+  if (!order.createdAt) return t("Earlier", "पहले के");
   const d = new Date(order.createdAt);
-  if (Number.isNaN(d.getTime())) return "Earlier";
+  if (Number.isNaN(d.getTime())) return t("Earlier", "पहले के");
   // IST months, not the runtime's: this also renders on the server (UTC), where
   // an order from 1 am IST on the 1st landed in the previous month.
   const orderMonth = istDateKey(d).slice(0, 7); // YYYY-MM
   const thisMonth = istDateKey().slice(0, 7);
-  if (orderMonth === thisMonth) return "This month";
-  return formatIst(d, {
+  if (orderMonth === thisMonth) return t("This month", "इस महीने");
+  const options: Intl.DateTimeFormatOptions = {
     month: "long",
     ...(orderMonth.slice(0, 4) === thisMonth.slice(0, 4)
       ? {}
       : { year: "numeric" }),
-  });
+  };
+  return lang === "hi"
+    ? d.toLocaleString("hi-IN", { ...options, timeZone: "Asia/Kolkata" })
+    : formatIst(d, options);
 }
 
 /**
@@ -66,6 +72,7 @@ export function OrderHistory({
   /** True when the server's read was capped, so older orders exist. */
   hasMore: boolean;
 }) {
+  const { lang, t } = useLang();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
 
@@ -105,13 +112,23 @@ export function OrderHistory({
         hasMore?: boolean;
       } | null;
       if (!res.ok || !data?.ok || !data.orders) {
-        setPageError("Couldn't load older orders. Try again.");
+        setPageError(
+          t(
+            "Couldn't load older orders. Try again.",
+            "पुराने ऑर्डर लोड नहीं हो पाए। फिर कोशिश करें।",
+          ),
+        );
         return;
       }
       setExtra((prev) => [...prev, ...data.orders!]);
       setHasMore(Boolean(data.hasMore));
     } catch {
-      setPageError("Couldn't load older orders. Try again.");
+      setPageError(
+        t(
+          "Couldn't load older orders. Try again.",
+          "पुराने ऑर्डर लोड नहीं हो पाए। फिर कोशिश करें।",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -145,18 +162,18 @@ export function OrderHistory({
   const groups = useMemo(() => {
     const out: { key: string; orders: UiOrder[] }[] = [];
     for (const o of shown) {
-      const key = monthKey(o);
+      const key = monthKey(o, lang);
       const last = out[out.length - 1];
       if (last && last.key === key) last.orders.push(o);
       else out.push({ key, orders: [o] });
     }
     return out;
-  }, [shown]);
+  }, [shown, lang]);
 
   return (
     <section>
       <h2 className="mb-2 text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
-        Past orders
+        {t("Past orders", "पुराने ऑर्डर")}
       </h2>
 
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
@@ -175,7 +192,7 @@ export function OrderHistory({
                   : "border-line bg-surface text-muted",
               )}
             >
-              {f.label}
+              {pick(lang, f.label)}
               <span className={cn("ml-1.5", active ? "opacity-70" : "")}>
                 {counts[f.key]}
               </span>
@@ -192,15 +209,18 @@ export function OrderHistory({
             onChange={(e) => setQuery(e.target.value)}
             type="search"
             enterKeyHint="search"
-            placeholder="Search a restaurant or a dish"
-            aria-label="Search your orders"
+            placeholder={t(
+              "Search a restaurant or a dish",
+              "रेस्टोरेंट या डिश खोजें",
+            )}
+            aria-label={t("Search your orders", "अपने ऑर्डर खोजें")}
             className="h-11 w-full rounded-full border border-line bg-surface-2 pl-10 pr-10 text-[15px] outline-none placeholder:text-muted focus:border-accent"
           />
           {query ? (
             <button
               type="button"
               onClick={() => setQuery("")}
-              aria-label="Clear search"
+              aria-label={t("Clear search", "खोज हटाएँ")}
               className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full text-muted"
             >
               <X className="size-4" />
@@ -226,11 +246,19 @@ export function OrderHistory({
         /* Narrowed to nothing, which is not the same as having no history —
            say which, and give back the way out. */
         <div className="mt-4 rounded-2xl border border-dashed border-line px-4 py-8 text-center">
-          <p className="text-[15px] font-bold">Nothing matches</p>
+          <p className="text-[15px] font-bold">
+            {t("Nothing matches", "कुछ नहीं मिला")}
+          </p>
           <p className="mx-auto mt-1 max-w-[32ch] text-[13px] leading-snug text-muted">
             {query
-              ? `No order here mentions “${query.trim()}”.`
-              : "No orders with this status yet."}
+              ? t(
+                  `No order here mentions “${query.trim()}”.`,
+                  `किसी ऑर्डर में “${query.trim()}” नहीं मिला।`,
+                )
+              : t(
+                  "No orders with this status yet.",
+                  "इस स्टेटस का अभी कोई ऑर्डर नहीं है।",
+                )}
           </p>
           <button
             type="button"
@@ -240,7 +268,7 @@ export function OrderHistory({
             }}
             className="press mt-3 rounded-full border border-line bg-surface px-4 py-2 text-[13px] font-bold"
           >
-            Show all orders
+            {t("Show all orders", "सभी ऑर्डर दिखाएँ")}
           </button>
         </div>
       )}
@@ -252,8 +280,10 @@ export function OrderHistory({
         <div className="mt-4 space-y-2 text-center">
           {query.trim() ? (
             <p className="text-[12px] leading-snug text-muted">
-              Searching the orders loaded so far. Load older ones to search
-              further back.
+              {t(
+                "Searching the orders loaded so far. Load older ones to search further back.",
+                "अभी तक लोड हुए ऑर्डर में खोज रहे हैं। और पीछे खोजने के लिए पुराने ऑर्डर लोड करें।",
+              )}
             </p>
           ) : null}
           <button
@@ -263,7 +293,9 @@ export function OrderHistory({
             className="press inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2.5 text-[13px] font-bold disabled:opacity-60"
           >
             {loading ? <Loader2 className="size-4 animate-spin" /> : null}
-            {loading ? "Loading…" : "Load older orders"}
+            {loading
+              ? t("Loading…", "लोड हो रहा है…")
+              : t("Load older orders", "पुराने ऑर्डर लोड करें")}
           </button>
           {pageError ? (
             <p className="text-[12px] font-medium text-deal">{pageError}</p>

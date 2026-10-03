@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils/cn";
 import { loadGoogleMaps } from "@/lib/maps/loader";
 import { isMapsConfigured, DEFAULT_CENTER } from "@/lib/maps/config";
 import { locationSettingsSteps } from "@/lib/location/permission-help";
+import { useLang } from "@/components/providers/lang-provider";
 
 export interface PickedLocation {
   lat: number;
@@ -32,6 +33,9 @@ export function MapPicker({
   /** "checkout" — embedded map with Adjust pin, no search bar */
   variant?: "form" | "checkout";
 }) {
+  // Also used by the vendor and admin shop-location forms, which have no
+  // language provider and so read English.
+  const { lang, t } = useLang();
   const mapEl = useRef<HTMLDivElement>(null);
   const searchEl = useRef<HTMLInputElement>(null);
   const marker = useRef<google.maps.Marker | null>(null);
@@ -48,7 +52,7 @@ export function MapPicker({
   // the map container. isMapsConfigured is a build-time constant, so this is a
   // stable initial value — no conditional hooks below.
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
-    isMapsConfigured ? "loading" : "error"
+    isMapsConfigured ? "loading" : "error",
   );
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
@@ -61,7 +65,13 @@ export function MapPicker({
     mapObj.current?.panTo(pos);
     geocoder.current
       ?.geocode({ location: { lat, lng } })
-      .then((r) => onPickRef.current({ lat, lng, address: r.results?.[0]?.formatted_address ?? "" }))
+      .then((r) =>
+        onPickRef.current({
+          lat,
+          lng,
+          address: r.results?.[0]?.formatted_address ?? "",
+        }),
+      )
       .catch(() => onPickRef.current({ lat, lng, address: "" }));
   }
 
@@ -81,7 +91,11 @@ export function MapPicker({
           clickableIcons: false,
           gestureHandling: "greedy",
         });
-        const pin = new google.maps.Marker({ map, position: start, draggable: true });
+        const pin = new google.maps.Marker({
+          map,
+          position: start,
+          draggable: true,
+        });
         mapObj.current = map;
         marker.current = pin;
         geocoder.current = new google.maps.Geocoder();
@@ -129,11 +143,21 @@ export function MapPicker({
   function useMyLocation() {
     setLocateError(null);
     if (!("geolocation" in navigator)) {
-      setLocateError("This device can't share its location. Drag the pin instead.");
+      setLocateError(
+        t(
+          "This device can't share its location. Drag the pin instead.",
+          "यह फ़ोन लोकेशन नहीं दे पा रहा। पिन खींचकर अपना पता लगाएं।",
+        ),
+      );
       return;
     }
     if (!window.isSecureContext) {
-      setLocateError("Location needs a secure (https) connection. Drag the pin instead.");
+      setLocateError(
+        t(
+          "Location needs a secure (https) connection. Drag the pin instead.",
+          "लोकेशन के लिए सुरक्षित कनेक्शन चाहिए। पिन खींचकर अपना पता लगाएं।",
+        ),
+      );
       return;
     }
     setLocating(true);
@@ -141,19 +165,30 @@ export function MapPicker({
       (pos) => {
         setLocating(false);
         mapObj.current?.setZoom(17);
-        settle(new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
+        settle(
+          new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude),
+        );
       },
       (err) => {
         setLocating(false);
         setLocateError(
           err.code === err.PERMISSION_DENIED
-            ? `Location is blocked for this site. ${locationSettingsSteps().join(" ")} Or drag the pin to your address.`
+            ? t(
+                `Location is blocked for this site. ${locationSettingsSteps(lang).join(" ")} Or drag the pin to your address.`,
+                `इस साइट के लिए लोकेशन बंद है। ${locationSettingsSteps(lang).join(" ")} या पिन खींचकर अपने पते पर लगाएं।`,
+              )
             : err.code === err.TIMEOUT
-              ? "Your phone took too long to find you. Try again, or drag the pin."
-              : "Couldn't get your location. Try again, or drag the pin."
+              ? t(
+                  "Your phone took too long to find you. Try again, or drag the pin.",
+                  "फ़ोन को लोकेशन ढूंढने में बहुत देर लगी। फिर से कोशिश करें या पिन खींचें।",
+                )
+              : t(
+                  "Couldn't get your location. Try again, or drag the pin.",
+                  "आपकी लोकेशन नहीं मिली। फिर से कोशिश करें या पिन खींचें।",
+                ),
         );
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
   }
 
@@ -162,7 +197,10 @@ export function MapPicker({
       return (
         <div className="relative overflow-hidden rounded-xl bg-surface-2">
           <div className="grid h-44 place-items-center text-sm text-muted">
-            Map unavailable — enter address details below
+            {t(
+              "Map unavailable — enter address details below",
+              "नक्शा नहीं खुल रहा — नीचे पते की जानकारी लिखें",
+            )}
           </div>
         </div>
       );
@@ -180,7 +218,10 @@ export function MapPicker({
           <input
             ref={searchEl}
             type="text"
-            placeholder="Search for area, street, landmark…"
+            placeholder={t(
+              "Search for area, street, landmark…",
+              "मोहल्ला, गली या पास की जगह खोजें…",
+            )}
             className="w-full rounded-lg border border-line bg-surface py-2 pl-9 pr-3 text-sm outline-none focus:border-accent"
           />
         </div>
@@ -196,7 +237,7 @@ export function MapPicker({
         {checkout ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
             <span className="rounded-full bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-[var(--shadow-md)]">
-              Adjust pin
+              {t("Adjust pin", "पिन सही करें")}
             </span>
           </div>
         ) : null}
@@ -215,17 +256,25 @@ export function MapPicker({
           ) : (
             <LocateFixed className="size-4" />
           )}
-          {locating ? "Locating…" : "Use my location"}
+          {locating
+            ? t("Locating…", "लोकेशन ढूंढ रहे हैं…")
+            : t("Use my location", "मेरी लोकेशन लें")}
         </button>
       </div>
       {locateError ? (
-        <p role="alert" className={cn("text-xs font-medium text-deal", checkout && "mt-2")}>
+        <p
+          role="alert"
+          className={cn("text-xs font-medium text-deal", checkout && "mt-2")}
+        >
           {locateError}
         </p>
       ) : null}
       {!checkout ? (
         <p className="text-xs text-muted">
-          Tap the map or drag the pin to set your exact delivery spot.
+          {t(
+            "Tap the map or drag the pin to set your exact delivery spot.",
+            "नक्शे पर दबाएं या पिन खींचकर डिलीवरी की सही जगह चुनें।",
+          )}
         </p>
       ) : null}
     </div>

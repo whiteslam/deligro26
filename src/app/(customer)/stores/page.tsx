@@ -12,13 +12,16 @@ import { listAddresses } from "@/lib/data-access/addresses";
 import { getSettings } from "@/lib/settings";
 import { enabledStoreCategories } from "@/lib/store-categories";
 import { ADDRESSES } from "@/lib/data";
+import { categoryLabel } from "@/lib/taxonomy";
+import { getLang } from "@/lib/i18n/server";
+import { translator } from "@/lib/i18n/lang";
 
 export default async function StoresPage({
   searchParams,
 }: {
   searchParams: Promise<{ category?: string }>;
 }) {
-  const [{ category }, catalog, settings, addrs] = await Promise.all([
+  const [{ category }, catalog, settings, addrs, lang] = await Promise.all([
     searchParams,
     // RestaurantCard (the only thing this page renders restaurants through)
     // never reads menu data — see listRestaurantsFromDb's doc comment.
@@ -27,8 +30,10 @@ export default async function StoresPage({
     isSupabaseConfigured
       ? listAddresses().catch(() => [])
       : Promise.resolve(ADDRESSES),
+    getLang(),
   ]);
   const { restaurants } = catalog;
+  const t = translator(lang);
 
   // Which storefront types the admin has switched on. The Settings toggles used
   // to be stored, validated, displayed — and read by nothing: switching
@@ -46,13 +51,14 @@ export default async function StoresPage({
   // groceries link stops working the moment an admin turns it off, rather than
   // reaching a hero the platform is no longer serving.
   const active = categories.find((c) => c.id === category) ?? null;
+  const activeLabel = active ? categoryLabel(lang, active) : null;
 
   /** Shops matching one category, by the rule the filter below uses. */
   const matching = (c: (typeof categories)[number]) =>
     restaurants.filter((r) =>
       r.cuisines.some((x) =>
-        c.tags.some((t) => t.toLowerCase() === x.toLowerCase())
-      )
+        c.tags.some((t) => t.toLowerCase() === x.toLowerCase()),
+      ),
     );
 
   /*
@@ -72,7 +78,7 @@ export default async function StoresPage({
     categories.map((c) => [
       c.id,
       { shops: matching(c).length, hasOwnScreen: OWN_SCREEN.has(c.id) },
-    ])
+    ]),
   );
   const ordered = [...categories].sort((a, b) => {
     const dead = (c: (typeof categories)[number]) =>
@@ -106,7 +112,7 @@ export default async function StoresPage({
 
       <div className="space-y-7 pt-3">
         <section className="space-y-3">
-          <h2 className="px-4 text-heading">Categories</h2>
+          <h2 className="px-4 text-heading">{t("Categories", "श्रेणियाँ")}</h2>
           <StoreCategoryStrip
             active={active?.id}
             categories={ordered}
@@ -118,8 +124,10 @@ export default async function StoresPage({
           <div className="mx-4 flex items-start gap-2.5 rounded-2xl border border-deal/30 bg-deal-soft px-3 py-2.5 text-sm font-medium text-deal">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" />
             <span>
-              We couldn&apos;t load stores just now. This is a problem on our
-              side — try again in a moment.
+              {t(
+                "We couldn't load stores just now. This is a problem on our side — try again in a moment.",
+                "अभी दुकानें नहीं दिख पाईं। गड़बड़ी हमारी तरफ़ से है — थोड़ी देर बाद फिर कोशिश करें।",
+              )}
             </span>
           </div>
         ) : null}
@@ -139,16 +147,26 @@ export default async function StoresPage({
         ) : all.length === 0 ? (
           <EmptyState
             icon={<Store className="size-7" />}
-            title={`No ${active?.label.toLowerCase() ?? "stores"} yet`}
-            description={`We haven't onboarded a ${
-              active?.label.toLowerCase() ?? "store"
-            } near you. Browse everything else in the meantime.`}
+            title={t(
+              `No ${active?.label.toLowerCase() ?? "stores"} yet`,
+              activeLabel
+                ? `अभी कोई ${activeLabel} दुकान नहीं`
+                : "अभी कोई दुकान नहीं",
+            )}
+            description={t(
+              `We haven't onboarded a ${
+                active?.label.toLowerCase() ?? "store"
+              } near you. Browse everything else in the meantime.`,
+              activeLabel
+                ? `आपके पास अभी कोई ${activeLabel} दुकान नहीं जुड़ी है। तब तक बाकी सब देखें।`
+                : "आपके पास अभी कोई दुकान नहीं जुड़ी है। थोड़ी देर बाद फिर देखें।",
+            )}
             action={
               <Link
                 href="/stores"
                 className="press rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)]"
               >
-                Show all stores
+                {t("Show all stores", "सभी दुकानें देखें")}
               </Link>
             }
           />
@@ -169,7 +187,7 @@ export default async function StoresPage({
             {openNow.length ? (
               <section className="space-y-3">
                 <h2 className="flex items-baseline gap-2 px-4 text-heading">
-                  {active ? active.label : "Open now"}
+                  {activeLabel ?? t("Open now", "अभी खुले हैं")}
                   <span className="text-[13px] font-semibold text-muted">
                     {openNow.length}
                   </span>
@@ -184,16 +202,19 @@ export default async function StoresPage({
               /* Every shop in view is shut. Said once, at the top, rather than
                  left for somebody to infer from a column of grey badges. */
               <p className="mx-4 rounded-2xl bg-surface-2 px-4 py-3 text-[13px] leading-snug text-muted">
-                Nothing {active ? `in ${active.label.toLowerCase()} ` : ""}is
-                open right now. The kitchens below are closed — you can still
-                look at their menus.
+                {t(
+                  `Nothing ${active ? `in ${active.label.toLowerCase()} ` : ""}is open right now. The kitchens below are closed — you can still look at their menus.`,
+                  activeLabel
+                    ? `अभी ${activeLabel} में कुछ भी खुला नहीं है। नीचे की दुकानें बंद हैं — आप फिर भी उनका मेन्यू देख सकते हैं।`
+                    : "अभी कुछ भी खुला नहीं है। नीचे की दुकानें बंद हैं — आप फिर भी उनका मेन्यू देख सकते हैं।",
+                )}
               </p>
             )}
 
             {closed.length ? (
               <section className="space-y-3">
                 <h2 className="flex items-baseline gap-2 px-4 text-heading text-muted">
-                  Closed right now
+                  {t("Closed right now", "अभी बंद हैं")}
                   <span className="text-[13px] font-semibold">
                     {closed.length}
                   </span>

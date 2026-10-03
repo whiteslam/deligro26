@@ -40,6 +40,8 @@ import { RestaurantCard } from "@/components/shared/restaurant-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
+import { categoryLabel } from "@/lib/taxonomy";
+import { useLang, useT } from "@/components/providers/lang-provider";
 
 type Tab = "dishes" | "shops";
 
@@ -82,12 +84,13 @@ export function SearchView({
    */
   rotationSeed?: string;
 }) {
+  const { lang, t } = useLang();
   const [query, setQuery] = useState(initialQuery ?? "");
   const [tab, setTab] = useState<Tab>("dishes");
   const [sort, setSort] = useState<DishSort>("relevance");
   const [chips, setChips] = useState<Set<string>>(new Set());
   const [category, setCategory] = useState<string | null>(
-    initialCategory ?? null
+    initialCategory ?? null,
   );
   const [sheet, setSheet] = useState<null | "filters" | "sort">(null);
 
@@ -106,7 +109,7 @@ export function SearchView({
       offers: chips.has("offers"),
       category,
     }),
-    [chips, category]
+    [chips, category],
   );
 
   // Ranking measures from wherever the customer is — the same origin the header
@@ -115,17 +118,17 @@ export function SearchView({
   const origin = useLocation((s) => s.coords) ?? PINNED_LOCATION.coords;
   const ctx = useMemo<RankContext>(
     () => ({ origin, rotationSeed }),
-    [origin, rotationSeed]
+    [origin, rotationSeed],
   );
 
   const dishes = useMemo(
     () => searchDishes(index, deferredQuery, filters, sort, ctx),
-    [index, deferredQuery, filters, sort, ctx]
+    [index, deferredQuery, filters, sort, ctx],
   );
 
   const shops = useMemo(
     () => groupByShop(dishes, restaurants, deferredQuery, filters, sort),
-    [dishes, restaurants, deferredQuery, filters, sort]
+    [dishes, restaurants, deferredQuery, filters, sort],
   );
 
   const toggleChip = (id: string) =>
@@ -169,8 +172,8 @@ export function SearchView({
   const foundSomething = dishes.length > 0;
   useEffect(() => {
     if (!typed || !foundSomething) return;
-    const t = window.setTimeout(() => recordSearch(typed), 900);
-    return () => window.clearTimeout(t);
+    const timer = window.setTimeout(() => recordSearch(typed), 900);
+    return () => window.clearTimeout(timer);
   }, [typed, foundSomething, recordSearch]);
 
   const activeCount = chips.size + (category ? 1 : 0);
@@ -178,6 +181,9 @@ export function SearchView({
   const shown = dishes.slice(0, DISH_LIMIT);
 
   const activeCategory = FOOD_CATEGORIES.find((c) => c.id === category) ?? null;
+  const activeCategoryLabel = activeCategory
+    ? categoryLabel(lang, activeCategory)
+    : null;
   // A chip nothing on any menu actually matches is being answered by the shops'
   // cuisine tags instead. Say so — otherwise "Rolls" quietly lists milkshakes.
   const byCuisineOnly = categoryBasis(index, category) === "cuisine";
@@ -187,7 +193,7 @@ export function SearchView({
   // the list is answering, so a fuzzy result doesn't read as a wrong one.
   const correction = useMemo(
     () => (typed ? searchCorrection(index, deferredQuery, dishes) : null),
-    [typed, index, deferredQuery, dishes]
+    [typed, index, deferredQuery, dishes],
   );
 
   // When a category chip is what emptied the screen, the useful thing to say is
@@ -201,7 +207,7 @@ export function SearchView({
       deferredQuery,
       { ...filters, category: null },
       sort,
-      ctx
+      ctx,
     ).length;
   }, [
     dishes.length,
@@ -229,13 +235,19 @@ export function SearchView({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search for a dish, cuisine or restaurant"
-            aria-label="Search for a dish, cuisine or restaurant"
+            placeholder={t(
+              "Search for a dish, cuisine or restaurant",
+              "खाना या रेस्टोरेंट खोजें",
+            )}
+            aria-label={t(
+              "Search for a dish, cuisine or restaurant",
+              "खाना या रेस्टोरेंट खोजें",
+            )}
           />
           {query ? (
             <button
               onClick={() => setQuery("")}
-              aria-label="Clear"
+              aria-label={t("Clear", "मिटाएं")}
               className="press grid size-6 shrink-0 place-items-center rounded-full bg-surface text-muted"
             >
               <X className="size-4" />
@@ -274,7 +286,7 @@ export function SearchView({
             icon={<UtensilsCrossed className="size-4" />}
             count={dishes.length}
           >
-            Dishes
+            {t("Dishes", "व्यंजन")}
           </TabBtn>
           <TabBtn
             on={tab === "shops"}
@@ -282,7 +294,7 @@ export function SearchView({
             icon={<Store className="size-4" />}
             count={shops.length}
           >
-            Restaurants
+            {t("Restaurants", "रेस्टोरेंट")}
           </TabBtn>
         </div>
       </div>
@@ -292,8 +304,10 @@ export function SearchView({
           <div className="mb-3 flex items-start gap-2.5 rounded-2xl border border-deal/30 bg-deal-soft px-3 py-2.5 text-sm font-medium text-deal">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" />
             <span>
-              We couldn&apos;t load the catalog just now. This is a problem on
-              our side — try again in a moment.
+              {t(
+                "We couldn't load the catalog just now. This is a problem on our side — try again in a moment.",
+                "अभी सूची नहीं खुल पाई। गड़बड़ी हमारी तरफ़ से है — थोड़ी देर बाद फिर कोशिश करें।",
+              )}
             </span>
           </div>
         ) : null}
@@ -306,14 +320,14 @@ export function SearchView({
           <div>
             <div className="flex items-baseline justify-between gap-3">
               <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
-                Recent
+                {t("Recent", "हाल की खोज")}
               </p>
               <button
                 type="button"
                 onClick={clearHistory}
                 className="press text-[13px] font-bold text-muted underline"
               >
-                Clear
+                {t("Clear", "मिटाएं")}
               </button>
             </div>
             <ul className="mt-1 divide-y divide-line">
@@ -332,7 +346,7 @@ export function SearchView({
                   <button
                     type="button"
                     onClick={() => removeSearch(term)}
-                    aria-label={`Forget ${term}`}
+                    aria-label={t(`Forget ${term}`, `${term} हटाएं`)}
                     className="press grid size-8 shrink-0 place-items-center rounded-full text-muted"
                   >
                     <X className="size-4" />
@@ -352,7 +366,7 @@ export function SearchView({
         {showSuggestions ? (
           <div className={history.length ? "mt-4" : ""}>
             <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
-              Try searching · यह खोजें
+              {t("Try searching", "यह खोजें")}
             </p>
             <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1">
               {SUGGESTIONS.map((term) => (
@@ -386,11 +400,11 @@ export function SearchView({
               "press flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-bold",
               activeCount
                 ? "border-ink bg-ink text-bg"
-                : "border-line bg-surface text-ink"
+                : "border-line bg-surface text-ink",
             )}
           >
             <SlidersHorizontal className="size-4" />
-            Filters
+            {t("Filters", "फ़िल्टर")}
             {activeCount ? (
               <span className="grid size-5 place-items-center rounded-full bg-bg text-[11px] text-ink">
                 {activeCount}
@@ -405,7 +419,7 @@ export function SearchView({
             className="press flex min-w-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 py-2 text-[13px] font-bold text-ink"
           >
             <ArrowUpDown className="size-4 shrink-0" />
-            <span className="truncate">{sortLabel(sort)}</span>
+            <span className="truncate">{sortLabel(sort, lang)}</span>
             <ChevronDown className="size-4 shrink-0 text-muted" />
           </button>
         </div>
@@ -419,12 +433,12 @@ export function SearchView({
           <div className="no-scrollbar -mx-4 mt-2 flex items-center gap-2 overflow-x-auto px-4">
             {[...chips].map((id) => (
               <Token key={id} onRemove={() => toggleChip(id)}>
-                {filterLabel(id)}
+                {filterLabel(id, lang)}
               </Token>
             ))}
-            {activeCategory ? (
+            {activeCategoryLabel ? (
               <Token onRemove={() => setCategory(null)}>
-                {activeCategory.label}
+                {activeCategoryLabel}
               </Token>
             ) : null}
             <button
@@ -432,7 +446,7 @@ export function SearchView({
               onClick={clearFilters}
               className="press shrink-0 whitespace-nowrap px-1 text-[13px] font-bold text-muted underline"
             >
-              Clear all
+              {t("Clear all", "सब हटाएं")}
             </button>
           </div>
         ) : null}
@@ -445,45 +459,57 @@ export function SearchView({
           <p className="mt-4 text-sm font-medium text-muted">
             {tab === "dishes" ? (
               <>
-                {dishes.length.toLocaleString("en-IN")}{" "}
-                {dishes.length === 1 ? "dish" : "dishes"}
+                {t(
+                  `${dishes.length.toLocaleString("en-IN")} ${dishes.length === 1 ? "dish" : "dishes"}`,
+                  `${dishes.length.toLocaleString("en-IN")} व्यंजन`,
+                )}
                 {dishes.length > DISH_LIMIT
-                  ? ` · showing top ${DISH_LIMIT}`
+                  ? t(
+                      ` · showing top ${DISH_LIMIT}`,
+                      ` · ऊपर के ${DISH_LIMIT} दिख रहे हैं`,
+                    )
                   : ""}
               </>
             ) : (
-              <>
-                {shops.length}{" "}
-                {shops.length === 1 ? "restaurant" : "restaurants"}
-              </>
+              t(
+                `${shops.length} ${shops.length === 1 ? "restaurant" : "restaurants"}`,
+                `${shops.length} रेस्टोरेंट`,
+              )
             )}
           </p>
         ) : null}
 
         {!typed && tab === "dishes" && shown.length ? (
           <h2 className="mt-4 text-[17px] font-extrabold tracking-tight">
-            {activeCategory ? activeCategory.label : "Popular dishes near you · पास के लोकप्रिय व्यंजन"}
+            {activeCategoryLabel ??
+              t("Popular dishes near you", "पास के लोकप्रिय व्यंजन")}
           </h2>
         ) : null}
 
-        {byCuisineOnly && activeCategory ? (
+        {byCuisineOnly && activeCategory && activeCategoryLabel ? (
           <p className="mt-2 text-[13px] font-medium leading-snug text-muted">
-            No dish near you is listed as {activeCategory.label.toLowerCase()}{" "}
-            yet — showing what these kitchens do serve.
+            {t(
+              `No dish near you is listed as ${activeCategory.label.toLowerCase()} yet — showing what these kitchens do serve.`,
+              `पास में अभी कोई व्यंजन "${activeCategoryLabel}" में नहीं है — ये रसोई जो बनाती हैं, वह दिखा रहे हैं।`,
+            )}
           </p>
         ) : null}
 
         {correction ? (
           <p className="mt-3 text-[13px] font-medium leading-snug text-muted">
-            Showing results for{" "}
-            <span className="font-bold text-ink">&ldquo;{correction}&rdquo;</span>
+            {t("Showing results for", "इसके नतीजे दिखा रहे हैं:")}{" "}
+            <span className="font-bold text-ink">
+              &ldquo;{correction}&rdquo;
+            </span>
           </p>
         ) : null}
 
         {partial ? (
           <p className="mt-3 text-[13px] font-medium leading-snug text-muted">
-            Nothing is called &ldquo;{typed}&rdquo; exactly. These are the
-            closest dishes.
+            {t(
+              `Nothing is called “${typed}” exactly. These are the closest dishes.`,
+              `ठीक “${typed}” नाम का कुछ नहीं मिला। ये सबसे मिलते-जुलते व्यंजन हैं।`,
+            )}
           </p>
         ) : null}
 
@@ -499,7 +525,7 @@ export function SearchView({
               query={typed}
               onClear={clearFilters}
               kind="dish"
-              categoryLabel={activeCategory?.label ?? null}
+              categoryLabel={activeCategoryLabel}
               elsewhere={withoutCategory}
               onDropCategory={() => setCategory(null)}
             />
@@ -515,7 +541,7 @@ export function SearchView({
                     href={`/restaurant/${shop.restaurant.slug}`}
                     className="press mt-1.5 block truncate px-0.5 text-[12px] font-medium text-muted"
                   >
-                    Serves{" "}
+                    {t("Serves", "मिलता है:")}{" "}
                     <span className="font-semibold text-ink">
                       {shop.dishes
                         .slice(0, 3)
@@ -523,7 +549,10 @@ export function SearchView({
                         .join(", ")}
                     </span>
                     {shop.dishes.length > 3
-                      ? ` +${shop.dishes.length - 3} more`
+                      ? t(
+                          ` +${shop.dishes.length - 3} more`,
+                          ` +${shop.dishes.length - 3} और`,
+                        )
                       : ""}
                   </Link>
                 ) : null}
@@ -540,7 +569,7 @@ export function SearchView({
           chips={chips}
           category={category}
           resultCount={tab === "dishes" ? dishes.length : shops.length}
-          resultNoun={tab === "dishes" ? "dish" : "restaurant"}
+          resultKind={tab === "dishes" ? "dish" : "restaurant"}
           onToggleChip={toggleChip}
           onSetCategory={setCategory}
           onClearAll={clearFilters}
@@ -582,19 +611,29 @@ function NoResults({
   // "nothing matches" next to a list of chips leaves someone to guess which one
   // to poke. Worth the extra sentence for a first-time smartphone user.
   const blockedByCategory = Boolean(categoryLabel) && elsewhere > 0;
+  const t = useT();
 
   if (blockedByCategory) {
     return (
       <EmptyState
         className="mt-6"
         icon={<Search className="size-7" />}
-        title={`No ${categoryLabel} matches “${query}”`}
-        description={`But ${elsewhere} other ${
-          elsewhere === 1 ? "dish matches" : "dishes match"
-        } — they're just not ${categoryLabel}.`}
+        title={t(
+          `No ${categoryLabel} matches “${query}”`,
+          `“${query}” ${categoryLabel} में नहीं मिला`,
+        )}
+        description={t(
+          `But ${elsewhere} other ${
+            elsewhere === 1 ? "dish matches" : "dishes match"
+          } — they're just not ${categoryLabel}.`,
+          `पर ${elsewhere} दूसरे व्यंजन मिले — बस वे ${categoryLabel} में नहीं हैं।`,
+        )}
         action={
           <Button onClick={onDropCategory}>
-            Show all {elsewhere} {elsewhere === 1 ? "result" : "results"}
+            {t(
+              `Show all ${elsewhere} ${elsewhere === 1 ? "result" : "results"}`,
+              `सभी ${elsewhere} नतीजे दिखाएं`,
+            )}
           </Button>
         }
       />
@@ -605,15 +644,25 @@ function NoResults({
     <EmptyState
       className="mt-6"
       icon={<Search className="size-7" />}
-      title={query ? `Nothing called “${query}” yet` : "Nothing matches — yet"}
+      title={
+        query
+          ? t(`Nothing called “${query}” yet`, `“${query}” अभी नहीं मिला`)
+          : t("Nothing matches — yet", "अभी कुछ नहीं मिला")
+      }
       description={
         kind === "dish"
-          ? "No kitchen near you is cooking that right now. Try a shorter word, or clear a filter."
-          : "No restaurant here fits these filters. Try a wider search or clear a filter."
+          ? t(
+              "No kitchen near you is cooking that right now. Try a shorter word, or clear a filter.",
+              "अभी पास में कोई रसोई यह नहीं बना रही। छोटा शब्द लिखकर देखें, या कोई फ़िल्टर हटाएं।",
+            )
+          : t(
+              "No restaurant here fits these filters. Try a wider search or clear a filter.",
+              "इन फ़िल्टर से कोई रेस्टोरेंट नहीं मिला। कुछ और खोजें या कोई फ़िल्टर हटाएं।",
+            )
       }
       action={
         <Button variant="outline" onClick={onClear}>
-          Clear filters
+          {t("Clear filters", "फ़िल्टर हटाएं")}
         </Button>
       }
     />
@@ -646,7 +695,7 @@ function TabBtn({
         // Colour changes slower than the thumb moves, so the label settles just
         // after it arrives rather than racing ahead of it.
         "press relative z-10 flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full py-2 transition-colors duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
-        on ? "text-[var(--on-accent)]" : "text-muted"
+        on ? "text-[var(--on-accent)]" : "text-muted",
       )}
     >
       {icon}
@@ -668,6 +717,7 @@ function Token({
   children: React.ReactNode;
   onRemove: () => void;
 }) {
+  const t = useT();
   return (
     /* Written out rather than built on `.bolt-chip`: that class is unlayered
        CSS with a `padding` shorthand, so a Tailwind utility in @layer
@@ -679,7 +729,10 @@ function Token({
       <button
         type="button"
         onClick={onRemove}
-        aria-label={`Remove ${String(children)} filter`}
+        aria-label={t(
+          `Remove ${String(children)} filter`,
+          `${String(children)} फ़िल्टर हटाएं`,
+        )}
         className="press grid size-5 place-items-center rounded-full bg-bg/25"
       >
         <X className="size-3.5" strokeWidth={3} />

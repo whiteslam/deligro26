@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Share, X } from "lucide-react";
+import type { T } from "@/lib/i18n/lang";
 
 /**
  * The install suggestion.
@@ -15,11 +16,14 @@ export function InstallPrompt({
   manual,
   onInstall,
   onDismiss,
+  t,
 }: {
   /** iOS: no programmatic prompt exists, so describe the Share-sheet route. */
   manual: boolean;
   onInstall: () => void;
   onDismiss: () => void;
+  /** From PwaProvider, which sits above the customer app's LangProvider. */
+  t: T;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -41,10 +45,19 @@ export function InstallPrompt({
     if (!el) return;
     const root = document.documentElement;
     const publish = () => {
-      const scroller = el.closest(".app-shell")?.querySelector<HTMLElement>(".app-scroll");
-      const bottom = scroller ? scroller.getBoundingClientRect().bottom : window.innerHeight;
-      const reserved = scroller ? parseFloat(getComputedStyle(scroller).paddingBottom) || 0 : 0;
-      const need = Math.max(0, Math.ceil(bottom - el.getBoundingClientRect().top + 12 - reserved));
+      const scroller = el
+        .closest(".app-shell")
+        ?.querySelector<HTMLElement>(".app-scroll");
+      const bottom = scroller
+        ? scroller.getBoundingClientRect().bottom
+        : window.innerHeight;
+      const reserved = scroller
+        ? parseFloat(getComputedStyle(scroller).paddingBottom) || 0
+        : 0;
+      const need = Math.max(
+        0,
+        Math.ceil(bottom - el.getBoundingClientRect().top + 12 - reserved),
+      );
       root.style.setProperty("--install-inset", `${need}px`);
     };
     publish();
@@ -62,33 +75,43 @@ export function InstallPrompt({
     <div
       ref={ref}
       role="dialog"
-      aria-label="Install Deligro"
+      aria-label={t("Install Deligro", "Deligro इंस्टॉल करें")}
       className="install-card pointer-events-auto fixed inset-x-3 z-[88] mx-auto max-w-sm rounded-xl border border-line bg-surface px-3.5 py-3 shadow-[var(--shadow-lg)]"
     >
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold text-ink">Install Deligro</p>
+          <p className="text-[13px] font-semibold text-ink">
+            {t("Install Deligro", "Deligro इंस्टॉल करें")}
+          </p>
           {manual ? (
             <p className="mt-0.5 text-xs leading-snug text-muted">
-              Tap{" "}
+              {t("Tap", "")}{" "}
               <Share
                 className="inline-block size-3.5 -translate-y-px"
-                aria-label="the Share button"
+                aria-label={t("the Share button", "शेयर बटन")}
               />{" "}
-              then <strong className="font-semibold">Add to Home Screen</strong>{" "}
-              to open Deligro like an app.
+              {t("then", "दबाएं, फिर")}{" "}
+              <strong className="font-semibold">
+                {t("Add to Home Screen", "होम स्क्रीन में जोड़ें")}
+              </strong>{" "}
+              {t(
+                "to open Deligro like an app.",
+                "चुनें — Deligro ऐप की तरह खुलेगा।",
+              )}
             </p>
           ) : (
             <p className="mt-0.5 text-xs leading-snug text-muted">
-              Add it to your home screen — opens faster, and works even on a weak
-              connection.
+              {t(
+                "Add it to your home screen — opens faster, and works even on a weak connection.",
+                "इसे होम स्क्रीन पर जोड़ें — जल्दी खुलेगा और कमज़ोर इंटरनेट पर भी चलेगा।",
+              )}
             </p>
           )}
         </div>
         <button
           type="button"
           onClick={onDismiss}
-          aria-label="Dismiss"
+          aria-label={t("Dismiss", "हटाएं")}
           className="press -m-1 rounded-lg p-1 text-muted"
         >
           <X className="size-4" aria-hidden="true" />
@@ -101,7 +124,7 @@ export function InstallPrompt({
           onClick={onInstall}
           className="press mt-2.5 inline-flex rounded-lg bg-ink px-3 py-1.5 text-xs font-semibold text-[color:var(--surface)]"
         >
-          Install
+          {t("Install", "इंस्टॉल करें")}
         </button>
       )}
     </div>

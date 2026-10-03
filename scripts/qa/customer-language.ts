@@ -72,7 +72,9 @@ for (const f of files) {
     if (code.startsWith("*") || code.startsWith("/*") || code.startsWith("{/*")) return;
     // A Hindi phrase and an English phrase inside the SAME string literal.
     for (const lit of code.match(/"[^"]*"|`[^`]*`|>[^<{}]+</g) ?? []) {
-      if (DEV.test(lit) && LATIN.test(lit.replace(/\$\{[^}]*\}/g, ""))) offenders.push(`${f.slice(ROOT.length + 1)}:${i + 1}`);
+      // Brand names and acronyms stay in Latin script inside Hindi text.
+      const words = lit.replace(/\$\{[^}]*\}/g, "").replace(/\b(Deligro|OTP|UPI|SMS|GST)\b/g, "");
+      if (DEV.test(lit) && LATIN.test(words)) offenders.push(`${f.slice(ROOT.length + 1)}:${i + 1}`);
     }
   });
 }

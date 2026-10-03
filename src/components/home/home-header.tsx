@@ -15,6 +15,7 @@ import { useLocation } from "@/stores/location-store";
 import { useScrollCollapse } from "@/hooks/use-scroll-collapse";
 import { cn } from "@/lib/utils/cn";
 import { addressLocality } from "@/lib/utils/address-locality";
+import { useT } from "@/components/providers/lang-provider";
 
 /** The user's saved default address, resolved server-side and passed in. */
 export interface SavedAddress {
@@ -46,6 +47,7 @@ export function HomeHeader({
   const sublabel = useLocation((s) => s.sublabel);
 
   const collapsed = useScrollCollapse();
+  const t = useT();
 
   const detecting = status === "loading";
   const detected = status === "granted" && !!label;
@@ -72,12 +74,14 @@ export function HomeHeader({
   const fallback = label ? { label, sublabel } : null;
 
   const shown = place ?? saved ?? fallback;
-  const primary = shown?.label ?? "Set your location";
+  const primary = shown?.label ?? t("Set your location", "अपनी जगह चुनें");
   // The subtitle is where the age goes: it is the line nobody depends on for
   // the place name, and "Last known area" is the whole disclosure a customer
   // needs before they read a distance off a card.
   const secondary =
-    stale && !saved ? "Last known area · tap to update" : (shown?.sublabel ?? "Tap to detect");
+    stale && !saved
+      ? t("Last known area · tap to update", "पिछली जगह · बदलने के लिए दबाएं")
+      : (shown?.sublabel ?? t("Tap to detect", "जगह पता करने के लिए दबाएं"));
 
   return (
     <div className="app-header sticky top-0 z-20 px-4 pb-3 pt-2.5">
@@ -98,7 +102,7 @@ export function HomeHeader({
             <Link
               href="/location"
               className="press flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left"
-              aria-label="Change delivery location"
+              aria-label={t("Change delivery location", "डिलीवरी की जगह बदलें")}
             >
               <span className="grid size-7 shrink-0 place-items-center rounded-full bg-blue/12 text-blue">
                 {detecting ? (
@@ -111,13 +115,17 @@ export function HomeHeader({
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
-                  {detecting ? "Locating… / खोज रहे हैं" : "Deliver to · पहुंचाएं"}
+                  {detecting
+                    ? t("Locating…", "जगह खोज रहे हैं…")
+                    : t("Deliver to", "यहां पहुंचाएं")}
                 </span>
                 <span className="flex min-w-0 items-center gap-1 text-[15px] font-extrabold leading-tight tracking-tight">
                   {/* The label keeps its width ("Home" is short); only the
                       locality after it gives way. Both used to truncate, and
                       "Home" lost first — "H…" at 360px. */}
-                  <span className="max-w-[60%] shrink-0 truncate">{primary}</span>
+                  <span className="max-w-[60%] shrink-0 truncate">
+                    {primary}
+                  </span>
                   {secondary ? (
                     <span className="truncate font-semibold text-muted">
                       · {secondary}
@@ -130,14 +138,14 @@ export function HomeHeader({
 
             <Link
               href="/profile/notifications"
-              aria-label="Notifications"
+              aria-label={t("Notifications", "सूचनाएं")}
               className="press grid size-11 shrink-0 place-items-center rounded-full bg-accent/12 text-accent"
             >
               <Bell className="size-[18px]" />
             </Link>
             <Link
               href="/profile"
-              aria-label="Profile"
+              aria-label={t("Profile", "प्रोफ़ाइल")}
               className="press grid size-11 shrink-0 place-items-center rounded-full bg-violet-500/15 text-violet-500"
             >
               <User className="size-[18px]" />
@@ -152,14 +160,20 @@ export function HomeHeader({
           type="search"
           value={query}
           onChange={(e) => onQueryChange?.(e.target.value)}
-          placeholder="Search for a dish, cuisine or restaurant"
-          aria-label="Search for a dish, cuisine or restaurant"
+          placeholder={t(
+            "Search for a dish, cuisine or restaurant",
+            "खाना या रेस्टोरेंट खोजें",
+          )}
+          aria-label={t(
+            "Search for a dish, cuisine or restaurant",
+            "खाना या रेस्टोरेंट खोजें",
+          )}
         />
         {query ? (
           <button
             type="button"
             onClick={() => onQueryChange?.("")}
-            aria-label="Clear search"
+            aria-label={t("Clear search", "खोज मिटाएं")}
             className="press tap-target grid size-6 shrink-0 place-items-center rounded-full bg-surface text-muted"
           >
             <X className="size-4" />
