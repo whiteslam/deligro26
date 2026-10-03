@@ -3,7 +3,7 @@
  * and behaves exactly as before in a normal browser.
  * Usage: npx tsx scripts/qa/native-bridge.ts
  */
-import { isNativeApp, nativePush, nativeSessionSync, pushSupport } from "../../src/lib/native/bridge";
+import { isNativeApp, nativePush, nativeRing, nativeSessionSync, pushSupport, ringDiff } from "../../src/lib/native/bridge";
 
 let passed = 0;
 let failed = 0;
@@ -45,6 +45,21 @@ async function main() {
   check("push support in the Android shell is native", pushSupport(shell as never) === "native");
   check("push support in a browser with Notification is web", pushSupport({ Notification: function () {} } as never) === "web");
   check("push support with neither is unsupported", pushSupport({} as never) === "unsupported");
+
+  // --- ringing (Vendor/Rider ≥ 1.1.0) ---
+  const ringPlugin = { ...plugin, startRing: async () => {}, stopRing: async () => {}, ringSetup: async () => ({ notifications: true, fullScreen: true, batteryUnrestricted: true }), openRingSettings: async () => {} };
+  const ringShell = { Capacitor: { isNativePlatform: () => true, Plugins: { DeligroPush: ringPlugin } } };
+  check("new APK exposes the ring", nativeRing(ringShell as never) === ringPlugin);
+  check("old APK (no stopRing) has no ring", nativeRing(shell as never) === null);
+  check("browser has no ring", nativeRing(browser as never) === null);
+  check("server render has no ring", nativeRing(undefined) === null);
+  const d = ringDiff(["a", "b"], ["b", "c"]);
+  check("ringDiff starts new ids", d.started.join() === "c");
+  check("ringDiff stops departed ids", d.stopped.join() === "a");
+  const same = ringDiff(["a"], ["a"]);
+  check("ringDiff with no change does nothing", same.started.length === 0 && same.stopped.length === 0);
+  const first = ringDiff([], ["a", "b"]);
+  check("first look rings for everything already waiting", first.started.join() === "a,b" && first.stopped.length === 0);
 
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed ? 1 : 0);

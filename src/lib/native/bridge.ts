@@ -68,3 +68,38 @@ export function pushSupport(win: WindowLike = defaultWindow()): "native" | "web"
   if (win && typeof win === "object" && "Notification" in win) return "web";
   return "unsupported";
 }
+
+export interface RingSetup {
+  notifications: boolean;
+  fullScreen: boolean;
+  batteryUnrestricted: boolean;
+}
+
+/**
+ * The continuous order ring (lib/alerts/ring.ts). Present only in Vendor and
+ * Rider APKs built with RingService (≥ 1.1.0); older shells answer null and
+ * the board falls back to its own repeating tone.
+ */
+export interface NativeRing {
+  startRing(o: { ringId: string; title: string; body: string; timeoutSec: number }): Promise<void>;
+  stopRing(o: { ringId: string }): Promise<void>;
+  ringSetup(): Promise<RingSetup>;
+  openRingSettings(o: { which: "notifications" | "fullScreen" | "battery" }): Promise<void>;
+}
+
+export function nativeRing(win: WindowLike = defaultWindow()): NativeRing | null {
+  const p = nativePush(win) as unknown as Partial<NativeRing> | null;
+  return p && typeof p.startRing === "function" && typeof p.stopRing === "function"
+    ? (p as NativeRing)
+    : null;
+}
+
+/** Which orders just appeared on the board, and which just left it. */
+export function ringDiff(prev: string[], next: string[]): { started: string[]; stopped: string[] } {
+  const before = new Set(prev);
+  const after = new Set(next);
+  return {
+    started: next.filter((id) => !before.has(id)),
+    stopped: prev.filter((id) => !after.has(id)),
+  };
+}
