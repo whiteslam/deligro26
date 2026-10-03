@@ -11,6 +11,8 @@ import { Bell, BellOff, BellRing } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { playAlertSound } from "@/lib/alerts/tones";
 import { requestPushOptIn } from "@/components/notifications/onesignal-init";
+import { nativeRing, ringDiff } from "@/lib/native/bridge";
+import { ringId, RING_TIMEOUT_SEC } from "@/lib/alerts/ring";
 
 /**
  * Tells the kitchen an order has arrived.
@@ -41,13 +43,16 @@ import { requestPushOptIn } from "@/components/notifications/onesignal-init";
 const STORAGE_KEY = "deligro-kitchen-alerts";
 
 /**
- * How often an unacknowledged order re-announces itself.
+ * How often the tone repeats while an order waits in New.
  *
- * One beep is for someone who is present. This is for a tablet on a shelf: the
- * alert repeats until the order leaves the New column, which is to say until a
- * human has actually dealt with it.
+ * It used to be 25 s — a beep now and then, easy to miss over a busy kitchen.
+ * The owner asked for a ring that does not stop until somebody accepts or
+ * rejects, so in a browser the tone now repeats back-to-back until the order
+ * leaves the New column. Inside the Android app the native ring does this
+ * instead (lib/alerts/ring.ts) and this tone stays quiet, so the two never play
+ * over each other.
  */
-const RENOTIFY_MS = 25_000;
+const RING_REPEAT_MS = 2_500;
 
 /* ------------------------------------------------------------------
  * The armed preference, and whether this device can alert at all, are both
@@ -189,6 +194,18 @@ export function KitchenAlert({
     [restaurantName, soundPreset, soundUrl]
   );
 
+  /** The repeat: tone and buzz only — one system notification per arrival is enough. */
+  const ringTone = useCallback(() => {
+    const ctx = audioRef.current;
+    if (ctx) {
+      void ctx
+        .resume()
+        .then(() => playAlertSound(ctx, soundPreset, soundUrl))
+        .catch(() => {});
+    }
+    navigator.vibrate?.([200, 100, 200]);
+  }, [soundPreset, soundUrl]);
+
   async function arm() {
     try {
       const ctx = audioRef.current ?? new AudioContext();
@@ -248,16 +265,45 @@ export function KitchenAlert({
     fire(incomingIds.length);
   }, [incomingIds, on, fire]);
 
-  // Still unaccepted.
+  // Still unaccepted — keep ringing until the New column is empty. Not inside
+  // the Android app: the native ring below is already doing it.
   useEffect(() => {
-    if (!on || incomingIds.length === 0) return;
+    if (!on || incomingIds.length === 0 || nativeRing()) return;
     const id = setInterval(() => {
-      if (Date.now() - lastRepeat.current < RENOTIFY_MS) return;
+      if (Date.now() - lastRepeat.current < RING_REPEAT_MS) return;
       lastRepeat.current = Date.now();
-      fire(incomingIds.length);
-    }, 5_000);
+      ringTone();
+    }, 500);
     return () => clearInterval(id);
-  }, [incomingIds, on, fire]);
+  }, [incomingIds, on, ringTone]);
+
+  // Inside the Android app: ring natively for every order in New, and stop the
+  // moment it leaves (accepted, rejected, or cancelled by the customer). Covers
+  // a ring push that never arrived. Needs no arming — the native ring does not
+  // depend on a browser gesture. Orders already waiting when the board opens
+  // ring too: they are still unanswered.
+  const nativeSeen = useRef<string[]>([]);
+  useEffect(() => {
+    const ring = nativeRing();
+    if (!ring) return;
+    const { started, stopped } = ringDiff(nativeSeen.current, incomingIds);
+    nativeSeen.current = incomingIds;
+    for (const id of started) {
+      void ring
+        .startRing({
+          ringId: ringId("vendor", id),
+          title: "नया ऑर्डर 🔔 New order",
+          body: restaurantName
+            ? `${restaurantName} — स्वीकार करें / Accept`
+            : "स्वीकार करें / Accept",
+          timeoutSec: RING_TIMEOUT_SEC.vendor,
+        })
+        .catch(() => {});
+    }
+    for (const id of stopped) {
+      void ring.stopRing({ ringId: ringId("vendor", id) }).catch(() => {});
+    }
+  }, [incomingIds, restaurantName]);
 
   if (!supported) return null;
 

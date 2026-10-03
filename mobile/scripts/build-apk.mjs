@@ -19,6 +19,8 @@ import {
   patchMainActivity,
   patchAppGradle,
   patchManifestPermissions,
+  patchManifestRing,
+  ringWav,
   signedBuildArgs,
   redactArgs,
   offlinePageFor,
@@ -75,6 +77,19 @@ function build(role, cfg, env) {
   const pluginDir = join(javaRoot, "com", "ractrotech", "deligro", "push");
   mkdirSync(pluginDir, { recursive: true });
   copyFileSync(join(MOBILE, "native", "DeligroPushPlugin.java"), join(pluginDir, "DeligroPushPlugin.java"));
+  // Ringing (lib/alerts/ring.ts). The classes compile into every shell; only
+  // `"ring": true` roles declare the service and extension in the manifest.
+  for (const f of ["RingService.java", "DeligroNotificationExtension.java"]) {
+    copyFileSync(join(MOBILE, "native", f), join(pluginDir, f));
+  }
+  if (role.ring) {
+    const rawDir = join(appDir, "android", "app", "src", "main", "res", "raw");
+    mkdirSync(rawDir, { recursive: true });
+    // An owner-supplied ring wins over the generated one.
+    const custom = ["deligro_ring.mp3", "deligro_ring.wav"].map((f) => join(MOBILE, "native", f)).find(existsSync);
+    if (custom) copyFileSync(custom, join(rawDir, custom.endsWith(".mp3") ? "deligro_ring.mp3" : "deligro_ring.wav"));
+    else writeFileSync(join(rawDir, "deligro_ring.wav"), ringWav());
+  }
   const mainDir = join(javaRoot, ...role.appId.split("."));
   mkdirSync(mainDir, { recursive: true });
   writeFileSync(join(mainDir, "MainActivity.java"), patchMainActivity(role.appId));
@@ -83,7 +98,9 @@ function build(role, cfg, env) {
   writeFileSync(gradlePath, patchAppGradle(readFileSync(gradlePath, "utf8"), role.versionCode, role.versionName));
 
   const manifestPath = join(appDir, "android", "app", "src", "main", "AndroidManifest.xml");
-  writeFileSync(manifestPath, patchManifestPermissions(readFileSync(manifestPath, "utf8")));
+  let manifest = patchManifestPermissions(readFileSync(manifestPath, "utf8"));
+  if (role.ring) manifest = patchManifestRing(manifest);
+  writeFileSync(manifestPath, manifest);
 
   // 5. Sync + signed release build.
   run("npx cap sync android", appDir);

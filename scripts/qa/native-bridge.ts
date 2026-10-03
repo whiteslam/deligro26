@@ -3,7 +3,7 @@
  * and behaves exactly as before in a normal browser.
  * Usage: npx tsx scripts/qa/native-bridge.ts
  */
-import { isNativeApp, nativePush, nativeSessionSync, pushSupport } from "../../src/lib/native/bridge";
+import { isNativeApp, missingRingSettings, nativePush, nativeRing, nativeSessionSync, pushSupport, ringDiff } from "../../src/lib/native/bridge";
 
 let passed = 0;
 let failed = 0;
@@ -45,6 +45,30 @@ async function main() {
   check("push support in the Android shell is native", pushSupport(shell as never) === "native");
   check("push support in a browser with Notification is web", pushSupport({ Notification: function () {} } as never) === "web");
   check("push support with neither is unsupported", pushSupport({} as never) === "unsupported");
+
+  // --- ringing (Vendor/Rider ≥ 1.1.0) ---
+  const ringPlugin = { ...plugin, startRing: async () => {}, stopRing: async () => {}, ringSetup: async () => ({ notifications: true, fullScreen: true, batteryUnrestricted: true }), openRingSettings: async () => {} };
+  const ringShell = { Capacitor: { isNativePlatform: () => true, Plugins: { DeligroPush: ringPlugin } } };
+  check("new APK exposes the ring", nativeRing(ringShell as never) === ringPlugin);
+  check("old APK (no stopRing) has no ring", nativeRing(shell as never) === null);
+  check("browser has no ring", nativeRing(browser as never) === null);
+  check("server render has no ring", nativeRing(undefined) === null);
+  const d = ringDiff(["a", "b"], ["b", "c"]);
+  check("ringDiff starts new ids", d.started.join() === "c");
+  check("ringDiff stops departed ids", d.stopped.join() === "a");
+  const same = ringDiff(["a"], ["a"]);
+  check("ringDiff with no change does nothing", same.started.length === 0 && same.stopped.length === 0);
+  const all = { notifications: true, fullScreen: true, batteryUnrestricted: true, manufacturer: "samsung" };
+  check("fully set-up phone needs nothing", missingRingSettings(all).length === 0);
+  check("battery saver on is flagged", missingRingSettings({ ...all, batteryUnrestricted: false }).join() === "battery");
+  check("notifications off comes first", missingRingSettings({ notifications: false, fullScreen: false, batteryUnrestricted: false }).join() === "notifications,battery,fullScreen");
+  const redmi = { ...all, manufacturer: "Xiaomi" };
+  check("Xiaomi keeps an Autostart step even with everything else fixed", missingRingSettings(redmi).join() === "autostart");
+  check("Vivo / Oppo / Realme too", ["vivo", "OPPO", "realme"].every((m) => missingRingSettings({ ...all, manufacturer: m }).includes("autostart")));
+  check("Autostart goes once acknowledged", missingRingSettings(redmi, { autostartDone: true }).length === 0);
+  check("Samsung has no Autostart step", !missingRingSettings(all).includes("autostart"));
+  const first = ringDiff([], ["a", "b"]);
+  check("first look rings for everything already waiting", first.started.join() === "a,b" && first.stopped.length === 0);
 
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed ? 1 : 0);

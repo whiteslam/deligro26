@@ -1,7 +1,8 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { shortOrderId } from "@/lib/utils/order-map";
-import { sendPush, isPushConfigured, type PushText } from "./onesignal";
+import { sendPush, isPushConfigured, type PushOptions, type PushText } from "./onesignal";
+import { ringStartData, ringStopData, RING_TIMEOUT_SEC } from "@/lib/alerts/ring";
 
 /**
  * Order notifications — every transition, for every side of it.
@@ -32,11 +33,12 @@ async function pushToUser(
   playerId: string | null | undefined,
   heading: PushText,
   message: PushText,
-  url: string
+  url: string,
+  opts: PushOptions = {}
 ): Promise<void> {
   if (!userId && !playerId) return;
   try {
-    await sendPush({ userIds: [userId], playerIds: [playerId] }, heading, message, { url });
+    await sendPush({ userIds: [userId], playerIds: [playerId] }, heading, message, { url, ...opts });
   } catch {
     // swallow — fire-and-forget
   }
@@ -86,7 +88,8 @@ export async function notifyCustomer(
 export async function notifyVendor(
   orderId: string,
   heading: PushText,
-  message: PushText
+  message: PushText,
+  opts: PushOptions = {}
 ): Promise<void> {
   if (!isPushConfigured) return;
   try {
@@ -108,7 +111,7 @@ export async function notifyVendor(
       .eq("id", restaurant.owner_id)
       .maybeSingle();
 
-    await pushToUser(restaurant.owner_id, owner?.onesignal_id, heading, message, `/vendor`);
+    await pushToUser(restaurant.owner_id, owner?.onesignal_id, heading, message, `/vendor`, opts);
   } catch {
     // swallow — fire-and-forget
   }
@@ -125,7 +128,8 @@ export async function notifyVendor(
 export async function notifyDriver(
   driverId: string,
   heading: PushText,
-  message: PushText
+  message: PushText,
+  opts: PushOptions = {}
 ): Promise<void> {
   if (!isPushConfigured) return;
   try {
@@ -136,7 +140,7 @@ export async function notifyDriver(
       .eq("id", driverId)
       .maybeSingle();
 
-    await pushToUser(driverId, data?.onesignal_id, heading, message, "/driver");
+    await pushToUser(driverId, data?.onesignal_id, heading, message, "/driver", opts);
   } catch {
     // swallow — fire-and-forget
   }
@@ -172,6 +176,49 @@ export async function notifyOps(
   } catch {
     // swallow — fire-and-forget
   }
+}
+
+/* ---------- ringing (lib/alerts/ring.ts) ---------- */
+
+/**
+ * High priority: Android only lets the Vendor/Rider app start its ringing
+ * service from a high-priority message. The ttl matches the ring's own
+ * timeout — a phone that comes online after that has nothing left to ring for.
+ */
+const vendorRing = (orderId: string): PushOptions => ({
+  priority: 10,
+  ttlSec: RING_TIMEOUT_SEC.vendor,
+  data: { ...ringStartData("vendor", orderId) },
+});
+const riderRing = (orderId: string): PushOptions => ({
+  priority: 10,
+  ttlSec: RING_TIMEOUT_SEC.rider,
+  data: { ...ringStartData("rider", orderId) },
+});
+
+/**
+ * Every phone signed in to the restaurant stops ringing for this order —
+ * accepted on the counter tablet silences the owner's phone too. Silent: it
+ * shows nothing anywhere, including web push and APKs without the ring.
+ *
+ * Normal priority, deliberately: FCM may downgrade an app's high-priority
+ * messages when they produce no visible notification, and the ring STARTS
+ * depend on high priority. A ringing phone runs a foreground service, so a
+ * stop delivered at normal priority still lands; the open board and the
+ * ring's own timeout cover the rest.
+ */
+export function stopVendorRing(orderId: string): Promise<void> {
+  return notifyVendor(orderId, { en: "" }, { en: "" }, {
+    silent: true,
+    data: { ...ringStopData("vendor", orderId) },
+  });
+}
+
+export function stopRiderRing(driverId: string, orderId: string): Promise<void> {
+  return notifyDriver(driverId, { en: "" }, { en: "" }, {
+    silent: true,
+    data: { ...ringStopData("rider", orderId) },
+  });
 }
 
 /* ---------- customer-facing transitions ---------- */
@@ -348,7 +395,8 @@ export function notifyDriverPickupOffered(
     {
       en: `${opts.restaurantName}${where} is cooking order #${id} — ready in about ${opts.readyInMinutes} min. Head over.`,
       hi: `${opts.restaurantName}${where} ऑर्डर #${id} बना रहा है — लगभग ${opts.readyInMinutes} मिनट में तैयार। निकल पड़िए।`,
-    }
+    },
+    riderRing(opts.orderId)
   );
 }
 
@@ -364,7 +412,8 @@ export function notifyDriverPickupReady(
     {
       en: `${opts.restaurantName} has packed order #${id}. It's held for you — accept it in the app.`,
       hi: `${opts.restaurantName} ने ऑर्डर #${id} पैक कर दिया है। यह आपके लिए रखा है — ऐप में स्वीकार करें।`,
-    }
+    },
+    riderRing(opts.orderId)
   );
 }
 
@@ -372,6 +421,10 @@ export function notifyDriverPickupReady(
  * A manager put this rider on the order by hand. Without this the rider only
  * found out on their next board refresh — which, with the phone in a pocket,
  * is whenever they next looked.
+ *
+ * Does not ring: an assignment is an instruction, not an offer. There is no
+ * Accept step that could stop the ring, so it would ring out its full timeout
+ * whatever the rider did.
  */
 export function notifyDriverAssigned(
   driverId: string,
@@ -392,10 +445,11 @@ export function notifyDriverAssigned(
  * The order this rider was offered or carrying is off. A rider already riding
  * to the shop used to keep riding until they looked at the screen.
  */
-export function notifyDriverOrderCancelled(
+export async function notifyDriverOrderCancelled(
   driverId: string,
   opts: { orderId: string; pickedUp: boolean }
 ): Promise<void> {
+  await stopRiderRing(driverId, opts.orderId);
   const id = shortOrderId(opts.orderId);
   return notifyDriver(
     driverId,
@@ -450,7 +504,8 @@ export function notifyVendorNewOrder(
     {
       en: `Order #${id}${itemsEn} is waiting for you to accept.`,
       hi: `ऑर्डर #${id}${itemsHi} आपके स्वीकार करने का इंतज़ार कर रहा है।`,
-    }
+    },
+    vendorRing(orderId)
   );
 }
 
@@ -458,10 +513,11 @@ export function notifyVendorNewOrder(
  * The customer pulled out. The board would otherwise just drop the card, which
  * a kitchen already cooking has no way to notice.
  */
-export function notifyVendorOrderCancelled(
+export async function notifyVendorOrderCancelled(
   orderId: string,
   opts: { byAdmin?: boolean } = {}
 ): Promise<void> {
+  await stopVendorRing(orderId);
   const id = shortOrderId(orderId);
   // Who pulled the order changes what the kitchen does next: a customer
   // cancelling is routine, support cancelling on their behalf usually means

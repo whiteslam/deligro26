@@ -5,7 +5,7 @@ import { getProfile } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { acceptDelivery, advanceDelivery } from "@/lib/data-access/driver-orders";
 import { deferNotify } from "@/lib/notifications/defer";
-import { notifyVendorRiderAssigned } from "@/lib/notifications/order-events";
+import { notifyVendorRiderAssigned, stopRiderRing } from "@/lib/notifications/order-events";
 
 async function requireDriver() {
   const profile = await getProfile();
@@ -31,6 +31,8 @@ export async function acceptDeliveryAction(orderId: string) {
   // board's next refresh — or when a stranger walks up to the counter.
   if (result.ok) {
     deferNotify(() => notifyVendorRiderAssigned(orderId, driver.full_name));
+    // Accepted: this rider's phones stop ringing for it.
+    deferNotify(() => stopRiderRing(driverId, orderId));
   }
   revalidatePath("/driver");
   return result;

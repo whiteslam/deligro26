@@ -6,6 +6,8 @@ import {
   patchMainActivity,
   patchAppGradle,
   patchManifestPermissions,
+  patchManifestRing,
+  ringWav,
 } from "./lib.mjs";
 
 const good = JSON.stringify({
@@ -108,4 +110,59 @@ test("offline page Retry goes back to the role's live URL, not a local reload", 
   const out = offlinePageFor(html, "https://deligrodelivery.ractrotech.com/driver");
   assert.doesNotMatch(out, /location\.reload\(\)/);
   assert.match(out, /location\.replace\("https:\/\/deligrodelivery\.ractrotech\.com\/driver"\)/);
+});
+
+const MANIFEST = `<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="x">
+        <activity android:name=".MainActivity" />
+    </application>
+</manifest>
+`;
+
+test("patchManifestRing declares the service, extension and permissions", () => {
+  const out = patchManifestRing(MANIFEST);
+  assert.match(out, /<service android:name="com\.ractrotech\.deligro\.push\.RingService"[^>]*android:foregroundServiceType="mediaPlayback"/);
+  assert.match(out, /com\.onesignal\.NotificationServiceExtension/);
+  assert.match(out, /com\.ractrotech\.deligro\.push\.DeligroNotificationExtension/);
+  for (const p of ["FOREGROUND_SERVICE", "FOREGROUND_SERVICE_MEDIA_PLAYBACK", "USE_FULL_SCREEN_INTENT", "VIBRATE", "WAKE_LOCK", "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"]) {
+    assert.ok(out.includes(`android.permission.${p}"`), p);
+  }
+  assert.ok(out.indexOf("RingService") < out.indexOf("</application>"));
+  assert.ok(out.indexOf("RingService") > out.indexOf("<application"));
+});
+
+test("patchManifestRing is idempotent", () => {
+  const once = patchManifestRing(MANIFEST);
+  assert.equal(patchManifestRing(once), once);
+});
+
+test("ringWav is a valid 16-bit mono WAV of 2 s", () => {
+  const wav = ringWav(8000);
+  assert.equal(wav.toString("ascii", 0, 4), "RIFF");
+  assert.equal(wav.toString("ascii", 8, 12), "WAVE");
+  assert.equal(wav.readUInt16LE(22), 1);
+  assert.equal(wav.readUInt32LE(24), 8000);
+  assert.equal(wav.readUInt16LE(34), 16);
+  assert.equal(wav.readUInt32LE(40), 8000 * 2 * 2);
+  assert.equal(wav.length, 44 + 8000 * 2 * 2);
+});
+
+test("ringWav rings then goes quiet (not silence, not a constant tone)", () => {
+  const wav = ringWav(8000);
+  const at = (sec) => Math.abs(wav.readInt16LE(44 + Math.floor(sec * 8000) * 2));
+  let loud = 0;
+  for (let t = 0.05; t < 1.15; t += 0.01) loud = Math.max(loud, at(t));
+  let quiet = 0;
+  for (let t = 1.25; t < 1.99; t += 0.01) quiet = Math.max(quiet, at(t));
+  assert.ok(loud > 20000, `loud part peaks at ${loud}`);
+  assert.equal(quiet, 0);
+});
+
+test("loadRoles accepts a boolean ring flag and rejects anything else", () => {
+  const withRing = JSON.parse(good);
+  withRing.roles[0].ring = true;
+  assert.equal(loadRoles(JSON.stringify(withRing)).roles[0].ring, true);
+  withRing.roles[0].ring = "yes";
+  assert.throws(() => loadRoles(JSON.stringify(withRing)), /ring/);
 });

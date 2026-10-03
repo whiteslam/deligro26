@@ -44,6 +44,7 @@
     "test:native-bridge": "npx tsx scripts/qa/native-bridge.ts",
     "test:customer-language": "npx tsx scripts/qa/customer-language.ts",
     "test:otp-limits": "npx tsx scripts/qa/otp-limits.ts",
+    "test:ring": "npx tsx scripts/qa/ring-protocol.ts",
     "test:zap": "bash scripts/qa/zap-baseline.sh",
     "test:qa": "bash scripts/qa/run-all.sh"
   },

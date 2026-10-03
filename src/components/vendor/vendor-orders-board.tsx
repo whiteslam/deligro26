@@ -25,6 +25,7 @@ import { VendorOrderHistoryDialog } from "@/components/vendor/vendor-order-histo
 import { RejectOrderDialog } from "@/components/vendor/reject-order-dialog";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { KitchenAlert } from "@/components/vendor/kitchen-alert";
+import { RingSetup } from "@/components/notifications/ring-setup";
 import { KitchenBusyControl } from "@/components/vendor/kitchen-busy-control";
 import type { VendorPace } from "@/lib/data-access/vendor-restaurant";
 import {
@@ -923,6 +924,7 @@ export function VendorOrdersBoard({
 
       {/* The two kitchen controls: separate cards, grouped close together. */}
       <div className="kitchen-controls">
+        {live ? <RingSetup /> : null}
         {live ? (
           <KitchenAlert
             incomingIds={incoming.map((o) => o.id)}

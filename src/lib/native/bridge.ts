@@ -68,3 +68,66 @@ export function pushSupport(win: WindowLike = defaultWindow()): "native" | "web"
   if (win && typeof win === "object" && "Notification" in win) return "web";
   return "unsupported";
 }
+
+export interface RingSetup {
+  notifications: boolean;
+  fullScreen: boolean;
+  batteryUnrestricted: boolean;
+  /** Build.MANUFACTURER, e.g. "Xiaomi". Absent on older 1.1.0 builds. */
+  manufacturer?: string;
+}
+
+/**
+ * The continuous order ring (lib/alerts/ring.ts). Present only in Vendor and
+ * Rider APKs built with RingService (≥ 1.1.0); older shells answer null and
+ * the board falls back to its own repeating tone.
+ */
+export interface NativeRing {
+  startRing(o: { ringId: string; title: string; body: string; timeoutSec: number }): Promise<void>;
+  stopRing(o: { ringId: string }): Promise<void>;
+  ringSetup(): Promise<RingSetup>;
+  openRingSettings(o: { which: RingSetting }): Promise<void>;
+}
+
+export function nativeRing(win: WindowLike = defaultWindow()): NativeRing | null {
+  const p = nativePush(win) as unknown as Partial<NativeRing> | null;
+  return p && typeof p.startRing === "function" && typeof p.stopRing === "function"
+    ? (p as NativeRing)
+    : null;
+}
+
+/** Which orders just appeared on the board, and which just left it. */
+export function ringDiff(prev: string[], next: string[]): { started: string[]; stopped: string[] } {
+  const before = new Set(prev);
+  const after = new Set(next);
+  return {
+    started: next.filter((id) => !before.has(id)),
+    stopped: prev.filter((id) => !after.has(id)),
+  };
+}
+
+export type RingSetting = "notifications" | "battery" | "fullScreen" | "autostart";
+
+/**
+ * Phone makers whose own task killer stops a swiped-away app from receiving
+ * pushes unless "Autostart" is on — a setting no app can read, so it stays on
+ * the list until the user says they have done it.
+ */
+const AUTOSTART_MAKERS = ["xiaomi", "redmi", "poco", "vivo", "iqoo", "oppo", "realme", "oneplus", "tecno", "infinix", "itel"];
+
+/**
+ * The settings still standing between this phone and a ring that wakes it,
+ * most important first: with notifications off nothing works at all; with the
+ * battery saver on, budget phones kill the app and the push never arrives;
+ * without full-screen permission (Android 14+) it rings but shows only a
+ * banner over the lock screen.
+ */
+export function missingRingSettings(s: RingSetup, opts: { autostartDone?: boolean } = {}): RingSetting[] {
+  const out: RingSetting[] = [];
+  if (!s.notifications) out.push("notifications");
+  if (!s.batteryUnrestricted) out.push("battery");
+  if (!s.fullScreen) out.push("fullScreen");
+  const maker = (s.manufacturer ?? "").toLowerCase();
+  if (!opts.autostartDone && AUTOSTART_MAKERS.some((m) => maker.includes(m))) out.push("autostart");
+  return out;
+}

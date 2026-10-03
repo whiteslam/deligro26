@@ -11,6 +11,8 @@ import { Bell, BellOff, BellRing } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { playAlertSound } from "@/lib/alerts/tones";
 import { requestPushOptIn } from "@/components/notifications/onesignal-init";
+import { nativeRing, ringDiff } from "@/lib/native/bridge";
+import { ringId, RING_TIMEOUT_SEC } from "@/lib/alerts/ring";
 
 /**
  * Tells a rider a job has appeared in the available pool.
@@ -29,7 +31,8 @@ import { requestPushOptIn } from "@/components/notifications/onesignal-init";
  */
 
 const STORAGE_KEY = "deligro-rider-alerts";
-const RENOTIFY_MS = 25_000;
+/** Back-to-back, until the pool is empty or the rider has a job — see kitchen-alert.tsx. */
+const RING_REPEAT_MS = 2_500;
 
 const armedListeners = new Set<() => void>();
 
@@ -135,6 +138,18 @@ export function RiderAlert({
     [soundPreset, soundUrl]
   );
 
+  /** The repeat: tone and buzz only — one system notification per arrival is enough. */
+  const ringTone = useCallback(() => {
+    const ctx = audioRef.current;
+    if (ctx) {
+      void ctx
+        .resume()
+        .then(() => playAlertSound(ctx, soundPreset, soundUrl))
+        .catch(() => {});
+    }
+    navigator.vibrate?.([200, 100, 200]);
+  }, [soundPreset, soundUrl]);
+
   async function arm() {
     try {
       const ctx = audioRef.current ?? new AudioContext();
@@ -187,16 +202,41 @@ export function RiderAlert({
     fire(incomingIds.length);
   }, [incomingIds, on, fire]);
 
-  // Still unclaimed.
+  // Still unclaimed — keep ringing. Not inside the Android app: the native ring
+  // below is already doing it.
   useEffect(() => {
-    if (!on || incomingIds.length === 0) return;
+    if (!on || incomingIds.length === 0 || nativeRing()) return;
     const id = setInterval(() => {
-      if (Date.now() - lastRepeat.current < RENOTIFY_MS) return;
+      if (Date.now() - lastRepeat.current < RING_REPEAT_MS) return;
       lastRepeat.current = Date.now();
-      fire(incomingIds.length);
-    }, 5_000);
+      ringTone();
+    }, 500);
     return () => clearInterval(id);
-  }, [incomingIds, on, fire]);
+  }, [incomingIds, on, ringTone]);
+
+  // Inside the Android app: ring natively for every job in the pool, and stop
+  // when it leaves — taken by this rider (the caller then passes []), taken by
+  // someone else, or cancelled. Covers a ring push that never arrived.
+  const nativeSeen = useRef<string[]>([]);
+  useEffect(() => {
+    const ring = nativeRing();
+    if (!ring) return;
+    const { started, stopped } = ringDiff(nativeSeen.current, incomingIds);
+    nativeSeen.current = incomingIds;
+    for (const id of started) {
+      void ring
+        .startRing({
+          ringId: ringId("rider", id),
+          title: "नया पिकअप 🛵 New pickup",
+          body: "स्वीकार करें / Accept",
+          timeoutSec: RING_TIMEOUT_SEC.rider,
+        })
+        .catch(() => {});
+    }
+    for (const id of stopped) {
+      void ring.stopRing({ ringId: ringId("rider", id) }).catch(() => {});
+    }
+  }, [incomingIds]);
 
   if (!supported) return null;
 
