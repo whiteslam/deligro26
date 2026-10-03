@@ -28,6 +28,15 @@ Output: `mobile/dist/deligro-<role>-<version>.apk` + `.sha256`.
 3. Customer and rider only: update the APK version/URL in Admin → Settings so
    installed apps are told to update (`/api/app-version`).
 
+## Order ringing (Vendor + Rider, from 1.1.0)
+Roles with `"ring": true` in `roles.json` get `RingService` (continuous ring on
+the alarm stream until the order is accepted, rejected or cancelled) and the
+OneSignal extension that starts/stops it — see `src/lib/alerts/ring.ts`.
+The ring sound is generated (`ringWav` in `scripts/lib.mjs`); drop a
+`native/deligro_ring.mp3` or `.wav` to replace it. Vendor 1.1.0 must be
+reinstalled by hand (no update gate for vendor); rider gets the in-app update
+after step 3 above. iPhone cannot ring continuously (iOS limit).
+
 ## Most changes don't need a new APK
 The apps load the live site, so anything deployed to Vercel appears in the
 apps immediately. Rebuild only for: app name/icon, version, native push
