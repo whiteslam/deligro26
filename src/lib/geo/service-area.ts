@@ -1,3 +1,4 @@
+import { translator, type Lang, type T } from "@/lib/i18n/lang";
 import { haversineKm } from "@/lib/geo/distance";
 import { PINNED_LOCATION } from "@/lib/location/pinned";
 
@@ -159,19 +160,38 @@ export function blocksOrder(area: ServiceArea): boolean {
 }
 
 /**
- * Why the order was refused, in a sentence a customer can act on — English
- * then Hindi, the pattern the rest of the app uses.
+ * Why the order was refused, in a sentence a customer can act on. Pass the
+ * customer's language; without one it says it in both (English / Hindi), for
+ * callers that cannot know who will read it.
  */
-export function outOfRangeMessage(area: ServiceArea): string {
+export function outOfRangeMessage(area: ServiceArea, lang?: Lang): string {
+  const en = outOfRangeText(area, translator("en"));
+  const hi = outOfRangeText(area, translator("hi"));
+  return lang === "en" ? en : lang === "hi" ? hi : `${en} / ${hi}`;
+}
+
+function outOfRangeText(area: ServiceArea, t: T): string {
   if (area.status === "unverifiable") {
-    return 'Put your delivery address on the map first (drop a pin or tap "Use my location"), so we can check we deliver there. / पहले नक्शे पर अपना पता लगाएं।';
+    return t(
+      'Put your delivery address on the map first (drop a pin or tap "Use my location"), so we can check we deliver there.',
+      "पहले नक्शे पर अपना पता लगाएं (पिन लगाएं या \"मेरी लोकेशन\" दबाएं), ताकि हम देख सकें कि वहां डिलीवरी होती है।"
+    );
   }
   if (area.reason === "shop_outside_area") {
-    return `This shop is outside our ${area.radiusKm} km Bemetara delivery area, so it can't deliver to you. Please pick another shop. / यह दुकान हमारे डिलीवरी क्षेत्र से बाहर है।`;
+    return t(
+      `This shop is outside our ${area.radiusKm} km Bemetara delivery area, so it can't deliver to you. Please pick another shop.`,
+      `यह दुकान हमारे ${area.radiusKm} किमी बेमेतरा डिलीवरी क्षेत्र से बाहर है, इसलिए आप तक डिलीवरी नहीं कर सकती। कृपया दूसरी दुकान चुनें।`
+    );
   }
   const distance =
     area.distanceKm === null ? null : Math.round(area.distanceKm * 10) / 10;
   return distance === null
-    ? `Sorry, we deliver only within ${area.radiusKm} km of Bemetara. / हम केवल बेमेतरा के ${area.radiusKm} किमी के अंदर डिलीवरी करते हैं।`
-    : `Sorry, we deliver only within ${area.radiusKm} km of Bemetara — this address is about ${distance} km away. / हम केवल बेमेतरा के ${area.radiusKm} किमी के अंदर डिलीवरी करते हैं।`;
+    ? t(
+        `Sorry, we deliver only within ${area.radiusKm} km of Bemetara.`,
+        `माफ़ करें, हम केवल बेमेतरा के ${area.radiusKm} किमी के अंदर डिलीवरी करते हैं।`
+      )
+    : t(
+        `Sorry, we deliver only within ${area.radiusKm} km of Bemetara — this address is about ${distance} km away.`,
+        `माफ़ करें, हम केवल बेमेतरा के ${area.radiusKm} किमी के अंदर डिलीवरी करते हैं — यह पता लगभग ${distance} किमी दूर है।`
+      );
 }

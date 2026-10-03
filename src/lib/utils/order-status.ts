@@ -1,4 +1,5 @@
 import type { OrderStatus } from "@/types";
+import { translator, type Bi, type Lang } from "@/lib/i18n/lang";
 
 /**
  * Short labels for the order-list row and the home "ongoing order" strip.
@@ -9,17 +10,35 @@ import type { OrderStatus } from "@/types";
  * stage existed in the database from the start and had no label anywhere,
  * because it was folded into `KITCHEN` on the way to the screen.
  */
-export const STATUS_META: Record<
-  OrderStatus,
-  { label: string; tone: "accent" | "green" | "muted" }
-> = {
-  PLACED: { label: "Sent to restaurant · भेजा गया", tone: "accent" },
-  KITCHEN: { label: "Preparing · बन रहा है", tone: "accent" },
-  READY: { label: "Waiting for rider · राइडर का इंतज़ार", tone: "accent" },
-  ON_THE_WAY: { label: "On the way · रास्ते में", tone: "accent" },
-  DELIVERED: { label: "Delivered · डिलीवर हो गया", tone: "green" },
-  CANCELLED: { label: "Cancelled · रद्द", tone: "muted" },
+const STATUS_TEXT: Record<OrderStatus, Bi> = {
+  PLACED: { en: "Sent to restaurant", hi: "रेस्टोरेंट को भेजा गया" },
+  KITCHEN: { en: "Preparing", hi: "बन रहा है" },
+  READY: { en: "Waiting for rider", hi: "राइडर का इंतज़ार" },
+  ON_THE_WAY: { en: "On the way", hi: "रास्ते में" },
+  DELIVERED: { en: "Delivered", hi: "डिलीवर हो गया" },
+  CANCELLED: { en: "Cancelled", hi: "रद्द" },
 };
+
+const STATUS_TONE: Record<OrderStatus, "accent" | "green" | "muted"> = {
+  PLACED: "accent",
+  KITCHEN: "accent",
+  READY: "accent",
+  ON_THE_WAY: "accent",
+  DELIVERED: "green",
+  CANCELLED: "muted",
+};
+
+/**
+ * `en`/`hi` are for the customer app, which shows one language (pick them with
+ * `pick(lang, meta)`); `label` keeps the combined "English · हिंदी" form the
+ * operator screens use.
+ */
+export const STATUS_META = Object.fromEntries(
+  (Object.keys(STATUS_TEXT) as OrderStatus[]).map((s) => [
+    s,
+    { ...STATUS_TEXT[s], label: `${STATUS_TEXT[s].en} · ${STATUS_TEXT[s].hi}`, tone: STATUS_TONE[s] },
+  ])
+) as Record<OrderStatus, Bi & { label: string; tone: "accent" | "green" | "muted" }>;
 
 /**
  * The stages of an order, worded to be true at the moment each one lights up.
@@ -35,46 +54,48 @@ export const STATUS_META: Record<
  *
  * The wording deliberately matches the push notifications in
  * `notifications/order-events.ts`, so the phone and the screen tell the same
- * story rather than two slightly different ones — in both languages: English
- * then Hindi, the pattern the rider app established. Most customers here read
- * Hindi first; the 28 Sept audit found no Hindi on any customer screen.
+ * story, in the customer's chosen language.
  */
-export function trackingSteps({
-  restaurantName,
-  riderName,
-}: {
-  restaurantName?: string;
-  riderName?: string;
-}) {
+export function trackingSteps(
+  {
+    restaurantName,
+    riderName,
+  }: {
+    restaurantName?: string;
+    riderName?: string;
+  },
+  lang: Lang = "en"
+) {
+  const t = translator(lang);
   return [
     {
       key: "PLACED" as const,
-      title: "Order sent · ऑर्डर भेजा गया",
+      title: t("Order sent", "ऑर्डर भेजा गया"),
       sub: restaurantName
-        ? `Waiting for ${restaurantName} to accept`
-        : "Waiting for the restaurant to accept",
+        ? t(`Waiting for ${restaurantName} to accept`, `${restaurantName} के स्वीकार करने का इंतज़ार`)
+        : t("Waiting for the restaurant to accept", "रेस्टोरेंट के स्वीकार करने का इंतज़ार"),
     },
     {
       key: "KITCHEN" as const,
-      title: "Accepted · स्वीकार हुआ",
+      title: t("Accepted", "स्वीकार हुआ"),
       sub: restaurantName
-        ? `${restaurantName} started cooking`
-        : "The kitchen started cooking",
+        ? t(`${restaurantName} started cooking`, `${restaurantName} ने खाना बनाना शुरू किया`)
+        : t("The kitchen started cooking", "किचन ने खाना बनाना शुरू किया"),
     },
     {
       key: "READY" as const,
-      title: "Packed · पैक हो गया",
-      sub: "Waiting for a rider to collect it",
+      title: t("Packed", "पैक हो गया"),
+      sub: t("Waiting for a rider to collect it", "राइडर के लेने का इंतज़ार"),
     },
     {
       key: "ON_THE_WAY" as const,
-      title: "On the way · रास्ते में",
-      sub: riderName ? `${riderName} is heading to you` : "Heading to you",
+      title: t("On the way", "रास्ते में"),
+      sub: riderName ? t(`${riderName} is heading to you`, `${riderName} आपकी ओर आ रहे हैं`) : t("Heading to you", "आपकी ओर आ रहा है"),
     },
     {
       key: "DELIVERED" as const,
-      title: "Delivered · डिलीवर हो गया",
-      sub: "Handed to you at the door",
+      title: t("Delivered", "डिलीवर हो गया"),
+      sub: t("Handed to you at the door", "आपको दरवाज़े पर दिया गया"),
     },
   ];
 }

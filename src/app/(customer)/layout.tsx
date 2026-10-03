@@ -8,6 +8,8 @@ import { ReorderReviewDialog } from "@/components/shared/reorder-review-dialog";
 import { SplashScreen } from "@/components/shared/splash-screen";
 import { OneSignalInit } from "@/components/notifications/onesignal-init";
 import { ChargesConfigProvider } from "@/components/providers/charges-config-provider";
+import { LangProvider } from "@/components/providers/lang-provider";
+import { getLang } from "@/lib/i18n/server";
 import { getProfile } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 
@@ -36,34 +38,40 @@ export default async function CustomerLayout({
   // and `createOrder` bill from. Read here, once, rather than per surface:
   // `getSettings()` is request-cached, and this is the one node that is an
   // ancestor of both the page tree and the cart sheet.
-  const [profile, settings] = await Promise.all([getProfile(), getSettings()]);
+  const [profile, settings, lang] = await Promise.all([
+    getProfile(),
+    getSettings(),
+    getLang(),
+  ]);
 
   return (
-    <ChargesConfigProvider
-      config={{
-        deliveryFee: settings.deliveryFee,
-        taxRate: settings.taxRate,
-        freeDeliveryThreshold: settings.freeDeliveryThreshold,
-      }}
-    >
-      <div className="device">
-        <div className="app-shell">
-          <div className="app-scroll no-scrollbar pb-[80px]">
-            {/* The content landmark screen readers jump to. */}
-            <main>{children}</main>
+    <LangProvider initial={lang}>
+      <ChargesConfigProvider
+        config={{
+          deliveryFee: settings.deliveryFee,
+          taxRate: settings.taxRate,
+          freeDeliveryThreshold: settings.freeDeliveryThreshold,
+        }}
+      >
+        <div className="device">
+          <div className="app-shell">
+            <div className="app-scroll no-scrollbar pb-[80px]">
+              {/* The content landmark screen readers jump to. */}
+              <main>{children}</main>
+            </div>
+            <StatusBar />
+            <ItemSheet />
+            <CartSwitchDialog />
+            <ReorderReviewDialog />
+            <GlassCart />
+            <CartHydrator />
+            <TabBar />
+            <SplashScreen />
+            {/* Always mounted: signed out, it logs this browser out of push. */}
+            <OneSignalInit userId={profile?.id ?? null} />
           </div>
-          <StatusBar />
-          <ItemSheet />
-          <CartSwitchDialog />
-          <ReorderReviewDialog />
-          <GlassCart />
-          <CartHydrator />
-          <TabBar />
-          <SplashScreen />
-          {/* Always mounted: signed out, it logs this browser out of push. */}
-          <OneSignalInit userId={profile?.id ?? null} />
         </div>
-      </div>
-    </ChargesConfigProvider>
+      </ChargesConfigProvider>
+    </LangProvider>
   );
 }

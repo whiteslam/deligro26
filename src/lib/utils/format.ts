@@ -1,3 +1,5 @@
+import { translator, type Lang } from "@/lib/i18n/lang";
+
 /** Money & display formatting helpers. Prices are stored as whole rupees. */
 
 export function formatINR(amount: number): string {
@@ -26,16 +28,17 @@ export function formatLateness(minutes: number): string {
 export const CUSTOMER_LATE_CAP_MINUTES = 180;
 
 /**
- * Customer-facing lateness, English + Hindi. Exact up to the cap, then a
- * plain "delayed" — never "27 days late". Operator screens keep the exact
- * figure (`formatLateness`), because for them the number is the point.
+ * Customer-facing lateness, in the customer's language. Exact up to the cap,
+ * then a plain "delayed" — never "27 days late". Operator screens keep the
+ * exact figure (`formatLateness`), because for them the number is the point.
  */
-export function formatCustomerLateness(minutes: number): string {
+export function formatCustomerLateness(minutes: number, lang: Lang = "en"): string {
+  const t = translator(lang);
   const m = Math.max(0, Math.round(minutes));
-  if (m >= CUSTOMER_LATE_CAP_MINUTES) return "Delayed — we're on it / देरी — हम देख रहे हैं";
-  if (m < 60) return `${m} min late / ${m} मिनट देर`;
+  if (m >= CUSTOMER_LATE_CAP_MINUTES) return t("Delayed — we're on it", "देरी — हम देख रहे हैं");
+  if (m < 60) return t(`${m} min late`, `${m} मिनट देर`);
   const h = Math.round(m / 60);
-  return `${h} h late / ${h} घंटे देर`;
+  return t(`${h} h late`, `${h} घंटे देर`);
 }
 
 export function formatRating(rating: number): string {
