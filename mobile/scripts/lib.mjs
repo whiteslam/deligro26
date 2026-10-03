@@ -21,6 +21,9 @@ export function loadRoles(json) {
     if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(r.appId)) {
       throw new Error(`roles.json: invalid appId ${r.appId}`);
     }
+    if (r.ring !== undefined && typeof r.ring !== "boolean") {
+      throw new Error(`roles.json: role ${r.role} ring must be true or false`);
+    }
     if (seen.has(r.appId)) throw new Error(`roles.json: duplicate appId ${r.appId}`);
     seen.add(r.appId);
   }
@@ -128,4 +131,73 @@ export function redactArgs(args) {
  */
 export function offlinePageFor(html, url) {
   return html.replace(/location\.reload\(\)/g, `location.replace(${JSON.stringify(url)})`);
+}
+
+const RING_PERMS = [
+  "android.permission.FOREGROUND_SERVICE",
+  "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+  "android.permission.USE_FULL_SCREEN_INTENT",
+  "android.permission.VIBRATE",
+  "android.permission.WAKE_LOCK",
+  "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+];
+
+const RING_APP_ENTRIES = `        <service android:name="com.ractrotech.deligro.push.RingService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <meta-data android:name="com.onesignal.NotificationServiceExtension"
+            android:value="com.ractrotech.deligro.push.DeligroNotificationExtension" />
+`;
+
+/**
+ * Vendor + Rider only (roles.json `"ring": true`): the ringing service, the
+ * OneSignal extension that starts and stops it, and what they need.
+ */
+export function patchManifestRing(xml) {
+  let out = xml;
+  const missing = RING_PERMS.filter((p) => !out.includes(`"${p}"`));
+  if (missing.length > 0) {
+    const lines = missing.map((p) => `    <uses-permission android:name="${p}" />`).join("\n");
+    out = out.replace(/<\/manifest>\s*$/, `${lines}\n</manifest>\n`);
+  }
+  if (!out.includes("push.RingService")) {
+    out = out.replace(/\n(\s*)<\/application>/, `\n${RING_APP_ENTRIES}$1</application>`);
+  }
+  return out;
+}
+
+/**
+ * The ring: 1.2 s of alternating 880/660 Hz (0.2 s each, 10 ms fades so it
+ * doesn't click), then 0.8 s of silence — 2 s, looped by RingService.
+ * Generated rather than shipped, so there is no licence question about it.
+ */
+export function ringWav(rate = 22050) {
+  const n = rate * 2;
+  const data = Buffer.alloc(n * 2);
+  for (let i = 0; i < n; i++) {
+    const t = i / rate;
+    let s = 0;
+    if (t < 1.2) {
+      const local = t % 0.2;
+      const f = Math.floor(t / 0.2) % 2 === 0 ? 880 : 660;
+      const env = Math.min(1, local / 0.01, (0.2 - local) / 0.01);
+      s = Math.sin(2 * Math.PI * f * t) * 0.8 * env;
+    }
+    data.writeInt16LE(Math.round(s * 32767), i * 2);
+  }
+  const h = Buffer.alloc(44);
+  h.write("RIFF", 0, "ascii");
+  h.writeUInt32LE(36 + data.length, 4);
+  h.write("WAVE", 8, "ascii");
+  h.write("fmt ", 12, "ascii");
+  h.writeUInt32LE(16, 16);
+  h.writeUInt16LE(1, 20);
+  h.writeUInt16LE(1, 22);
+  h.writeUInt32LE(rate, 24);
+  h.writeUInt32LE(rate * 2, 28);
+  h.writeUInt16LE(2, 32);
+  h.writeUInt16LE(16, 34);
+  h.write("data", 36, "ascii");
+  h.writeUInt32LE(data.length, 40);
+  return Buffer.concat([h, data]);
 }
