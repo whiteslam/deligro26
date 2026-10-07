@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deligro security verification — 2026-10-07</title>
+<style>
+  :root { --bg:#fff; --fg:#1a1d21; --muted:#5b6470; --line:#e3e6ea; --ok:#117a45; --okbg:#e6f6ee; --warn:#9a5b00; --warnbg:#fff3dc; --info:#1f5fa8; --infobg:#e8f1fb; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14171b; --fg:#e8eaed; --muted:#9aa3ad; --line:#2a2f36; --ok:#5fd596; --okbg:#12301f; --warn:#f0b45a; --warnbg:#35280f; --info:#7db4f0; --infobg:#142536; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:32px 16px 64px; }
+  h1 { font-size:26px; margin:0 0 4px; }
+  h2 { font-size:19px; margin:36px 0 10px; padding-top:8px; border-top:1px solid var(--line); }
+  p, li { margin:6px 0; }
+  .meta { color:var(--muted); font-size:14px; }
+  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:14.5px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:13px; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12.5px; font-weight:600; white-space:nowrap; }
+  .pass { background:var(--okbg); color:var(--ok); }
+  .fix { background:var(--warnbg); color:var(--warn); }
+  .note { background:var(--infobg); color:var(--info); }
+  code { font:13px ui-monospace,Consolas,monospace; background:var(--infobg); padding:1px 5px; border-radius:4px; }
+  .box { border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin:12px 0; }
+  .scroll { overflow-x:auto; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Deligro security verification</h1>
+<p class="meta">Live Supabase project and codebase · 7 October 2026 · read-only checks</p>
+
+<h2>Bottom line</h2>
+<p><strong>No way for a logged-out visitor to read private data was found.</strong> Row-level security is on for every table, order totals and payment status are locked by database triggers, and private tables return nothing to anonymous requests. Three small leftover permissions were found. They were fixed by migration 0054, and blocks 3 and 4 were re-run afterwards to confirm. Nothing needs to stop the handover.</p>
+
+<h2>Findings</h2>
+<div class="scroll">
+<table>
+<tr><th>#</th><th>Finding</th><th>Severity</th><th>Status</th></tr>
+<tr><td>1</td><td><code>bump_banner_stat</code> can still be called by anonymous visitors. Audit item M-4 was marked fixed in migration 0024, but that migration revoked access by role name and missed the default public grant. Anyone can inflate banner impression and click counters.</td><td>Medium-Low</td><td><span class="tag pass">Fixed, verified</span></td></tr>
+<tr><td>2</td><td>Default telemetry partition <code>obs_events_default</code> still carries anonymous table privileges (missed by migration 0046). A direct anonymous request returned 404, so it is not reachable today.</td><td>Low</td><td><span class="tag pass">Fixed, verified</span></td></tr>
+<tr><td>3</td><td>Weekly telemetry partitions have row-level security off. Not exploitable, because their privileges are revoked. The maintenance job would keep creating new ones the same way.</td><td>Low</td><td><span class="tag pass">Fixed, verified</span></td></tr>
+<tr><td>4</td><td>The service worker caches the home page HTML (<code>/</code> is not in its private list). It contains the saved address and active-order strip, and stays on that device until sign-out clears it.</td><td>Low</td><td><span class="tag pass">Fixed in code, needs deploy</span> <code>/</code> and <code>/stores</code> are now private in the service worker (cache version v2 also clears old copies). Trade-off: no stale home feed offline.</td></tr>
+<tr><td>5</td><td><code>platform_settings.rider_commission</code> (8% default) is publicly readable. The vendor commission is correctly hidden, and the rider one is not.</td><td>Low</td><td><span class="tag note">Open, your decision</span></td></tr>
+<tr><td>6</td><td><code>delivery_fee</code> and <code>tax_amount</code> are accepted as submitted if someone posts an order directly to the API. Order total, discount and payment status are locked. Already logged as accepted risk N-1.</td><td>Low</td><td><span class="tag note">Known, accepted</span></td></tr>
+</table>
+</div>
+
+<h2>What was checked and passed</h2>
+<div class="scroll">
+<table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td>Security migrations 0039, 0042, 0048, 0051, 0052, 0053 applied on the live database</td><td><span class="tag pass">Pass</span> all present</td></tr>
+<tr><td>Triggers on <code>orders</code>: <code>orders_clear_cancellation_insert</code>, <code>orders_force_payment_pending</code>, <code>orders_force_total_pending</code>, <code>orders_guard_update</code>, <code>zz_orders_stamp_lifecycle</code></td><td><span class="tag pass">Pass</span> all five enabled</td></tr>
+<tr><td>Row-level security on every table in <code>public</code></td><td><span class="tag pass">Pass</span> on for every table (only the weekly partitions are off, finding 3)</td></tr>
+<tr><td>Policies that allow anyone to read every row</td><td><span class="tag pass">Pass</span> only <code>category_images</code>, <code>food_images</code> and <code>platform_settings</code>, all meant to be public</td></tr>
+<tr><td>Sensitive columns (bank, PAN, GST, UPI, password, token, secret) readable by anonymous or logged-in users</td><td><span class="tag pass">Pass</span> none. The commission columns on settlements are protected by an admin-only policy.</td></tr>
+<tr><td>Anonymous read of private tables, by live API row count (no data read)</td><td><span class="tag pass">Pass</span> zero rows from <code>orders</code>, <code>profiles</code>, <code>addresses</code>, <code>otp_codes</code>, <code>rate_limits</code>, <code>deliveries</code>, <code>refunds</code>, <code>wallet_transactions</code>, <code>vendor_documents</code>, <code>favorites</code>. Refused outright: <code>payments</code>, <code>coupons</code>, <code>coupon_redemptions</code>, <code>vendor_login_credentials</code>, <code>obs_issues</code>.</td></tr>
+<tr><td>Functions anonymous visitors can run</td><td><span class="tag pass">Pass</span> apart from finding 1. The rest are trigger functions or role checks that return false when logged out.</td></tr>
+<tr><td>Dependencies</td><td><span class="tag pass">Pass</span> 9 high audit findings, all in dev-only tooling. Production code shows only a denial-of-service issue in <code>source-map-js</code>.</td></tr>
+<tr><td>HTML injection points</td><td><span class="tag pass">Pass</span> three uses of <code>dangerouslySetInnerHTML</code>, all server-owned JSON</td></tr>
+<tr><td>Public environment variables</td><td><span class="tag pass">Pass</span> only keys meant for the browser. No service-role key.</td></tr>
+</table>
+</div>
+
+<h2>About the address in the HTML</h2>
+<p>A separate review of the home page HTML flagged <code>Home · B.t.i.colony</code> as a possible leak of a customer's location. It is not. The home page reads the logged-in user's own saved address through row-level security, on a page built per request. The address shown is the viewer's own. The only related risk is finding 4, the on-device cache. The other claims in that review (chunk paths, company name, theme setting) are normal for a Next.js app.</p>
+
+<h2>What was not checked</h2>
+<ul>
+<li><strong>Anonymous writes were not tested</strong> against the live database. Anonymous users hold write privileges on most tables (Supabase's default), so the protection is row-level security alone. It is on everywhere, but it was not exercised with a real write attempt.</li>
+<li><strong>Cross-account access for logged-in users</strong> (one customer reading another's order) was not tested live. The suite for that is <code>npm run test:idor</code>. It creates QA accounts on the live database, so it needs your explicit go-ahead.</li>
+<li>The live <code>Cache-Control</code> header on the home page was not confirmed.</li>
+<li>The Google Maps key restriction (by domain or app) can only be checked in Google Cloud.</li>
+<li>Application code was read for the areas above, not fully audited.</li>
+</ul>
+
+<h2>To do</h2>
+<ol>
+<li><span class="tag pass">Done</span> Migration <code>0054_close_public_execute_and_obs_partition.sql</code> applied. Re-run of blocks 3 and 4 shows <code>bump_banner_stat</code> and <code>obs_events_default</code> no longer listed.</li>
+<li>Deploy the service-worker change (finding 4). The APKs load the production domain, so no new APK is needed.</li>
+<li>Decide on finding 5.</li>
+<li>Optionally approve the live cross-account test (<code>npm run test:idor</code>).</li>
+</ol>
+<p><strong>Notes from the re-run.</strong> <code>recompute_order_total</code> is still callable by anonymous visitors, but migration 0053 makes it refuse anyone except the order's own customer (while the order is still <code>placed</code>), admin, or the server, so it is safe. Anonymous roles also still hold <code>TRUNCATE</code> and <code>TRIGGER</code> privileges on many tables. That is Supabase's default, and the REST API has no way to use them. They would matter only if someone had a direct database connection.</p>
+
+</main>
+</body>
+</html>

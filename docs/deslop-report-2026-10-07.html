@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deligro code cleanup report — 2026-10-07</title>
+<style>
+  :root { --bg:#fff; --fg:#1a1d21; --muted:#5b6470; --line:#e3e6ea; --ok:#117a45; --okbg:#e6f6ee; --warn:#9a5b00; --warnbg:#fff3dc; --info:#1f5fa8; --infobg:#e8f1fb; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14171b; --fg:#e8eaed; --muted:#9aa3ad; --line:#2a2f36; --ok:#5fd596; --okbg:#12301f; --warn:#f0b45a; --warnbg:#35280f; --info:#7db4f0; --infobg:#142536; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:32px 16px 64px; }
+  h1 { font-size:26px; margin:0 0 4px; }
+  h2 { font-size:19px; margin:36px 0 10px; padding-top:8px; border-top:1px solid var(--line); }
+  p, li { margin:6px 0; }
+  .meta { color:var(--muted); font-size:14px; }
+  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:14.5px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:13px; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12.5px; font-weight:600; white-space:nowrap; }
+  .pass { background:var(--okbg); color:var(--ok); }
+  .fix { background:var(--warnbg); color:var(--warn); }
+  .note { background:var(--infobg); color:var(--info); }
+  code { font:13px ui-monospace,Consolas,monospace; background:var(--infobg); padding:1px 5px; border-radius:4px; }
+  .scroll { overflow-x:auto; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Code cleanup report</h1>
+<p class="meta">Customer, vendor, rider, manager and admin app (<code>deligro</code>) · 7 October 2026 · report only, no code changed</p>
+
+<h2>Bottom line</h2>
+<p><strong>The code is in good shape.</strong> The automated checks found no unused code, no lint errors and no leftover debugging output. What remains is small housekeeping: a few commented-out lines, two package lock files, and some very large files that are risky to split right before handover. Nothing here affects how the app works.</p>
+
+<h2>Automated checks</h2>
+<div class="scroll">
+<table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td>TypeScript, with unused variables and parameters treated as errors</td><td><span class="tag pass">Pass</span> 0 issues</td></tr>
+<tr><td>ESLint across 607 files</td><td><span class="tag pass">Pass</span> 0 errors, 3 warnings (all <code>no-img-element</code>)</td></tr>
+<tr><td><code>console.log</code> left in <code>src</code></td><td><span class="tag pass">Pass</span> none</td></tr>
+<tr><td><code>@ts-ignore</code>, <code>@ts-nocheck</code>, <code>@ts-expect-error</code></td><td><span class="tag pass">Pass</span> none</td></tr>
+<tr><td>Use of <code>any</code></td><td><span class="tag pass">Pass</span> 1 place</td></tr>
+<tr><td>TODO, FIXME, HACK markers</td><td><span class="tag pass">Pass</span> 1</td></tr>
+<tr><td>Backup files (<code>.bak</code>, <code>.orig</code>, <code>.old</code>)</td><td><span class="tag pass">Pass</span> none</td></tr>
+<tr><td>Packages in <code>package.json</code> that nothing references</td><td><span class="tag pass">Pass</span> every dependency is referenced somewhere</td></tr>
+<tr><td>Knip: unused files, exports, types</td><td><span class="tag note">Done</span> 2 truly dead files, 145 unused exports, 75 unused types (see findings 1b and 1c)</td></tr>
+</table>
+</div>
+
+<h2>Findings</h2>
+<div class="scroll">
+<table>
+<tr><th>#</th><th>Finding</th><th>Severity</th><th>Suggestion</th></tr>
+<tr><td>1</td><td>Seven blocks of commented-out code: <code>profile/page.tsx:28</code>, <code>restaurant/[slug]/page.tsx</code> lines 20 to 22, 97 and 268, and <code>restaurant-card.tsx:9</code>.</td><td>Low</td><td>Mostly leave them. A previous audit recorded that <code>rating.tsx</code> and <code>language-switch.tsx</code> are parked work, and these commented imports are the way back to them. Only the dead <code>return</code> at <code>restaurant/[slug]/page.tsx:268</code> and the old imports on lines 20 to 22 are safe to delete.</td></tr>
+<tr><td>1b</td><td>Two source files that nothing references at all: <code>src/hooks/use-vendor-shell-mode.ts</code> (17 lines) and <code>src/lib/pwa/native.ts</code> (100 lines). Found by knip and confirmed by a text search across the repo.</td><td>Low</td><td><span class="tag pass">Done</span> Both deleted. TypeScript, lint and the service-worker test still pass.</td></tr>
+<tr><td>1c</td><td>145 exported functions and constants and 75 exported types that no other file imports. The most: <code>lib/search/semantic.ts</code> (7), <code>lib/roles-data.ts</code> (6), <code>lib/pricing.ts</code> (5), <code>lib/settlements/cycle.ts</code> (5), plus 26 across <code>lib/data-access</code>.</td><td>Low</td><td>Do not bulk-remove. Many are shared constants or helpers that are tested or kept for later, and removing them is a code change in money and search code. Review after launch.</td></tr>
+<tr><td>2</td><td>Two lock files are tracked: <code>package-lock.json</code> and <code>pnpm-lock.yaml</code>. The scripts are written for npm. The two can disagree on which package versions get installed.</td><td>Low-Medium</td><td>Keep the one your deploy uses and delete the other. I did not check which one the hosting platform reads.</td></tr>
+<tr><td>3</td><td>Raw audit tool output is tracked in the repo root: <code>audit.json</code> and <code>audit2.json</code>, next to the audit reports.</td><td>Low</td><td>The JSON files are machine output. The written reports are fine to keep.</td></tr>
+<tr><td>4</td><td>Some very large files. Biggest: <code>admin-settlements.ts</code> (2,256 lines), <code>checkout-view.tsx</code> (1,695), <code>driver-orders.ts</code> (1,431), <code>dishes.ts</code> (1,308), <code>registration-wizard.tsx</code> (1,284), <code>vendor-orders-board.tsx</code> (1,091).</td><td>Low</td><td>Do not split these now. They handle money and orders, and breaking them up is a code change with real regression risk right before handover. Revisit after launch.</td></tr>
+<tr><td>5</td><td>Five <code>react-hooks/exhaustive-deps</code> suppressions. Each can hide a stale-value bug in a React effect.</td><td>Low</td><td>Not reviewed one by one in this pass. Worth a look after launch.</td></tr>
+<tr><td>6</td><td>Sixteen <code>no-img-element</code> suppressions (plus 3 warnings). Plain images skip Next.js image optimisation.</td><td>Low</td><td>Likely deliberate, because images are limited by the content security policy. Leave them.</td></tr>
+<tr><td>7</td><td>An internal project-plan page (<code>/build</code>, backed by <code>build-plan.ts</code>, 1,071 lines) ships inside the production app. It is limited to admins.</td><td>Info</td><td>Your call whether the client should see it. Not dead code.</td></tr>
+</table>
+</div>
+
+<h2>Not done</h2>
+<ul>
+<li><strong>Duplicate code.</strong> Knip was run for unused files and exports (findings 1b and 1c), but no duplicate-code tool was run. Knip was run through <code>npx</code> with its default settings, so nothing was added to the repo.</li>
+<li><strong>Knip false positives.</strong> It also lists <code>public/sw-core.js</code>, <code>public/OneSignalSDKWorker.js</code>, the <code>mobile/scripts</code> build files and three <code>scripts/ops</code> tools as unused. They are loaded by the browser or run from the command line, so they are not dead.</li>
+<li><strong>No refactoring or renaming.</strong> You chose report-only, which suits the handover phase.</li>
+<li><strong>Dev-tool vulnerabilities.</strong> Covered in the security verification report. They sit in lint tooling and do not ship to users.</li>
+</ul>
+
+</main>
+</body>
+</html>

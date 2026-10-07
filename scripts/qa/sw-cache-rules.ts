@@ -80,15 +80,21 @@ for (const path of [
   "/checkout",
   "/switch",
   "/auth/signout",
+  // Render the saved address / active order into the HTML.
+  "/",
+  "/stores",
 ]) {
   check(`${path} is private`, sw.isPrivatePath(path), true);
 }
 
 console.log("\n═══ Public paths may be cached ═══");
 
-for (const path of ["/", "/login", "/search", "/stores", "/restaurant/burger-republic", "/offline.html"]) {
+for (const path of ["/login", "/search", "/restaurant/burger-republic", "/offline.html"]) {
   check(`${path} is cacheable`, sw.isPrivatePath(path), false);
 }
+
+// "/" is in the private list, so make sure it did not turn every path private.
+check("/ does not swallow other paths", sw.isPrivatePath("/anything"), false);
 
 console.log("\n═══ Prefix matching is on segments, not substrings ═══");
 

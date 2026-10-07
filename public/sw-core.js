@@ -20,7 +20,7 @@
 
 /* Bump on any behavioural change here. It names the caches, so bumping it is
  * also what evicts the previous version's entries in `activate`. */
-const SW_VERSION = "v1";
+const SW_VERSION = "v2";
 
 const NAV_CACHE = `deligro-nav-${SW_VERSION}`;
 const STATIC_CACHE = `deligro-static-${SW_VERSION}`;
@@ -70,6 +70,13 @@ const PRIVATE_PREFIXES = [
   "/checkout",
   "/switch",
   "/auth",
+  // The home feed and the stores list render the signed-in customer's saved
+  // default address and active-order strip into the HTML (see HomeHeader), so
+  // they are private pages even though they look public. "/" only ever matches
+  // the exact root: isPrivatePath tests `p + "/"` for the prefix case, which is
+  // "//" and never a real path. Cost: no stale home feed offline.
+  "/",
+  "/stores",
 ];
 
 function isPrivatePath(pathname) {
