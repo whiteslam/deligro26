@@ -14,6 +14,7 @@ import {
 } from "@/lib/dispatch/sweep-select";
 import { notifyVendorStillWaiting, stopRiderRing } from "@/lib/notifications/order-events";
 import { evaluateAlerts } from "@/lib/ops/alerts/engine";
+import { refreshInsightRollups } from "@/lib/ops/insights/rollups";
 import { deferNotify } from "@/lib/notifications/defer";
 import {
   columnKnownMissing,
@@ -497,6 +498,8 @@ export async function sweepDispatch(now = Date.now()): Promise<SweepResult> {
   // 0160: campaign statuses follow their windows, and shops hear when theirs
   // starts or ends. Customer surfaces read the window and never wait on this.
   await safe(syncCampaigns(new Date(now), { force: true }).then((r) => r.changed.length));
+  // 0170: the hourly demand and rider-supply rollups behind the Insights forecast.
+  await safe(refreshInsightRollups(new Date(now)));
   return {
     reoffered,
     offlined,
