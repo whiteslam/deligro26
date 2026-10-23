@@ -56,13 +56,36 @@ String _stageWho(SlaStage s) => switch (s) {
 
 /// Service levels (§17.9): how often each stage of an order runs past its
 /// target, and who it comes down to. The targets are per zone.
-class SlaScreen extends ConsumerWidget {
-  const SlaScreen({super.key});
+class SlaScreen extends ConsumerStatefulWidget {
+  const SlaScreen({super.key, this.zoneId});
+
+  /// Set when opened from an SLA alert (`?zone=<id>`): the screen looks at
+  /// that zone, if this manager works it.
+  final String? zoneId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SlaScreen> createState() => _SlaScreenState();
+}
+
+class _SlaScreenState extends ConsumerState<SlaScreen> {
+  bool _applied = false;
+
+  @override
+  Widget build(BuildContext context) {
     final c = context.colors;
     final me = ref.watch(managerMeProvider).value;
+    final want = widget.zoneId;
+    if (!_applied && want != null && me != null) {
+      _applied = true;
+      for (final z in me.zones.zones) {
+        if (z.id == want) {
+          // After this frame: a provider cannot change while the tree builds.
+          Future.microtask(() {
+            if (mounted) ref.read(areaProvider.notifier).set(AreaZone(z.id, z.name, z.cityName));
+          });
+        }
+      }
+    }
     final value = ref.watch(slaProvider);
     final canEdit = me != null && (me.isAdmin || me.can('manager.alerts.configure'));
     return Scaffold(

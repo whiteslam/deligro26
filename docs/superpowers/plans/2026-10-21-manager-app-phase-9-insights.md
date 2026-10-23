@@ -421,3 +421,30 @@ export function toJournalCsv(vouchers: Voucher[]): string;   // BOM + formula gu
 - **Rider:** `dispatchOrder` gains an auto-assign branch and `chooseRider` exposes `rankDispatchCandidates`; `deliveries.assignment_source` is stamped by the rider accept path (default trigger). Rider phase work that edits dispatch should merge `feat/manager-app` first. An auto-assigned rider receives the existing "assigned" push, not an offer ring.
 - **Customer app:** sends `x-device-id` (random install UUID) on API calls; the server stores only a peppered hash, service-role only.
 - **Owner steps:** set `DEVICE_HASH_PEPPER` (random 32+ bytes) and schedule `/api/cron/reports` (or rely on the dispatch sweep's throttled call) when deploying; fill in ledger names and the Tally company name in Admin → Settings → Accounting before the first export.
+
+---
+
+## Part A execution notes (2026-10-23)
+
+**Built** (all in `apps/manager`, English only, no `tr()`): the city-aware area picker on every screen (A1); the Insights hub, demand forecast and riders needed (A2); the zone map, vendor benchmarks and service levels with the edit-targets sheet (A3); fraud cases, fraud rules and dispatch mode, with fraud and SLA alerts and pushes opening their own screens (A4); scheduled reports and the accounting export (A5); screenshots and the release check (A6).
+
+**Verification:** `flutter analyze` clean; `flutter test` all pass (745 before the final SLA-zone change); the app and its tests contain no Devanagari (the English-only test scans `lib`, and a Python scan covered `test` and `test_screens`); 30 screenshots rendered from fixtures in light, dark and tablet (`flutter test test_screens/phase9_screens_test.dart --update-goldens`, output in `test_screens/out/`, gitignored) and each main screen looked at; release APK (76.7 MB) installed on `deligro_test`, cold start reaches the English login, process stays up, no `FATAL` or `E/flutter` in logcat.
+
+**Not verified:** any Insights screen against a real server (no signed-in login reaches migrations 0141 onward yet, and Part S is not merged). The integration task contract-checks these models against the server's own output.
+
+### How the area (multi-city) filter works
+
+`areaProvider` holds the choice (all, one city, one zone), saved on the phone as `zone:<id>` or `city:<id>` (the old single-zone setting is still read) and cleared when the manager profile goes empty on sign-out. Screens that only read use `areaFilterProvider`; a city is carried as a zone whose id is `city:<id>`, so every existing filter, family key and refetch trigger keeps working, and the API client rewrites `zone=city:<id>` to `city=<id>` in one place (`applyCityFilter` in `lib/state/area.dart`, called from `ApiClient._uri`). Screens that create something (alert thresholds, incident, campaign, offer) keep using `activeZoneProvider`, which is a real zone or null.
+
+### Where the contract left gaps (for Part S and I1)
+
+1. **No single-case endpoint for fraud.** The case screen looks for the case in the open, dismissed and resolved lists in turn (up to 5 pages each). A `GET /api/manager/insights/fraud/[alertId]` would remove those calls.
+2. **SLA target reset** (`DELETE sla-targets?zone=`) is sent with `clientActionId` in the query, like alert-rule reset, and no reason. The contract names neither.
+3. **Schedule filters:** the form edits payment and vendor; rider and status filters on an existing schedule are carried through unchanged. The contract does not say which filters each report kind takes.
+4. **Schedule recipients** come from the Phase 8 ticket assignees endpoint (staff in reach). Whether a *new* recipient is eligible is only known when the server answers `409 recipient_ineligible { ids }`; the form then disables those people. Existing recipients arrive with an `eligible` flag.
+5. **Pause and resume** send the whole schedule with `active` flipped (`PATCH report-schedules/[id]`).
+6. **Accounting files** come from `GET insights/accounting?format=tally|journal[&includeMasters=1]`; the app uses the server's file name from `Content-Disposition`, or the contract name if absent.
+7. **Fraud rule edits** are sent without a reason (the contract has none). The platform default (`zoneId null`) is offered only to admins; a manager must pick one zone.
+8. **Dispatch edits** need `manager.dispatch.configure` and the server's `canConfigure`; switching a zone to automatic asks for confirmation first.
+9. **Alert links:** `fraud_suspected` opens `/more/insights/fraud/<alertId>`; `sla_breach` opens `/more/insights/sla?zone=<zoneId>` (the screen looks at that zone if the manager works it). Pushes use `data.kind` + `data.alertId` (+ `data.zoneId`) for the same two kinds.
+10. **Report delivery** pushes and inbox rows carry `url: /more/insights/reports/runs/<id>`; the app never follows a link outside its own screens.

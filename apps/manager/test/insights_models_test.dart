@@ -200,7 +200,7 @@ void main() {
   });
 
   test('every fixture avoids Devanagari', () {
-    final devanagari = RegExp(r'[ऀ-ॿ]');
+    final devanagari = RegExp(r'[\u0900-\u097F]');
     for (final n in ['demand', 'riders', 'zones', 'vendors', 'sla', 'dispatch', 'fraud', 'fraud_rules', 'schedules', 'runs', 'accounting']) {
       expect(devanagari.hasMatch(ins(n).toString()), isFalse, reason: n);
     }

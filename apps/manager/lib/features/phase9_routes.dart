@@ -29,7 +29,11 @@ List<RouteBase> phase9Routes() => [
           GoRoute(path: 'riders', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const RidersNeededScreen()),
           GoRoute(path: 'zones', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const ZoneMapScreen()),
           GoRoute(path: 'vendors', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const VendorBenchmarksScreen()),
-          GoRoute(path: 'sla', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const SlaScreen()),
+          GoRoute(
+            path: 'sla',
+            parentNavigatorKey: rootNavigatorKey,
+            builder: (_, state) => SlaScreen(zoneId: state.uri.queryParameters['zone']),
+          ),
           GoRoute(path: 'accounting', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const AccountingScreen()),
           GoRoute(
             path: 'reports',

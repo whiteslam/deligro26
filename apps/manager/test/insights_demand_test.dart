@@ -205,7 +205,7 @@ void main() {
   });
 
   test('the Insights screens are English only', () {
-    final devanagari = RegExp(r'[ऀ-ॿ]');
+    final devanagari = RegExp(r'[\u0900-\u097F]');
     for (final f in Directory('lib/features/insights').listSync(recursive: true).whereType<File>()) {
       final s = f.readAsStringSync();
       expect(devanagari.hasMatch(s), isFalse, reason: f.path);

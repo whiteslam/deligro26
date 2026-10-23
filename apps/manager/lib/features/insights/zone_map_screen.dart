@@ -283,7 +283,7 @@ class _ZoneMapScreenState extends ConsumerState<ZoneMapScreen> {
     final c = context.colors;
     return InsightCard(
       title: 'What to look at',
-      subtitle: 'Plain suggestions from the last ${rangeWords(m.range.from, m.range.to)}. Tap one to see where.',
+      subtitle: 'Plain suggestions for ${rangeWords(m.range.from, m.range.to)}. Tap one to see where.',
       child: m.suggestions.isEmpty
           ? Text('Nothing to change right now.', style: TextStyle(color: c.muted))
           : Column(children: [

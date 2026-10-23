@@ -418,5 +418,19 @@ void main() {
       await settleInsights(tester);
       expect(repo.slaCalls.last.$3, 'city:c1');
     });
+
+    testWidgets('opened from an SLA alert, it looks at the zone in the link', (tester) async {
+      final repo = FakeInsightsRepository();
+      await pumpInsights(tester, const SlaScreen(zoneId: 'z1'), repo: repo);
+      await settleInsights(tester);
+      expect(repo.slaCalls.last.$3, 'z1');
+    });
+
+    testWidgets('a zone this manager does not work is ignored, not trusted', (tester) async {
+      final repo = FakeInsightsRepository();
+      await pumpInsights(tester, const SlaScreen(zoneId: 'someone-elses-zone'), repo: repo);
+      await settleInsights(tester);
+      expect(repo.slaCalls.last.$3, isNull);
+    });
   });
 }
