@@ -84,6 +84,15 @@ String? inAppPathFrom(String? launchUrl, Map<String, dynamic>? data) {
   if (type == 'inbox') return safeAppPath(data?['url'] as String?) ?? '/inbox';
   // The server's alert pushes and inbox rows carry `alertId` and `url: /alerts/<id>`.
   final alertId = data?['alertId'];
+  // Phase 9: a fraud case and an SLA breach have screens of their own.
+  final kind = data?['kind'];
+  if (alertId is String && RegExp(r'^[0-9a-zA-Z-]{6,}$').hasMatch(alertId)) {
+    if (kind == 'fraud_suspected') return '/more/insights/fraud/$alertId';
+    if (kind == 'sla_breach') {
+      final zone = data?['zoneId'];
+      return zone is String && RegExp(r'^[0-9a-zA-Z-]{6,}$').hasMatch(zone) ? '/more/insights/sla?zone=$zone' : '/more/insights/sla';
+    }
+  }
   if (alertId is String && RegExp(r'^[0-9a-zA-Z-]{6,}$').hasMatch(alertId)) return '/alerts/$alertId';
   for (final raw in [data?['appPath'], launchUrl, data?['url'], data?['path']]) {
     if (raw is! String || raw.isEmpty) continue;

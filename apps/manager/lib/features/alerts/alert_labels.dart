@@ -52,8 +52,19 @@ String alertRefusalText(Refused<Object?> r) => switch (r.code) {
       _ => "That didn't go through (${r.code}).",
     };
 
-/// The screen an alert is about.
-String alertTarget(Alert a) => routeForEntity(a.entityType, a.entityId, alertId: a.id);
+/// The screen an alert is about. Two kinds have a screen of their own, by kind:
+/// a fraud alert opens its case, an SLA alert opens service levels for its zone.
+String alertTarget(Alert a) {
+  switch (a.kind) {
+    case AlertKind.fraudSuspected:
+      return '/more/insights/fraud/${Uri.encodeComponent(a.id)}';
+    case AlertKind.slaBreach:
+      final zone = a.zoneId;
+      return zone == null || zone.isEmpty ? '/more/insights/sla' : '/more/insights/sla?zone=${Uri.encodeQueryComponent(zone)}';
+    default:
+      return routeForEntity(a.entityType, a.entityId, alertId: a.id);
+  }
+}
 
 /// Acknowledge or resolve one alert through [send]; resolving asks for a
 /// note first. A network fault offers Retry with the same action.

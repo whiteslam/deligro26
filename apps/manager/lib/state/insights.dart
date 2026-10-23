@@ -115,3 +115,71 @@ final slaProvider = FutureProvider.autoDispose<SlaReport>(
   },
   retry: (_, _) => null,
 );
+
+// ─── Fraud, dispatch mode ───────────────────────────────────────────────
+
+/// Fraud cases of one status (§17.6), a page at a time.
+class FraudListNotifier extends AsyncNotifier<FraudPage> {
+  FraudListNotifier(this.status);
+  final FraudStatus status;
+  bool loadingMore = false;
+
+  @override
+  Future<FraudPage> build() => ref.read(insightsRepoProvider).fraud(status: status, zoneId: ref.watch(areaFilterProvider)?.id);
+
+  Future<void> loadMore() async {
+    final cur = state.value;
+    if (cur == null || cur.nextCursor == null || loadingMore) return;
+    loadingMore = true;
+    try {
+      final next = await ref
+          .read(insightsRepoProvider)
+          .fraud(status: status, zoneId: ref.read(areaFilterProvider)?.id, cursor: cur.nextCursor);
+      final seen = {for (final c in cur.items) c.alertId};
+      state = AsyncData(FraudPage(
+        items: [...cur.items, for (final c in next.items) if (!seen.contains(c.alertId)) c],
+        nextCursor: next.nextCursor,
+        counts: next.counts,
+      ));
+    } finally {
+      loadingMore = false;
+    }
+  }
+}
+
+final fraudListProvider = AsyncNotifierProvider.autoDispose.family<FraudListNotifier, FraudPage, FraudStatus>(
+  FraudListNotifier.new,
+  retry: (_, _) => null,
+);
+
+/// One case by its alert id. The API lists cases by status, so a case reached
+/// from a link is looked for in each status in turn (a few pages at most).
+final fraudCaseProvider = FutureProvider.autoDispose.family<FraudCase?, String>(
+  (ref, alertId) async {
+    final repo = ref.read(insightsRepoProvider);
+    for (final status in [FraudStatus.open, FraudStatus.dismissed, FraudStatus.resolved]) {
+      String? cursor;
+      for (var page = 0; page < 5; page++) {
+        final p = await repo.fraud(status: status, cursor: cursor);
+        for (final c in p.items) {
+          if (c.alertId == alertId) return c;
+        }
+        cursor = p.nextCursor;
+        if (cursor == null) break;
+      }
+    }
+    return null;
+  },
+  retry: (_, _) => null,
+);
+
+/// The fraud rules for one zone (null = the platform defaults).
+final fraudRulesProvider = FutureProvider.autoDispose.family<FraudRulesView, String?>(
+  (ref, zoneId) => ref.read(insightsRepoProvider).fraudRules(zoneId: zoneId),
+  retry: (_, _) => null,
+);
+
+final dispatchProvider = FutureProvider.autoDispose<DispatchOverview>(
+  (ref) => ref.read(insightsRepoProvider).dispatch(),
+  retry: (_, _) => null,
+);

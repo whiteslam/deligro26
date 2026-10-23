@@ -2,6 +2,10 @@ import 'package:go_router/go_router.dart';
 
 import '../router.dart' show rootNavigatorKey;
 import 'insights/demand_screen.dart';
+import 'insights/dispatch_screen.dart';
+import 'insights/fraud_case_screen.dart';
+import 'insights/fraud_rules_screen.dart';
+import 'insights/fraud_screen.dart';
 import 'insights/insights_hub_screen.dart';
 import 'insights/riders_needed_screen.dart';
 import 'insights/sla_screen.dart';
@@ -20,10 +24,21 @@ List<RouteBase> phase9Routes() => [
           GoRoute(path: 'riders', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const RidersNeededScreen()),
           GoRoute(path: 'zones', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const ZoneMapScreen()),
           GoRoute(path: 'vendors', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const VendorBenchmarksScreen()),
+          GoRoute(path: 'sla', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const SlaScreen()),
+          GoRoute(path: 'dispatch', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const DispatchScreen()),
           GoRoute(
-            path: 'sla',
+            path: 'fraud',
             parentNavigatorKey: rootNavigatorKey,
-            builder: (_, state) => const SlaScreen(),
+            builder: (_, _) => const FraudScreen(),
+            routes: [
+              // Before ':alertId', or "rules" would read as a case.
+              GoRoute(path: 'rules', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const FraudRulesScreen()),
+              GoRoute(
+                path: ':alertId',
+                parentNavigatorKey: rootNavigatorKey,
+                builder: (_, state) => FraudCaseScreen(alertId: state.pathParameters['alertId']!),
+              ),
+            ],
           ),
         ],
       ),
