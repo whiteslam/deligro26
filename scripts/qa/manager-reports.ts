@@ -137,7 +137,7 @@ check("all=1 parsed", (() => { const r = parseReportQuery(P("kind=orders&all=1")
 
 console.log("\n── structure ──");
 const route = readFileSync("src/app/api/manager/reports/route.ts", "utf8");
-check("reports route needs manager.reports.view and the kind's permission", /managerApiContext\("manager\.reports\.view"\)/.test(route) && /mayRun\(def/.test(route));
+check("reports route needs manager.reports.view and the kind's permission", /managerApiContext\("manager\.reports\.view"[,)]/.test(route) && /mayRun\(def/.test(route));
 check("reports route answers 413 too_large", /too_large/.test(route) && /413/.test(route));
 check("kinds route lists only permitted kinds", /permittedKinds\(/.test(readFileSync("src/app/api/manager/reports/kinds/route.ts", "utf8")));
 const registry = readFileSync("src/lib/reports/registry.ts", "utf8");

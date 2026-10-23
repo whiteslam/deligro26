@@ -20,7 +20,7 @@ const STATUSES: SettlementStatusFilter[] = ["draft", "paid", "void", "pending_ap
  * → 200 { items: SettlementSummary[], nextCursor, totals: { netPayable, count } }   → 400   → 403
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.finance.view");
+  const ctx = await managerApiContext("manager.finance.view", request);
   if (ctx instanceof Response) return ctx;
   const limited = await financeReadLimit(ctx);
   if (limited) return limited;
@@ -70,7 +70,7 @@ export async function GET(request: Request) {
  * → 409 nothing_to_pay | negative_net | duplicate_pending | already_settled
  */
 export async function POST(request: Request) {
-  const ctx = await managerApiContext("manager.finance.view");
+  const ctx = await managerApiContext("manager.finance.view", request);
   if (ctx instanceof Response) return ctx;
   if (ctx.profile.role !== "admin" && ctx.permissions["manager.finance.initiate_payment"] !== true) {
     return NextResponse.json({ error: "permission_denied", permission: "manager.finance.initiate_payment" }, { status: 403 });

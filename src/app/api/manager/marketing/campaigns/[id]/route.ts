@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * only the end, budget, notes and banner, with a reason (enforced in 0160).
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.marketing.manage");
+  const ctx = await managerApiContext("manager.marketing.manage", request);
   if (ctx instanceof Response) return ctx;
   const { id } = await params;
   if (!isUuid(id)) return notFound();
@@ -29,7 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.marketing.manage");
+  const ctx = await managerApiContext("manager.marketing.manage", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "marketing");
   if (limited) return limited;

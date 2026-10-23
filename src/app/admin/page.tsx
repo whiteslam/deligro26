@@ -18,6 +18,8 @@ import {
   type StatusSlice,
 } from "@/lib/data-access/admin-series";
 import { getLiveBoard } from "@/lib/data-access/admin-dispatch";
+import { listCitiesWithZones } from "@/lib/data-access/zones";
+import { SelectFilter } from "@/components/admin/select-filter";
 import {
   listPendingExceptions,
   type OpsException,
@@ -227,18 +229,18 @@ function attentionItems({
  * the optional ones answer empty, so a demo install renders zeros rather than
  * failing. Called only after the page's `requireRole("admin")`.
  */
-function loadOverview(days: number) {
+function loadOverview(days: number, zoneIds: readonly string[] | null) {
   return Promise.all([
-    getAdminDashboard(),
+    getAdminDashboard(zoneIds ? { all: false, zoneIds: [...zoneIds] } : { all: true }),
     listPendingRestaurants(),
     isSupabaseConfigured
-      ? getAdminSeries(days)
+      ? getAdminSeries(days, undefined, zoneIds)
       : Promise.resolve<AdminSeries>(EMPTY_SERIES),
     isSupabaseConfigured
-      ? getOrderStatusMix(days)
+      ? getOrderStatusMix(days, undefined, zoneIds)
       : Promise.resolve<StatusSlice[]>([]),
     isSupabaseConfigured
-      ? getPaymentMix(days)
+      ? getPaymentMix(days, undefined, zoneIds)
       : Promise.resolve<PaymentSlice[]>([]),
     isSupabaseConfigured
       ? getLiveBoard(BOARD_ROWS)
@@ -268,13 +270,21 @@ function loadOverview(days: number) {
 export default async function AdminOverviewPage({
   searchParams,
 }: Readonly<{
-  searchParams: Promise<{ days?: string; metric?: string }>;
+  searchParams: Promise<{ days?: string; metric?: string; city?: string }>;
 }>) {
   // The layout is not a guard: Next skips it when the client already holds that
   // segment, so the page that reads service-role data checks for itself.
   await requireRole("admin");
 
-  const { days: daysParam, metric: metricParam } = await searchParams;
+  const { days: daysParam, metric: metricParam, city: cityParam } = await searchParams;
+  // A city narrows the order figures and charts to its zones (a city with no
+  // zones, or an unknown one, shows nothing rather than everything).
+  const cityList = isSupabaseConfigured
+    ? await listCitiesWithZones().catch(() => [] as Awaited<ReturnType<typeof listCitiesWithZones>>)
+    : [];
+  const city = cityList.find((c) => c.id === (cityParam ?? "").toLowerCase()) ?? null;
+  const cityId = city?.id ?? "";
+  const zoneIds: readonly string[] | null = cityParam ? (city ? city.zones.map((z) => z.id) : []) : null;
   const requested = Number(daysParam);
   const days = RANGES.some((r) => r.value === requested) ? requested : 7;
   const metric: TrendMetric = isTrendMetric(metricParam) ? metricParam : "revenue";
@@ -296,7 +306,7 @@ export default async function AdminOverviewPage({
     ],
     emergencies,
   ] = await Promise.all([
-    loadOverview(days),
+    loadOverview(days, zoneIds),
     // Open rider emergencies (0087). Its failure costs only the banner.
     isSupabaseConfigured
       ? listEmergenciesAction().catch(() => [] as EmergencyItem[])
@@ -314,8 +324,8 @@ export default async function AdminOverviewPage({
 
   const rangeLabel = RANGES.find((r) => r.value === days)?.label ?? `${days} days`;
   const rangeHref = (v: number) =>
-    hrefFor({ days: v, metric });
-  const metricHref = (m: TrendMetric) => hrefFor({ days, metric: m });
+    hrefFor({ days: v, metric, city: cityId });
+  const metricHref = (m: TrendMetric) => hrefFor({ days, metric: m, city: cityId });
 
   /* ---------- the metric strip ----------
      Six figures. Three have a history to draw; riders on delivery and orders in
@@ -458,8 +468,30 @@ export default async function AdminOverviewPage({
         description={`Live operational overview · ${now} IST`}
         status={<LiveBadge />}
         actions={
-          <div className="hidden @3xl:block">
-            <RangeTabs options={RANGES} active={days} hrefFor={rangeHref} />
+          <div className="flex items-center gap-2">
+            {cityList.filter((c) => c.zones.length > 0).length > 1 ? (
+              <form action="/admin" method="get" className="flex items-center gap-1.5">
+                {days !== 7 ? <input type="hidden" name="days" value={days} /> : null}
+                {metric !== "revenue" ? <input type="hidden" name="metric" value={metric} /> : null}
+                <SelectFilter
+                  name="city"
+                  label="City"
+                  value={cityId}
+                  options={[
+                    { value: "", label: "All cities" },
+                    ...cityList
+                      .filter((c) => c.zones.length > 0)
+                      .map((c) => ({ value: c.id, label: c.name })),
+                  ]}
+                />
+                <noscript>
+                  <button type="submit">Apply</button>
+                </noscript>
+              </form>
+            ) : null}
+            <div className="hidden @3xl:block">
+              <RangeTabs options={RANGES} active={days} hrefFor={rangeHref} />
+            </div>
           </div>
         }
       />
@@ -679,10 +711,19 @@ function Headline({
  * the chosen metric, which is what happens when each control writes its own
  * query string.
  */
-function hrefFor({ days, metric }: { days: number; metric: TrendMetric }): string {
+function hrefFor({
+  days,
+  metric,
+  city,
+}: {
+  days: number;
+  metric: TrendMetric;
+  city?: string;
+}): string {
   const params = new URLSearchParams();
   if (days !== 7) params.set("days", String(days));
   if (metric !== "revenue") params.set("metric", metric);
+  if (city) params.set("city", city);
   const qs = params.toString();
   return qs ? `/admin?${qs}` : "/admin";
 }

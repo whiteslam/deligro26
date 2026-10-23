@@ -16,7 +16,7 @@ const STATUSES = ["submitted", "confirmed", "disputed", "withdrawn"] as const;
  * → 200 { items: CashDeposit[], nextCursor, counts: { submitted } }   → 400 bad_request
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.cash");
+  const ctx = await managerApiContext("manager.cash", request);
   if (ctx instanceof Response) return ctx;
 
   const p = new URL(request.url).searchParams;

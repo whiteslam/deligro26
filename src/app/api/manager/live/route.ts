@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * → 500 { error: "load_failed" }
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.live.view");
+  const ctx = await managerApiContext("manager.live.view", request);
   if (ctx instanceof Response) return ctx;
 
   const zone = new URL(request.url).searchParams.get("zone");

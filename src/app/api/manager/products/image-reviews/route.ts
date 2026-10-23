@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * → 400 { error: "bad_request", field }   → 500 { error: "load_failed" }
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.products.moderate");
+  const ctx = await managerApiContext("manager.products.moderate", request);
   if (ctx instanceof Response) return ctx;
 
   const params = new URL(request.url).searchParams;

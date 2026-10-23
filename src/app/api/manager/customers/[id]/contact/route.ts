@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * 10 a minute per manager. The only manager payload that carries contact.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.customers.view");
+  const ctx = await managerApiContext("manager.customers.view", request);
   if (ctx instanceof Response) return ctx;
   if (ctx.permissions["manager.customers.contact"] !== true) {
     return NextResponse.json({ error: "permission_denied", permission: "manager.customers.contact" }, { status: 403 });

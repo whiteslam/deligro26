@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * 10 a minute per manager.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.customers.view");
+  const ctx = await managerApiContext("manager.customers.view", request);
   if (ctx instanceof Response) return ctx;
   if (ctx.permissions["manager.customers.suspend"] !== true) {
     return NextResponse.json({ error: "permission_denied", permission: "manager.customers.suspend" }, { status: 403 });

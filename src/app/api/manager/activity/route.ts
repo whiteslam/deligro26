@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  * → { items: [{ id, action, entityType, entityId, zoneId, reason, createdAt }], page, hasMore }
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
 
   const url = new URL(request.url);

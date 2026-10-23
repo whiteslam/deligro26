@@ -17,7 +17,7 @@ const LOGO_MAX_BYTES = 5 * 1024 * 1024;
  * → 403 permission_denied   → 429   → 500 action_failed
  */
 export async function POST(request: Request) {
-  const ctx = await managerApiContext("manager.vendors.onboard");
+  const ctx = await managerApiContext("manager.vendors.onboard", request);
   if (ctx instanceof Response) return ctx;
 
   const limited = await managerWriteLimit(ctx, "vendor-logo", 20);

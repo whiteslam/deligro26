@@ -59,7 +59,7 @@ export async function GET() {
 }
 
 export async function DELETE(request: Request) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "sessions", 20);
   if (limited) return limited;

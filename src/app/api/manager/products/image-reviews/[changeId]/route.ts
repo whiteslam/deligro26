@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  * → 409 invalid_transition (already reviewed)   → 429   → 500 action_failed
  */
 export async function POST(request: Request, { params }: { params: Promise<{ changeId: string }> }) {
-  const ctx = await managerApiContext("manager.products.moderate");
+  const ctx = await managerApiContext("manager.products.moderate", request);
   if (ctx instanceof Response) return ctx;
 
   const limited = await managerWriteLimit(ctx, "image-reviews");

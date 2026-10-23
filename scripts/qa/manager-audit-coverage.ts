@@ -231,7 +231,7 @@ check("every manager write route is pinned here", unpinned.length === 0, unpinne
 for (const r of writeRoutes.filter((x) => x in ROUTE_SWITCH)) {
   const src = readFileSync(`src/app/api/manager/${r}`, "utf8");
   // The handler(s) that write: their managerApiContext calls.
-  const writes = [...src.matchAll(/export async function (POST|PUT|PATCH|DELETE)[\s\S]*?managerApiContext\(("([a-z_.]+)")?\)/g)].map((m) => m[3] ?? "");
+  const writes = [...src.matchAll(/export async function (POST|PUT|PATCH|DELETE)[\s\S]*?managerApiContext\((?:"([a-z_.]+)"|undefined)?(?:, request)?\)/g)].map((m) => m[2] ?? "");
   const want = ROUTE_SWITCH[r];
   check(`${r} opens its writes with ${want || "any manager"}`, writes.length > 0 && writes.every((k) => k === want), writes.join(", "));
 }
@@ -274,9 +274,11 @@ const SENSITIVE = [
   "manager.orders.correct", "manager.vendors.onboard", "manager.riders.onboard", "manager.finance.initiate_payment",
   "manager.finance.approve_payment", "manager.finance.adjust", "manager.customers.contact", "manager.customers.suspend",
   "manager.products.adjust_stock", "manager.audit.view_zone",
+  // Phase 9 (§17): switching a zone to automatic assignment and exporting to accounting.
+  "manager.dispatch.configure", "manager.accounting.export",
 ];
 const off = FEATURES.filter((f) => (f as { defaultOn?: boolean }).defaultOn === false).map((f) => f.key).sort();
-check("the default-off switches are exactly the design's ten sensitive ones", JSON.stringify(off) === JSON.stringify([...SENSITIVE].sort()), off.join(", "));
+check("the default-off switches are exactly the design's sensitive ones", JSON.stringify(off) === JSON.stringify([...SENSITIVE].sort()), off.join(", "));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

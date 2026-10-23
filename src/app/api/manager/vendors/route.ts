@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  * Contract: docs/superpowers/plans/2026-10-21-manager-app-phase-4-vendors-products.md.
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.vendors.view");
+  const ctx = await managerApiContext("manager.vendors.view", request);
   if (ctx instanceof Response) return ctx;
 
   const parsed = parseVendorQuery(new URL(request.url).searchParams);
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
  * → 409 email_taken | phone_taken   → 429
  */
 export async function POST(request: Request) {
-  const ctx = await managerApiContext("manager.vendors.onboard");
+  const ctx = await managerApiContext("manager.vendors.onboard", request);
   if (ctx instanceof Response) return ctx;
 
   const limited = await managerWriteLimit(ctx, "vendor-onboard", 10);

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 /** GET …/customers/[id]/feedback — reviews and rider ratings this customer left, in scope (§10.7). */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.customers.view");
+  const ctx = await managerApiContext("manager.customers.view", request);
   if (ctx instanceof Response) return ctx;
   const { id: raw } = await params;
   if (!isUuid(raw)) return notFound();

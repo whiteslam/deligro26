@@ -88,6 +88,7 @@ type ReportSearchParams = {
   vendor?: string;
   rider?: string;
   zone?: string;
+  city?: string;
   status?: string;
   payment?: string;
 };
@@ -102,10 +103,11 @@ function reportQuery(sp: ReportSearchParams) {
   const vendorId = def.filters.includes("vendor") ? (sp.vendor ?? "") : "";
   const riderId = def.filters.includes("rider") ? (sp.rider ?? "") : "";
   const zoneId = def.filters.includes("zone") && /^[0-9a-f-]{36}$/i.test(sp.zone ?? "") ? (sp.zone as string) : "";
+  const cityId = def.filters.includes("zone") && /^[0-9a-f-]{36}$/i.test(sp.city ?? "") ? (sp.city as string) : "";
   const status = def.statusOptions.some((s) => s.value === sp.status) ? (sp.status as string) : "";
   const payment: PaymentFilter =
     def.filters.includes("payment") && (sp.payment === "cod" || sp.payment === "online") ? sp.payment : "all";
-  return { kind, from, to, vendorId, riderId, zoneId, status, payment };
+  return { kind, from, to, vendorId, riderId, zoneId, cityId, status, payment };
 }
 
 export default async function ReportsPage({
@@ -117,7 +119,7 @@ export default async function ReportsPage({
   // segment, so the page that reads service-role data checks for itself.
   const admin = await requireRole("admin");
 
-  const { kind, from, to, vendorId, riderId, zoneId, status, payment } = reportQuery(await searchParams);
+  const { kind, from, to, vendorId, riderId, zoneId, cityId, status, payment } = reportQuery(await searchParams);
 
   if (!isSupabaseConfigured) {
     return (
@@ -128,11 +130,14 @@ export default async function ReportsPage({
     );
   }
 
-  const [vendors, riders, zones] = await Promise.all([
+  const [vendors, riders, zones, cities] = await Promise.all([
     listReportVendors().catch(() => []),
     listReportRiders().catch(() => []),
     listCitiesWithZones()
       .then((cs) => cs.flatMap((c) => c.zones.map((z) => ({ id: z.id, name: cs.length > 1 ? `${c.name} · ${z.name}` : z.name }))))
+      .catch(() => [] as { id: string; name: string }[]),
+    listCitiesWithZones()
+      .then((cs) => cs.filter((c) => c.zones.length > 0).map((c) => ({ id: c.id, name: c.name })))
       .catch(() => [] as { id: string; name: string }[]),
   ]);
   const result = await buildReport(
@@ -143,6 +148,7 @@ export default async function ReportsPage({
       vendorId: vendorId || undefined,
       riderId: riderId || undefined,
       zoneId: zoneId || undefined,
+      cityId: cityId || undefined,
       status: status || undefined,
       payment,
     },
@@ -176,6 +182,8 @@ export default async function ReportsPage({
         riders={riders}
         zones={zones}
         zoneId={zoneId}
+        cities={cities}
+        cityId={cityId}
         kind={kind}
         from={from}
         to={to}

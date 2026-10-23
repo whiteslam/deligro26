@@ -19,7 +19,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
  * → 200 TicketMetrics   → 400 bad_request | range_too_long   → 500 load_failed
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.support.manage");
+  const ctx = await managerApiContext("manager.support.manage", request);
   if (ctx instanceof Response) return ctx;
 
   const sp = new URL(request.url).searchParams;

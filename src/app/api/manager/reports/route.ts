@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
  * → 200 ReportPayload   → 400 bad_kind | bad_range | bad_filter | bad_request   → 403 permission_denied   → 413 too_large
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.reports.view");
+  const ctx = await managerApiContext("manager.reports.view", request);
   if (ctx instanceof Response) return ctx;
 
   const q = parseReportQuery(new URL(request.url).searchParams, new Date());

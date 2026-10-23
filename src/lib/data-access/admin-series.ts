@@ -1,4 +1,5 @@
 import "server-only";
+import { NO_ZONE } from "@/lib/auth/manager-scope";
 import { createClient } from "@/lib/supabase/server";
 import { readAllRows } from "@/lib/data-access/read-all";
 import { requireRole } from "@/lib/auth";
@@ -97,7 +98,9 @@ const MAX_SERIES_DAYS = 180;
  */
 export async function getAdminSeries(
   days = SERIES_DAYS,
-  restaurantId?: string
+  restaurantId?: string,
+  /** Limit to these zones (a city on the admin dashboard); omitted = every zone. */
+  zoneIds?: readonly string[] | null
 ): Promise<AdminSeries> {
   // The orders are read with the service role (ops-metrics.ts), so this
   // checks for an admin itself rather than trusting the layout (AGENTS.md §5).
@@ -118,7 +121,10 @@ export async function getAdminSeries(
     // the chart agrees with the "Revenue today" tile beside it (design §18.4;
     // scripts/qa/admin-metrics-parity.ts). Before this the bars added cancelled
     // orders' totals in.
-    const orders = await loadMetricOrders({ all: true }, { range, restaurantId });
+    const orders = await loadMetricOrders(
+      zoneIds ? { all: false, zoneIds: [...zoneIds] } : { all: true },
+      { range, restaurantId }
+    );
     points = adminDailyPoints(orders, range);
 
     // Only worth asking for "All time": an explicit 7/14/30-day request was
@@ -133,6 +139,7 @@ export async function getAdminSeries(
       // Scoped the same way as the series itself, or the disclosure would
       // count every shop's history against one shop's chart.
       if (restaurantId) older = older.eq("restaurant_id", restaurantId);
+      if (zoneIds) older = older.in("zone_id", zoneIds.length > 0 ? [...zoneIds] : [NO_ZONE]);
       const { count } = await older;
       olderOrders = count ?? 0;
     }
@@ -193,7 +200,8 @@ const STATUS_ORDER = [
  */
 export async function getOrderStatusMix(
   days = 7,
-  restaurantId?: string
+  restaurantId?: string,
+  zoneIds?: readonly string[] | null
 ): Promise<StatusSlice[]> {
   const since =
     days === ALL_TIME
@@ -208,6 +216,7 @@ export async function getOrderStatusMix(
       let query = supabase.from("orders").select("status");
       if (since) query = query.gte("created_at", since);
       if (restaurantId) query = query.eq("restaurant_id", restaurantId);
+      if (zoneIds) query = query.in("zone_id", zoneIds.length > 0 ? [...zoneIds] : [NO_ZONE]);
       return query.order("id").range(from, to);
     });
     if (error) return [];
@@ -267,7 +276,8 @@ export interface PaymentSlice {
  */
 export async function getPaymentMix(
   days = 7,
-  restaurantId?: string
+  restaurantId?: string,
+  zoneIds?: readonly string[] | null
 ): Promise<PaymentSlice[]> {
   const since =
     days === ALL_TIME
@@ -289,6 +299,7 @@ export async function getPaymentMix(
         .neq("status", "cancelled");
       if (since) query = query.gte("created_at", since);
       if (restaurantId) query = query.eq("restaurant_id", restaurantId);
+      if (zoneIds) query = query.in("zone_id", zoneIds.length > 0 ? [...zoneIds] : [NO_ZONE]);
       return query.order("id").range(from, to);
     });
     if (error) return empty;

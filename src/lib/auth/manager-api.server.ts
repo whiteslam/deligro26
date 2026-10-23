@@ -6,7 +6,9 @@ import { getFeatures } from "@/lib/features/flags.server";
 import { listStaffZoneIds } from "@/lib/data-access/zones";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import type { ManagerScope } from "@/lib/auth/manager-scope";
+import { narrowScope, type ManagerScope } from "@/lib/auth/manager-scope";
+import { cityIdsByZone, loadZoneCityMap } from "@/lib/data-access/zone-city";
+import { parseAreaQuery, type AreaQuery } from "@/lib/ops/area";
 
 /**
  * The gate every Manager-app route opens with.
@@ -26,6 +28,12 @@ export interface ManagerApiContext {
   scope: ManagerScope;
   /** Manager switches only (`manager.*`). */
   permissions: Record<string, boolean>;
+  /**
+   * The area the request asked for (`zone` / `city`), as strict uuids or null.
+   * `scope` has already been narrowed by `city` (never widened); a `zone` is
+   * applied by the route itself, as before, and wins over a city.
+   */
+  area: AreaQuery;
 }
 
 function managerPermissions(map: FeatureMap): Record<string, boolean> {
@@ -35,8 +43,44 @@ function managerPermissions(map: FeatureMap): Record<string, boolean> {
 }
 
 export async function managerApiContext(
-  permission?: FeatureKey
+  permission?: FeatureKey,
+  request?: Request
 ): Promise<ManagerApiContext | Response> {
+  const base = await baseContext(permission);
+  if (base instanceof Response) return base;
+  if (!request) return { ...base, area: { zone: null, city: null } };
+
+  // The city filter (§17.8) lives here so no route can forget it: it can only
+  // shrink the scope, and an explicit `zone` wins (the route applies that).
+  const sp = new URL(request.url).searchParams;
+  const rawZone = sp.get("zone")?.trim() || null;
+  const rawCity = sp.get("city")?.trim() || null;
+  const area: AreaQuery = { zone: null, city: null };
+  const zone = parseAreaQuery(new URLSearchParams(rawZone ? { zone: rawZone } : {}));
+  if (!("error" in zone)) area.zone = zone.zone;
+  if (rawCity) {
+    const city = parseAreaQuery(new URLSearchParams({ city: rawCity }));
+    if ("error" in city) {
+      return NextResponse.json({ error: "bad_request", field: "city" }, { status: 400 });
+    }
+    area.city = city.city;
+  }
+  if (!area.zone && area.city) {
+    let zoneCity: Map<string, string>;
+    try {
+      zoneCity = cityIdsByZone(await loadZoneCityMap());
+    } catch {
+      // Cannot tell which zones are in the city: show nothing, not everything.
+      return { ...base, scope: { all: false, zoneIds: [] }, area };
+    }
+    return { ...base, scope: narrowScope(base.scope, { city: area.city }, zoneCity), area };
+  }
+  return { ...base, area };
+}
+
+async function baseContext(
+  permission?: FeatureKey
+): Promise<Omit<ManagerApiContext, "area"> | Response> {
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: "not_configured" }, { status: 503 });
   }

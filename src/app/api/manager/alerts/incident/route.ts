@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * → 201 { alert }   → 400 bad_request   → 404 not_found (zone not theirs)   → 409 stale   → 429
  */
 export async function POST(request: Request) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "incident", 10);
   if (limited) return limited;

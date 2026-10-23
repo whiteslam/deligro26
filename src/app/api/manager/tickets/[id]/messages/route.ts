@@ -23,7 +23,7 @@ const MAX_BODY_BYTES = ATTACHMENT_MAX_FILES * ATTACHMENT_MAX_BYTES + 64 * 1024;
  * → 409 invalid_transition (closed) | stale   → 413 too_large   → 429
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.support.manage");
+  const ctx = await managerApiContext("manager.support.manage", request);
   if (ctx instanceof Response) return ctx;
 
   const limited = await managerWriteLimit(ctx, "ticket-messages");

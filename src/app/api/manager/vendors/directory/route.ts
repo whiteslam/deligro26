@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * → 400 { error: "bad_request", field: "zone" }   → 500 { error: "load_failed" }
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
   const p = ctx.permissions;
   if (!p["manager.orders.view"] && !p["manager.products.view"] && !p["manager.vendors.view"] && !p["manager.reports.view"]) {

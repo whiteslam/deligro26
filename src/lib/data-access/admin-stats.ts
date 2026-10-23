@@ -95,7 +95,7 @@ async function countOf(
  * failing sub-query resolves to 0 rather than throwing, so one missing table
  * can't blank the entire dashboard.
  */
-export async function getAdminDashboard(): Promise<AdminDashboard> {
+export async function getAdminDashboard(scope: ManagerScope = ALL_ZONES): Promise<AdminDashboard> {
   // The order figures below read with the service role (ops-metrics.ts), so
   // this checks for itself rather than trusting the layout (AGENTS.md rule 5).
   await requireRole("admin");
@@ -189,7 +189,7 @@ export async function getAdminDashboard(): Promise<AdminDashboard> {
     // by the shared ops metrics so this tile and the manager dashboard's
     // "Today's Total Sales" are one number (design §18.4). A failed read is
     // reported as unavailable, never as zeros.
-    loadMetricOrders(ALL_ZONES, {
+    loadMetricOrders(scope, {
       range: { from: istDayKey(new Date(now.getTime() - 15 * 86_400_000)), to: istDayKey(now) },
     }).then(
       (rows) => ({ ok: true as const, rows }),

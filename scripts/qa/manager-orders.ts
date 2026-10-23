@@ -168,8 +168,8 @@ console.log("\n── structure ──");
 const listRoute = readFileSync("src/app/api/manager/orders/route.ts", "utf8");
 const detailRoute = readFileSync("src/app/api/manager/orders/[id]/route.ts", "utf8");
 const data = readFileSync("src/lib/data-access/manager-ops-orders.ts", "utf8");
-check("the list route opens with managerApiContext(\"manager.orders.view\")", /managerApiContext\("manager\.orders\.view"\)/.test(listRoute));
-check("the detail route opens with managerApiContext(\"manager.orders.view\")", /managerApiContext\("manager\.orders\.view"\)/.test(detailRoute));
+check("the list route opens with managerApiContext(\"manager.orders.view\")", /managerApiContext\("manager\.orders\.view"[,)]/.test(listRoute));
+check("the detail route opens with managerApiContext(\"manager.orders.view\")", /managerApiContext\("manager\.orders\.view"[,)]/.test(detailRoute));
 check("the data layer never selects * from orders", !/select\(\s*["'`]\*["'`]\s*\)/.test(data));
 const orderChains = data.split(/\.from\("orders"\)/).slice(1);
 check("every orders read in the data layer is zone-scoped",

@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * → 200 { items: CashDispute[], nextCursor, counts: { open, resolved } }   → 400 bad_request
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.cash");
+  const ctx = await managerApiContext("manager.cash", request);
   if (ctx instanceof Response) return ctx;
   const p = new URL(request.url).searchParams;
   const status = p.get("status");

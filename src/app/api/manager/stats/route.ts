@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
  * per user, 30 a minute.
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.reports.view");
+  const ctx = await managerApiContext("manager.reports.view", request);
   if (ctx instanceof Response) return ctx;
 
   const limit = await rateLimit(`manager-stats:${ctx.profile.id}`, 30, 60_000);

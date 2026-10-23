@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * audited (last four digits only). Payloads carry a masked phone only.
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.customers.view");
+  const ctx = await managerApiContext("manager.customers.view", request);
   if (ctx instanceof Response) return ctx;
   const parsed = parseCustomerQuery(new URL(request.url).searchParams);
   if (!parsed.ok) return badField(parsed.field);

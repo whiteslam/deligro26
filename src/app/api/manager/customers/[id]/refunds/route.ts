@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * customers.view; deciding is Phase 6's route (finance.view + finance.adjust).
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.customers.view");
+  const ctx = await managerApiContext("manager.customers.view", request);
   if (ctx instanceof Response) return ctx;
   const { id: raw } = await params;
   if (!isUuid(raw)) return notFound();

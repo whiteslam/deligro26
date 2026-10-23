@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { istDay } from "@/lib/settlements/cycle";
 import { resolveKind, reportMeta } from "@/lib/reports/definitions";
 import { runReport } from "@/lib/reports/registry";
+import { narrowScope, type ManagerScope } from "@/lib/auth/manager-scope";
+import { cityIdsByZone, loadZoneCityMap } from "@/lib/data-access/zone-city";
 import type { ReportCell, ReportPayload, ReportRow } from "@/lib/reports/payload";
 import type { ReportDay, ReportFilters, ReportResult } from "@/lib/reports/kinds";
 
@@ -102,9 +104,14 @@ export async function buildReport(
 ): Promise<ReportResult | { error: string }> {
   const kind = resolveKind(f.kind);
   if (!kind) return { error: "Unknown report." };
+  // An admin sees every zone; a city narrows that to its zones (a zone wins).
+  let scope: ManagerScope = { all: true };
+  if (!f.zoneId && f.cityId) {
+    scope = narrowScope({ all: true }, { city: f.cityId }, cityIdsByZone(await loadZoneCityMap()));
+  }
   const result = await runReport({
     kind,
-    scope: { all: true },
+    scope,
     range: { from: f.from, to: f.to },
     zoneId: f.zoneId || null,
     vendorId: f.vendorId || null,

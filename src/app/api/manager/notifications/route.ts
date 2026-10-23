@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * → 200 { items: [InboxItem], nextCursor, unread }   → 400 bad_request   → 500 load_failed
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
   const sp = new URL(request.url).searchParams;
   const raw = sp.get("cursor");

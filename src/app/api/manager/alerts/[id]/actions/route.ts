@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * → 200 { alert }   → 400 bad_request | reason_required   → 404 not_found   → 409 already_resolved | stale   → 429
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "alert-actions");
   if (limited) return limited;

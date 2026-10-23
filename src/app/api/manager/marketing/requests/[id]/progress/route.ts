@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /** POST …/requests/[id]/progress — move a request with no campaign along by hand. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.marketing.manage");
+  const ctx = await managerApiContext("manager.marketing.manage", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "marketing");
   if (limited) return limited;

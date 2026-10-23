@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  * → 409 max_level | invalid_transition | stale   → 429
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.support.manage");
+  const ctx = await managerApiContext("manager.support.manage", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "ticket-escalate");
   if (limited) return limited;

@@ -84,8 +84,8 @@ const api = join(__dirname, "../../src/app/api/manager/offers");
 for (const f of ["route.ts", "[code]/route.ts", "[code]/actions/route.ts"]) {
   const src = readFileSync(join(api, f), "utf8");
   const handlers = [...src.matchAll(/export async function (GET|POST|PATCH)/g)].map((x) => x[1]);
-  check(`${f}: every handler opens with managerApiContext("manager.offers.manage")`,
-    (src.match(/managerApiContext\("manager\.offers\.manage"\)/g) ?? []).length === handlers.length);
+  check(`${f}: every handler opens with managerApiContext("manager.offers.manage"`,
+    (src.match(/managerApiContext\("manager\.offers\.manage"[,)]/g) ?? []).length === handlers.length);
   for (const h of handlers.filter((x) => x !== "GET")) {
     const start = src.indexOf(`export async function ${h}`);
     const next = src.indexOf("export async function", start + 1);

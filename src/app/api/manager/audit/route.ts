@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * → 200 { items: [AuditEntry], nextCursor }   → 400 bad_request   → 403 permission_denied   → 500 load_failed
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.audit.view_zone");
+  const ctx = await managerApiContext("manager.audit.view_zone", request);
   if (ctx instanceof Response) return ctx;
   const q = parseAuditQuery(new URL(request.url).searchParams);
   if ("error" in q) return NextResponse.json(q, { status: 400 });

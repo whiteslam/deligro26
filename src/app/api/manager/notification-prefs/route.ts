@@ -42,7 +42,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "notif-prefs", 60);
   if (limited) return limited;

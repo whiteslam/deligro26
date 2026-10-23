@@ -16,7 +16,7 @@ const STATUSES = ["open", "in_progress", "waiting_on_requester", "escalated", "r
  * → 404 { error: "not_found" }   → 500 { error: "load_failed" }
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.vendors.view");
+  const ctx = await managerApiContext("manager.vendors.view", request);
   if (ctx instanceof Response) return ctx;
 
   const { id } = await params;

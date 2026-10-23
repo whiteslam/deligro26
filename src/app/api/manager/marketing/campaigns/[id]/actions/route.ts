@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /** POST …/campaigns/[id]/actions — cancel before start, or end now while running. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.marketing.manage");
+  const ctx = await managerApiContext("manager.marketing.manage", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "marketing");
   if (limited) return limited;

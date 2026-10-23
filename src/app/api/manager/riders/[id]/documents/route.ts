@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
  * → 403 permission_denied   → 404 not_found
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.riders.onboard");
+  const ctx = await managerApiContext("manager.riders.onboard", request);
   if (ctx instanceof Response) return ctx;
 
   const limited = await managerWriteLimit(ctx, "rider-writes");

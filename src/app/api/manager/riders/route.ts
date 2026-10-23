@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  * Contract: docs/superpowers/plans/2026-10-21-manager-app-phase-5-riders.md.
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.riders.view");
+  const ctx = await managerApiContext("manager.riders.view", request);
   if (ctx instanceof Response) return ctx;
 
   const parsed = parseRiderQuery(new URL(request.url).searchParams);
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
  * → 409 phone_taken | email_taken | stale
  */
 export async function POST(request: Request) {
-  const ctx = await managerApiContext("manager.riders.onboard");
+  const ctx = await managerApiContext("manager.riders.onboard", request);
   if (ctx instanceof Response) return ctx;
 
   const limited = await managerWriteLimit(ctx, "rider-writes");

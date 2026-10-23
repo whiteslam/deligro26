@@ -83,7 +83,7 @@ const reviewRoutes = ["src/app/api/manager/products/image-reviews/route.ts", "sr
 for (const f of reviewRoutes) {
   let src = "";
   try { src = readFileSync(f, "utf8"); } catch { /* missing */ }
-  check(`${f}: exists and needs manager.products.moderate`, src.includes('managerApiContext("manager.products.moderate")'));
+  check(`${f}: exists and needs manager.products.moderate`, src.includes('managerApiContext("manager.products.moderate"'));
 }
 
 console.log("\n── restricted categories ──");

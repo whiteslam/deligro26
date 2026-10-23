@@ -28,7 +28,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const ctx = await managerApiContext("manager.products.moderate");
+  const ctx = await managerApiContext("manager.products.moderate", request);
   if (ctx instanceof Response) return ctx;
   if (ctx.profile.role !== "admin") return NextResponse.json({ error: "admin_only" }, { status: 403 });
 

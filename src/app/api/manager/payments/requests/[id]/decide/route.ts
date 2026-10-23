@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
  * → 409 amount_changed | already_decided | nothing_to_pay
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.finance.view");
+  const ctx = await managerApiContext("manager.finance.view", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "payment-writes");
   if (limited) return limited;

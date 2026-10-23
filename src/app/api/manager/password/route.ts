@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
 const MIN_LENGTH = 8;
 
 export async function POST(request: Request) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
 
   const body = await readJsonObject(request);

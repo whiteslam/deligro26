@@ -77,7 +77,7 @@ check("the admin refund action passes a reason", /decideRefund\(\{ id: admin\.id
 
 console.log("\n── routes ──");
 const list = read("src/app/api/manager/finance/settlements/route.ts");
-check("GET settlements needs finance.view", /managerApiContext\("manager\.finance\.view"\)/.test(list));
+check("GET settlements needs finance.view", /managerApiContext\("manager\.finance\.view"[,)]/.test(list));
 check("POST settlements needs initiate_payment", /manager\.finance\.initiate_payment/.test(list));
 check("POST settlements checks the shop is in scope", /shopInScope\(/.test(list));
 check("POST settlements is rate-limited", /managerWriteLimit\(/.test(list));
@@ -91,7 +91,7 @@ check("refund decide answers effect_failed / already_decided", /already_decided/
 check("money sent but not recorded has its own answer (no retry)", /recorded_failed_after_gateway/.test(decide));
 check("an unknown gateway outcome has its own answer", /gateway_unknown/.test(decide));
 const refundList = read("src/app/api/manager/finance/refunds/route.ts");
-check("refund list needs finance.view", /managerApiContext\("manager\.finance\.view"\)/.test(refundList));
+check("refund list needs finance.view", /managerApiContext\("manager\.finance\.view"[,)]/.test(refundList));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

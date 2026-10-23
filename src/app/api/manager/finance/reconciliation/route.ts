@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
  * → 200 ReconciliationPayload   → 400 bad_range | bad_request   → 403 permission_denied
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
 
   const now = new Date();

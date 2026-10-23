@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
  * → 400 { error: "bad_request", field }   → 403 permission_denied   → 404 not_found
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.riders.view");
+  const ctx = await managerApiContext("manager.riders.view", request);
   if (ctx instanceof Response) return ctx;
   if (ctx.permissions["manager.finance.view"] !== true) {
     return NextResponse.json({ error: "permission_denied", permission: "manager.finance.view" }, { status: 403 });

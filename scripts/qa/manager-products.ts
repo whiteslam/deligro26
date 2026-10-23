@@ -125,7 +125,7 @@ function walk(dir: string): string[] {
 const routes = walk("src/app/api/manager/products").filter((f) => f.endsWith("route.ts"));
 check("product routes exist", routes.length >= 4, routes.join());
 for (const r of routes.filter((x) => !/actions|restricted|image-reviews/.test(x))) {
-  check(`${r} opens with managerApiContext("manager.products.view")`, readFileSync(r, "utf8").includes('managerApiContext("manager.products.view")'));
+  check(`${r} opens with managerApiContext("manager.products.view"`, readFileSync(r, "utf8").includes('managerApiContext("manager.products.view"'));
 }
 const da = readFileSync("src/lib/data-access/manager-products.ts", "utf8");
 check("no select(\"*\")", !/select\(\s*["']\*["']/.test(da));

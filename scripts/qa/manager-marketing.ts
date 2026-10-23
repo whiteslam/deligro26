@@ -126,8 +126,8 @@ for (const f of files) {
   const src = readFileSync(f, "utf8");
   const rel = f.slice(root.length);
   const handlers = [...src.matchAll(/export async function (GET|POST|PATCH|DELETE)/g)].map((x) => x[1]);
-  check(`${rel}: every handler opens with managerApiContext("manager.marketing.manage")`,
-    (src.match(/managerApiContext\("manager\.marketing\.manage"\)/g) ?? []).length === handlers.length);
+  check(`${rel}: every handler opens with managerApiContext("manager.marketing.manage"`,
+    (src.match(/managerApiContext\("manager\.marketing\.manage"[,)]/g) ?? []).length === handlers.length);
   for (const h of handlers.filter((x) => x !== "GET")) {
     const start = src.indexOf(`export async function ${h}`);
     const next = src.indexOf("export async function", start + 1);

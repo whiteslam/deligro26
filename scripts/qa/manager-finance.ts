@@ -119,7 +119,7 @@ for (const r of routes) {
   const rel = r.replace(/\\/g, "/").split("src/app/api/manager/")[1];
   // Reconciliation's cash section also opens to manager.cash; its own rule is
   // checked in manager-reconciliation.ts.
-  const gate = rel.includes("reconciliation") ? /reconciliationPermission\(/ : /managerApiContext\("manager\.finance\.view"\)/;
+  const gate = rel.includes("reconciliation") ? /reconciliationPermission\(/ : /managerApiContext\("manager\.finance\.view"[,)]/;
   check(`${rel}: the finance permission is checked first`, gate.test(src));
   check(`${rel}: no money arithmetic or service-role client in the route`, !/createAdminClient|breakdownOrder|net_payable\s*[-+*]/.test(src));
 }

@@ -19,7 +19,7 @@ const STATUSES = ["pending_approval", "approved", "rejected", "cancelled"] as co
  * → 200 { items: PaymentRequest[], nextCursor, counts }   → 400 bad_request   → 403 permission_denied
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.finance.view");
+  const ctx = await managerApiContext("manager.finance.view", request);
   if (ctx instanceof Response) return ctx;
 
   const p = new URL(request.url).searchParams;
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
  * → 404 not_found   → 409 nothing_to_pay | duplicate_pending
  */
 export async function POST(request: Request) {
-  const ctx = await managerApiContext("manager.finance.view");
+  const ctx = await managerApiContext("manager.finance.view", request);
   if (ctx instanceof Response) return ctx;
   if (ctx.permissions["manager.finance.initiate_payment"] !== true) {
     return NextResponse.json({ error: "permission_denied", permission: "manager.finance.initiate_payment" }, { status: 403 });

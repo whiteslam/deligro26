@@ -1,4 +1,6 @@
 import "server-only";
+import { loadZoneCityMap } from "@/lib/data-access/zone-city";
+import { rollupByCity } from "@/lib/ops/area";
 import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { narrowScope, scopeZoneIds, type ManagerScope } from "@/lib/auth/manager-scope";
@@ -469,6 +471,7 @@ export async function ticketMetrics(scope: ManagerScope, range: { from: string; 
   const personName = new Map(people.map((p) => [p.id, p.full_name?.trim() || "Rider"]));
   const riderCode = new Map(codes.map((c) => [c.driver_id, c.rider_code]));
   const zoneName = new Map(zoneRows.map((z) => [z.id, z.name]));
+  const cityOfZone = await loadZoneCityMap().catch(() => new Map<string, { id: string; name: string }>());
   const byRole: Record<string, number> = {};
   for (const [k, v] of Object.entries(m.byRequesterRole ?? {})) byRole[contractRole(k)] = (byRole[contractRole(k)] ?? 0) + Number(v);
   return {
@@ -481,6 +484,13 @@ export async function ticketMetrics(scope: ManagerScope, range: { from: string; 
       vendors: m.recurring.vendors.map((v) => ({ id: v.id, name: shopName.get(v.id) ?? "Shop", count: Number(v.count), share: Number(v.share) })),
       riders: m.recurring.riders.map((r) => ({ id: r.id, name: personName.get(r.id) ?? "Rider", code: riderCode.get(r.id) ?? null, count: Number(r.count), share: Number(r.share) })),
       zones: m.recurring.zones.map((z) => ({ id: z.id, name: zoneName.get(z.id) ?? "Zone", count: Number(z.count), share: Number(z.share) })),
+      // Same ticket totals, grouped by city: counts and shares (all over one
+      // total) are summed, never averaged.
+      cities: rollupByCity(
+        m.recurring.zones.map((z) => ({ zoneId: z.id, count: Number(z.count), share: Number(z.share) })),
+        cityOfZone,
+        { sum: ["count", "share"] }
+      ).map((c) => ({ id: c.cityId, name: c.name, count: Number(c.count), share: Number(c.share) })),
       orders: m.recurring.orders.map((o) => ({ id: o.id, code: orderShortCode(o.id), count: Number(o.count) })),
     },
     daily: m.daily,

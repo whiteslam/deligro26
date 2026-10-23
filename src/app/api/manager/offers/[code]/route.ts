@@ -14,7 +14,7 @@ const CODE = /^[A-Z0-9]{3,20}$/;
  * PATCH — edit its terms with the current `expectedUpdatedAt` and a reason.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ code: string }> }) {
-  const ctx = await managerApiContext("manager.offers.manage");
+  const ctx = await managerApiContext("manager.offers.manage", request);
   if (ctx instanceof Response) return ctx;
   const code = decodeURIComponent((await params).code).toUpperCase();
   if (!CODE.test(code)) return notFound();
@@ -29,7 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ code
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ code: string }> }) {
-  const ctx = await managerApiContext("manager.offers.manage");
+  const ctx = await managerApiContext("manager.offers.manage", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "offers");
   if (limited) return limited;

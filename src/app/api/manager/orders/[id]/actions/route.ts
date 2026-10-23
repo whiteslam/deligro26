@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
  * nothing. 60 writes a minute per manager.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
 
   const limited = await managerWriteLimit(ctx, "order-actions");

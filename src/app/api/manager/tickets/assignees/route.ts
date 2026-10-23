@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * → 200 { staff: [{ id, name, role, openAssigned }], teams }   → 400 bad_request   → 500 load_failed
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.support.manage");
+  const ctx = await managerApiContext("manager.support.manage", request);
   if (ctx instanceof Response) return ctx;
 
   const zone = new URL(request.url).searchParams.get("zone");

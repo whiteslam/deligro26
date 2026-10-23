@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
  *       recorded_failed_after_gateway (money returned but not even its id saved — do NOT retry; an admin reconciles)
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.finance.view");
+  const ctx = await managerApiContext("manager.finance.view", request);
   if (ctx instanceof Response) return ctx;
   if (ctx.profile.role !== "admin" && ctx.permissions["manager.finance.adjust"] !== true) {
     return NextResponse.json({ error: "permission_denied", permission: "manager.finance.adjust" }, { status: 403 });

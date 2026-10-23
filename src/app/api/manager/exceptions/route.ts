@@ -18,7 +18,7 @@ const STATUSES = ["pending", "approved", "rejected", "acknowledged"] as const;
  * → 200 { items: DeliveryException[], nextCursor, counts: { pending } }   → 400 bad_request
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.riders.view");
+  const ctx = await managerApiContext("manager.riders.view", request);
   if (ctx instanceof Response) return ctx;
   const p = new URL(request.url).searchParams;
   const status = p.get("status");

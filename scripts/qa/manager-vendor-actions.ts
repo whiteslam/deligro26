@@ -178,7 +178,7 @@ check("admin status changes carry a reason (no optional reason, no default)",
 }
 for (const f of ["src/app/api/manager/tickets/[id]/route.ts", "src/app/api/manager/tickets/[id]/messages/route.ts",
   "src/app/api/manager/tickets/[id]/status/route.ts"]) {
-  check(`${f} opens with managerApiContext("manager.support.manage")`, readFileSync(f, "utf8").includes('managerApiContext("manager.support.manage")'));
+  check(`${f} opens with managerApiContext("manager.support.manage"`, readFileSync(f, "utf8").includes('managerApiContext("manager.support.manage"'));
 }
 for (const f of ["src/app/api/manager/vendors/[id]/actions/route.ts", "src/app/api/manager/vendors/[id]/documents/route.ts"]) {
   const src = readFileSync(f, "utf8");
@@ -194,7 +194,7 @@ check("a declared body far over 10 MB is refused before it is read", uploadTooLa
     logo.includes("uploadTooLarge(") && logo.indexOf("uploadTooLarge(") < logo.indexOf("request.formData()"));
 }
 check("onboarding requires manager.vendors.onboard",
-  readFileSync("src/app/api/manager/vendors/route.ts", "utf8").includes('managerApiContext("manager.vendors.onboard")'));
+  readFileSync("src/app/api/manager/vendors/route.ts", "utf8").includes('managerApiContext("manager.vendors.onboard"'));
 
 console.log("\n── live (optional) ──");
 const BASE = process.env.BASE ?? "http://localhost:3005";

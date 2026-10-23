@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  * Contract: docs/superpowers/plans/2026-10-21-manager-app-phase-3-orders-live.md.
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.orders.view");
+  const ctx = await managerApiContext("manager.orders.view", request);
   if (ctx instanceof Response) return ctx;
 
   const now = new Date();

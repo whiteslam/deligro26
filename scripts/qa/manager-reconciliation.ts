@@ -42,7 +42,7 @@ check("a reversed range → bad_range", (() => { const r = parseReconciliationQu
 console.log("\n── structure ──");
 const route = existsSync("src/app/api/manager/finance/reconciliation/route.ts") ? readFileSync("src/app/api/manager/finance/reconciliation/route.ts", "utf8") : "";
 check("the route exists", route.length > 0);
-check("the route signs in with managerApiContext() and applies the section's rule", /managerApiContext\(\)/.test(route) && /reconciliationPermission\(/.test(route));
+check("the route signs in with managerApiContext() and applies the section's rule", /managerApiContext\((?:undefined, request)?\)/.test(route) && /reconciliationPermission\(/.test(route));
 check("the route is read-limited", /financeReadLimit\(/.test(route));
 const data = readFileSync("src/lib/data-access/manager-finance.ts", "utf8");
 check("orders states come from ops_reconciliation_orders", /\("ops_reconciliation_orders", \{/.test(data));

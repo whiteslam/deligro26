@@ -14,7 +14,7 @@ const CODE = /^[A-Z0-9]{3,20}$/;
  * exhausted): give it a new end with a PATCH first (§9.8).
  */
 export async function POST(request: Request, { params }: { params: Promise<{ code: string }> }) {
-  const ctx = await managerApiContext("manager.offers.manage");
+  const ctx = await managerApiContext("manager.offers.manage", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "offers");
   if (limited) return limited;

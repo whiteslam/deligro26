@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * enforced in the database (0161); every manager code must end.
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.offers.manage");
+  const ctx = await managerApiContext("manager.offers.manage", request);
   if (ctx instanceof Response) return ctx;
   const parsed = parseOfferQuery(new URL(request.url).searchParams);
   if (!parsed.ok) return badField(parsed.field);
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const ctx = await managerApiContext("manager.offers.manage");
+  const ctx = await managerApiContext("manager.offers.manage", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "offers");
   if (limited) return limited;

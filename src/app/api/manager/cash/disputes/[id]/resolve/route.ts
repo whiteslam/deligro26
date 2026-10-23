@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * → 200 { dispute: CashDispute }   → 400 bad_request   → 404 not_found   → 409 already_resolved
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.cash");
+  const ctx = await managerApiContext("manager.cash", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "cash-writes");
   if (limited) return limited;

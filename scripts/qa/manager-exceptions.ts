@@ -62,10 +62,10 @@ check("forbidden → 404", (() => { const x = e("forbidden", "42501"); return !x
 
 console.log("\n── structural ──");
 const route = readFileSync("src/app/api/manager/exceptions/[id]/decide/route.ts", "utf8");
-check("decide route needs manager.exceptions.decide", /managerApiContext\("manager\.exceptions\.decide"\)/.test(route));
+check("decide route needs manager.exceptions.decide", /managerApiContext\("manager\.exceptions\.decide"[,)]/.test(route));
 check("decide route answers 502 effect_failed", /502/.test(route) && /effect_failed/.test(route));
 const list = readFileSync("src/app/api/manager/exceptions/route.ts", "utf8");
-check("list route needs manager.riders.view", /managerApiContext\("manager\.riders\.view"\)/.test(list));
+check("list route needs manager.riders.view", /managerApiContext\("manager\.riders\.view"[,)]/.test(list));
 const da = readFileSync("src/lib/data-access/delivery-exceptions.ts", "utf8");
 // The merged module (the Rider branch's, writing through 0152): the decision
 // is recorded by the RPC before any effect runs, and every effect re-reads the

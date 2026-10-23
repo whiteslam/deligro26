@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  * → 200 { ok: true }   → 400 bad_request   → 404 not_found   → 409 assignee_ineligible | invalid_transition | stale   → 429
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.support.manage");
+  const ctx = await managerApiContext("manager.support.manage", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "ticket-assign");
   if (limited) return limited;

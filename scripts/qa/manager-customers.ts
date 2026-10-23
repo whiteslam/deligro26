@@ -73,7 +73,7 @@ walkDir(root);
 check("eight customer route files", files.length === 8, files.length);
 for (const f of files) {
   const src = readFileSync(f, "utf8");
-  check(`${f.slice(root.length)}: opens with managerApiContext("manager.customers.view")`, src.includes('managerApiContext("manager.customers.view")'));
+  check(`${f.slice(root.length)}: opens with managerApiContext("manager.customers.view"`, src.includes('managerApiContext("manager.customers.view"'));
   check(`${f.slice(root.length)}: no select("*")`, !/select\("\*"\)/.test(src));
 }
 const list = readFileSync(join(root, "route.ts"), "utf8");

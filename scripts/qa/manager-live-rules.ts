@@ -246,7 +246,7 @@ check("rows without a phone give null, not undefined", snap.riders.every((r) => 
 
 console.log("\n── the live route ──");
 const route = readFileSync("src/app/api/manager/live/route.ts", "utf8");
-check("the route opens with managerApiContext(\"manager.live.view\")", /managerApiContext\("manager\.live\.view"\)/.test(route));
+check("the route opens with managerApiContext(\"manager.live.view\")", /managerApiContext\("manager\.live\.view"[,)]/.test(route));
 check("a malformed zone is a 400, not everything", /bad_request/.test(route) && /narrowScope\(/.test(route));
 const live = readFileSync("src/lib/data-access/manager-live.ts", "utf8");
 check("the live data layer is server-only and scoped", live.startsWith('import "server-only";') && /scopeZoneIds\(/.test(live));

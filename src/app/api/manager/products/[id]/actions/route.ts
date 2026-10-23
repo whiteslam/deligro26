@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
  * → 403 permission_denied   → 404 not_found   → 409 invalid_transition | stale   → 429
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.products.view");
+  const ctx = await managerApiContext("manager.products.view", request);
   if (ctx instanceof Response) return ctx;
 
   const limited = await managerWriteLimit(ctx, "product-actions");

@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * → 200 { items, nextCursor, totals: { amount, count } }   → 400 bad_range | bad_request   → 403 permission_denied
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.finance.view");
+  const ctx = await managerApiContext("manager.finance.view", request);
   if (ctx instanceof Response) return ctx;
   const limited = await financeReadLimit(ctx);
   if (limited) return limited;

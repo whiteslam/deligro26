@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  * → 404 not_found   → 409 not_paid | duplicate_pending
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.finance.view");
+  const ctx = await managerApiContext("manager.finance.view", request);
   if (ctx instanceof Response) return ctx;
   if (ctx.profile.role !== "admin" && ctx.permissions["manager.finance.initiate_payment"] !== true) {
     return NextResponse.json({ error: "permission_denied", permission: "manager.finance.initiate_payment" }, { status: 403 });

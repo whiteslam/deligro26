@@ -20,7 +20,7 @@ const MAX_DAYS = 92;
  * → 400 { error: "bad_request", field }   → 404 (vendor out of scope)   → 500 { error: "load_failed" }
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.products.view");
+  const ctx = await managerApiContext("manager.products.view", request);
   if (ctx instanceof Response) return ctx;
 
   const sp = new URL(request.url).searchParams;

@@ -132,7 +132,7 @@ walk("src/app/api/manager/tickets");
 check("nine ticket routes", routeFiles.length === 9, String(routeFiles.length));
 for (const f of routeFiles) {
   const src = readFileSync(f, "utf8");
-  check(`${f.replace(/\\/g, "/")} opens with managerApiContext("manager.support.manage")`, /managerApiContext\("manager\.support\.manage"\)/.test(src));
+  check(`${f.replace(/\\/g, "/")} opens with managerApiContext("manager.support.manage"`, /managerApiContext\("manager\.support\.manage"[,)]/.test(src));
   if (/export async function POST/.test(src)) check(`${f.replace(/\\/g, "/")} is rate-limited`, /managerWriteLimit\(/.test(src));
 }
 const data = readFileSync("src/lib/data-access/manager-tickets.ts", "utf8");

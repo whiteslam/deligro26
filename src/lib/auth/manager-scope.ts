@@ -101,10 +101,28 @@ export function applyRiderScope<Q extends InFilterable<Q>>(
  * A screen's "this zone only" filter. Never widens: a zone outside the scope,
  * or anything that is not a uuid, narrows to nothing.
  */
-export function narrowScope(scope: ManagerScope, zoneId: string | null | undefined): ManagerScope {
-  if (zoneId === null || zoneId === undefined || zoneId === "") return scope;
-  if (!isUuid(zoneId) || !scopeAllows(scope, zoneId)) return { all: false, zoneIds: [] };
-  return { all: false, zoneIds: [zoneId] };
+export function narrowScope(
+  scope: ManagerScope,
+  area: string | null | undefined | { zone?: string | null; city?: string | null },
+  zoneCity?: ReadonlyMap<string, string>
+): ManagerScope {
+  const zone = typeof area === "object" && area !== null ? area.zone : area;
+  const city = typeof area === "object" && area !== null ? area.city : null;
+  if (zone !== null && zone !== undefined && zone !== "") {
+    // A zone wins over a city, and never widens the scope.
+    if (!isUuid(zone) || !scopeAllows(scope, zone)) return { all: false, zoneIds: [] };
+    return { all: false, zoneIds: [zone] };
+  }
+  if (city === null || city === undefined || city === "") return scope;
+  // A city is only the zones in it that the scope already holds. Without the
+  // zone → city map there is no honest answer, so the answer is nothing.
+  if (!isUuid(city) || !zoneCity) return { all: false, zoneIds: [] };
+  const wanted = city.toLowerCase();
+  const inCity = (z: string) => zoneCity.get(z)?.toLowerCase() === wanted;
+  const zoneIds = scope.all
+    ? [...zoneCity.keys()].filter(inCity)
+    : scope.zoneIds.filter(inCity);
+  return { all: false, zoneIds };
 }
 
 export interface ZoneInput {

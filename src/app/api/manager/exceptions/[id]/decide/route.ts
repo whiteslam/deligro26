@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  * → 404 not_found   → 409 already_resolved | invalid_transition   → 502 effect_failed { exceptionId }
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.exceptions.decide");
+  const ctx = await managerApiContext("manager.exceptions.decide", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "exception-decisions");
   if (limited) return limited;

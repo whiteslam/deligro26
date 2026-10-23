@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * 90 days) and six monthly cohorts ending with `to`'s month.
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.customers.view");
+  const ctx = await managerApiContext("manager.customers.view", request);
   if (ctx instanceof Response) return ctx;
   const p = new URL(request.url).searchParams;
   const parsed = parseOptionalRange(p);

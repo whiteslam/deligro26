@@ -175,7 +175,7 @@ export async function resolveCashDisputeAction(input: { disputeId: string; resol
   if (resolution.length < 3 || resolution.length > 500) return { ok: false, error: "Write what you found (3–500 characters)." };
   const scope = await staffScopeFor(profile);
   const result = await resolveCashDispute(
-    { profile, scope, permissions: {} },
+    { profile, scope, permissions: {}, area: { zone: null, city: null } },
     input.disputeId,
     { clientActionId: randomUUID(), resolution }
   );

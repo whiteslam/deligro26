@@ -18,7 +18,7 @@ const STATUSES = ["pending", "approved", "denied"] as const;
  * → 200 { items: RefundItem[], nextCursor, counts: { pending } }   → 400   → 403
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.finance.view");
+  const ctx = await managerApiContext("manager.finance.view", request);
   if (ctx instanceof Response) return ctx;
   const limited = await financeReadLimit(ctx);
   if (limited) return limited;

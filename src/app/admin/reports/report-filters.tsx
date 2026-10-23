@@ -26,6 +26,8 @@ export function ReportFilters({
   riders,
   zones,
   zoneId,
+  cities,
+  cityId,
   kind,
   from,
   to,
@@ -38,6 +40,8 @@ export function ReportFilters({
   riders: { id: string; name: string }[];
   zones: { id: string; name: string }[];
   zoneId: string;
+  cities: { id: string; name: string }[];
+  cityId: string;
   kind: ReportKindId;
   from: string;
   to: string;
@@ -102,6 +106,24 @@ export function ReportFilters({
             onChange={(v) => navigate({ to: v })}
           />
         </label>
+        {def.filters.includes("zone") && cities.length > 1 ? (
+          <label className="block min-w-[150px] flex-1 space-y-1">
+            <span className={labelCls}>City</span>
+            <select
+              className={fieldCls}
+              value={cityId}
+              disabled={pending}
+              onChange={(e) => navigate({ city: e.target.value, zone: "" })}
+            >
+              <option value="">All cities</option>
+              {cities.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         {def.filters.includes("zone") && zones.length > 1 ? (
           <label className="block min-w-[150px] flex-1 space-y-1">
             <span className={labelCls}>Zone</span>

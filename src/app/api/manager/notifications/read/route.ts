@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * → 200 { unread }   → 400 bad_request   → 429
  */
 export async function POST(request: Request) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "inbox-read", 120);
   if (limited) return limited;

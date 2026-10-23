@@ -32,6 +32,8 @@ export interface ReportFilters {
   riderId?: string;
   /** One delivery zone, or omitted for every zone. */
   zoneId?: string;
+  /** One city (all its zones), or omitted for every city. A zone wins over a city. */
+  cityId?: string;
   status?: string;
   payment?: PaymentFilter;
 }

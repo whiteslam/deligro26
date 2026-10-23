@@ -14,7 +14,7 @@ const MAX_BODY = 2 * 1024 * 1024 + 64 * 1024;
  * app then sets it on the banner with a PATCH, which is what is audited.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.marketing.manage");
+  const ctx = await managerApiContext("manager.marketing.manage", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "marketing-image", 20);
   if (limited) return limited;

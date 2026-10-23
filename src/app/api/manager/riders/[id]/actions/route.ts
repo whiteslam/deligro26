@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
  * → 404 not_found   → 409 stale | documents_unverified | active_delivery | invalid_transition | already_decided
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await managerApiContext("manager.riders.view");
+  const ctx = await managerApiContext("manager.riders.view", request);
   if (ctx instanceof Response) return ctx;
 
   const limited = await managerWriteLimit(ctx, "rider-writes");

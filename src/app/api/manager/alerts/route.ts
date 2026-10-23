@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  * → 400 { error: "bad_request", field }   → 500 { error: "load_failed" }
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
   const q = parseAlertQuery(new URL(request.url).searchParams);
   if ("error" in q) return NextResponse.json(q, { status: 400 });

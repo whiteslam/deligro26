@@ -25,7 +25,7 @@ const actorOf = (role: string, id: string): OpsActor => ({ id, role: role === "a
  * Writes are audited (alert_rule.set / alert_rule.reset).
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
   const zone = new URL(request.url).searchParams.get("zone");
   if (zone && !isUuid(zone)) return NextResponse.json({ error: "bad_request", field: "zone" }, { status: 400 });
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const ctx = await managerApiContext("manager.alerts.configure");
+  const ctx = await managerApiContext("manager.alerts.configure", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "alert-rules", 30);
   if (limited) return limited;
@@ -57,7 +57,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const ctx = await managerApiContext("manager.alerts.configure");
+  const ctx = await managerApiContext("manager.alerts.configure", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "alert-rules", 30);
   if (limited) return limited;

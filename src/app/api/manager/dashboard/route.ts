@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
  * read someone can hammer.
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext();
+  const ctx = await managerApiContext(undefined, request);
   if (ctx instanceof Response) return ctx;
 
   const limit = await rateLimit(`manager-dashboard:${ctx.profile.id}`, 60, 60_000);

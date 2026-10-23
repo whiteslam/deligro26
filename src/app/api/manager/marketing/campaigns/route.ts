@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * request pays for (consent checked in the database).
  */
 export async function GET(request: Request) {
-  const ctx = await managerApiContext("manager.marketing.manage");
+  const ctx = await managerApiContext("manager.marketing.manage", request);
   if (ctx instanceof Response) return ctx;
   const parsed = parseCampaignQuery(new URL(request.url).searchParams);
   if (!parsed.ok) return badField(parsed.field);
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const ctx = await managerApiContext("manager.marketing.manage");
+  const ctx = await managerApiContext("manager.marketing.manage", request);
   if (ctx instanceof Response) return ctx;
   const limited = await managerWriteLimit(ctx, "marketing");
   if (limited) return limited;

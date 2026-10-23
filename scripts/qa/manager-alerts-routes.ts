@@ -108,10 +108,10 @@ for (const f of routes) {
   const src = readFileSync(f, "utf8");
   check(`${f} opens with managerApiContext`, /managerApiContext\(/.test(src));
   if (/export async function (POST|PUT|DELETE)/.test(src)) check(`${f} rate-limits its writes`, /managerWriteLimit\(/.test(src));
-  if (f.includes("/audit")) check(`${f} needs manager.audit.view_zone`, /managerApiContext\("manager\.audit\.view_zone"\)/.test(src));
+  if (f.includes("/audit")) check(`${f} needs manager.audit.view_zone`, /managerApiContext\("manager\.audit\.view_zone"[,)]/.test(src));
 }
 const rules = readFileSync("src/app/api/manager/alert-rules/route.ts", "utf8");
-check("rule writes need manager.alerts.configure", (rules.match(/managerApiContext\("manager\.alerts\.configure"\)/g) ?? []).length === 2);
+check("rule writes need manager.alerts.configure", (rules.match(/managerApiContext\("manager\.alerts\.configure"[,)]/g) ?? []).length === 2);
 const alertsData = readFileSync("src/lib/data-access/manager-alerts.ts", "utf8");
 for (const rpc of ["ops_ack_alert", "ops_resolve_alert", "ops_raise_incident", "ops_set_alert_rule", "ops_reset_alert_rule"]) {
   check(`alerts data layer calls ${rpc}`, alertsData.includes(`"${rpc}"`));

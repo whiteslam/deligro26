@@ -81,6 +81,9 @@ export const FEATURES = [
   { key: "manager.customers.suspend", role: "manager", label: "Suspend customers", offMeans: "Cannot suspend or restrict customer accounts.", defaultOn: false },
   { key: "manager.products.adjust_stock", role: "manager", label: "Adjust stock", offMeans: "Stock stays with the vendor.", defaultOn: false },
   { key: "manager.audit.view_zone", role: "manager", label: "Zone audit log", offMeans: "Sees only their own activity, not their zones' audit log.", defaultOn: false },
+  { key: "manager.insights.view", role: "manager", label: "Insights", offMeans: "Forecasts, zone map, vendor benchmarks and service levels are hidden." },
+  { key: "manager.dispatch.configure", role: "manager", label: "Dispatch mode", offMeans: "Cannot switch a zone between rider offers and automatic assignment.", defaultOn: false },
+  { key: "manager.accounting.export", role: "manager", label: "Accounting export", offMeans: "Cannot export Tally vouchers or the journal file.", defaultOn: false },
   // ---- rider ----
   { key: "driver.history", role: "driver", label: "Delivery history", labelHi: "डिलीवरी इतिहास", offMeans: "History tab is hidden." },
   { key: "driver.earnings", role: "driver", label: "Trips & earnings stats", labelHi: "ट्रिप और कमाई", offMeans: "Trip counts and money totals are hidden." },
