@@ -77,6 +77,7 @@ const rows = await demand();
 const cell = (zone, d, hh) => rows.find((x) => x.zone_id === zone && x.h === `${d} ${hh}:00`);
 
 const h23 = cell(ZA, day2.d, "23");
+const h23ZA = (await one(`select (${ist(2, "23:00")}) as t`)).t;
 ok("the 23:xx IST hour holds the late, cancelled, planned and paid-online orders (unpaid checkout excluded)", h23?.orders === 4, JSON.stringify(h23));
 ok("...two of them delivered", h23?.delivered === 2, JSON.stringify(h23));
 ok("...one cancelled", h23?.cancelled === 1, JSON.stringify(h23));
@@ -101,6 +102,33 @@ const before = JSON.stringify(await demand()) + JSON.stringify(await all(`select
 await as("service_role", `select public.ops_refresh_insight_rollups(${FROM}, ${TO})`);
 const after = JSON.stringify(await demand()) + JSON.stringify(await all(`select * from public.ops_hourly_rider_supply order by zone_id, hour_start`));
 ok("refreshing twice gives the same rows", before === after);
+
+console.log("\n── the series the forecast reads ──");
+{
+  const all = await as("service_role", `select public.ops_insight_hourly(null, true, 10) as j`);
+  ok("the series runs for service_role", all.ok, all.msg);
+  const j = all.rows?.[0]?.j;
+  const sumAll = (j?.demand ?? []).reduce((a, r) => a + r[1], 0);
+  const expectAll = await one(`select coalesce(sum(orders),0)::int as n from public.ops_hourly_demand`);
+  ok("all zones: the demand series sums every zone's hours", sumAll === expectAll.n && sumAll > 0, `${sumAll} vs ${expectAll.n}`);
+  const za = await as("service_role", `select public.ops_insight_hourly(array['${ZA}']::uuid[], false, 10) as j`);
+  const sumZa = (za.rows?.[0]?.j?.demand ?? []).reduce((a, r) => a + r[1], 0);
+  const expectZa = await one(`select coalesce(sum(orders),0)::int as n from public.ops_hourly_demand where zone_id = '${ZA}'`);
+  ok("one zone: only that zone's hours", sumZa === expectZa.n && sumZa < sumAll, `${sumZa} vs ${expectZa.n}`);
+  const none = await as("service_role", `select public.ops_insight_hourly(array[]::uuid[], false, 10) as j`);
+  ok("no zones and not all: nothing (fail closed)", (none.rows?.[0]?.j?.demand ?? []).length === 0 && (none.rows?.[0]?.j?.supply ?? []).length === 0);
+  const nullZones = await as("service_role", `select public.ops_insight_hourly(null, false, 10) as j`);
+  ok("a null zone list without all is also nothing", (nullZones.rows?.[0]?.j?.demand ?? []).length === 0);
+  const h23 = (j?.demand ?? []).find((r) => r[0] === Math.floor(new Date(h23ZA).getTime() / 1000));
+  ok("hours are epoch seconds of the IST hour start, summed across zones (ZA 4 + ZB 1 = 5)", h23?.[1] === 5, JSON.stringify(h23));
+  const supplyMins = (j?.supply ?? []).filter((r) => Number(r[1]) > 0).length;
+  ok("the supply series carries the rider-minutes hours", supplyMins >= 3, String(supplyMins));
+  ok("the platform productivity has no sample yet (every hour here is under one rider-hour per zone)", j?.platform?.median === null && j?.platform?.sampleHours === 0, JSON.stringify(j?.platform));
+  const capped = await as("service_role", `select public.ops_insight_hourly(null, true, 99) as j`);
+  ok("weeks are capped at 12", capped.ok);
+  const denied = await as("authenticated", `select public.ops_insight_hourly(null, true, 10)`);
+  ok("authenticated cannot read the series", !denied.ok, denied.msg);
+}
 
 console.log("\n── a later change moves the figures ──");
 await db.exec(`update public.orders set status = 'cancelled' where id = '${sameHourA}'`);

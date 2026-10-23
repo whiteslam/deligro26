@@ -29,6 +29,7 @@
 -- from anon/authenticated; even the service role reads, never writes, directly.
 --
 -- Rollback:
+--   drop function if exists public.ops_insight_hourly(uuid[], boolean, int);
 --   drop function if exists public.ops_backfill_insight_rollups();
 --   drop function if exists public.ops_refresh_insight_rollups(timestamptz, timestamptz);
 --   drop function if exists public._ops_ist_hour(timestamptz);
@@ -195,12 +196,52 @@ begin
 end;
 $$;
 
--- 5 — Who may call ----------------------------------------------------------------------------------------
+-- 5 — The series the forecast reads ---------------------------------------------------------------------
+-- Ten weeks of hours summed across the zones in scope, as ONE jsonb value:
+-- 10 × 168 rows would run into PostgREST's 1,000-row cap if returned as a set.
+--   demand   [[hour_start epoch seconds, orders], …]
+--   supply   [[hour_start epoch seconds, rider_minutes, delivered], …]
+--   platform { median deliveries per rider-hour over every zone-hour with at
+--              least one rider-hour online in the last 28 days, sampleHours }
+-- p_all true = every zone (an admin); otherwise only the zones listed.
+create or replace function public.ops_insight_hourly(p_zone_ids uuid[], p_all boolean, p_weeks int default 10)
+returns jsonb
+language sql stable security definer set search_path = public as $$
+  with w as (
+    select greatest(1, least(coalesce(p_weeks, 10), 12)) as weeks
+  ), d as (
+    select x.hour_start, sum(x.orders)::int as orders
+      from public.ops_hourly_demand x
+     where x.hour_start >= now() - make_interval(weeks => (select weeks from w))
+       and (coalesce(p_all, false) or x.zone_id = any(coalesce(p_zone_ids, '{}'::uuid[])))
+     group by x.hour_start
+  ), s as (
+    select x.hour_start, sum(x.rider_minutes) as minutes, sum(x.delivered)::int as delivered
+      from public.ops_hourly_rider_supply x
+     where x.hour_start >= now() - make_interval(weeks => (select weeks from w))
+       and (coalesce(p_all, false) or x.zone_id = any(coalesce(p_zone_ids, '{}'::uuid[])))
+     group by x.hour_start
+  ), plat as (
+    select percentile_cont(0.5) within group (order by x.delivered / (x.rider_minutes / 60.0)) as median,
+           count(*)::int as n
+      from public.ops_hourly_rider_supply x
+     where x.hour_start >= now() - interval '28 days' and x.rider_minutes >= 60
+  )
+  select jsonb_build_object(
+    'demand', coalesce((select jsonb_agg(jsonb_build_array(extract(epoch from hour_start)::bigint, orders) order by hour_start) from d), '[]'::jsonb),
+    'supply', coalesce((select jsonb_agg(jsonb_build_array(extract(epoch from hour_start)::bigint, minutes, delivered) order by hour_start) from s), '[]'::jsonb),
+    'platform', (select jsonb_build_object('median', median, 'sampleHours', n) from plat)
+  );
+$$;
+
+-- 6 — Who may call ----------------------------------------------------------------------------------------
 revoke execute on function public._ops_ist_hour(timestamptz) from public, anon, authenticated;
 revoke execute on function public.ops_refresh_insight_rollups(timestamptz, timestamptz) from public, anon, authenticated;
 revoke execute on function public.ops_backfill_insight_rollups() from public, anon, authenticated;
+revoke execute on function public.ops_insight_hourly(uuid[], boolean, int) from public, anon, authenticated;
 grant execute on function public._ops_ist_hour(timestamptz) to service_role;
 grant execute on function public.ops_refresh_insight_rollups(timestamptz, timestamptz) to service_role;
 grant execute on function public.ops_backfill_insight_rollups() to service_role;
+grant execute on function public.ops_insight_hourly(uuid[], boolean, int) to service_role;
 
 commit;
