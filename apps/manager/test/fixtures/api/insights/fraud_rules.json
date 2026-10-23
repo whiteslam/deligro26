@@ -1,0 +1,60 @@
+{
+  "enabled": true,
+  "rules": [
+    {
+      "rule": "customer_cancellations",
+      "zoneId": null,
+      "inherited": true,
+      "enabled": true,
+      "threshold": 3,
+      "windowDays": 7,
+      "unit": "count",
+      "label": "Customer cancellations",
+      "description": "Orders a customer cancelled, plus failed deliveries where they could not be reached."
+    },
+    {
+      "rule": "code_sharing",
+      "zoneId": null,
+      "inherited": true,
+      "enabled": true,
+      "threshold": 2,
+      "windowDays": 30,
+      "unit": "count",
+      "label": "Shared promo codes",
+      "description": "One code redeemed by several accounts on the same phone or at the same drop point."
+    },
+    {
+      "rule": "refund_rate",
+      "zoneId": null,
+      "inherited": true,
+      "enabled": true,
+      "threshold": 0.3,
+      "windowDays": 30,
+      "unit": "ratio",
+      "label": "High refund rate",
+      "description": "Approved refunds as a share of delivered orders."
+    },
+    {
+      "rule": "rider_cash_gap",
+      "zoneId": "11111111-1111-4111-8111-111111111111",
+      "inherited": false,
+      "enabled": true,
+      "threshold": 2000,
+      "windowDays": 2,
+      "unit": "rupees",
+      "label": "Rider cash gap",
+      "description": "Cash collected but not deposited for over 48 hours."
+    },
+    {
+      "rule": "unusual_order_value",
+      "zoneId": null,
+      "inherited": true,
+      "enabled": false,
+      "threshold": 3,
+      "windowDays": 30,
+      "unit": "multiple",
+      "label": "Unusual order value",
+      "description": "An order far above this zone's normal."
+    }
+  ]
+}

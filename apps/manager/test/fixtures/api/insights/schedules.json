@@ -1,0 +1,87 @@
+{
+  "items": [
+    {
+      "id": "s0000001-0000-4000-8000-000000000000",
+      "name": "Daily sales",
+      "kind": "sales",
+      "filters": {
+        "vendor": null,
+        "rider": null,
+        "status": null,
+        "payment": "all"
+      },
+      "frequency": "daily",
+      "weekday": null,
+      "hourIst": 8,
+      "rangePreset": "yesterday",
+      "zoneIds": null,
+      "recipients": [
+        {
+          "id": "u1",
+          "name": "Asha Verma",
+          "eligible": true
+        },
+        {
+          "id": "u2",
+          "name": "Imran S",
+          "eligible": false
+        }
+      ],
+      "active": true,
+      "owner": {
+        "id": "u1",
+        "name": "Asha Verma"
+      },
+      "nextRunAt": "2026-10-23T02:30:00.000Z",
+      "lastRun": {
+        "id": "run00001-0000-4000-8000-000000000000",
+        "status": "partial",
+        "at": "2026-10-22T02:31:00.000Z"
+      }
+    },
+    {
+      "id": "s0000002-0000-4000-8000-000000000000",
+      "name": "Weekly cancellations",
+      "kind": "cancellations",
+      "filters": {
+        "vendor": null,
+        "rider": null,
+        "status": null,
+        "payment": "all"
+      },
+      "frequency": "weekly",
+      "weekday": 1,
+      "hourIst": 9,
+      "rangePreset": "last_week",
+      "zoneIds": null,
+      "recipients": [
+        {
+          "id": "u1",
+          "name": "Asha Verma",
+          "eligible": true
+        }
+      ],
+      "active": false,
+      "owner": {
+        "id": "u1",
+        "name": "Asha Verma"
+      },
+      "nextRunAt": "2026-10-23T02:30:00.000Z",
+      "lastRun": null
+    }
+  ],
+  "kinds": [
+    {
+      "kind": "sales",
+      "label": "Sales report"
+    },
+    {
+      "kind": "orders",
+      "label": "Order report"
+    },
+    {
+      "kind": "cancellations",
+      "label": "Cancellation report"
+    }
+  ]
+}

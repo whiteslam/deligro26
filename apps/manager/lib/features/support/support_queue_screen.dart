@@ -98,7 +98,7 @@ class _SupportQueueScreenState extends ConsumerState<SupportQueueScreen> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final me = ref.watch(managerMeProvider).value;
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     final eff = _filters.zoneId != null || zone == null ? _filters : _filters.copyWith(zoneId: zone.id);
     _effective = eff;
     final value = ref.watch(ticketListProvider(eff));
@@ -117,7 +117,7 @@ class _SupportQueueScreenState extends ConsumerState<SupportQueueScreen> {
             onPressed: () => GoRouter.maybeOf(context)?.push('/more/support/metrics'),
             icon: const Icon(Icons.insights_outlined),
           ),
-          const Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip()),
+          const Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip()),
         ],
       ),
       body: (me?.hasNoZones ?? false)

@@ -1,0 +1,20 @@
+{
+  "run": {
+    "id": "run00001-0000-4000-8000-000000000000",
+    "periodFrom": "2026-10-21",
+    "periodTo": "2026-10-21",
+    "status": "partial",
+    "rows": 120,
+    "createdAt": "2026-10-22T02:31:00.000Z",
+    "recipientsSent": 1,
+    "recipientsSkipped": [
+      {
+        "id": "u2",
+        "name": "Imran S",
+        "reason": "permission"
+      }
+    ],
+    "scheduleName": "Daily sales",
+    "kind": "sales"
+  }
+}

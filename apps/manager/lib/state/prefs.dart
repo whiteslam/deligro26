@@ -25,24 +25,3 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
 
 final themeModeProvider =
     NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
-
-/// The zone every screen is filtered to: null = "All my zones".
-class ZoneFilterNotifier extends Notifier<String?> {
-  static const _key = 'manager-zone';
-
-  @override
-  String? build() => ref.read(prefsProvider).getString(_key);
-
-  void set(String? zoneId) {
-    state = zoneId;
-    final prefs = ref.read(prefsProvider);
-    if (zoneId == null) {
-      prefs.remove(_key);
-    } else {
-      prefs.setString(_key, zoneId);
-    }
-  }
-}
-
-final zoneFilterProvider =
-    NotifierProvider<ZoneFilterNotifier, String?>(ZoneFilterNotifier.new);

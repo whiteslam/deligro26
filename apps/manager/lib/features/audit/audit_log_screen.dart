@@ -49,7 +49,7 @@ class _AuditLogScreenState extends ConsumerState<AuditLogScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     final eff = _filters.copyWith(zoneId: zone?.id);
     _effective = eff;
     final value = ref.watch(auditListProvider(eff));
@@ -75,7 +75,7 @@ class _AuditLogScreenState extends ConsumerState<AuditLogScreen> {
               child: const Icon(Icons.tune),
             ),
           ),
-          const Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip()),
+          const Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip()),
         ],
       ),
       body: Builder(builder: (context) {

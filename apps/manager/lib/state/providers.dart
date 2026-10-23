@@ -6,6 +6,7 @@ import '../data/alerts_repository.dart';
 import '../data/audit_repository.dart';
 import '../data/auth_repository.dart';
 import '../data/inbox_repository.dart';
+import '../data/insights_repository.dart';
 import '../data/cash_repository.dart';
 import '../data/exceptions_repository.dart';
 import '../data/finance_repository.dart';
@@ -73,3 +74,7 @@ final alertsRepoProvider = Provider<AlertsRepository>((ref) => ApiAlertsReposito
 final inboxRepoProvider = Provider<InboxRepository>((ref) => ApiInboxRepository(ref.watch(apiProvider)));
 
 final auditRepoProvider = Provider<AuditRepository>((ref) => ApiAuditRepository(ref.watch(apiProvider)));
+
+/// Insights (§17): forecasts, zone map, benchmarks, SLA, dispatch mode, fraud,
+/// scheduled reports and the accounting export. Overridden with fakes in tests.
+final insightsRepoProvider = Provider<InsightsRepository>((ref) => ApiInsightsRepository(ref.watch(apiProvider)));

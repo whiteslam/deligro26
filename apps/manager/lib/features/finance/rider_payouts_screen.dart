@@ -25,7 +25,7 @@ class RiderPayoutsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Rider payouts'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       body: FinancePagedList(
         value: value,

@@ -1,0 +1,254 @@
+{
+  "generatedAt": "2026-10-22T18:31:00.000Z",
+  "range": {
+    "from": "2026-09-25",
+    "to": "2026-10-22"
+  },
+  "area": {
+    "type": "scope",
+    "id": null,
+    "name": "All my zones"
+  },
+  "targets": [
+    {
+      "zoneId": null,
+      "inherited": false,
+      "acceptMinutes": 5,
+      "prepMinutes": 20,
+      "pickupMinutes": 10,
+      "deliverMinutes": 45,
+      "updatedBy": null,
+      "updatedAt": null
+    },
+    {
+      "zoneId": "11111111-1111-4111-8111-111111111111",
+      "inherited": true,
+      "acceptMinutes": 5,
+      "prepMinutes": 20,
+      "pickupMinutes": 10,
+      "deliverMinutes": 45,
+      "updatedBy": null,
+      "updatedAt": null
+    },
+    {
+      "zoneId": "22222222-2222-4222-8222-222222222222",
+      "inherited": false,
+      "acceptMinutes": 8,
+      "prepMinutes": 25,
+      "pickupMinutes": 12,
+      "deliverMinutes": 60,
+      "updatedBy": {
+        "id": "u1",
+        "name": "Asha Verma"
+      },
+      "updatedAt": "2026-10-20T10:00:00.000Z"
+    }
+  ],
+  "overall": {
+    "accept": {
+      "orders": 812,
+      "breaches": 61,
+      "rate": 0.075,
+      "medianMinutes": 3.2
+    },
+    "prep": {
+      "orders": 790,
+      "breaches": 118,
+      "rate": 0.149,
+      "medianMinutes": 17.0
+    },
+    "pickup": {
+      "orders": 760,
+      "breaches": 92,
+      "rate": 0.121,
+      "medianMinutes": 8.4
+    },
+    "deliver": {
+      "orders": 744,
+      "breaches": 141,
+      "rate": 0.19,
+      "medianMinutes": 38.0
+    }
+  },
+  "byZone": [
+    {
+      "zoneId": "11111111-1111-4111-8111-111111111111",
+      "name": "Bemetara",
+      "accept": {
+        "orders": 800,
+        "breaches": 58,
+        "rate": 0.072,
+        "medianMinutes": 3.1
+      },
+      "prep": {
+        "orders": 780,
+        "breaches": 115,
+        "rate": 0.147,
+        "medianMinutes": 17.0
+      },
+      "pickup": {
+        "orders": 750,
+        "breaches": 90,
+        "rate": 0.12,
+        "medianMinutes": 8.3
+      },
+      "deliver": {
+        "orders": 735,
+        "breaches": 138,
+        "rate": 0.188,
+        "medianMinutes": 38.0
+      }
+    }
+  ],
+  "byCity": [
+    {
+      "cityId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "name": "Bemetara",
+      "accept": {
+        "orders": 812,
+        "breaches": 61,
+        "rate": 0.075,
+        "medianMinutes": 3.2
+      },
+      "prep": {
+        "orders": 790,
+        "breaches": 118,
+        "rate": 0.149,
+        "medianMinutes": 17.0
+      },
+      "pickup": {
+        "orders": 760,
+        "breaches": 92,
+        "rate": 0.121,
+        "medianMinutes": 8.4
+      },
+      "deliver": {
+        "orders": 744,
+        "breaches": 141,
+        "rate": 0.19,
+        "medianMinutes": 38.0
+      }
+    }
+  ],
+  "byVendor": [
+    {
+      "id": "v0000001-0000-4000-8000-000000000000",
+      "name": "Spice Hub",
+      "accept": {
+        "orders": 230,
+        "breaches": 12,
+        "rate": 0.052,
+        "medianMinutes": 1.5
+      },
+      "prep": {
+        "orders": 228,
+        "breaches": 70,
+        "rate": 0.307,
+        "medianMinutes": 22.0
+      }
+    },
+    {
+      "id": "v0000002-0000-4000-8000-000000000000",
+      "name": "Biryani Junction",
+      "accept": {
+        "orders": 96,
+        "breaches": 20,
+        "rate": 0.208,
+        "medianMinutes": 3.0
+      },
+      "prep": {
+        "orders": 95,
+        "breaches": 8,
+        "rate": 0.084,
+        "medianMinutes": 15.0
+      }
+    }
+  ],
+  "byRider": [
+    {
+      "id": "r0000004-0000-4000-8000-000000000000",
+      "name": "Ravi K",
+      "code": "DR-0004",
+      "pickup": {
+        "orders": 60,
+        "breaches": 22,
+        "rate": 0.367,
+        "medianMinutes": 9.1
+      },
+      "deliver": {
+        "orders": 58,
+        "breaches": 19,
+        "rate": 0.328,
+        "medianMinutes": 41.0
+      }
+    },
+    {
+      "id": "r0000005-0000-4000-8000-000000000000",
+      "name": "Imran S",
+      "code": null,
+      "pickup": {
+        "orders": 40,
+        "breaches": 5,
+        "rate": 0.125,
+        "medianMinutes": 7.0
+      },
+      "deliver": {
+        "orders": 39,
+        "breaches": 6,
+        "rate": 0.154,
+        "medianMinutes": 33.0
+      }
+    }
+  ],
+  "daily": [
+    {
+      "date": "2026-10-16",
+      "accept": 0.05,
+      "prep": 0.09,
+      "pickup": 0.12,
+      "deliver": 0.07
+    },
+    {
+      "date": "2026-10-17",
+      "accept": 0.054,
+      "prep": 0.09,
+      "pickup": 0.12,
+      "deliver": 0.08
+    },
+    {
+      "date": "2026-10-18",
+      "accept": 0.058,
+      "prep": 0.09,
+      "pickup": 0.12,
+      "deliver": 0.09
+    },
+    {
+      "date": "2026-10-19",
+      "accept": 0.062,
+      "prep": 0.09,
+      "pickup": 0.12,
+      "deliver": 0.1
+    },
+    {
+      "date": "2026-10-20",
+      "accept": 0.066,
+      "prep": 0.09,
+      "pickup": 0.12,
+      "deliver": 0.11
+    },
+    {
+      "date": "2026-10-21",
+      "accept": 0.07,
+      "prep": 0.09,
+      "pickup": 0.12,
+      "deliver": 0.12
+    },
+    {
+      "date": "2026-10-22",
+      "accept": 0.074,
+      "prep": 0.09,
+      "pickup": 0.12,
+      "deliver": 0.13
+    }
+  ]
+}

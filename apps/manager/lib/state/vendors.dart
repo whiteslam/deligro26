@@ -103,7 +103,7 @@ final vendorDetailProvider = AsyncNotifierProvider.autoDispose.family<VendorDeta
 final vendorDirectoryProvider = FutureProvider.autoDispose<List<VendorRef>>(
   (ref) {
     ref.watch(signedInProvider);
-    return ref.read(vendorsRepoProvider).directory(zoneId: ref.watch(activeZoneProvider)?.id);
+    return ref.read(vendorsRepoProvider).directory(zoneId: ref.watch(areaFilterProvider)?.id);
   },
   retry: (_, _) => null,
 );

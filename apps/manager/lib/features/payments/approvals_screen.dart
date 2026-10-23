@@ -54,7 +54,7 @@ class _ApprovalsScreenState extends ConsumerState<ApprovalsScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     final f = _filters(zone?.id);
     final value = ref.watch(paymentListProvider(f));
     final data = value.value;
@@ -77,7 +77,7 @@ class _ApprovalsScreenState extends ConsumerState<ApprovalsScreen> {
       appBar: AppBar(
         title: const Text('Approvals'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

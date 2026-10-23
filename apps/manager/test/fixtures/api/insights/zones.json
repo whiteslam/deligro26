@@ -1,0 +1,247 @@
+{
+  "generatedAt": "2026-10-22T18:31:00.000Z",
+  "range": {
+    "from": "2026-09-25",
+    "to": "2026-10-22"
+  },
+  "area": {
+    "type": "scope",
+    "id": null,
+    "name": "All my zones"
+  },
+  "cellKm": 1,
+  "minCellDrops": 3,
+  "zones": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "name": "Bemetara",
+      "cityId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "cityName": "Bemetara",
+      "center": {
+        "lat": 21.71,
+        "lng": 81.53
+      },
+      "radiusKm": 6,
+      "drops": 820,
+      "avgDeliveryMinutes": 31.5,
+      "medianDeliveryMinutes": 28,
+      "avgDistanceKm": 2.9,
+      "outsideRadiusShare": 0.12,
+      "ordersPerDay": 29.3
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "name": "Nawagarh",
+      "cityId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "cityName": "Bemetara",
+      "center": {
+        "lat": 21.75,
+        "lng": 81.65
+      },
+      "radiusKm": 5,
+      "drops": 24,
+      "avgDeliveryMinutes": 44.0,
+      "medianDeliveryMinutes": 41,
+      "avgDistanceKm": 4.2,
+      "outsideRadiusShare": 0.0,
+      "ordersPerDay": 0.9
+    }
+  ],
+  "cities": [
+    {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "name": "Bemetara",
+      "drops": 844,
+      "avgDeliveryMinutes": 31.9,
+      "medianDeliveryMinutes": 28,
+      "avgDistanceKm": 2.9,
+      "outsideRadiusShare": 0.12,
+      "ordersPerDay": 30.2
+    }
+  ],
+  "cells": [
+    {
+      "key": "2410:8790",
+      "bounds": {
+        "south": 21.7,
+        "west": 81.5197,
+        "north": 21.709,
+        "east": 81.5293
+      },
+      "center": {
+        "lat": 21.7045,
+        "lng": 81.5245
+      },
+      "drops": 41,
+      "avgDeliveryMinutes": 27.0,
+      "medianDeliveryMinutes": 25,
+      "avgDistanceKm": 1.6,
+      "nearestZoneId": "11111111-1111-4111-8111-111111111111",
+      "distanceToZoneCenterKm": 1.8,
+      "insideZone": true
+    },
+    {
+      "key": "2411:8790",
+      "bounds": {
+        "south": 21.709,
+        "west": 81.5197,
+        "north": 21.718,
+        "east": 81.5293
+      },
+      "center": {
+        "lat": 21.7135,
+        "lng": 81.5245
+      },
+      "drops": 28,
+      "avgDeliveryMinutes": 31.5,
+      "medianDeliveryMinutes": 29,
+      "avgDistanceKm": 2.3,
+      "nearestZoneId": "11111111-1111-4111-8111-111111111111",
+      "distanceToZoneCenterKm": 2.6,
+      "insideZone": true
+    },
+    {
+      "key": "2412:8790",
+      "bounds": {
+        "south": 21.7,
+        "west": 81.5287,
+        "north": 21.709,
+        "east": 81.5383
+      },
+      "center": {
+        "lat": 21.7045,
+        "lng": 81.5335
+      },
+      "drops": 64,
+      "avgDeliveryMinutes": 24.0,
+      "medianDeliveryMinutes": 22,
+      "avgDistanceKm": 1.1,
+      "nearestZoneId": "11111111-1111-4111-8111-111111111111",
+      "distanceToZoneCenterKm": 1.2,
+      "insideZone": true
+    },
+    {
+      "key": "2413:8790",
+      "bounds": {
+        "south": 21.718,
+        "west": 81.5377,
+        "north": 21.727,
+        "east": 81.5473
+      },
+      "center": {
+        "lat": 21.7225,
+        "lng": 81.5425
+      },
+      "drops": 22,
+      "avgDeliveryMinutes": 52.0,
+      "medianDeliveryMinutes": 48,
+      "avgDistanceKm": 6.1,
+      "nearestZoneId": "11111111-1111-4111-8111-111111111111",
+      "distanceToZoneCenterKm": 6.8,
+      "insideZone": false
+    },
+    {
+      "key": "2414:8790",
+      "bounds": {
+        "south": 21.727,
+        "west": 81.5377,
+        "north": 21.736,
+        "east": 81.5473
+      },
+      "center": {
+        "lat": 21.7315,
+        "lng": 81.5425
+      },
+      "drops": 31,
+      "avgDeliveryMinutes": 55.0,
+      "medianDeliveryMinutes": 51,
+      "avgDistanceKm": 6.8,
+      "nearestZoneId": "11111111-1111-4111-8111-111111111111",
+      "distanceToZoneCenterKm": 7.5,
+      "insideZone": false
+    },
+    {
+      "key": "2415:8790",
+      "bounds": {
+        "south": 21.691,
+        "west": 81.5107,
+        "north": 21.7,
+        "east": 81.5203
+      },
+      "center": {
+        "lat": 21.6955,
+        "lng": 81.5155
+      },
+      "drops": 12,
+      "avgDeliveryMinutes": 35.0,
+      "medianDeliveryMinutes": 33,
+      "avgDistanceKm": 3.1,
+      "nearestZoneId": "11111111-1111-4111-8111-111111111111",
+      "distanceToZoneCenterKm": 3.4,
+      "insideZone": true
+    }
+  ],
+  "suggestions": [
+    {
+      "type": "new_zone",
+      "severity": "warning",
+      "zoneId": "11111111-1111-4111-8111-111111111111",
+      "text": "12% of Bemetara drops are beyond its 6 km radius; consider a zone centred at 21.742, 81.561.",
+      "center": {
+        "lat": 21.742,
+        "lng": 81.561
+      },
+      "metric": {
+        "share": 0.12,
+        "drops": 98
+      }
+    },
+    {
+      "type": "uncovered_demand",
+      "severity": "info",
+      "zoneId": null,
+      "text": "53 drops in this range came from places outside every zone.",
+      "center": {
+        "lat": 21.727,
+        "lng": 81.542
+      },
+      "metric": {
+        "drops": 53
+      }
+    },
+    {
+      "type": "slow_area",
+      "severity": "warning",
+      "zoneId": "11111111-1111-4111-8111-111111111111",
+      "text": "Deliveries around 21.7315, 81.5425 take 51 min at the median, 1.8 times the zone's 28 min.",
+      "center": {
+        "lat": 21.7315,
+        "lng": 81.5425
+      },
+      "metric": {
+        "medianMinutes": 51,
+        "ratio": 1.8
+      }
+    },
+    {
+      "type": "resize_zone",
+      "severity": "info",
+      "zoneId": "22222222-2222-4222-8222-222222222222",
+      "text": "Nawagarh drops sit within 2.6 km of its centre; it could shrink to 3 km.",
+      "center": null,
+      "metric": {
+        "p95Km": 2.6
+      }
+    },
+    {
+      "type": "merge_zone",
+      "severity": "info",
+      "zoneId": "22222222-2222-4222-8222-222222222222",
+      "text": "Nawagarh averages 0.9 orders a day; consider merging it into a neighbouring zone.",
+      "center": null,
+      "metric": {
+        "ordersPerDay": 0.9
+      }
+    }
+  ]
+}

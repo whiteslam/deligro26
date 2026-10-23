@@ -1,0 +1,1570 @@
+{
+  "generatedAt": "2026-10-22T18:31:00.000Z",
+  "area": {
+    "type": "scope",
+    "id": null,
+    "name": "All my zones"
+  },
+  "insufficientHistory": true,
+  "weeksOfHistory": 1,
+  "trend": {
+    "factor": 1,
+    "last4Weeks": 40,
+    "prior4Weeks": 0
+  },
+  "forecast": [
+    {
+      "hourStart": "2026-10-22T18:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 0,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-22T19:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 1,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-22T20:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 2,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-22T21:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 3,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-22T22:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 4,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-22T23:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 5,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-23T00:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 6,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-23T01:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 7,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-23T02:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 8,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-23T03:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 9,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-23T04:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 10,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-23T05:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 11,
+      "orders": 1.5,
+      "low": 1.2,
+      "high": 1.8
+    },
+    {
+      "hourStart": "2026-10-23T06:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 12,
+      "orders": 3.2,
+      "low": 2.5,
+      "high": 3.9
+    },
+    {
+      "hourStart": "2026-10-23T07:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 13,
+      "orders": 5.5,
+      "low": 4.3,
+      "high": 6.7
+    },
+    {
+      "hourStart": "2026-10-23T08:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 14,
+      "orders": 4.1,
+      "low": 3.2,
+      "high": 5.0
+    },
+    {
+      "hourStart": "2026-10-23T09:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 15,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-23T10:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 16,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-23T11:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 17,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-23T12:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 18,
+      "orders": 3.1,
+      "low": 2.4,
+      "high": 3.8
+    },
+    {
+      "hourStart": "2026-10-23T13:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 19,
+      "orders": 6.4,
+      "low": 5.0,
+      "high": 7.8
+    },
+    {
+      "hourStart": "2026-10-23T14:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 20,
+      "orders": 7.2,
+      "low": 5.6,
+      "high": 8.8
+    },
+    {
+      "hourStart": "2026-10-23T15:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 21,
+      "orders": 5.0,
+      "low": 3.9,
+      "high": 6.1
+    },
+    {
+      "hourStart": "2026-10-23T16:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 22,
+      "orders": 2.4,
+      "low": 1.9,
+      "high": 2.9
+    },
+    {
+      "hourStart": "2026-10-23T17:30:00.000Z",
+      "date": "2026-10-23",
+      "weekday": 5,
+      "hour": 23,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-23T18:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 0,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-23T19:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 1,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-23T20:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 2,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-23T21:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 3,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-23T22:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 4,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-23T23:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 5,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-24T00:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 6,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-24T01:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 7,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-24T02:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 8,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-24T03:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 9,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-24T04:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 10,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-24T05:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 11,
+      "orders": 1.7,
+      "low": 1.3,
+      "high": 2.1
+    },
+    {
+      "hourStart": "2026-10-24T06:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 12,
+      "orders": 3.7,
+      "low": 2.9,
+      "high": 4.5
+    },
+    {
+      "hourStart": "2026-10-24T07:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 13,
+      "orders": 6.3,
+      "low": 4.9,
+      "high": 7.7
+    },
+    {
+      "hourStart": "2026-10-24T08:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 14,
+      "orders": 4.7,
+      "low": 3.7,
+      "high": 5.7
+    },
+    {
+      "hourStart": "2026-10-24T09:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 15,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-24T10:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 16,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-24T11:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 17,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-24T12:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 18,
+      "orders": 3.6,
+      "low": 2.8,
+      "high": 4.4
+    },
+    {
+      "hourStart": "2026-10-24T13:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 19,
+      "orders": 7.4,
+      "low": 5.8,
+      "high": 9.0
+    },
+    {
+      "hourStart": "2026-10-24T14:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 20,
+      "orders": 8.3,
+      "low": 6.5,
+      "high": 10.1
+    },
+    {
+      "hourStart": "2026-10-24T15:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 21,
+      "orders": 5.8,
+      "low": 4.5,
+      "high": 7.1
+    },
+    {
+      "hourStart": "2026-10-24T16:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 22,
+      "orders": 2.8,
+      "low": 2.2,
+      "high": 3.4
+    },
+    {
+      "hourStart": "2026-10-24T17:30:00.000Z",
+      "date": "2026-10-24",
+      "weekday": 6,
+      "hour": 23,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-24T18:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 0,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-24T19:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 1,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-24T20:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 2,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-24T21:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 3,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-24T22:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 4,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-24T23:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 5,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-25T00:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 6,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-25T01:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 7,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-25T02:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 8,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-25T03:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 9,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-25T04:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 10,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-25T05:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 11,
+      "orders": 1.7,
+      "low": 1.3,
+      "high": 2.1
+    },
+    {
+      "hourStart": "2026-10-25T06:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 12,
+      "orders": 3.7,
+      "low": 2.9,
+      "high": 4.5
+    },
+    {
+      "hourStart": "2026-10-25T07:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 13,
+      "orders": 6.3,
+      "low": 4.9,
+      "high": 7.7
+    },
+    {
+      "hourStart": "2026-10-25T08:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 14,
+      "orders": 4.7,
+      "low": 3.7,
+      "high": 5.7
+    },
+    {
+      "hourStart": "2026-10-25T09:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 15,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-25T10:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 16,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-25T11:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 17,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-25T12:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 18,
+      "orders": 3.6,
+      "low": 2.8,
+      "high": 4.4
+    },
+    {
+      "hourStart": "2026-10-25T13:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 19,
+      "orders": 7.4,
+      "low": 5.8,
+      "high": 9.0
+    },
+    {
+      "hourStart": "2026-10-25T14:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 20,
+      "orders": 8.3,
+      "low": 6.5,
+      "high": 10.1
+    },
+    {
+      "hourStart": "2026-10-25T15:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 21,
+      "orders": 5.8,
+      "low": 4.5,
+      "high": 7.1
+    },
+    {
+      "hourStart": "2026-10-25T16:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 22,
+      "orders": 2.8,
+      "low": 2.2,
+      "high": 3.4
+    },
+    {
+      "hourStart": "2026-10-25T17:30:00.000Z",
+      "date": "2026-10-25",
+      "weekday": 7,
+      "hour": 23,
+      "orders": 0.5,
+      "low": 0.4,
+      "high": 0.6
+    },
+    {
+      "hourStart": "2026-10-25T18:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 0,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-25T19:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 1,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-25T20:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 2,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-25T21:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 3,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-25T22:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 4,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-25T23:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 5,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-26T00:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 6,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-26T01:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 7,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-26T02:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 8,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-26T03:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 9,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-26T04:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 10,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-26T05:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 11,
+      "orders": 1.5,
+      "low": 1.2,
+      "high": 1.8
+    },
+    {
+      "hourStart": "2026-10-26T06:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 12,
+      "orders": 3.2,
+      "low": 2.5,
+      "high": 3.9
+    },
+    {
+      "hourStart": "2026-10-26T07:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 13,
+      "orders": 5.5,
+      "low": 4.3,
+      "high": 6.7
+    },
+    {
+      "hourStart": "2026-10-26T08:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 14,
+      "orders": 4.1,
+      "low": 3.2,
+      "high": 5.0
+    },
+    {
+      "hourStart": "2026-10-26T09:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 15,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-26T10:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 16,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-26T11:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 17,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-26T12:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 18,
+      "orders": 3.1,
+      "low": 2.4,
+      "high": 3.8
+    },
+    {
+      "hourStart": "2026-10-26T13:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 19,
+      "orders": 6.4,
+      "low": 5.0,
+      "high": 7.8
+    },
+    {
+      "hourStart": "2026-10-26T14:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 20,
+      "orders": 7.2,
+      "low": 5.6,
+      "high": 8.8
+    },
+    {
+      "hourStart": "2026-10-26T15:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 21,
+      "orders": 5.0,
+      "low": 3.9,
+      "high": 6.1
+    },
+    {
+      "hourStart": "2026-10-26T16:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 22,
+      "orders": 2.4,
+      "low": 1.9,
+      "high": 2.9
+    },
+    {
+      "hourStart": "2026-10-26T17:30:00.000Z",
+      "date": "2026-10-26",
+      "weekday": 1,
+      "hour": 23,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-26T18:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 0,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-26T19:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 1,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-26T20:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 2,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-26T21:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 3,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-26T22:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 4,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-26T23:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 5,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-27T00:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 6,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-27T01:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 7,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-27T02:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 8,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-27T03:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 9,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-27T04:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 10,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-27T05:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 11,
+      "orders": 1.5,
+      "low": 1.2,
+      "high": 1.8
+    },
+    {
+      "hourStart": "2026-10-27T06:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 12,
+      "orders": 3.2,
+      "low": 2.5,
+      "high": 3.9
+    },
+    {
+      "hourStart": "2026-10-27T07:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 13,
+      "orders": 5.5,
+      "low": 4.3,
+      "high": 6.7
+    },
+    {
+      "hourStart": "2026-10-27T08:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 14,
+      "orders": 4.1,
+      "low": 3.2,
+      "high": 5.0
+    },
+    {
+      "hourStart": "2026-10-27T09:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 15,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-27T10:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 16,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-27T11:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 17,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-27T12:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 18,
+      "orders": 3.1,
+      "low": 2.4,
+      "high": 3.8
+    },
+    {
+      "hourStart": "2026-10-27T13:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 19,
+      "orders": 6.4,
+      "low": 5.0,
+      "high": 7.8
+    },
+    {
+      "hourStart": "2026-10-27T14:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 20,
+      "orders": 7.2,
+      "low": 5.6,
+      "high": 8.8
+    },
+    {
+      "hourStart": "2026-10-27T15:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 21,
+      "orders": 5.0,
+      "low": 3.9,
+      "high": 6.1
+    },
+    {
+      "hourStart": "2026-10-27T16:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 22,
+      "orders": 2.4,
+      "low": 1.9,
+      "high": 2.9
+    },
+    {
+      "hourStart": "2026-10-27T17:30:00.000Z",
+      "date": "2026-10-27",
+      "weekday": 2,
+      "hour": 23,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-27T18:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 0,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-27T19:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 1,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-27T20:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 2,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-27T21:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 3,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-27T22:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 4,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-27T23:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 5,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-28T00:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 6,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-28T01:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 7,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-28T02:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 8,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-28T03:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 9,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-28T04:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 10,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-28T05:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 11,
+      "orders": 1.5,
+      "low": 1.2,
+      "high": 1.8
+    },
+    {
+      "hourStart": "2026-10-28T06:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 12,
+      "orders": 3.2,
+      "low": 2.5,
+      "high": 3.9
+    },
+    {
+      "hourStart": "2026-10-28T07:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 13,
+      "orders": 5.5,
+      "low": 4.3,
+      "high": 6.7
+    },
+    {
+      "hourStart": "2026-10-28T08:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 14,
+      "orders": 4.1,
+      "low": 3.2,
+      "high": 5.0
+    },
+    {
+      "hourStart": "2026-10-28T09:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 15,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-28T10:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 16,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-28T11:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 17,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-28T12:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 18,
+      "orders": 3.1,
+      "low": 2.4,
+      "high": 3.8
+    },
+    {
+      "hourStart": "2026-10-28T13:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 19,
+      "orders": 6.4,
+      "low": 5.0,
+      "high": 7.8
+    },
+    {
+      "hourStart": "2026-10-28T14:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 20,
+      "orders": 7.2,
+      "low": 5.6,
+      "high": 8.8
+    },
+    {
+      "hourStart": "2026-10-28T15:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 21,
+      "orders": 5.0,
+      "low": 3.9,
+      "high": 6.1
+    },
+    {
+      "hourStart": "2026-10-28T16:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 22,
+      "orders": 2.4,
+      "low": 1.9,
+      "high": 2.9
+    },
+    {
+      "hourStart": "2026-10-28T17:30:00.000Z",
+      "date": "2026-10-28",
+      "weekday": 3,
+      "hour": 23,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-28T18:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 0,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-28T19:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 1,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-28T20:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 2,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-28T21:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 3,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-28T22:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 4,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-28T23:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 5,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-29T00:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 6,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-29T01:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 7,
+      "orders": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    {
+      "hourStart": "2026-10-29T02:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 8,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-29T03:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 9,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-29T04:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 10,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-29T05:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 11,
+      "orders": 1.5,
+      "low": 1.2,
+      "high": 1.8
+    },
+    {
+      "hourStart": "2026-10-29T06:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 12,
+      "orders": 3.2,
+      "low": 2.5,
+      "high": 3.9
+    },
+    {
+      "hourStart": "2026-10-29T07:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 13,
+      "orders": 5.5,
+      "low": 4.3,
+      "high": 6.7
+    },
+    {
+      "hourStart": "2026-10-29T08:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 14,
+      "orders": 4.1,
+      "low": 3.2,
+      "high": 5.0
+    },
+    {
+      "hourStart": "2026-10-29T09:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 15,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-29T10:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 16,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-29T11:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 17,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    },
+    {
+      "hourStart": "2026-10-29T12:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 18,
+      "orders": 3.1,
+      "low": 2.4,
+      "high": 3.8
+    },
+    {
+      "hourStart": "2026-10-29T13:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 19,
+      "orders": 6.4,
+      "low": 5.0,
+      "high": 7.8
+    },
+    {
+      "hourStart": "2026-10-29T14:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 20,
+      "orders": 7.2,
+      "low": 5.6,
+      "high": 8.8
+    },
+    {
+      "hourStart": "2026-10-29T15:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 21,
+      "orders": 5.0,
+      "low": 3.9,
+      "high": 6.1
+    },
+    {
+      "hourStart": "2026-10-29T16:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 22,
+      "orders": 2.4,
+      "low": 1.9,
+      "high": 2.9
+    },
+    {
+      "hourStart": "2026-10-29T17:30:00.000Z",
+      "date": "2026-10-29",
+      "weekday": 4,
+      "hour": 23,
+      "orders": 0.4,
+      "low": 0.3,
+      "high": 0.5
+    }
+  ],
+  "daily": [
+    {
+      "date": "2026-10-23",
+      "orders": 41.2
+    },
+    {
+      "date": "2026-10-24",
+      "orders": 47.8
+    },
+    {
+      "date": "2026-10-25",
+      "orders": 47.8
+    },
+    {
+      "date": "2026-10-26",
+      "orders": 41.2
+    },
+    {
+      "date": "2026-10-27",
+      "orders": 41.2
+    },
+    {
+      "date": "2026-10-28",
+      "orders": 41.2
+    },
+    {
+      "date": "2026-10-29",
+      "orders": 41.2
+    }
+  ],
+  "peak": {
+    "hourStart": "2026-10-24T14:30:00.000Z",
+    "orders": 8.3
+  },
+  "backtest": {
+    "days": 14,
+    "hoursCompared": 0,
+    "mape": null,
+    "wape": null,
+    "byDay": []
+  }
+}

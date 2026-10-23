@@ -25,14 +25,14 @@ class _RiderDuesScreenState extends ConsumerState<RiderDuesScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final args = (zoneId: ref.watch(activeZoneProvider)?.id, delayedOnly: _delayed);
+    final args = (zoneId: ref.watch(areaFilterProvider)?.id, delayedOnly: _delayed);
     final value = ref.watch(riderDuesProvider(args));
     return Scaffold(
       backgroundColor: c.bg,
       appBar: AppBar(
         title: const Text('Rider payouts due'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       body: FinancePagedList(
         value: value,

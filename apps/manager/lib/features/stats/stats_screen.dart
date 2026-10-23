@@ -60,7 +60,7 @@ class _Body extends ConsumerWidget {
         children: [
           const _PeriodPicker(),
           const SizedBox(height: 8),
-          const Align(alignment: Alignment.centerLeft, child: ZonePickerChip()),
+          const Align(alignment: Alignment.centerLeft, child: AreaPickerChip()),
           const SizedBox(height: 8),
           stats.when(
             skipLoadingOnRefresh: true,
@@ -351,7 +351,7 @@ class _DownloadButton extends ConsumerWidget {
                 onTap: () async {
                   Navigator.of(sheet).pop();
                   final me = ref.read(managerMeProvider).value;
-                  final zone = ref.read(activeZoneProvider);
+                  final zone = ref.read(areaFilterProvider);
                   final meta = reportMetaFor(
                     d,
                     generatedBy: me?.profile.displayName ?? '',

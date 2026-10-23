@@ -1,0 +1,1236 @@
+{
+  "generatedAt": "2026-10-22T18:31:00.000Z",
+  "area": {
+    "type": "scope",
+    "id": null,
+    "name": "All my zones"
+  },
+  "productivity": {
+    "deliveriesPerRiderHour": 2.0,
+    "sampleHours": 0,
+    "source": "default"
+  },
+  "hours": [
+    {
+      "hourStart": "2026-10-22T18:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-22T19:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-22T20:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-22T21:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-22T22:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-22T23:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T00:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T01:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T02:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T03:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T04:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T05:30:00.000Z",
+      "forecastOrders": 1.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T06:30:00.000Z",
+      "forecastOrders": 3.2,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T07:30:00.000Z",
+      "forecastOrders": 5.5,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-23T08:30:00.000Z",
+      "forecastOrders": 4.1,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T09:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T10:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T11:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T12:30:00.000Z",
+      "forecastOrders": 3.1,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T13:30:00.000Z",
+      "forecastOrders": 6.4,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-23T14:30:00.000Z",
+      "forecastOrders": 7.2,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-23T15:30:00.000Z",
+      "forecastOrders": 5.0,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-23T16:30:00.000Z",
+      "forecastOrders": 2.4,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T17:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T18:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T19:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T20:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T21:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T22:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-23T23:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T00:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T01:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T02:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T03:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T04:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T05:30:00.000Z",
+      "forecastOrders": 1.7,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T06:30:00.000Z",
+      "forecastOrders": 3.7,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T07:30:00.000Z",
+      "forecastOrders": 6.3,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-24T08:30:00.000Z",
+      "forecastOrders": 4.7,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T09:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T10:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T11:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T12:30:00.000Z",
+      "forecastOrders": 3.6,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T13:30:00.000Z",
+      "forecastOrders": 7.4,
+      "ridersNeeded": 4,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 2
+    },
+    {
+      "hourStart": "2026-10-24T14:30:00.000Z",
+      "forecastOrders": 8.3,
+      "ridersNeeded": 4,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 2
+    },
+    {
+      "hourStart": "2026-10-24T15:30:00.000Z",
+      "forecastOrders": 5.8,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-24T16:30:00.000Z",
+      "forecastOrders": 2.8,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-24T17:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T18:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T19:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T20:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T21:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T22:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-24T23:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T00:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T01:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T02:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T03:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T04:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T05:30:00.000Z",
+      "forecastOrders": 1.7,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T06:30:00.000Z",
+      "forecastOrders": 3.7,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T07:30:00.000Z",
+      "forecastOrders": 6.3,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-25T08:30:00.000Z",
+      "forecastOrders": 4.7,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T09:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T10:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T11:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T12:30:00.000Z",
+      "forecastOrders": 3.6,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T13:30:00.000Z",
+      "forecastOrders": 7.4,
+      "ridersNeeded": 4,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 2
+    },
+    {
+      "hourStart": "2026-10-25T14:30:00.000Z",
+      "forecastOrders": 8.3,
+      "ridersNeeded": 4,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 2
+    },
+    {
+      "hourStart": "2026-10-25T15:30:00.000Z",
+      "forecastOrders": 5.8,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-25T16:30:00.000Z",
+      "forecastOrders": 2.8,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-25T17:30:00.000Z",
+      "forecastOrders": 0.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T18:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T19:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T20:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T21:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T22:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-25T23:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T00:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T01:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T02:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T03:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T04:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T05:30:00.000Z",
+      "forecastOrders": 1.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T06:30:00.000Z",
+      "forecastOrders": 3.2,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T07:30:00.000Z",
+      "forecastOrders": 5.5,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-26T08:30:00.000Z",
+      "forecastOrders": 4.1,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T09:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T10:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T11:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T12:30:00.000Z",
+      "forecastOrders": 3.1,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T13:30:00.000Z",
+      "forecastOrders": 6.4,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-26T14:30:00.000Z",
+      "forecastOrders": 7.2,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-26T15:30:00.000Z",
+      "forecastOrders": 5.0,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-26T16:30:00.000Z",
+      "forecastOrders": 2.4,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T17:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T18:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T19:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T20:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T21:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T22:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-26T23:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T00:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T01:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T02:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T03:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T04:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T05:30:00.000Z",
+      "forecastOrders": 1.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T06:30:00.000Z",
+      "forecastOrders": 3.2,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T07:30:00.000Z",
+      "forecastOrders": 5.5,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-27T08:30:00.000Z",
+      "forecastOrders": 4.1,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T09:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T10:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T11:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T12:30:00.000Z",
+      "forecastOrders": 3.1,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T13:30:00.000Z",
+      "forecastOrders": 6.4,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-27T14:30:00.000Z",
+      "forecastOrders": 7.2,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-27T15:30:00.000Z",
+      "forecastOrders": 5.0,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-27T16:30:00.000Z",
+      "forecastOrders": 2.4,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T17:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T18:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T19:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T20:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T21:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T22:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-27T23:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T00:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T01:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T02:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T03:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T04:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T05:30:00.000Z",
+      "forecastOrders": 1.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T06:30:00.000Z",
+      "forecastOrders": 3.2,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T07:30:00.000Z",
+      "forecastOrders": 5.5,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-28T08:30:00.000Z",
+      "forecastOrders": 4.1,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T09:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T10:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T11:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T12:30:00.000Z",
+      "forecastOrders": 3.1,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T13:30:00.000Z",
+      "forecastOrders": 6.4,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-28T14:30:00.000Z",
+      "forecastOrders": 7.2,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-28T15:30:00.000Z",
+      "forecastOrders": 5.0,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-28T16:30:00.000Z",
+      "forecastOrders": 2.4,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T17:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T18:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T19:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T20:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T21:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T22:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-28T23:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T00:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T01:30:00.000Z",
+      "forecastOrders": 0.0,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T02:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T03:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T04:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T05:30:00.000Z",
+      "forecastOrders": 1.5,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T06:30:00.000Z",
+      "forecastOrders": 3.2,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T07:30:00.000Z",
+      "forecastOrders": 5.5,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-29T08:30:00.000Z",
+      "forecastOrders": 4.1,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T09:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T10:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T11:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T12:30:00.000Z",
+      "forecastOrders": 3.1,
+      "ridersNeeded": 2,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T13:30:00.000Z",
+      "forecastOrders": 6.4,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-29T14:30:00.000Z",
+      "forecastOrders": 7.2,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-29T15:30:00.000Z",
+      "forecastOrders": 5.0,
+      "ridersNeeded": 3,
+      "ridersUsuallyOnline": 2.0,
+      "gap": 1
+    },
+    {
+      "hourStart": "2026-10-29T16:30:00.000Z",
+      "forecastOrders": 2.4,
+      "ridersNeeded": 1,
+      "ridersUsuallyOnline": 1.0,
+      "gap": 0
+    },
+    {
+      "hourStart": "2026-10-29T17:30:00.000Z",
+      "forecastOrders": 0.4,
+      "ridersNeeded": 0,
+      "ridersUsuallyOnline": 0.0,
+      "gap": 0
+    }
+  ],
+  "daily": [
+    {
+      "date": "2026-10-23",
+      "peakNeeded": 3,
+      "peakUsual": 2.0,
+      "shortHours": 4
+    },
+    {
+      "date": "2026-10-24",
+      "peakNeeded": 4,
+      "peakUsual": 2.0,
+      "shortHours": 5
+    },
+    {
+      "date": "2026-10-25",
+      "peakNeeded": 4,
+      "peakUsual": 2.0,
+      "shortHours": 5
+    },
+    {
+      "date": "2026-10-26",
+      "peakNeeded": 3,
+      "peakUsual": 2.0,
+      "shortHours": 4
+    },
+    {
+      "date": "2026-10-27",
+      "peakNeeded": 3,
+      "peakUsual": 2.0,
+      "shortHours": 4
+    },
+    {
+      "date": "2026-10-28",
+      "peakNeeded": 3,
+      "peakUsual": 2.0,
+      "shortHours": 4
+    },
+    {
+      "date": "2026-10-29",
+      "peakNeeded": 3,
+      "peakUsual": 2.0,
+      "shortHours": 4
+    }
+  ],
+  "shortHours": 30
+}

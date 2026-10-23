@@ -27,7 +27,7 @@ class ProductInsightsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Product insights'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(productInsightsProvider.future),

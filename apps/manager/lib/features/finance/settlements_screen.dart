@@ -44,14 +44,14 @@ class _SettlementsScreenState extends ConsumerState<SettlementsScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final f = SettlementFilters(status: _status, zoneId: ref.watch(activeZoneProvider)?.id);
+    final f = SettlementFilters(status: _status, zoneId: ref.watch(areaFilterProvider)?.id);
     final value = ref.watch(settlementsProvider(f));
     return Scaffold(
       backgroundColor: c.bg,
       appBar: AppBar(
         title: const Text('Settlement history'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       body: LayoutBuilder(builder: (context, box) {
         final wide = box.maxWidth >= settlementsWideBreakpoint;

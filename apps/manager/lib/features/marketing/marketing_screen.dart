@@ -55,7 +55,7 @@ class _MarketingScreenState extends ConsumerState<MarketingScreen> with SingleTi
       appBar: AppBar(
         title: const Text('Marketing'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
         bottom: TabBar(
           controller: _tabs,
           tabs: const [Tab(key: Key('marketing-tab-requests'), text: 'Requests'), Tab(key: Key('marketing-tab-campaigns'), text: 'Campaigns')],
@@ -105,7 +105,7 @@ class _RequestsTabState extends ConsumerState<_RequestsTab> with AutomaticKeepAl
   Widget build(BuildContext context) {
     super.build(context);
     final c = context.colors;
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     final eff = _filters.zoneId != null || zone == null ? _filters : _filters.copyWith(zoneId: zone.id);
     final value = ref.watch(requestListProvider(eff));
     if (value.value != null) _counts = value.value!.counts;

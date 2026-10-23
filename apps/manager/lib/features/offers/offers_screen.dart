@@ -39,7 +39,7 @@ class _OffersScreenState extends ConsumerState<OffersScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     final eff = _filters.zoneId != null || zone == null ? _filters : _filters.copyWith(zoneId: zone.id);
     final value = ref.watch(offerListProvider(eff));
     if (value.value != null) _counts = value.value!.counts;
@@ -48,7 +48,7 @@ class _OffersScreenState extends ConsumerState<OffersScreen> {
       appBar: AppBar(
         title: const Text('Offers'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       floatingActionButton: FloatingActionButton.extended(
         key: const Key('offer-new'),

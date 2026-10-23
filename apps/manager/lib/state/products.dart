@@ -97,7 +97,7 @@ final productDetailProvider = AsyncNotifierProvider.autoDispose.family<ProductDe
 
 /// Categories across the manager's vendors, in the picked zone.
 final productCategoriesProvider = FutureProvider.autoDispose<List<CategoryRow>>(
-  (ref) => ref.read(productsRepoProvider).categories(zoneId: ref.watch(activeZoneProvider)?.id),
+  (ref) => ref.read(productsRepoProvider).categories(zoneId: ref.watch(areaFilterProvider)?.id),
   retry: (_, _) => null,
 );
 
@@ -150,7 +150,7 @@ final insightsRangeProvider = NotifierProvider<InsightsRangeNotifier, InsightsRa
 final productInsightsProvider = FutureProvider.autoDispose<ProductInsights>(
   (ref) {
     final (from, to) = ref.watch(insightsRangeProvider).bounds();
-    return ref.read(productsRepoProvider).insights(from: from, to: to, zoneId: ref.watch(activeZoneProvider)?.id);
+    return ref.read(productsRepoProvider).insights(from: from, to: to, zoneId: ref.watch(areaFilterProvider)?.id);
   },
   retry: (_, _) => null,
 );

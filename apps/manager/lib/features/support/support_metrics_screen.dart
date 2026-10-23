@@ -50,7 +50,7 @@ class _SupportMetricsScreenState extends ConsumerState<SupportMetricsScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     final q = _query(zone?.id);
     final value = ref.watch(ticketMetricsProvider(q));
     return Scaffold(
@@ -58,7 +58,7 @@ class _SupportMetricsScreenState extends ConsumerState<SupportMetricsScreen> {
       appBar: AppBar(
         title: const Text('Support metrics'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       body: Column(
         children: [

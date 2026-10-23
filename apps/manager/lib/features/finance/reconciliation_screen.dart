@@ -63,7 +63,7 @@ class _ReconciliationScreenState extends ConsumerState<ReconciliationScreen> {
       appBar: AppBar(
         title: const Text('Reconciliation'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(reconciliationProvider(args).future),

@@ -76,7 +76,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final me = ref.watch(managerMeProvider).value;
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     final eff = _filters.copyWith(zoneId: zone?.id);
     final value = ref.watch(alertListProvider(eff));
     final data = value.value;
@@ -111,7 +111,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
               child: const Icon(Icons.tune),
             ),
           ),
-          const Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip()),
+          const Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip()),
         ],
       ),
       floatingActionButton: (me?.hasNoZones ?? false)

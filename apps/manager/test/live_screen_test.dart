@@ -4,7 +4,7 @@ import 'package:deligro_manager/features/orders/order_mini_map.dart';
 import 'package:deligro_manager/models/live.dart';
 import 'package:deligro_manager/models/manager_me.dart';
 import 'package:deligro_manager/models/orders.dart';
-import 'package:deligro_manager/state/prefs.dart';
+import 'package:deligro_manager/state/area.dart';
 import 'package:deligro_manager/state/providers.dart';
 import 'package:deligro_manager/state/session.dart';
 import 'package:deligro_manager/theme/app_theme.dart';
@@ -138,7 +138,7 @@ void main() {
     final h = await _screen(tester);
     expect(h.live.calls.first, isNull);
     final container = ProviderScope.containerOf(tester.element(find.byType(LiveScreen)));
-    container.read(zoneFilterProvider.notifier).set('z1');
+    container.read(areaProvider.notifier).set(const AreaZone('z1', 'Bemetara', 'Bemetara'));
     await _settle(tester);
     expect(h.live.calls.last, 'z1');
   });

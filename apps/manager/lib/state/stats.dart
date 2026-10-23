@@ -21,7 +21,7 @@ final statsQueryProvider = NotifierProvider<StatsQueryNotifier, StatsQuery>(Stat
 /// screen shows the error in words and a Retry button.
 final statsProvider = FutureProvider.autoDispose<StatsData>(
   (ref) {
-    final q = ref.watch(statsQueryProvider).withZone(ref.watch(activeZoneProvider)?.id);
+    final q = ref.watch(statsQueryProvider).withZone(ref.watch(areaFilterProvider)?.id);
     return ref.read(managerRepoProvider).stats(q);
   },
   retry: (_, _) => null,
@@ -31,7 +31,7 @@ final statsProvider = FutureProvider.autoDispose<StatsData>(
 /// zone as the screen's picker.
 final vendorStatsProvider = FutureProvider.autoDispose.family<StatsData, String>(
   (ref, vendorId) {
-    final q = ref.watch(statsQueryProvider).withZone(ref.watch(activeZoneProvider)?.id).withVendor(vendorId);
+    final q = ref.watch(statsQueryProvider).withZone(ref.watch(areaFilterProvider)?.id).withVendor(vendorId);
     return ref.read(managerRepoProvider).stats(q);
   },
   retry: (_, _) => null,

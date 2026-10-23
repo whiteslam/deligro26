@@ -54,7 +54,7 @@ final financeRangeProvider = NotifierProvider<FinanceRangeNotifier, FinanceRange
 /// The period and zone every finance screen asks for.
 final financeQueryProvider = Provider<FinanceQuery>((ref) {
   final d = ref.watch(financeRangeProvider).dates();
-  return FinanceQuery(from: d.from, to: d.to, zoneId: ref.watch(activeZoneProvider)?.id);
+  return FinanceQuery(from: d.from, to: d.to, zoneId: ref.watch(areaFilterProvider)?.id);
 });
 
 final financeOverviewProvider = FutureProvider.autoDispose.family<FinanceOverview, FinanceQuery>((ref, q) {

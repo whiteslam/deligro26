@@ -13,7 +13,7 @@ class LiveNotifier extends AsyncNotifier<LiveSnapshot> {
   @override
   Future<LiveSnapshot> build() async {
     ref.watch(signedInProvider);
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     return ref.read(liveRepoProvider).snapshot(zoneId: zone?.id);
   }
 
@@ -22,7 +22,7 @@ class LiveNotifier extends AsyncNotifier<LiveSnapshot> {
       ref.invalidateSelf();
       return;
     }
-    final zone = ref.read(activeZoneProvider);
+    final zone = ref.read(areaFilterProvider);
     final next = await AsyncValue.guard(() => ref.read(liveRepoProvider).snapshot(zoneId: zone?.id));
     if (next.hasValue) state = next;
   }

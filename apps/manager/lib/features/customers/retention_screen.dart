@@ -28,7 +28,7 @@ class _RetentionScreenState extends ConsumerState<RetentionScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     final key = (from: _from, to: _to, zoneId: zone?.id);
     final value = ref.watch(retentionProvider(key));
     return Scaffold(
@@ -36,7 +36,7 @@ class _RetentionScreenState extends ConsumerState<RetentionScreen> {
       appBar: AppBar(
         title: const Text('Retention'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       body: AsyncView<Retention>(
         value: value,

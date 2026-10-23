@@ -21,7 +21,7 @@ class ProductCategoriesScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Categories'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       body: AsyncView(
         value: ref.watch(productCategoriesProvider),

@@ -48,7 +48,7 @@ class _ReportViewScreenState extends ConsumerState<ReportViewScreen> {
       kind: widget.kind,
       from: ok(p['from']) ? p['from']! : ymd(today.subtract(const Duration(days: 29))),
       to: ok(p['to']) ? p['to']! : ymd(today),
-      zoneId: p['zone'] ?? ref.read(activeZoneProvider)?.id,
+      zoneId: p['zone'] ?? ref.read(areaFilterProvider)?.id,
     );
   }
 

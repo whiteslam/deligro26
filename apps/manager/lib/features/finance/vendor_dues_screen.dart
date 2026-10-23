@@ -27,7 +27,7 @@ class _VendorDuesScreenState extends ConsumerState<VendorDuesScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final args = (zoneId: ref.watch(activeZoneProvider)?.id, delayedOnly: _delayed);
+    final args = (zoneId: ref.watch(areaFilterProvider)?.id, delayedOnly: _delayed);
     final value = ref.watch(vendorDuesProvider(args));
     final canInitiate = ref.watch(managerMeProvider).value?.can('manager.finance.initiate_payment') ?? false;
     return Scaffold(
@@ -35,7 +35,7 @@ class _VendorDuesScreenState extends ConsumerState<VendorDuesScreen> {
       appBar: AppBar(
         title: const Text('Vendor payments due'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       body: FinancePagedList(
         value: value,

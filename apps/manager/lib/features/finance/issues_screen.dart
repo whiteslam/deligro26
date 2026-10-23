@@ -38,7 +38,7 @@ class IssuesScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Failed or delayed transactions'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       body: data == null
           ? (value.hasError

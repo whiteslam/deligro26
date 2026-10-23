@@ -60,7 +60,7 @@ class HomeScreen extends ConsumerWidget {
                         style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: c.ink, letterSpacing: -0.4),
                       ),
                       const SizedBox(height: 12),
-                      const ZonePickerChip(),
+                      const AreaPickerChip(),
                       if (noZones) ...[const SizedBox(height: 12), const NoZonesNotice()],
                     ],
                   ),

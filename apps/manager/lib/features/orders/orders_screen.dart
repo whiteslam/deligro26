@@ -143,7 +143,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final me = ref.watch(managerMeProvider).value;
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     final eff = _filters.zoneId != null || zone == null ? _filters : _filters.copyWith(zoneId: zone.id);
     _effective = eff;
     final value = ref.watch(orderListProvider(eff));
@@ -155,7 +155,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       appBar: AppBar(
         title: Text('Orders'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       body: (me?.hasNoZones ?? false)
           ? const Padding(padding: EdgeInsets.all(16), child: NoZonesNotice())

@@ -34,7 +34,7 @@ class _CampaignsTabState extends ConsumerState<CampaignsTab> with AutomaticKeepA
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     final eff = _filters.zoneId != null || zone == null ? _filters : _filters.copyWith(zoneId: zone.id);
     final value = ref.watch(campaignListProvider(eff));
     if (value.value != null) _counts = value.value!.counts;

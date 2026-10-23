@@ -202,7 +202,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         ),
                     ]),
                     heading('Zone'),
-                    const Align(alignment: Alignment.centerLeft, child: ZonePickerChip()),
+                    const Align(alignment: Alignment.centerLeft, child: AreaPickerChip()),
                   ],
                 ),
               ),

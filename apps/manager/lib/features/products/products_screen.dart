@@ -109,7 +109,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final me = ref.watch(managerMeProvider).value;
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     final eff = _filters.zoneId != null || zone == null ? _filters : _filters.copyWith(zoneId: zone.id);
     _effective = eff;
     final value = ref.watch(productListProvider(eff));
@@ -123,7 +123,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         title: const Text('Products'),
         backgroundColor: c.bg,
         actions: [
-          const ZonePickerChip(),
+          const AreaPickerChip(),
           PopupMenuButton<String>(
             key: const Key('products-menu'),
             tooltip: 'More',

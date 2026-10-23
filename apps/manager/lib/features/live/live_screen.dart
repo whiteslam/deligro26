@@ -207,7 +207,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
         actions: [
           const AlertBell(),
           ExceptionsBadge(onOpen: () => _go('/live/exceptions')),
-          const Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip()),
+          const Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip()),
         ],
       ),
       body: body,

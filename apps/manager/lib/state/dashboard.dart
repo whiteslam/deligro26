@@ -31,7 +31,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   @override
   Future<DashboardData> build() async {
     ref.watch(signedInProvider);
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     _generation++;
     _listenToLifecycle();
     ref.onDispose(_stop);
@@ -81,12 +81,12 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
   /// Re-fetch in place: the figures stay visible while it runs.
   Future<void> refresh() async {
-    final zoneId = ref.read(activeZoneProvider)?.id;
+    final zoneId = ref.read(areaFilterProvider)?.id;
     final generation = _generation;
     final next = await AsyncValue.guard(
       () => ref.read(managerRepoProvider).dashboard(zoneId: zoneId),
     );
-    final stale = !ref.mounted || generation != _generation || ref.read(activeZoneProvider)?.id != zoneId;
+    final stale = !ref.mounted || generation != _generation || ref.read(areaFilterProvider)?.id != zoneId;
     if (stale) return;
     // A failed background refresh keeps the last good figures.
     if (next.hasValue || !state.hasValue) state = next;

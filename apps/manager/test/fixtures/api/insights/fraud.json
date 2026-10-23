@@ -1,0 +1,107 @@
+{
+  "items": [
+    {
+      "alertId": "f0000001-0000-4000-8000-000000000000",
+      "rule": "customer_cancellations",
+      "severity": "warning",
+      "status": "open",
+      "zoneId": "11111111-1111-4111-8111-111111111111",
+      "openedAt": "2026-10-22T07:10:00.000Z",
+      "subject": {
+        "type": "customer",
+        "id": "3f2a9c10",
+        "label": "Customer 3f2a9c10 · Ravi K."
+      },
+      "measure": {
+        "value": 4,
+        "threshold": 3,
+        "unit": "count",
+        "windowDays": 7
+      },
+      "evidence": [
+        {
+          "kind": "order",
+          "id": "ab12cd34",
+          "at": "2026-10-21T12:00:00.000Z",
+          "text": "Cancelled by customer · ₹420"
+        },
+        {
+          "kind": "order",
+          "id": "cd34ef56",
+          "at": "2026-10-20T13:00:00.000Z",
+          "text": "Cancelled by customer · ₹310"
+        }
+      ],
+      "dismissal": null
+    },
+    {
+      "alertId": "f0000002-0000-4000-8000-000000000000",
+      "rule": "refund_rate",
+      "severity": "critical",
+      "status": "open",
+      "zoneId": "11111111-1111-4111-8111-111111111111",
+      "openedAt": "2026-10-22T07:10:00.000Z",
+      "subject": {
+        "type": "customer",
+        "id": "9b8c7d6e",
+        "label": "Customer 9b8c7d6e · Meena T."
+      },
+      "measure": {
+        "value": 0.62,
+        "threshold": 0.3,
+        "unit": "ratio",
+        "windowDays": 30
+      },
+      "evidence": [
+        {
+          "kind": "refund",
+          "id": "rf1",
+          "at": "2026-10-19T09:00:00.000Z",
+          "text": "Refund approved · ₹280"
+        }
+      ],
+      "dismissal": null
+    },
+    {
+      "alertId": "f0000003-0000-4000-8000-000000000000",
+      "rule": "rider_cash_gap",
+      "severity": "warning",
+      "status": "dismissed",
+      "zoneId": "11111111-1111-4111-8111-111111111111",
+      "openedAt": "2026-10-22T07:10:00.000Z",
+      "subject": {
+        "type": "rider",
+        "id": "r0000004-0000-4000-8000-000000000000",
+        "label": "Rider DR-0004 · Ravi K"
+      },
+      "measure": {
+        "value": 3400,
+        "threshold": 2000,
+        "unit": "rupees",
+        "windowDays": 2
+      },
+      "evidence": [
+        {
+          "kind": "cash_day",
+          "id": "r0000004:2026-10-20",
+          "at": "2026-10-20T20:00:00.000Z",
+          "text": "Collected ₹5,400 · deposited ₹2,000"
+        }
+      ],
+      "dismissal": {
+        "by": {
+          "id": "u1",
+          "name": "Asha Verma"
+        },
+        "reason": "Deposit slip found, entered late",
+        "until": "2026-11-21T00:00:00.000Z"
+      }
+    }
+  ],
+  "nextCursor": null,
+  "counts": {
+    "open": 2,
+    "dismissed": 1,
+    "resolved": 7
+  }
+}

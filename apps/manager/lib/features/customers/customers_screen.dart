@@ -58,7 +58,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     final c = context.colors;
     final me = ref.watch(managerMeProvider).value;
     final canContact = me?.can('manager.customers.contact') ?? false;
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     final eff = _filters.zoneId != null || zone == null ? _filters : _filters.copyWith(zoneId: zone.id);
     final value = ref.watch(customerListProvider(eff));
 
@@ -133,7 +133,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             onPressed: () => GoRouter.maybeOf(context)?.push('/more/customers/retention'),
             icon: const Icon(Icons.insights_outlined),
           ),
-          const Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip()),
+          const Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip()),
         ],
       ),
       body: (me?.hasNoZones ?? false)

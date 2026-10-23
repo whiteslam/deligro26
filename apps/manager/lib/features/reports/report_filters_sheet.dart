@@ -39,7 +39,7 @@ class _FiltersSheetState extends ConsumerState<_FiltersSheet> {
   @override
   void initState() {
     super.initState();
-    final zone = ref.read(activeZoneProvider)?.id;
+    final zone = ref.read(areaFilterProvider)?.id;
     if (widget.kind.takes('vendor')) {
       ref.read(vendorsRepoProvider).directory(zoneId: zone).then((v) {
         if (mounted) setState(() => _vendors = [for (final x in v) (id: x.id, name: x.name)]);

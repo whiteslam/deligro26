@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/env.dart';
+import '../state/area.dart' show applyCityFilter;
 import 'errors.dart';
 import 'session_cookie.dart';
 
@@ -28,6 +29,14 @@ class ApiException implements Exception {
   String toString() => 'ApiException($status, $code)';
 }
 
+/// A file the server sent back: its bytes, the name it chose and its type.
+class ApiFile {
+  const ApiFile({required this.bytes, required this.fileName, required this.contentType});
+  final List<int> bytes;
+  final String? fileName;
+  final String contentType;
+}
+
 /// Talks to the website's `/api/*` routes.
 ///
 /// Those routes read the Supabase session from the `@supabase/ssr` cookie and
@@ -43,8 +52,11 @@ class ApiClient {
   final http.Client _http;
   final _cookieName = sessionCookieName(Env.supabaseUrl);
 
+  /// A city chosen on the area picker travels as `zone=city:<id>` (the code
+  /// that passes "the zone filter" around has one slot for it); the routes
+  /// want `city=<id>`, so it is turned over here, once, before sending.
   Uri _uri(String path, [Map<String, String>? query]) =>
-      Uri.parse('${Env.siteUrl}$path').replace(queryParameters: query);
+      Uri.parse('${Env.siteUrl}$path').replace(queryParameters: query == null ? null : applyCityFilter(query));
 
   Future<Map<String, String>> _headers({bool json = true}) async {
     final headers = <String, String>{
@@ -76,6 +88,30 @@ class ApiClient {
 
   Future<Map<String, dynamic>> get(String path, {Map<String, String>? query}) async =>
       _send(() async => _http.get(_uri(path, query), headers: await _headers(json: false)));
+
+  /// A GET whose answer is a file (Tally XML, a journal CSV). A refusal still
+  /// arrives as JSON and is thrown as an [ApiException] like any other.
+  Future<ApiFile> getFile(String path, {Map<String, String>? query}) async {
+    final http.Response res;
+    try {
+      res = await _http.get(_uri(path, query), headers: await _headers(json: false)).timeout(const Duration(seconds: 60));
+    } catch (_) {
+      throw ApiException(0, 'network');
+    }
+    await _adoptRotated(res.headers['set-cookie']);
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      final disposition = res.headers['content-disposition'] ?? '';
+      final name = RegExp(r'filename="?([^";]+)"?').firstMatch(disposition)?.group(1);
+      return ApiFile(bytes: res.bodyBytes, fileName: name, contentType: res.headers['content-type'] ?? 'application/octet-stream');
+    }
+    Map<String, dynamic> body = const {};
+    try {
+      final decoded = jsonDecode(res.body);
+      if (decoded is Map<String, dynamic>) body = decoded;
+    } catch (_) {}
+    throw ApiException(res.statusCode, '${body['error'] ?? 'http_${res.statusCode}'}',
+        message: body['message'] as String?, body: body);
+  }
 
   Future<Map<String, dynamic>> post(String path, [Object? body]) async => _send(
         () async => _http.post(

@@ -1,0 +1,153 @@
+{
+  "generatedAt": "2026-10-22T18:31:00.000Z",
+  "range": {
+    "from": "2026-10-20",
+    "to": "2026-10-21"
+  },
+  "area": {
+    "type": "scope",
+    "id": null,
+    "name": "All my zones"
+  },
+  "company": "Deligro",
+  "vouchers": [
+    {
+      "number": "DLG-SALES-20261020-bemetara",
+      "type": "sales",
+      "date": "2026-10-20",
+      "narration": "Sales, Bemetara, 20 Oct",
+      "reference": null,
+      "lines": [
+        {
+          "ledger": "Customer Collections - COD",
+          "debit": 6400.0,
+          "credit": 0
+        },
+        {
+          "ledger": "Customer Collections - Online",
+          "debit": 5100.0,
+          "credit": 0
+        },
+        {
+          "ledger": "Vendor Payable",
+          "debit": 0,
+          "credit": 9800.0
+        },
+        {
+          "ledger": "Delivery Fee Income",
+          "debit": 0,
+          "credit": 1200.0
+        },
+        {
+          "ledger": "GST Payable",
+          "debit": 0,
+          "credit": 500.0
+        }
+      ]
+    },
+    {
+      "number": "DLG-COMMISSION-20261020-bemetara",
+      "type": "commission",
+      "date": "2026-10-20",
+      "narration": "Commission, Bemetara, 20 Oct",
+      "reference": null,
+      "lines": [
+        {
+          "ledger": "Vendor Payable",
+          "debit": 1470.0,
+          "credit": 0
+        },
+        {
+          "ledger": "Commission Income",
+          "debit": 0,
+          "credit": 1245.0
+        },
+        {
+          "ledger": "Output GST on Commission",
+          "debit": 0,
+          "credit": 225.0
+        }
+      ]
+    },
+    {
+      "number": "DLG-VENDORPAYOUT-20261021-bemetara",
+      "type": "vendor_payout",
+      "date": "2026-10-21",
+      "narration": "Settlement S-0012 paid",
+      "reference": "UTR123456789",
+      "lines": [
+        {
+          "ledger": "Vendor Payable",
+          "debit": 7000.0,
+          "credit": 0
+        },
+        {
+          "ledger": "Bank",
+          "debit": 0,
+          "credit": 7000.0
+        }
+      ]
+    },
+    {
+      "number": "DLG-RIDERSALARY-20261021-bemetara",
+      "type": "rider_salary",
+      "date": "2026-10-21",
+      "narration": "Rider salary, October",
+      "reference": "UPI-4455",
+      "lines": [
+        {
+          "ledger": "Rider Salary",
+          "debit": 12000.0,
+          "credit": 0
+        },
+        {
+          "ledger": "Bank",
+          "debit": 0,
+          "credit": 12000.0
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "debit": 31970.0,
+    "credit": 31970.0
+  },
+  "reconciliation": [
+    {
+      "figure": "customerPaid",
+      "export": 11500.0,
+      "finance": 11500.0,
+      "match": true
+    },
+    {
+      "figure": "deliveryFees",
+      "export": 1200.0,
+      "finance": 1200.0,
+      "match": true
+    },
+    {
+      "figure": "platformCommission",
+      "export": 1470.0,
+      "finance": 1470.0,
+      "match": true
+    },
+    {
+      "figure": "refunds",
+      "export": 0.0,
+      "finance": 0.0,
+      "match": true
+    },
+    {
+      "figure": "vendorPaymentsCompleted",
+      "export": 7000.0,
+      "finance": 7000.0,
+      "match": true
+    },
+    {
+      "figure": "riderPayoutsCompleted",
+      "export": 12000.0,
+      "finance": 12500.0,
+      "match": false
+    }
+  ]
+}

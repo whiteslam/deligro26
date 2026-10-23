@@ -43,7 +43,7 @@ class _RefundsScreenState extends ConsumerState<RefundsScreen> {
       appBar: AppBar(
         title: const Text('Refunds'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       body: FinancePagedList(
         value: value,

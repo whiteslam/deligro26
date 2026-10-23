@@ -111,7 +111,7 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final me = ref.watch(managerMeProvider).value;
-    final zone = ref.watch(activeZoneProvider);
+    final zone = ref.watch(areaFilterProvider);
     final eff = _filters.zoneId != null || zone == null ? _filters : _filters.copyWith(zoneId: zone.id);
     _effective = eff;
     final value = ref.watch(vendorListProvider(eff));
@@ -124,7 +124,7 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
       appBar: AppBar(
         title: const Text('Vendors'),
         backgroundColor: c.bg,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: ZonePickerChip())],
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: AreaPickerChip())],
       ),
       floatingActionButton: canOnboard
           ? FloatingActionButton.extended(
