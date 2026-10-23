@@ -541,6 +541,25 @@ class VendorBenchmarks {
 
   bool get hasMore => page * pageSize < total;
 
+  /// This page with [next] (the following page) added after it. Medians and
+  /// metrics come from the first page; only the vendors and the page move on.
+  VendorBenchmarks withMore(VendorBenchmarks next) {
+    final seen = {for (final v in vendors) v.id};
+    return VendorBenchmarks(
+      generatedAt: generatedAt,
+      range: range,
+      area: area,
+      minOrders: minOrders,
+      metrics: metrics,
+      zones: zones,
+      cities: cities,
+      vendors: [...vendors, for (final v in next.vendors) if (!seen.contains(v.id)) v],
+      page: next.page,
+      pageSize: pageSize,
+      total: next.total,
+    );
+  }
+
   factory VendorBenchmarks.fromJson(Map<String, dynamic> j) => VendorBenchmarks(
         generatedAt: jDate(j['generatedAt']),
         range: InsightRange.fromJson(j['range']),

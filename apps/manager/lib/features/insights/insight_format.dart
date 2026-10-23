@@ -36,3 +36,18 @@ String signedPercent(int pct) => pct > 0 ? '+$pct%' : pct < 0 ? '−${pct.abs()}
 
 /// A number without a trailing ".0".
 String plain(num n) => n == n.roundToDouble() ? n.round().toString() : n.toStringAsFixed(1);
+
+/// "27 min", "3.2 min", or a dash when there is nothing to say.
+String minutesWord(double? m) => m == null ? '—' : '${m < 10 ? plain(double.parse(m.toStringAsFixed(1))) : m.round()} min';
+
+/// "1.8 km".
+String kmWord(double? km) => km == null ? '—' : '${plain(double.parse(km.toStringAsFixed(1)))} km';
+
+/// "25 Sep – 22 Oct" for two `YYYY-MM-DD` days.
+String rangeWords(String from, String to) {
+  final a = DateTime.tryParse(from);
+  final b = DateTime.tryParse(to);
+  if (a == null || b == null) return '$from – $to';
+  final f = DateFormat('d MMM');
+  return a == b ? f.format(a) : '${f.format(a)} – ${f.format(b)}';
+}

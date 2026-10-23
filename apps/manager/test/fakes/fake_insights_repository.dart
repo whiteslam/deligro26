@@ -17,6 +17,9 @@ class FakeInsightsRepository implements InsightsRepository {
   RidersNeeded ridersValue;
   ZoneMap zoneMapValue = ZoneMap.fromJson(_ins('zones'));
   VendorBenchmarks vendorsValue = VendorBenchmarks.fromJson(_ins('vendors'));
+
+  /// Later pages of the benchmarks, by page number; page 1 is [vendorsValue].
+  final vendorPages = <int, VendorBenchmarks>{};
   SlaReport slaValue = SlaReport.fromJson(_ins('sla'));
   DispatchOverview dispatchValue = DispatchOverview.fromJson(_ins('dispatch'));
   FraudPage fraudValue = FraudPage.fromJson(_ins('fraud'));
@@ -97,7 +100,7 @@ class FakeInsightsRepository implements InsightsRepository {
   Future<VendorBenchmarks> vendors({required String from, required String to, String? zoneId, int page = 1}) async {
     vendorCalls.add((from, to, zoneId, page));
     _maybeThrow();
-    return vendorsValue;
+    return vendorPages[page] ?? vendorsValue;
   }
 
   @override
