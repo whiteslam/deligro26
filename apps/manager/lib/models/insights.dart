@@ -1298,6 +1298,21 @@ class ScheduleDraft {
   final bool active;
   final String clientActionId;
 
+  /// The same schedule as it stands, optionally with [active] flipped (pause
+  /// and resume send exactly what is there, changing nothing else).
+  factory ScheduleDraft.from(Schedule s, {bool? active}) => ScheduleDraft(
+        name: s.name,
+        kind: s.kind,
+        filters: s.filters,
+        frequency: s.frequency,
+        weekday: s.weekday,
+        hourIst: s.hourIst,
+        rangePreset: s.rangePreset,
+        zoneIds: s.zoneIds,
+        recipientIds: [for (final r in s.recipients) r.id],
+        active: active ?? s.active,
+      );
+
   Map<String, dynamic> toJson() => {
         'name': name,
         'kind': kind,

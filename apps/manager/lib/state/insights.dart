@@ -183,3 +183,55 @@ final dispatchProvider = FutureProvider.autoDispose<DispatchOverview>(
   (ref) => ref.read(insightsRepoProvider).dispatch(),
   retry: (_, _) => null,
 );
+
+// ─── Scheduled reports, accounting ──────────────────────────────────────
+
+final schedulesProvider = FutureProvider.autoDispose<ScheduleList>(
+  (ref) => ref.read(insightsRepoProvider).schedules(),
+  retry: (_, _) => null,
+);
+
+/// The runs of one schedule, a page at a time.
+class RunsNotifier extends AsyncNotifier<RunPage> {
+  RunsNotifier(this.scheduleId);
+  final String scheduleId;
+  bool loadingMore = false;
+
+  @override
+  Future<RunPage> build() => ref.read(insightsRepoProvider).runs(scheduleId);
+
+  Future<void> loadMore() async {
+    final cur = state.value;
+    if (cur == null || cur.nextCursor == null || loadingMore) return;
+    loadingMore = true;
+    try {
+      final next = await ref.read(insightsRepoProvider).runs(scheduleId, cursor: cur.nextCursor);
+      final seen = {for (final r in cur.items) r.id};
+      state = AsyncData(RunPage(items: [...cur.items, for (final r in next.items) if (!seen.contains(r.id)) r], nextCursor: next.nextCursor));
+    } finally {
+      loadingMore = false;
+    }
+  }
+}
+
+final runsProvider = AsyncNotifierProvider.autoDispose.family<RunsNotifier, RunPage, String>(
+  RunsNotifier.new,
+  retry: (_, _) => null,
+);
+
+final runDetailProvider = FutureProvider.autoDispose.family<ReportRun, String>(
+  (ref, runId) => ref.read(insightsRepoProvider).run(runId),
+  retry: (_, _) => null,
+);
+
+/// The accounting export has its own range (up to a year), apart from the
+/// one the map, benchmarks and service levels share.
+final accountingRangeProvider = NotifierProvider<InsightRangeNotifier, InsightRangeState>(InsightRangeNotifier.new);
+
+final accountingProvider = FutureProvider.autoDispose<AccountingSummary>(
+  (ref) {
+    final r = ref.watch(accountingRangeProvider);
+    return ref.read(insightsRepoProvider).accounting(from: r.from, to: r.to, zoneId: ref.watch(areaFilterProvider)?.id);
+  },
+  retry: (_, _) => null,
+);

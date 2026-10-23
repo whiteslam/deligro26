@@ -1,4 +1,7 @@
+import 'package:deligro_manager/models/support_ops.dart' show Assignee, AssigneeList;
 import 'package:deligro_manager/state/area.dart';
+import 'package:deligro_manager/state/support.dart' show ticketAssigneesProvider;
+import 'package:deligro_manager/state/vendors.dart' show vendorDirectoryProvider;
 import 'package:deligro_manager/state/providers.dart';
 import 'package:deligro_manager/state/session.dart';
 import 'package:flutter/material.dart';
@@ -47,6 +50,12 @@ Future<void> pumpInsights(
       insightsRepoProvider.overrideWithValue(repo ?? FakeInsightsRepository()),
       managerMeProvider.overrideWith(() => MeWith(permissions, role)),
       signedInProvider.overrideWithValue(true),
+      // The pickers in the schedule form: no network in a widget test.
+      vendorDirectoryProvider.overrideWith((ref) async => const []),
+      ticketAssigneesProvider.overrideWith((ref, zoneId) async => const AssigneeList(
+            staff: [Assignee(id: 'u1', name: 'Asha Verma', role: 'manager'), Assignee(id: 'u2', name: 'Imran S', role: 'manager')],
+            teams: [],
+          )),
       ...extra,
     ],
   ));

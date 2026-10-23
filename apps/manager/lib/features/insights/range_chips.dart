@@ -9,11 +9,15 @@ import 'insight_format.dart';
 /// 7 days · 28 days · 90 days · Custom, with the dates they mean. The choice
 /// is shared by the zone map, the benchmarks and the service levels.
 class RangeChips extends ConsumerWidget {
-  const RangeChips({super.key});
+  const RangeChips({super.key, this.provider});
+
+  /// The range this control edits; the shared one unless a screen keeps its own.
+  final NotifierProvider<InsightRangeNotifier, InsightRangeState>? provider;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final r = ref.watch(insightRangeProvider);
+    final p = provider ?? insightRangeProvider;
+    final r = ref.watch(p);
     final c = context.colors;
     Widget chip(String key, String label, bool selected, VoidCallback onTap) => ChoiceChip(
           key: Key(key),
@@ -23,9 +27,9 @@ class RangeChips extends ConsumerWidget {
         );
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Wrap(spacing: 8, runSpacing: 8, children: [
-        chip('range-7', '7 days', r.choice == RangeChoice.days7, () => ref.read(insightRangeProvider.notifier).setDays(7)),
-        chip('range-28', '28 days', r.choice == RangeChoice.days28, () => ref.read(insightRangeProvider.notifier).setDays(28)),
-        chip('range-90', '90 days', r.choice == RangeChoice.days90, () => ref.read(insightRangeProvider.notifier).setDays(90)),
+        chip('range-7', '7 days', r.choice == RangeChoice.days7, () => ref.read(p.notifier).setDays(7)),
+        chip('range-28', '28 days', r.choice == RangeChoice.days28, () => ref.read(p.notifier).setDays(28)),
+        chip('range-90', '90 days', r.choice == RangeChoice.days90, () => ref.read(p.notifier).setDays(90)),
         chip('range-custom', 'Custom', r.choice == RangeChoice.custom, () async {
           // India's today, not the phone's: the server refuses a range that
           // ends after the IST day, or one longer than a year.
@@ -37,7 +41,7 @@ class RangeChips extends ConsumerWidget {
             initialDateRange: DateTimeRange(start: DateTime.parse(r.from), end: DateTime.parse(r.to)),
             helpText: 'Pick a range (a year at most)',
           );
-          if (picked != null) ref.read(insightRangeProvider.notifier).setCustom(picked);
+          if (picked != null) ref.read(p.notifier).setCustom(picked);
         }),
       ]),
       const SizedBox(height: 6),

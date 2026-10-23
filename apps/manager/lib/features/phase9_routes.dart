@@ -7,7 +7,12 @@ import 'insights/fraud_case_screen.dart';
 import 'insights/fraud_rules_screen.dart';
 import 'insights/fraud_screen.dart';
 import 'insights/insights_hub_screen.dart';
+import 'insights/accounting_screen.dart';
+import 'insights/report_run_screen.dart';
 import 'insights/riders_needed_screen.dart';
+import 'insights/schedule_form_screen.dart';
+import 'insights/schedule_runs_screen.dart';
+import 'insights/schedules_screen.dart';
 import 'insights/sla_screen.dart';
 import 'insights/vendor_benchmarks_screen.dart';
 import 'insights/zone_map_screen.dart';
@@ -25,6 +30,33 @@ List<RouteBase> phase9Routes() => [
           GoRoute(path: 'zones', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const ZoneMapScreen()),
           GoRoute(path: 'vendors', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const VendorBenchmarksScreen()),
           GoRoute(path: 'sla', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const SlaScreen()),
+          GoRoute(path: 'accounting', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const AccountingScreen()),
+          GoRoute(
+            path: 'reports',
+            parentNavigatorKey: rootNavigatorKey,
+            builder: (_, _) => const SchedulesScreen(),
+            routes: [
+              // Fixed paths before ':id', or "new" and "runs" would read as a schedule.
+              GoRoute(path: 'new', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const ScheduleFormScreen()),
+              GoRoute(
+                path: 'runs/:runId',
+                parentNavigatorKey: rootNavigatorKey,
+                builder: (_, state) => ReportRunScreen(runId: state.pathParameters['runId']!),
+              ),
+              GoRoute(
+                path: ':id',
+                parentNavigatorKey: rootNavigatorKey,
+                builder: (_, state) => ScheduleFormScreen(scheduleId: state.pathParameters['id']),
+                routes: [
+                  GoRoute(
+                    path: 'runs',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => ScheduleRunsScreen(scheduleId: state.pathParameters['id']!),
+                  ),
+                ],
+              ),
+            ],
+          ),
           GoRoute(path: 'dispatch', parentNavigatorKey: rootNavigatorKey, builder: (_, _) => const DispatchScreen()),
           GoRoute(
             path: 'fraud',
