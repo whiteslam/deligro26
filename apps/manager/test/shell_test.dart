@@ -145,12 +145,27 @@ void main() {
     expect(find.text('Arrives in build phase 4.'), findsOneWidget);
   });
 
-  testWidgets('More lists only permitted rows and opens their placeholder', (tester) async {
+  testWidgets('More lists only permitted rows, and Insights opens its hub', (tester) async {
     await _pumpApp(tester, _me(perms: {'manager.vendors.view': false}), at: '/more');
     expect(find.byKey(const Key('more-/more/vendors')), findsNothing);
     await tester.scrollUntilVisible(find.byKey(const Key('more-/more/insights')), 200, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const Key('more-/more/insights')));
     await tester.pumpAndSettle();
-    expect(find.text('Arrives in build phase 9.'), findsOneWidget);
+    expect(find.byKey(const Key('insight-demand')), findsOneWidget);
+    expect(find.text('Arrives in build phase 9.'), findsNothing);
+  });
+
+  testWidgets('Insights is not in More without its own switch', (tester) async {
+    await _pumpApp(tester, _me(perms: {'manager.insights.view': false}), at: '/more');
+    expect(find.byKey(const Key('more-/more/insights')), findsNothing);
+  });
+
+  testWidgets('a screen deep in Insights needs the permission it names', (tester) async {
+    expect(permissionFor('/more/insights'), 'manager.insights.view');
+    expect(permissionFor('/more/insights/demand'), 'manager.insights.view');
+    expect(permissionFor('/more/insights/fraud'), 'manager.customers.view');
+    expect(permissionFor('/more/insights/fraud/abc'), 'manager.customers.view');
+    expect(permissionFor('/more/insights/reports/runs/r1'), 'manager.reports.view');
+    expect(permissionFor('/more/insights/accounting'), 'manager.accounting.export');
   });
 }

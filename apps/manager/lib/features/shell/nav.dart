@@ -72,8 +72,8 @@ const moreItems = <MoreItem>[
       permission: 'manager.audit.view_zone',
       subtitleEn: 'Every recorded action in your zones'),
   MoreItem('/more/insights', 'Insights', Icons.insights_outlined,
-      permission: 'manager.reports.view', phase: 9,
-      subtitleEn: 'Forecasts, benchmarks, SLAs'),
+      permission: 'manager.insights.view',
+      subtitleEn: 'Forecasts, zone map, benchmarks, service levels'),
   MoreItem('/more/profile', 'Profile & permissions', Icons.badge_outlined,
       subtitleEn: 'Zones, permissions, activity, devices'),
   MoreItem('/more/settings/alerts', 'Alert thresholds', Icons.tune_outlined,
@@ -101,6 +101,10 @@ String? permissionFor(String path) {
   if (path.startsWith('/more/tickets/')) return 'manager.support.manage';
   if (path == '/more/products/restricted') return 'manager.products.moderate';
   if (path == '/more/products/image-reviews') return 'manager.products.moderate';
+  // Insights: the hub needs insights.view; three of its screens need more.
+  if (path == '/more/insights/fraud' || path.startsWith('/more/insights/fraud/')) return 'manager.customers.view';
+  if (path == '/more/insights/reports' || path.startsWith('/more/insights/reports/')) return 'manager.reports.view';
+  if (path == '/more/insights/accounting') return 'manager.accounting.export';
   for (final t in tabs) {
     if (t.permission != null && (path == t.path || path.startsWith('${t.path}/'))) return t.permission;
   }
