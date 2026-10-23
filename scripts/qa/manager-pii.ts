@@ -19,6 +19,9 @@ import { buildTicketThread } from "../../src/lib/ops/ticket-thread";
 import { redactAuditPayload, toAlert } from "../../src/lib/ops/alerts-contract";
 import { ALERT_KINDS } from "../../src/lib/ops/alerts/catalog";
 import { emptyFacts, evaluate } from "../../src/lib/ops/alerts/evaluate";
+import { evaluateFraud } from "../../src/lib/ops/alerts/fraud";
+import { evaluateSla } from "../../src/lib/ops/alerts/sla";
+import { fraudCasePayload, fraudRulesPayload } from "../../src/lib/ops/insights/fraud-contract";
 
 let passed = 0;
 let failed = 0;
@@ -155,6 +158,32 @@ check("audit before/after are redacted", piiPaths(redacted).every((p) => {
   const v = p.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown>)?.[k], redacted);
   return v === "[redacted]";
 }));
+
+console.log("\n-- Phase 9 payloads (fraud and SLA) --");
+{
+  const fcase = fraudCasePayload(
+    {
+      alertId: "a1", rule: "code_sharing", severity: "warning", status: "open", zoneId: "z1", openedAt: row.created_at,
+      subject: { type: "code", id: "DIWALI50", label: null },
+      measure: { value: 3, threshold: 2, unit: "count", windowDays: 30 },
+      evidence: [{ kind: "redemption", id: "o1", at: row.created_at, text: "Account ending 5001 redeemed DIWALI50, 50 rupees off" }],
+      dismissal: null,
+    },
+    new Map()
+  );
+  check("a fraud case carries no personal fields", piiPaths(fcase).length === 0, piiPaths(fcase).join(", "));
+  check("the fraud rules carry none either", piiPaths(fraudRulesPayload([], null, true)).length === 0);
+  const alerts = evaluateFraud(
+    [
+      { rule: "customer_cancellations", zoneId: "z1", subjectType: "customer", subjectId: "c1", measure: 3, threshold: 3, windowDays: 7, evidence: [] },
+      { rule: "rider_cash_gap", zoneId: "z1", subjectType: "rider", subjectId: "d1", measure: 2500, threshold: 2000, windowDays: 2, evidence: [] },
+    ],
+    now
+  );
+  check("fraud alert text never carries a phone number", alerts.every((x) => !/\d{10}/.test(`${x.title} ${x.body}`)));
+  const sla = evaluateSla([{ zoneId: "z1", stage: "pickup", orders: 8, breaches: 4, rate: 0.5 }], null, new Map(), now);
+  check("SLA alert text never carries a phone number", sla.every((x) => !/\d{10}/.test(`${x.title} ${x.body}`)));
+}
 
 console.log("\n── requesters and texts ──");
 const support = readFileSync("src/lib/data-access/support.ts", "utf8");

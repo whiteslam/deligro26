@@ -182,6 +182,8 @@ const ROUTE_SWITCH: Record<string, string> = {
   "alert-rules/route.ts": "manager.alerts.configure",
   "insights/sla-targets/route.ts": "manager.alerts.configure",
   "insights/dispatch/route.ts": "manager.dispatch.configure",
+  "insights/fraud-rules/route.ts": "manager.alerts.configure",
+  "insights/fraud/[alertId]/dismiss/route.ts": "manager.insights.view",
   "alerts/[id]/actions/route.ts": "",
   "alerts/incident/route.ts": "",
   "customers/[id]/actions/route.ts": "manager.customers.view",

@@ -25,6 +25,7 @@ loudly. Better here than silently in front of customers.
 | Variable | Notes |
 |---|---|
 | `CRON_SECRET` | At least 16 characters (`openssl rand -hex 32`). Authenticates `/api/cron/dispatch-sweep` and `/api/cron/rider-documents` as `Authorization: Bearer <secret>`. Unset or short → both routes answer 401 to everyone (fail closed): no off-hours re-offers, pickup reminders, delay alerts or scheduled announcement pushes, and no document expiry reminders. |
+| `DEVICE_HASH_PEPPER` | At least 16 characters (`openssl rand -hex 32`). Salts the one-way hash of an install id that is kept with each order for coupon-sharing detection (migration 0173). Unset or short: nothing is stored and the coupon-sharing rule falls back to matching drop points only. Never reuse another secret; changing it starts the matching afresh. |
 | `UPSTASH_REDIS_REST_URL` + `_TOKEN` (or `KV_REST_API_*`) | Not required. Rate limits default to Supabase Postgres (`0027_rate_limits.sql`). Redis is only an optional faster backend if you add it later. |
 
 ### Must be ABSENT (or empty) in production

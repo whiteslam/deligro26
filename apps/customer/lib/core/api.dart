@@ -37,9 +37,12 @@ class ApiException implements Exception {
 /// token behind the SDK's back. Should that still happen, [_adoptRotated]
 /// takes the server's new session so the app is not signed out.
 class ApiClient {
-  ApiClient(this._auth, {http.Client? client}) : _http = client ?? http.Client();
+  ApiClient(this._auth, {http.Client? client, this.deviceId}) : _http = client ?? http.Client();
 
   final GoTrueClient _auth;
+
+  /// The install id (see device_id.dart), sent with every call as `x-device-id`.
+  final String? deviceId;
   final http.Client _http;
   final _cookieName = sessionCookieName(Env.supabaseUrl);
 
@@ -51,6 +54,7 @@ class ApiClient {
       'accept': 'application/json',
       if (json) 'content-type': 'application/json',
       'x-client': 'deligro-customer-flutter/${Env.versionCode}',
+      if (deviceId != null) 'x-device-id': deviceId!,
     };
     var session = _auth.currentSession;
     if (session != null) {

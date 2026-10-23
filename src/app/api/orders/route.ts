@@ -13,6 +13,9 @@ import { recordDomain } from "@/lib/obs/emit";
 import { obsRequestContext } from "@/lib/obs/request";
 import { getLang } from "@/lib/i18n/server";
 import { translator } from "@/lib/i18n/lang";
+import { deferNotify } from "@/lib/notifications/defer";
+import { recordOrderClientMeta } from "@/lib/data-access/order-client-meta";
+import { DEVICE_COOKIE, DEVICE_HEADER, cookieValue, resolveDeviceId } from "@/lib/orders/device-id";
 
 function mapCreateError(message: string) {
   // Coupon refusals are the customer's to act on — retry without the code, or
@@ -163,7 +166,30 @@ export async function POST(request: Request) {
         paymentMethod: body.paymentMethod,
       },
     });
-    return NextResponse.json({ order }, { status: 201 });
+    // Which install placed it, kept only as a salted hash (migration 0173): the
+    // app sends its install id, the website carries one in a first-party cookie.
+    // Best effort, after the order exists, and never a reason for it to fail.
+    const device = resolveDeviceId(
+      request.headers.get(DEVICE_HEADER),
+      cookieValue(request.headers.get("cookie"), DEVICE_COOKIE),
+    );
+    const response = NextResponse.json({ order }, { status: 201 });
+    if (order?.id && device.id) {
+      const orderId = order.id;
+      const deviceId = device.id;
+      deferNotify(() => recordOrderClientMeta(orderId, deviceId));
+    }
+    // Only a request that had no id of its own is given one to keep.
+    if (device.fresh && device.id) {
+      response.cookies.set(DEVICE_COOKIE, device.id, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+      });
+    }
+    return response;
   } catch (err) {
     return orderFailure(err, { obs, t, body });
   }

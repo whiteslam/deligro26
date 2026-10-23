@@ -122,6 +122,8 @@ export const AUDIT_ACTIONS: readonly AuditActionDef[] = [
   { code: "sla_target.set", label: "Service-level target changed", group: "Alerts", sensitive: false },
   { code: "sla_target.reset", label: "Service-level target reset", group: "Alerts", sensitive: false },
   { code: "zone.dispatch_mode", label: "Zone dispatch mode changed", group: "Deliveries", sensitive: true },
+  { code: "fraud.dismiss", label: "Fraud case dismissed as a false positive", group: "Customers", sensitive: true },
+  { code: "fraud_rule.set", label: "Fraud rule changed", group: "Alerts", sensitive: false },
   // Access (0141)
   { code: "city.create", label: "City added", group: "Access", sensitive: false },
   { code: "zone.create", label: "Zone added", group: "Access", sensitive: false },

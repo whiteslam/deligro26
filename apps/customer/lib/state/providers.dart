@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/api.dart';
+import '../core/device_id.dart';
 import '../data/account_repository.dart';
 import '../data/catalog_repository.dart';
 import '../data/checkout_repository.dart';
@@ -12,12 +13,23 @@ import '../models/order.dart';
 import '../models/restaurant.dart';
 import '../models/settings.dart';
 import 'campaigns.dart';
+import 'prefs.dart';
 
 // ---------- Infrastructure ----------
 
 final supabaseProvider = Provider<SupabaseClient>((_) => Supabase.instance.client);
 
-final apiProvider = Provider<ApiClient>((ref) => ApiClient(ref.watch(supabaseProvider).auth));
+final apiProvider = Provider<ApiClient>((ref) {
+  // The install id rides along on every call. Without a prefs store (a test
+  // that never overrides it) there is simply none.
+  String? deviceId;
+  try {
+    deviceId = installId(ref.watch(prefsProvider));
+  } catch (_) {
+    deviceId = null;
+  }
+  return ApiClient(ref.watch(supabaseProvider).auth, deviceId: deviceId);
+});
 
 final catalogRepoProvider =
     Provider((ref) => CatalogRepository(ref.watch(supabaseProvider)));

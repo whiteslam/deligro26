@@ -104,6 +104,7 @@
     "test:manager-forecast": "tsx scripts/qa/manager-forecast.ts",
     "test:manager-insights-analytics": "tsx scripts/qa/manager-insights-analytics.ts",
     "test:manager-auto-assign": "tsx scripts/qa/manager-auto-assign.ts",
+    "test:manager-fraud": "tsx scripts/qa/manager-fraud.ts",
     "test:manager-orders": "tsx scripts/qa/manager-orders.ts",
     "test:manager-actions": "tsx scripts/qa/manager-order-actions.ts",
     "test:manager-contract": "tsx scripts/qa/manager-contract-emit.ts && tsx --conditions=react-server scripts/qa/manager-contract-phase5.ts && tsx --conditions=react-server scripts/qa/manager-contract-phase6.ts && tsx --conditions=react-server scripts/qa/manager-contract-phase7.ts && tsx --conditions=react-server scripts/qa/manager-contract-phase8.ts",
