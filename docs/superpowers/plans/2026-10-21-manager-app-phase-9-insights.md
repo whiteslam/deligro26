@@ -421,3 +421,39 @@ export function toJournalCsv(vouchers: Voucher[]): string;   // BOM + formula gu
 - **Rider:** `dispatchOrder` gains an auto-assign branch and `chooseRider` exposes `rankDispatchCandidates`; `deliveries.assignment_source` is stamped by the rider accept path (default trigger). Rider phase work that edits dispatch should merge `feat/manager-app` first. An auto-assigned rider receives the existing "assigned" push, not an offer ring.
 - **Customer app:** sends `x-device-id` (random install UUID) on API calls; the server stores only a peppered hash, service-role only.
 - **Owner steps:** set `DEVICE_HASH_PEPPER` (random 32+ bytes) and schedule `/api/cron/reports` (or rely on the dispatch sweep's throttled call) when deploying; fill in ledger names and the Tally company name in Admin → Settings → Accounting before the first export.
+
+## Resume here (Part S)
+
+Branch `feat/manager-p9-server` (worktree `deligro-manager-p9s`, based on a91f371). Tree clean when this was written.
+
+**Done (commits)**
+- S1 `ef7006d` — city filter on every manager route, `narrowScope`, city rollups, admin Reports/dashboard city filter.
+- S2 `2041f7a` — migration 0170 hourly rollups + sweep hook.
+- S3 `9b7f909` — forecast, backtest, riders needed (`insights/demand`, `insights/riders`).
+- S4 `90dc062` — migration 0171: zone grid + suggestions, vendor benchmarks, SLA targets/breaches (`insights/zones|vendors|sla|sla-targets`).
+- S5 `3ce570e` — migration 0172: per-zone automatic assignment, `insights/dispatch`, admin Zones toggle.
+- S6 (standalone only) `9631c34` — migration 0173 fraud rules/dismissals/SLA live, evaluators, fraud routes, customer app `x-device-id`.
+- S7 part 1 `2683a94` and `9cb6963` — migration 0174 (schedules, runs, bucket, accounting settings, runner RPCs; proof `migration-0174.mjs`, 91 checks), `pdf-lib`, `@pdf-lib/fontkit`, Roboto fonts, audit-catalog entries.
+
+**Not done**
+- **S7 rest:** `src/lib/ops/insights/schedules.ts` (presetPeriod, nextRunAt, eligibleRecipient, body parsers), `src/lib/reports/pdf/render.ts` (+ a pure layout function), the runner `runDueSchedules` with injected dependencies (lease `ops_claim_alert_run('report_schedules', 300)`), routes `report-schedules` (+ `[id]` PATCH/PUT/DELETE, `runs`, `run-now`), `report-runs/[id]` and `/download`, `src/app/api/cron/reports/route.ts`, `next.config.ts` `outputFileTracingIncludes` for the fonts, a throttled call in `sweep.ts`, 90-day file prune (`ops_prune_report_runs` + storage delete), `scripts/qa/manager-schedules.ts` + `test:manager-schedules`, ROUTE_SWITCH pins in manager-audit-coverage. Decisions already made: finance columns only if the owner AND every eligible recipient hold finance.view; the period is computed from the schedule's due time; run-now returns the existing run id when that period already ran; the push carries only the in-app path `/more/insights/reports/runs/<id>`; skipped recipients get reason `permission` or `zone` (plus `delivery` if the notify call wrote nothing); `PUT` with a full body is accepted for pause/resume; reuse `answerFromRpc` from `src/lib/ops/insights/rpc-errors.ts`; run-now claims the run row, answers 202, and does the work in `after()`.
+- **S8 (all):** `ops_accounting_lines` in 0174 (+ proof), `accounting.ts`, `tally.ts`, the `insights/accounting` route, admin Settings → Accounting page + action, `manager-accounting.ts` + `test:manager-accounting`, parity test with `getFinanceOverview`.
+- Final: one `next build` (check the fonts are traced), customer `flutter analyze/test` re-run, final report.
+
+**JSON deviations so far (app half)**
+- Demand `daily` rows carry an extra `hours`; `peak` is null when every hour is zero.
+- Plan example "8,0,…,0 ≈ 1.92" is wrong: correct is 2.22 (forecast rounds to 2.2).
+- `ops_vendor_benchmarks` returns one jsonb value (not a table); fraud candidates/cases likewise.
+- Fraud evidence lives in `ops_fraud_alerts` (not `ops_alerts.details`).
+- SLA target DELETE: reason optional.
+- Report schedules (planned): `recipientsSkipped[].reason` may also be `delivery`; recipients are accepted as ids (`recipientIds`).
+
+**Standing TODO — wire fraud and SLA into the alert engine at integration** (not edited here: `alerts/engine.ts`, `facts.ts`, `evaluate.ts`, `catalog.ts`)
+1. In the sweep evaluation: call `ops_fraud_candidates` → `evaluateFraud` → raise alerts, then `ops_attach_fraud_evidence`; call `ops_sla_live` → `evaluateSla`; clear with `ops_clear_alerts`.
+2. `alerts/catalog.ts`: mark `fraud_suspected` and `sla_breach` as `evaluated: "sweep"`; change `_ops_alert_unit('sla_breach')` from 'none' to 'percent' (SQL + catalog).
+3. Audience permission per fraud rule: `manager.customers.view` (rider cash gap: `manager.finance.view`).
+4. Call `ops_prune_order_client_meta` from the sweep.
+5. Resolve audit-catalog / ROUTE_SWITCH merge conflicts with Phases 7 and 8; add contract-test fixtures and `manager-contract-emit` emitters for all Phase 9 endpoints (I1).
+6. Owner steps: apply 0170–0174, set `DEVICE_HASH_PEPPER`, schedule `/api/cron/reports` once S7 is finished.
+
+**Checks at pause:** SQL proofs 0170 (37), 0171 (74), 0172 (58), 0173 (90), 0174 (91) and migration-order pass; QA area 33, forecast 59, insights-analytics 69, auto-assign 36, fraud 87, pii 111, audit-coverage 184 pass; `tsc --noEmit` (8 GB) clean. `next build`, eslint on all touched files and the customer Flutter tests were not re-run at pause.
