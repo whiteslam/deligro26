@@ -133,7 +133,7 @@ declare
   v_next     timestamptz;
   z          uuid;
   new_id     uuid;
-  act        text;
+  v_after    jsonb;
 begin
   if coalesce(auth.jwt() ->> 'role', '') not in ('service_role', 'supabase_admin') then
     raise exception 'forbidden' using errcode = '42501';
@@ -224,7 +224,6 @@ begin
                                            recipient_ids, active, owner_id, next_run_at)
       values (v_name, v_kind, v_filters, v_freq, v_weekday, v_hour, v_preset, v_zones, v_recips, v_active, p_actor, v_next)
       returning id into new_id;
-      act := 'report_schedule.create';
     else
       update public.report_schedules
          set name = v_name, kind = v_kind, filters = v_filters, frequency = v_freq, weekday = v_weekday, hour_ist = v_hour,
@@ -232,18 +231,23 @@ begin
              next_run_at = v_next, updated_at = now()
        where id = p_id;
       new_id := p_id;
-      act := 'report_schedule.update';
     end if;
   exception when check_violation or invalid_text_representation or invalid_datetime_format or numeric_value_out_of_range then
     raise exception 'bad_request' using errcode = '22023';
   end;
 
-  perform public._ops_log(p_actor, act, 'report_schedule', new_id::text, case when cardinality(v_zones) = 1 then v_zones[1] end, null,
-    case when p_id is null then null else jsonb_build_object('name', cur.name, 'kind', cur.kind, 'frequency', cur.frequency,
-      'hourIst', cur.hour_ist, 'active', cur.active, 'recipients', cardinality(cur.recipient_ids)) end,
-    jsonb_build_object('name', v_name, 'kind', v_kind, 'frequency', v_freq, 'hourIst', v_hour, 'rangePreset', v_preset,
-      'active', v_active, 'recipients', cardinality(v_recips), 'zones', coalesce(cardinality(v_zones), 0)),
-    p_client_action_id);
+  v_after := jsonb_build_object('name', v_name, 'kind', v_kind, 'frequency', v_freq, 'hourIst', v_hour, 'rangePreset', v_preset,
+    'active', v_active, 'recipients', cardinality(v_recips), 'zones', coalesce(cardinality(v_zones), 0));
+  if p_id is null then
+    perform public._ops_log(p_actor, 'report_schedule.create', 'report_schedule', new_id::text,
+      case when cardinality(v_zones) = 1 then v_zones[1] end, null, null, v_after, p_client_action_id);
+  else
+    perform public._ops_log(p_actor, 'report_schedule.update', 'report_schedule', new_id::text,
+      case when cardinality(v_zones) = 1 then v_zones[1] end, null,
+      jsonb_build_object('name', cur.name, 'kind', cur.kind, 'frequency', cur.frequency,
+        'hourIst', cur.hour_ist, 'active', cur.active, 'recipients', cardinality(cur.recipient_ids)),
+      v_after, p_client_action_id);
+  end if;
   return jsonb_build_object('id', new_id, 'replayed', false);
 end;
 $$;
