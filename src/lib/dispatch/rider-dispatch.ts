@@ -4,11 +4,14 @@ import { haversineKm } from "@/lib/geo/distance";
 import { getSettings } from "@/lib/settings";
 import { kitchenPrepMinutes } from "@/lib/orders/eta";
 import {
+  notifyDriverAssigned,
   notifyDriverOrderCancelled,
   notifyDriverPickupOffered,
   notifyDriverPickupReady,
+  notifyVendorRiderAssigned,
   stopRiderRing,
 } from "@/lib/notifications/order-events";
+import { runAutoAssign, zoneDispatchConfig, type ZoneDispatchConfig } from "@/lib/dispatch/auto-assign";
 import { deferNotify } from "@/lib/notifications/defer";
 import { staleOfferee } from "@/lib/alerts/ring";
 import {
@@ -428,6 +431,46 @@ async function pendingOffersByRider(
 }
 
 /**
+ * Every rider who could take a pickup at `from`, best first.
+ *
+ * The order is the rule at the top of this file: anyone not already committed
+ * comes before anyone who is; among the equally committed, the nearest the
+ * shop wins, then the name. Sorting the whole roster by (commitments, distance,
+ * name) is that rule - the free riders are exactly those with no commitments,
+ * so they sort first - and it gives automatic assignment its fallbacks in the
+ * same order the offer would have used.
+ */
+export async function rankDispatchCandidates(
+  from: Point | null,
+  opts: { now?: number; exceptOrderId?: string; excludeRiderIds?: string[]; orderZoneId?: string | null } = {}
+): Promise<RiderChoice[]> {
+  const supabase = createAdminClient();
+  const now = opts.now ?? Date.now();
+
+  // Riders who already let an offer for this order lapse (see sweep.ts). Asking
+  // the same person again is how an ignored offer used to become a stranded one.
+  const excluded = new Set(opts.excludeRiderIds ?? []);
+  const candidates = (
+    await loadCandidates(supabase, from, now, opts.exceptOrderId, opts.orderZoneId)
+  ).filter((c) => !excluded.has(c.id));
+
+  return [...candidates]
+    .sort(
+      (a, b) =>
+        a.commitments - b.commitments ||
+        a.sortKey - b.sortKey ||
+        a.name.localeCompare(b.name)
+    )
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      distanceKm: c.distanceKm,
+      activeJobs: c.activeJobs,
+      pendingOffers: c.pendingOffers,
+    }));
+}
+
+/**
  * Pick the rider to offer a pickup at `from` to, or null when there are no
  * riders on the platform at all.
  *
@@ -438,43 +481,7 @@ export async function chooseRider(
   from: Point | null,
   opts: { now?: number; exceptOrderId?: string; excludeRiderIds?: string[]; orderZoneId?: string | null } = {}
 ): Promise<RiderChoice | null> {
-  const supabase = createAdminClient();
-  const now = opts.now ?? Date.now();
-
-  // Riders who already let an offer for this order lapse (see sweep.ts). Asking
-  // the same person again is how an ignored offer used to become a stranded one.
-  const excluded = new Set(opts.excludeRiderIds ?? []);
-  const candidates = (
-    await loadCandidates(supabase, from, now, opts.exceptOrderId, opts.orderZoneId)
-  ).filter((c) => !excluded.has(c.id));
-  if (candidates.length === 0) return null;
-
-  // Rule 1: anyone not already committed — neither mid-delivery nor holding an
-  // offer they haven't answered. Only if the whole fleet is committed do we
-  // consider the rest, and then the least-loaded first, so a rider on their
-  // second job is not handed a third while somebody else carries one.
-  const free = candidates.filter((c) => c.commitments === 0);
-  const pool = free.length > 0 ? free : candidates;
-
-  // Within the pool: nearest the shop wins. That is rule 2 for a free fleet and
-  // rule 3 for a busy one — the tie-break on `commitments` above means the
-  // distance comparison only ever runs between equally-loaded riders.
-  const best = [...pool].sort(
-    (a, b) =>
-      a.commitments - b.commitments ||
-      a.sortKey - b.sortKey ||
-      a.name.localeCompare(b.name)
-  )[0];
-
-  return best
-    ? {
-        id: best.id,
-        name: best.name,
-        distanceKm: best.distanceKm,
-        activeJobs: best.activeJobs,
-        pendingOffers: best.pendingOffers,
-      }
-    : null;
+  return (await rankDispatchCandidates(from, opts))[0] ?? null;
 }
 
 interface DispatchOrderRow {
@@ -644,6 +651,8 @@ export interface DispatchResult {
   rider: RiderChoice | null;
   /** False when the offer could not be recorded (pre-0042, or already taken). */
   offered: boolean;
+  /** True when the zone is on automatic assignment and the rider now holds the order. */
+  autoAssigned?: boolean;
 }
 
 /**
@@ -663,6 +672,76 @@ async function readOrderZone(
     throw error;
   }
   return (data as { zone_id: string | null } | null)?.zone_id ?? null;
+}
+
+/**
+ * The zone's dispatch setting (migration 0172). A database without the columns,
+ * or any read failure, is the offer mode - exactly the behaviour that existed
+ * before automatic assignment.
+ */
+async function readZoneDispatch(
+  supabase: ReturnType<typeof createAdminClient>,
+  zoneId: string | null | undefined
+): Promise<ZoneDispatchConfig> {
+  if (!zoneId) return zoneDispatchConfig(null);
+  const { data, error } = await supabase
+    .from("delivery_zones")
+    .select("dispatch_mode, auto_assign_max_load")
+    .eq("id", zoneId)
+    .maybeSingle();
+  return zoneDispatchConfig(error ? null : data);
+}
+
+/**
+ * Put the order straight on the best eligible rider, asking the database to
+ * accept up to three of them in turn. The only write is the database function
+ * `ops_auto_assign_delivery`, which re-checks eligibility and load under a lock
+ * on the order - so two runs for one order, or a rider going offline in between,
+ * cannot produce two assigned legs or an ineligible rider.
+ *
+ * `fallback` means nobody took it and the caller offers the order as it always
+ * has; `taken` means someone already holds it.
+ */
+async function tryAutoAssign(
+  supabase: ReturnType<typeof createAdminClient>,
+  args: {
+    orderId: string;
+    from: Point | null;
+    maxLoad: number;
+    choose: { now?: number; exceptOrderId?: string; excludeRiderIds?: string[]; orderZoneId?: string | null };
+    restaurantName: string;
+  }
+): Promise<{ kind: "assigned"; rider: RiderChoice } | { kind: "taken" } | { kind: "fallback" }> {
+  const ranked = await rankDispatchCandidates(args.from, args.choose);
+  const outcome = await runAutoAssign(ranked, args.maxLoad, async (rider) => {
+    const { data, error } = await supabase.rpc("ops_auto_assign_delivery", {
+      p_order: args.orderId,
+      p_rider: rider.id,
+      p_max_load: args.maxLoad,
+    });
+    return { error: !!error, result: (data as string | null) ?? null };
+  });
+
+  if (outcome.kind === "assigned") {
+    const rider = outcome.rider;
+    // A rider who was only offered the order before (a heads-up that lapsed,
+    // or an offer from before the zone switched) stops ringing for it.
+    const { data: leg } = await supabase.from("deliveries").select("offered_driver_id").eq("order_id", args.orderId).maybeSingle();
+    const stale = staleOfferee((leg as { offered_driver_id: string | null } | null)?.offered_driver_id ?? null, rider.id);
+    if (stale) deferNotify(() => stopRiderRing(stale, args.orderId));
+    deferNotify(async () => {
+      await Promise.all([
+        notifyDriverAssigned(rider.id, { orderId: args.orderId, restaurantName: args.restaurantName }),
+        notifyVendorRiderAssigned(args.orderId, rider.name),
+      ]);
+    });
+    return { kind: "assigned", rider };
+  }
+  if (outcome.kind === "taken") return { kind: "taken" };
+
+  // Nobody took it: say so on the delivery (best effort; the offer path is next).
+  await supabase.rpc("ops_mark_auto_fallback", { p_order: args.orderId });
+  return { kind: "fallback" };
 }
 
 /**
@@ -701,12 +780,26 @@ export async function dispatchOrder(
     const shop = one(data.restaurants);
     const from = pointOf(shop?.lat, shop?.lng);
 
-    const rider = await chooseRider(from, {
-      now,
-      exceptOrderId: orderId,
-      excludeRiderIds: opts.excludeRiderIds,
-      orderZoneId: await readOrderZone(supabase, orderId),
-    });
+    const orderZoneId = await readOrderZone(supabase, orderId);
+    const choose = { now, exceptOrderId: orderId, excludeRiderIds: opts.excludeRiderIds, orderZoneId };
+
+    // A zone on automatic assignment gives the order to the best eligible rider
+    // outright. Anything it cannot place falls through to the offer below,
+    // which is the whole of dispatch for every other zone.
+    const zoneCfg = await readZoneDispatch(supabase, orderZoneId);
+    if (zoneCfg.mode === "auto_assign") {
+      const assigned = await tryAutoAssign(supabase, {
+        orderId,
+        from,
+        maxLoad: zoneCfg.maxLoad,
+        choose,
+        restaurantName: shop?.name?.trim() || "the restaurant",
+      });
+      if (assigned.kind === "assigned") return { rider: assigned.rider, offered: false, autoAssigned: true };
+      if (assigned.kind === "taken") return empty;
+    }
+
+    const rider = await chooseRider(from, choose);
     if (!rider) return empty;
 
     const { outcome, previousOfferee } = await writeOffer(supabase, orderId, rider.id, now);

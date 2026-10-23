@@ -118,6 +118,10 @@ export const AUDIT_ACTIONS: readonly AuditActionDef[] = [
   { code: "alert.incident", label: "Incident raised", group: "Alerts", sensitive: false },
   { code: "alert_rule.set", label: "Alert threshold changed", group: "Alerts", sensitive: false },
   { code: "alert_rule.reset", label: "Alert threshold reset", group: "Alerts", sensitive: false },
+  // Insights (0171, 0172): filed under existing groups so the audit filters need no new one.
+  { code: "sla_target.set", label: "Service-level target changed", group: "Alerts", sensitive: false },
+  { code: "sla_target.reset", label: "Service-level target reset", group: "Alerts", sensitive: false },
+  { code: "zone.dispatch_mode", label: "Zone dispatch mode changed", group: "Deliveries", sensitive: true },
   // Access (0141)
   { code: "city.create", label: "City added", group: "Access", sensitive: false },
   { code: "zone.create", label: "Zone added", group: "Access", sensitive: false },

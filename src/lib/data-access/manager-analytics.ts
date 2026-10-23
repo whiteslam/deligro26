@@ -58,3 +58,39 @@ export async function loadSlaTargets(scope: ManagerScope): Promise<SlaTarget[]> 
   }
   return slaTargets(rows, inScope, people);
 }
+
+export type DispatchZone = {
+  zoneId: string;
+  name: string;
+  cityName: string;
+  mode: "offer" | "auto_assign";
+  autoAssignMaxLoad: number;
+  updatedBy: { id: string; name: string } | null;
+  updatedAt: string | null;
+  last24h: { auto: number; offerAccepted: number; ops: number; fellBackToOffer: number };
+};
+
+/** Each zone's dispatch mode and what happened in the last 24 hours (migration 0172). */
+export async function loadDispatchOverview(scope: ManagerScope): Promise<DispatchZone[]> {
+  const db = createAdminClient();
+  const { data, error } = await db.rpc("ops_dispatch_overview", scopeArgs(scope));
+  if (error) throw error;
+  const rows = (data ?? []) as (Omit<DispatchZone, "updatedBy"> & { updatedBy: string | null })[];
+
+  const ids = [...new Set(rows.map((r) => r.updatedBy).filter((x): x is string => !!x))];
+  const people = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data: ps } = await db.from("profiles").select("id, full_name").in("id", ids);
+    for (const p of (ps ?? []) as { id: string; full_name: string | null }[]) people.set(p.id, p.full_name?.trim() || "Staff");
+  }
+  return rows.map((r) => ({
+    ...r,
+    last24h: {
+      auto: Number(r.last24h.auto),
+      offerAccepted: Number(r.last24h.offerAccepted),
+      ops: Number(r.last24h.ops),
+      fellBackToOffer: Number(r.last24h.fellBackToOffer),
+    },
+    updatedBy: r.updatedBy ? { id: r.updatedBy, name: people.get(r.updatedBy) ?? "Staff" } : null,
+  }));
+}

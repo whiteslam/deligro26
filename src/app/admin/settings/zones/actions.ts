@@ -1,11 +1,13 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { isUuid, slugify, validateZoneInput, type ZoneInput } from "@/lib/auth/manager-scope";
 import { rateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { parseDispatchBody } from "@/lib/ops/insights/dispatch-contract";
 
 /**
  * Cities, zones, and which staff work which zone (migration 0141).
@@ -46,6 +48,8 @@ function failure(error: { code?: string; message?: string } | null): ZoneActionR
   }
   if (/not_staff/.test(message)) return { ok: false, error: "Zones are assigned to managers and riders only." };
   if (/not_found/.test(message)) return { ok: false, error: "Unknown zone." };
+  if (/reason_required/.test(message)) return { ok: false, error: "Write a reason (3 to 300 characters)." };
+  if (/bad_request/.test(message)) return { ok: false, error: "Check the mode and the load." };
   if (error?.code === "23503") return { ok: false, error: "Unknown zone." };
   return { ok: false, error: "Couldn't save. Try again." };
 }
@@ -131,6 +135,41 @@ export async function setManagerZonesAction(input: {
     p_actor: g.adminId,
     p_user: input.managerId,
     p_zone_ids: zoneIds,
+  });
+  return error ? failure(error) : done();
+}
+
+/**
+ * Switch a zone between rider offers and automatic assignment (migration 0172).
+ * The same audited RPC the Manager app uses (`zone.dispatch_mode`), so an admin
+ * change is recorded the same way, with its reason.
+ */
+export async function setZoneDispatchAction(input: {
+  zoneId: string;
+  mode: string;
+  maxLoad: number;
+  reason: string;
+}): Promise<ZoneActionResult> {
+  const g = await gate();
+  if ("ok" in g) return g;
+  const parsed = parseDispatchBody({
+    zoneId: input.zoneId,
+    mode: input.mode,
+    autoAssignMaxLoad: input.maxLoad,
+    reason: input.reason,
+    clientActionId: randomUUID(),
+  });
+  if (!parsed.ok) {
+    return { ok: false, error: parsed.error === "reason_required" ? "Write a reason (3 to 300 characters)." : "Check the mode and the load." };
+  }
+  const v = parsed.value;
+  const { error } = await createAdminClient().rpc("ops_set_zone_dispatch", {
+    p_actor: g.adminId,
+    p_zone: v.zoneId,
+    p_mode: v.mode,
+    p_max_load: v.autoAssignMaxLoad,
+    p_reason: v.reason,
+    p_client_action_id: v.clientActionId,
   });
   return error ? failure(error) : done();
 }

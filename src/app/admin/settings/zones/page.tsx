@@ -4,7 +4,9 @@ import { AdminHero, EmptyState, PreviewNotice } from "@/components/admin/admin-u
 import { Figure, FigureRow } from "@/components/admin/console";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { listCitiesWithZones, type CityZones } from "@/lib/data-access/zones";
+import { loadDispatchOverview, type DispatchZone } from "@/lib/data-access/manager-analytics";
 import { ZonesManager } from "./zones-manager";
+import { DispatchModes } from "./dispatch-modes";
 
 /**
  * Settings → Zones. The cities Deligro runs in and the delivery zones inside
@@ -27,6 +29,11 @@ export default async function AdminZonesPage() {
     }
   }
   const zones = cities.flatMap((c) => c.zones);
+  // Absent before migration 0172: the section simply is not shown.
+  let dispatch: DispatchZone[] | null = null;
+  if (isSupabaseConfigured && !missing) {
+    dispatch = await loadDispatchOverview({ all: true }).catch(() => null);
+  }
 
   return (
     <>
@@ -53,6 +60,7 @@ export default async function AdminZonesPage() {
             <Figure label="Zones" value={zones.length} note={`${zones.filter((z) => z.isActive).length} active`} />
           </FigureRow>
           <ZonesManager cities={cities} disabled={!isSupabaseConfigured} />
+          {dispatch ? <DispatchModes zones={dispatch} disabled={!isSupabaseConfigured} /> : null}
         </>
       )}
     </>

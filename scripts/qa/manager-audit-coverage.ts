@@ -180,6 +180,8 @@ console.log("\n── 3. each write behind its switch ──");
 /** Write route → the switch it opens with ("" = any manager; per-action checks are pinned below). */
 const ROUTE_SWITCH: Record<string, string> = {
   "alert-rules/route.ts": "manager.alerts.configure",
+  "insights/sla-targets/route.ts": "manager.alerts.configure",
+  "insights/dispatch/route.ts": "manager.dispatch.configure",
   "alerts/[id]/actions/route.ts": "",
   "alerts/incident/route.ts": "",
   "customers/[id]/actions/route.ts": "manager.customers.view",
