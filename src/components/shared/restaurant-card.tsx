@@ -59,7 +59,7 @@ export function RestaurantCard({
         />
         {/* Temporarily hidden — offer banner not needed right now
         {r.offer ? (
-          <span className="pill-deal absolute left-2.5 top-2.5 inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold uppercase tracking-wide">
+          <span className="pill-deal absolute left-2.5 top-2.5 inline-flex items-center gap-1 px-2 py-1 text-[12px] font-semibold">
             <BadgePercent className="size-3.5" />
             {r.offer}
           </span>
@@ -75,12 +75,12 @@ export function RestaurantCard({
             behind. */}
         {/* A paid placement says so (0160): honest labelling, always. */}
         {featuredId ? (
-          <span className="pill-pop absolute left-2.5 top-2.5 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+          <span className="pill-pop absolute left-2.5 top-2.5 rounded-md px-2 py-0.5 text-[12px] font-semibold">
             {t("Featured", "फ़ीचर्ड")}
           </span>
         ) : null}
         {!r.open ? (
-          <span className="absolute bottom-2.5 right-2.5 rounded-full bg-ink px-2.5 py-1 text-xs font-semibold text-white">
+          <span className="absolute bottom-2.5 right-2.5 rounded-full bg-ink px-2.5 py-1 text-xs font-semibold text-[color:var(--surface)]">
             {t("Closed", "बंद")}
           </span>
         ) : null}
@@ -101,7 +101,7 @@ export function RestaurantCard({
           {r.name}
         </h3>
         <p className="mt-0.5 truncate text-[12px] text-muted">
-          {r.cuisines.join(" · ")}
+          {r.cuisines.join(", ")}
         </p>
         <div className="mt-1.5 flex items-center gap-2 text-[12px] font-medium text-muted">
           <span className="inline-flex items-center gap-1">

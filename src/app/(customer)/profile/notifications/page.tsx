@@ -149,7 +149,7 @@ function ActivityFeed({
                     {ago(e.at, t)}
                   </span>
                 </span>
-                <span className="text-data mt-0.5 block text-[11px] font-bold tracking-[0.1em] text-muted">
+                <span className="text-data mt-0.5 block text-[12px] font-semibold text-muted">
                   {shortOrderId(e.orderId)}
                 </span>
                 {e.detail ? (
@@ -195,7 +195,7 @@ export default async function NotificationsPage() {
       */}
       <ActivityFeed activity={activity} t={t} />
 
-      <h2 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
+      <h2 className="mb-2 px-1 text-[15px] font-bold text-ink">
         {t("Settings", "सेटिंग")}
       </h2>
 

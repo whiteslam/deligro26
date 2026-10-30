@@ -39,8 +39,6 @@ function toWaNumber(configured: string | undefined): string {
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB, matching the avatar upload limit
 const OK_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-const WA_GREEN = "#25D366";
-
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MON = [
   "Jan",
@@ -207,16 +205,16 @@ export function GroceryListHero({
 
   return (
     <section className="px-4">
-      <div className="overflow-hidden rounded-3xl bg-[linear-gradient(150deg,#f2a71b_0%,#e59a01_55%,#d98600_100%)] p-5 text-white">
+      <div className="overflow-hidden rounded-3xl bg-[linear-gradient(150deg,var(--hero-amber-1)_0%,var(--hero-amber-2)_55%,var(--hero-amber-3)_100%)] p-5 text-[var(--on-amber)]">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-[11px] font-bold uppercase tracking-wide">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/35 px-3 py-1 text-[12px] font-semibold">
               <ShoppingBag className="size-3.5" /> {t("Groceries", "किराना")}
             </span>
             <h2 className="mt-3 text-[24px] font-extrabold leading-tight tracking-tight">
               {t("Order groceries", "किराना मंगाएं")}
             </h2>
-            <p className="mt-1.5 text-[13.5px] font-medium leading-snug text-white/90">
+            <p className="mt-1.5 text-[13.5px] font-medium leading-snug">
               {t(
                 "No time to browse? Send us your list and we shop it for you.",
                 "समय नहीं है? अपनी सूची भेजें, हम सामान लेकर आएंगे।",
@@ -246,14 +244,13 @@ export function GroceryListHero({
               "e.g. 2kg atta, 1 dozen eggs, Amul butter 500g, 1L milk…",
               "जैसे: 2 किलो आटा, 1 दर्जन अंडे, अमूल मक्खन 500 ग्राम, 1 लीटर दूध…",
             )}
-            className="mt-2 min-h-[130px] w-full resize-none rounded-xl bg-surface-2 p-3.5 text-[14px] leading-relaxed text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[#25D366]"
+            className="mt-2 min-h-[130px] w-full resize-none rounded-xl bg-surface-2 p-3.5 text-[14px] leading-relaxed text-ink placeholder:text-muted focus:ring-2 focus:ring-[var(--whatsapp)]"
           />
           <button
             type="button"
             onClick={sendList}
             disabled={note.trim().length === 0}
-            style={{ backgroundColor: WA_GREEN }}
-            className="press mt-2.5 flex w-full items-center justify-center gap-2 rounded-full py-3 text-[14px] font-bold text-white shadow-sm transition disabled:opacity-45"
+            className="press mt-2.5 flex w-full items-center justify-center gap-2 rounded-full bg-[var(--whatsapp)] py-3 text-[14px] font-bold text-[var(--on-whatsapp)] shadow-sm disabled:cursor-not-allowed disabled:opacity-55"
           >
             <WhatsAppIcon className="size-[18px]" />{" "}
             {t("Send list on WhatsApp", "सूची व्हाट्सऐप पर भेजें")}
@@ -290,7 +287,7 @@ export function GroceryListHero({
                 type="button"
                 onClick={clearPhoto}
                 aria-label={t("Remove photo", "फ़ोटो हटाएं")}
-                className="press grid size-8 shrink-0 place-items-center rounded-full bg-line text-ink"
+                className="press tap-target grid size-8 shrink-0 place-items-center rounded-full bg-line text-ink"
               >
                 <X className="size-4" />
               </button>
@@ -307,7 +304,7 @@ export function GroceryListHero({
           )}
 
           {error ? (
-            <p className="mt-2 text-[12.5px] font-semibold text-red-600">
+            <p className="mt-2 text-[12.5px] font-semibold text-deal">
               {error}
             </p>
           ) : null}
@@ -316,8 +313,7 @@ export function GroceryListHero({
             type="button"
             onClick={sendPhoto}
             disabled={!photo}
-            style={{ backgroundColor: WA_GREEN }}
-            className="press mt-2.5 flex w-full items-center justify-center gap-2 rounded-full py-3 text-[14px] font-bold text-white shadow-sm transition disabled:opacity-45"
+            className="press mt-2.5 flex w-full items-center justify-center gap-2 rounded-full bg-[var(--whatsapp)] py-3 text-[14px] font-bold text-[var(--on-whatsapp)] shadow-sm disabled:cursor-not-allowed disabled:opacity-55"
           >
             <WhatsAppIcon className="size-[18px]" />{" "}
             {t("Send photo on WhatsApp", "फ़ोटो व्हाट्सऐप पर भेजें")}
@@ -333,8 +329,7 @@ export function GroceryListHero({
         <button
           type="button"
           onClick={chat}
-          style={{ color: WA_GREEN }}
-          className="press mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-surface py-3 text-[14px] font-extrabold shadow-sm"
+          className="press mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-surface py-3 text-[14px] font-extrabold text-green shadow-sm"
         >
           <WhatsAppIcon className="size-[18px]" />{" "}
           {t("Chat with us on WhatsApp", "व्हाट्सऐप पर हमसे बात करें")}
@@ -343,7 +338,7 @@ export function GroceryListHero({
         {/* Reorder history — past typed lists, one tap to send again */}
         {history.length > 0 ? (
           <div className="mt-5">
-            <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-white/70">
+            <p className="text-[13px] font-bold">
               {t("Recent lists", "पिछली सूचियां")}
             </p>
             <ul className="mt-2 space-y-2">
@@ -356,17 +351,17 @@ export function GroceryListHero({
                       `Reorder list from ${formatDate(h.ts, lang)}`,
                       `${formatDate(h.ts, lang)} की सूची फिर से भेजें`,
                     )}
-                    className="press flex w-full items-center gap-3 rounded-2xl bg-white/15 p-3 text-left"
+                    className="press flex w-full items-center gap-3 rounded-2xl bg-white/35 p-3 text-left"
                   >
                     <div className="min-w-0 flex-1">
-                      <span className="text-[11px] font-bold text-white/70">
+                      <span className="text-[12px] font-semibold">
                         {formatDate(h.ts, lang)}
                       </span>
-                      <p className="truncate text-[13px] font-medium text-white">
+                      <p className="truncate text-[13px] font-medium">
                         {h.text}
                       </p>
                     </div>
-                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-[12px] font-bold text-[#c56a00]">
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-[12px] font-bold text-[var(--on-amber)]">
                       <RotateCcw className="size-3.5" />{" "}
                       {t("Reorder", "फिर से मंगाएं")}
                     </span>

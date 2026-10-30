@@ -842,11 +842,20 @@ export function CheckoutView({ config }: Readonly<{ config: CheckoutConfig }>) {
   // The address card: still loading, the add form, or the chosen address.
   function addressCard() {
     if (addrLoading) {
+      // Shaped like the address row it turns into, so the card does not
+      // change height the moment the addresses arrive. The words stay for
+      // screen readers.
       return (
-        <p className="flex items-center gap-2 p-4 text-sm text-muted">
-          <Loader2 className="size-4 animate-spin" />{" "}
-          {t("Loading your addresses…", "आपके पते लोड हो रहे हैं…")}
-        </p>
+        <div className="flex animate-pulse items-center gap-3 px-4 py-3.5" role="status">
+          <span className="size-9 shrink-0 rounded-xl bg-surface-2" />
+          <span className="min-w-0 flex-1 space-y-2">
+            <span className="block h-4 w-1/3 rounded bg-surface-2" />
+            <span className="block h-3 w-2/3 rounded bg-surface-2" />
+          </span>
+          <span className="sr-only">
+            {t("Loading your addresses…", "आपके पते लोड हो रहे हैं…")}
+          </span>
+        </div>
       );
     }
     if (showAddForm) {
@@ -1298,7 +1307,7 @@ export function CheckoutView({ config }: Readonly<{ config: CheckoutConfig }>) {
         <button
           onClick={placeOrder}
           disabled={status !== "ready" || orderBlocked}
-          className="press flex h-12 w-full items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:opacity-70"
+          className="press flex h-12 w-full items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:cursor-not-allowed disabled:opacity-70"
         >
           {placeOrderLabel()}
         </button>
@@ -1611,7 +1620,7 @@ function PaymentOption({
         <span className="flex flex-wrap items-center gap-2">
           <span className="text-[15px] font-semibold">{label}</span>
           {badge ? (
-            <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-muted">
+            <span className="rounded-full bg-surface px-2 py-0.5 text-[12px] font-semibold text-muted">
               {badge}
             </span>
           ) : null}
@@ -1648,7 +1657,7 @@ function CheckoutHeader({
       <button
         onClick={onBack}
         aria-label={t("Go back", "वापस जाएं")}
-        className="press grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
+        className="press tap-target grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
       >
         <ChevronLeft className="size-5" />
       </button>
@@ -1659,7 +1668,7 @@ function CheckoutHeader({
         <button
           onClick={onClear}
           aria-label={t("Clear cart", "टोकरी खाली करें")}
-          className="press grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
+          className="press tap-target grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
         >
           <Trash2 className="size-[18px]" />
         </button>
@@ -1734,7 +1743,7 @@ function DetailsSheet({
             type="button"
             onClick={onClose}
             aria-label={t("Close", "बंद करें")}
-            className="press grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
+            className="press tap-target grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
           >
             <X className="size-5" />
           </button>

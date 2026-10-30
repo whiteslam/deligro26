@@ -122,7 +122,7 @@ function ItemSheetInner() {
             <button
               onClick={onClose}
               aria-label={t("Close", "बंद करें")}
-              className="press absolute right-4 top-4 grid size-9 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
+              className="press tap-target absolute right-4 top-4 grid size-9 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
             >
               <X className="size-5" />
             </button>
@@ -130,7 +130,7 @@ function ItemSheetInner() {
 
           <div className="px-5 pb-5 pt-4">
             {item.bestseller || item.popular ? (
-              <span className="pill-pop mb-2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+              <span className="pill-pop mb-2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12px] font-semibold">
                 {t("Popular", "लोकप्रिय")}
               </span>
             ) : null}
@@ -180,7 +180,7 @@ function ItemSheetInner() {
           <button
             onClick={commit}
             disabled={!canAdd}
-            className="press flex h-12 flex-1 items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:opacity-50"
+            className="press flex h-12 flex-1 items-center justify-between rounded-full bg-accent px-5 text-[16px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span>
               {commitLabel}
@@ -258,7 +258,7 @@ function OptionsPicker({
     return t(`Required · pick ${g.minSelect}–${g.maxSelect}`, `ज़रूरी · ${g.minSelect}–${g.maxSelect} चुनें`);
   };
 
-  const row = "flex min-h-12 w-full items-center gap-3 px-5 py-2 text-left disabled:opacity-45";
+  const row = "flex min-h-12 w-full items-center gap-3 px-5 py-2 text-left disabled:cursor-not-allowed disabled:opacity-45";
   const mark = (on: boolean, round: boolean) =>
     `grid size-5 shrink-0 place-items-center border-2 ${round ? "rounded-full" : "rounded-md"} ${
       on ? "border-accent bg-accent" : "border-line"

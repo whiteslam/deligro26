@@ -51,21 +51,21 @@ export function MenuItemRow({
   function addControl() {
     if (!restaurant.open) {
       return (
-        <span className="absolute inset-x-0 bottom-0 rounded-b-lg bg-black/65 py-1 text-center text-[11px] font-bold uppercase tracking-wide text-white">
+        <span className="absolute inset-x-0 bottom-0 rounded-b-lg bg-black/65 py-1 text-center text-[12px] font-semibold text-white">
           {t("Closed", "बंद")}
         </span>
       );
     }
     if (item.soldOut) {
       return (
-        <span className="absolute inset-x-0 bottom-0 rounded-b-xl bg-ink/70 py-1 text-center text-[11px] font-bold uppercase tracking-wide text-white">
+        <span className="absolute inset-x-0 bottom-0 rounded-b-xl bg-black/65 py-1 text-center text-[12px] font-semibold text-white">
           {t("Sold out", "ख़त्म हो गया")}
         </span>
       );
     }
     if (!offered) {
       return (
-        <span className="absolute inset-x-0 bottom-0 rounded-b-xl bg-ink/70 py-1 text-center text-[11px] font-bold uppercase tracking-wide text-white">
+        <span className="absolute inset-x-0 bottom-0 rounded-b-xl bg-black/65 py-1 text-center text-[12px] font-semibold text-white">
           {t("Not now", "अभी नहीं")}
         </span>
       );
@@ -129,12 +129,12 @@ export function MenuItemRow({
         className="min-w-0 flex-1 text-left"
       >
         {item.bestseller || item.popular ? (
-          <span className="pill-pop mb-1.5 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+          <span className="pill-pop mb-1.5 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12px] font-semibold">
             {t("Popular", "लोकप्रिय")}
           </span>
         ) : null}
         {item.sponsored ? (
-          <span className="mb-1.5 inline-flex items-center rounded-md border border-line px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-muted">
+          <span className="mb-1.5 inline-flex items-center rounded-md border border-line px-2 py-0.5 text-[12px] font-semibold text-muted">
             {t("Sponsored", "प्रायोजित")}
           </span>
         ) : null}

@@ -92,7 +92,7 @@ export function ReorderReviewDialog() {
                 confirm();
                 openCart();
               }}
-              className="press h-12 flex-1 rounded-full bg-accent text-[15px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:opacity-40"
+              className="press h-12 flex-1 rounded-full bg-accent text-[15px] font-bold text-[var(--on-accent)] shadow-[var(--glow-accent)] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {nothingLeft
                 ? t("Nothing left to order", "ऑर्डर करने को कुछ नहीं बचा")

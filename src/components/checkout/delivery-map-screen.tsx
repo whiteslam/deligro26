@@ -115,7 +115,7 @@ export function DeliveryMapScreen({
           type="button"
           onClick={onClose}
           aria-label={t("Go back", "वापस जाएं")}
-          className="press grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
+          className="press tap-target grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
         >
           <ChevronLeft className="size-5" />
         </button>
@@ -169,7 +169,7 @@ export function DeliveryMapScreen({
             type="button"
             onClick={onSavePin}
             disabled={pinBusy}
-            className="press w-full rounded-xl border border-accent bg-accent-soft py-2.5 text-sm font-bold text-accent-ink disabled:opacity-60"
+            className="press w-full rounded-xl border border-accent bg-accent-soft py-2.5 text-sm font-bold text-accent-ink disabled:cursor-not-allowed disabled:opacity-60"
           >
             {pinBusy ? (
               <Loader2 className="mx-auto size-4 animate-spin" />

@@ -38,7 +38,7 @@ const ICON_TONE = {
   green: "bg-green/12 text-green",
   blue: "bg-blue/12 text-blue",
   deal: "bg-deal/12 text-deal",
-  violet: "bg-violet-500/15 text-violet-500",
+  violet: "bg-violet/15 text-violet",
 } as const;
 
 type IconTone = keyof typeof ICON_TONE;
@@ -170,8 +170,7 @@ export default async function ProfilePage() {
             </p>
             {summary.isDeveloper ? (
               <span
-                className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide"
-                style={{ backgroundColor: "#ffc531", color: "#3d2800" }}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-pop px-2 py-0.5 text-[12px] font-bold text-pop-ink"
               >
                 <Code2 className="size-3" />
                 {t("Developer", "डेवलपर")}
@@ -324,7 +323,7 @@ export default async function ProfilePage() {
 function SectionHead({ title, action }: Readonly<{ title: string; action?: string }>) {
   return (
     <div className="mb-2 mt-7 flex items-end justify-between">
-      <h2 className="text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
+      <h2 className="text-[15px] font-bold text-ink">
         {title}
       </h2>
       {action ? (

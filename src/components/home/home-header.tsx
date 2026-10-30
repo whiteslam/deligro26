@@ -150,7 +150,7 @@ export function HomeHeader({
                 {locationIcon}
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
+                <span className="text-[12px] font-semibold text-muted">
                   {detecting
                     ? t("Locating…", "जगह खोज रहे हैं…")
                     : t("Deliver to", "यहां पहुंचाएं")}
@@ -182,7 +182,7 @@ export function HomeHeader({
             <Link
               href="/profile"
               aria-label={t("Profile", "प्रोफ़ाइल")}
-              className="press grid size-11 shrink-0 place-items-center rounded-full bg-violet-500/15 text-violet-500"
+              className="press grid size-11 shrink-0 place-items-center rounded-full bg-violet/15 text-violet"
             >
               <User className="size-[18px]" />
             </Link>

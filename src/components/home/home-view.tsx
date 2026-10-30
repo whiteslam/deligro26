@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Search, TriangleAlert } from "lucide-react";
+import { Search, TriangleAlert } from "lucide-react";
 import type { Banner, Category, Order, Restaurant } from "@/types";
 import { useLocation } from "@/stores/location-store";
 import { PINNED_LOCATION } from "@/lib/location/pinned";
@@ -190,8 +190,8 @@ export function HomeView({
                       )}
                 </p>
               </div>
-              <Link href="/search" className="bolt-section-link">
-                {t("See all", "सभी देखें")} <ChevronRight className="size-4" />
+              <Link href="/search" className="tap-target bolt-section-link">
+                {t("See all", "सभी देखें")}
               </Link>
             </div>
 
@@ -261,13 +261,12 @@ function HomeSearchResults({
           {dishes.length > HOME_DISH_LIMIT ? (
             <Link
               href={`/search?q=${encodeURIComponent(query.trim())}`}
-              className="press bolt-section-link mt-1 inline-flex"
+              className="press tap-target bolt-section-link mt-1 inline-flex"
             >
               {t(
                 `See all ${dishes.length} dishes`,
                 `सभी ${dishes.length} व्यंजन देखें`,
-              )}{" "}
-              <ChevronRight className="size-4" />
+              )}
             </Link>
           ) : null}
         </>
@@ -321,8 +320,8 @@ function Section({
     <section className="space-y-3">
       <div className="bolt-section-head px-4">
         <h2 className="text-heading">{title}</h2>
-        <Link href={href} className="bolt-section-link">
-          {t("See all", "सभी देखें")} <ChevronRight className="size-4" />
+        <Link href={href} className="tap-target bolt-section-link">
+          {t("See all", "सभी देखें")}
         </Link>
       </div>
       {children}

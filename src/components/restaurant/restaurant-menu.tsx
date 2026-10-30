@@ -105,7 +105,7 @@ export function RestaurantMenu({ restaurant }: Readonly<{ restaurant: Restaurant
               type="button"
               onClick={close}
               aria-label={t("Close menu search", "मेन्यू खोज बंद करें")}
-              className="press grid size-6 shrink-0 place-items-center rounded-full bg-surface text-muted"
+              className="press tap-target grid size-6 shrink-0 place-items-center rounded-full bg-surface text-muted"
             >
               <X className="size-4" />
             </button>

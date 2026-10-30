@@ -24,7 +24,7 @@ const LOOK: Record<
 > = {
   customer: { icon: UtensilsCrossed, chip: "bg-accent/12 text-accent" },
   admin: { icon: ShieldCheck, chip: "bg-green/12 text-green" },
-  manager: { icon: ClipboardList, chip: "bg-violet-500/15 text-violet-500" },
+  manager: { icon: ClipboardList, chip: "bg-violet/15 text-violet" },
   vendor: { icon: Store, chip: "bg-deal/12 text-deal" },
   driver: { icon: Bike, chip: "bg-blue/12 text-blue" },
   developer: { icon: Terminal, chip: "bg-pop/25 text-pop-ink" },

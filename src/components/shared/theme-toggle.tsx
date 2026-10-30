@@ -28,7 +28,7 @@ export function ThemeToggle({ className }: Readonly<{ className?: string }>) {
           : t("Switch to dark mode", "डार्क मोड चालू करें")
       }
       className={cn(
-        "press grid size-10 place-items-center rounded-full border border-line bg-surface text-ink",
+        "press tap-target grid size-10 place-items-center rounded-full border border-line bg-surface text-ink",
         className,
       )}
     >

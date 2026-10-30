@@ -7,7 +7,7 @@ const TONES = {
   green: "bg-green/12 text-green",
   blue: "bg-blue/12 text-blue",
   deal: "bg-deal/12 text-deal",
-  violet: "bg-violet-500/15 text-violet-500",
+  violet: "bg-violet/15 text-violet",
 } as const;
 
 /**

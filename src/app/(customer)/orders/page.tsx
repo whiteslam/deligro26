@@ -64,7 +64,7 @@ export default async function OrdersPage() {
         <div className="space-y-5 px-4 pt-2">
           {active ? (
             <section>
-              <h2 className="mb-2 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
+              <h2 className="mb-2 flex items-center gap-1.5 text-[15px] font-bold text-ink">
                 <span className="size-1.5 animate-pulse rounded-full bg-green" />
                 {t("Happening now", "अभी चल रहा है")}
               </h2>
@@ -84,7 +84,7 @@ export default async function OrdersPage() {
         <EmptyState
           className="mt-12"
           icon={<TriangleAlert className="size-7" />}
-          tone="violet"
+          tone="deal"
           title={t("Couldn't load your orders", "आपके ऑर्डर लोड नहीं हो पाए")}
           description={t(
             "This is a problem on our side, not a sign that anything is missing. Your orders are safe — try again in a moment.",

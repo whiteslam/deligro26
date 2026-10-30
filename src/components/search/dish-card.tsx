@@ -66,12 +66,12 @@ export function DishCard({ hit }: Readonly<{ hit: DishHit }>) {
           className="min-w-0 text-left"
         >
           {item.popular || item.bestseller ? (
-            <span className="pill-pop mb-1.5 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+            <span className="pill-pop mb-1.5 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12px] font-semibold">
               {t("Popular", "लोकप्रिय")}
             </span>
           ) : null}
           {item.sponsored ? (
-            <span className="mb-1.5 inline-flex items-center rounded-md border border-line px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-muted">
+            <span className="mb-1.5 inline-flex items-center rounded-md border border-line px-2 py-0.5 text-[12px] font-semibold text-muted">
               {t("Sponsored", "प्रायोजित")}
             </span>
           ) : null}
@@ -99,7 +99,7 @@ export function DishCard({ hit }: Readonly<{ hit: DishHit }>) {
                 {formatRating(restaurant.rating)}
               </span>
             ) : (
-              <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-muted">
+              <span className="shrink-0 text-[12px] font-semibold text-muted">
                 {t("New", "नया")}
               </span>
             )}
@@ -134,7 +134,7 @@ export function DishCard({ hit }: Readonly<{ hit: DishHit }>) {
         {/* A shut kitchen is stated as such rather than offering an Add that
             would build a basket nobody can cook. */}
         {unavailable ? (
-          <span className="absolute inset-x-0 bottom-0 rounded-b-lg bg-ink/70 py-1 text-center text-[11px] font-bold uppercase tracking-wide text-white">
+          <span className="absolute inset-x-0 bottom-0 rounded-b-lg bg-black/65 py-1 text-center text-[12px] font-semibold text-white">
             {!restaurant.open
               ? t("Closed", "बंद")
               : item.soldOut

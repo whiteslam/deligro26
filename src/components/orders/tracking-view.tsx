@@ -736,7 +736,7 @@ function OrderOutcome({
                   `Rate ${n} star${n > 1 ? "s" : ""}`,
                   `${n} स्टार दें`,
                 )}
-                className="press grid size-11 place-items-center rounded-full bg-surface disabled:opacity-100"
+                className="press grid size-11 place-items-center rounded-full bg-surface disabled:cursor-not-allowed disabled:opacity-100"
               >
                 <Star
                   className={cn(
@@ -879,10 +879,10 @@ function CourierInfo({
       {displayRider && !delivered && !cancelled ? (
         <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-[var(--shadow-md)]">
           <div className="flex items-center justify-between gap-2 bg-ink px-4 py-1.5">
-            <span className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[color:var(--surface)]">
+            <span className="text-[12px] font-bold text-[color:var(--surface)]">
               {t("Deligro rider", "Deligro राइडर")}
             </span>
-            <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[color:var(--surface)]/70">
+            <span className="flex items-center gap-1 text-[12px] font-semibold text-[color:var(--surface)]/80">
               <ShieldCheck className="size-3" />{" "}
               {t("Verified", "सत्यापित")}
             </span>
@@ -902,7 +902,7 @@ function CourierInfo({
               thing that makes "is this my rider?" answerable at the door
               rather than a matter of trusting whoever turned up. */}
               {displayRider.id ? (
-                <p className="text-data mt-0.5 text-[11px] font-bold tracking-[0.12em] text-muted">
+                <p className="text-data mt-0.5 text-[12px] font-semibold text-muted">
                   {t("ID", "आईडी")} {displayRider.id}
                 </p>
               ) : null}
@@ -944,7 +944,7 @@ function CourierInfo({
                 className="press flex shrink-0 flex-col items-center gap-1 rounded-xl bg-accent px-3.5 py-2.5 text-[var(--on-accent)] shadow-[var(--glow-accent)]"
               >
                 <Phone className="size-5" />
-                <span className="text-[11px] font-bold uppercase tracking-wider">
+                <span className="text-[12px] font-semiboldr">
                   {t("Call", "कॉल")}
                 </span>
               </a>
@@ -957,10 +957,10 @@ function CourierInfo({
                   "No phone number recorded for this rider",
                   "इस राइडर का फ़ोन नंबर नहीं है",
                 )}
-                className="press flex shrink-0 flex-col items-center gap-1 rounded-xl bg-accent px-3.5 py-2.5 text-[var(--on-accent)] opacity-50 shadow-[var(--glow-accent)]"
+                className="press flex shrink-0 flex-col items-center gap-1 rounded-xl bg-accent px-3.5 py-2.5 text-[var(--on-accent)] cursor-not-allowed opacity-55 shadow-[var(--glow-accent)]"
               >
                 <Phone className="size-5" />
-                <span className="text-[11px] font-bold uppercase tracking-wider">
+                <span className="text-[12px] font-semiboldr">
                   {t("Call", "कॉल")}
                 </span>
               </button>
@@ -1046,7 +1046,7 @@ function OrderFollowUp({
           <button
             onClick={() => setShowCancelConfirm(true)}
             disabled={cancelBusy}
-            className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-deal disabled:opacity-60"
+            className="press flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3.5 text-sm font-bold text-deal disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelBusy ? (
               <Loader2 className="size-4 animate-spin" />
@@ -1131,7 +1131,7 @@ function CancelConfirm({
             type="button"
             onClick={() => setShowCancelConfirm(false)}
             disabled={cancelBusy}
-            className="press rounded-full border border-line bg-surface py-3 text-sm font-bold text-ink disabled:opacity-60"
+            className="press rounded-full border border-line bg-surface py-3 text-sm font-bold text-ink disabled:cursor-not-allowed disabled:opacity-60"
           >
             {t("No", "नहीं")}
           </button>
@@ -1142,7 +1142,7 @@ function CancelConfirm({
               await cancelOrder();
             }}
             disabled={cancelBusy}
-            className="press rounded-full bg-deal py-3 text-sm font-bold text-[var(--on-deal)] disabled:opacity-60"
+            className="press rounded-full bg-deal py-3 text-sm font-bold text-[var(--on-deal)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {t("Yes, cancel", "हाँ, कैंसिल करें")}
           </button>

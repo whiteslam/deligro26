@@ -220,7 +220,7 @@ export function ProfileAvatar({
               <button
                 type="button"
                 onClick={() => setSheet(false)}
-                className="press grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
+                className="press tap-target grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
               >
                 <X className="size-5" />
               </button>

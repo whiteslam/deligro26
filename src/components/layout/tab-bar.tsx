@@ -18,9 +18,9 @@ const COLORS = {
   green: { text: "text-green", chip: "bg-green/15", bar: "bg-green" },
   blue: { text: "text-blue", chip: "bg-blue/15", bar: "bg-blue" },
   violet: {
-    text: "text-violet-500",
-    chip: "bg-violet-500/15",
-    bar: "bg-violet-500",
+    text: "text-violet",
+    chip: "bg-violet/15",
+    bar: "bg-violet",
   },
   deal: { text: "text-deal", chip: "bg-deal/15", bar: "bg-deal" },
 } satisfies Record<string, TabColor>;
