@@ -870,7 +870,9 @@ class _ActionBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: c.surface,
         border: Border(top: BorderSide(color: c.line)),
-        boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 12, offset: Offset(0, -2))],
+        boxShadow: [
+          BoxShadow(color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, -2)),
+        ],
       ),
       padding: EdgeInsets.fromLTRB(16, 12, 16, 6 + MediaQuery.paddingOf(context).bottom),
       child: Column(

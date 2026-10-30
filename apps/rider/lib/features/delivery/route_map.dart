@@ -212,7 +212,9 @@ class _Pin extends StatelessWidget {
             color: color,
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white, width: 2.5),
-            boxShadow: const [BoxShadow(color: Color(0x40000000), blurRadius: 6, offset: Offset(0, 2))],
+            boxShadow: [
+              BoxShadow(color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(0, 2)),
+            ],
           ),
           child: Icon(icon, size: 18, color: fg),
         ),

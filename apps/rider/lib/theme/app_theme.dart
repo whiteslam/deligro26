@@ -69,7 +69,9 @@ class AppColors extends ThemeExtension<AppColors> {
     onGreen: Color(0xFFFFFFFF),
     onDeal: Color(0xFFFFFFFF),
     pop: Color(0xFFFFC531),
-    popInk: Color(0xFF6B4700),
+    // 7.7:1 on [pop]: "Collect ₹485 cash" and the stale-data strips are read
+    // in sunlight, so this sits well past AA (the old 0xFF6B4700 was 5.3:1).
+    popInk: Color(0xFF4A3000),
     blue: Color(0xFF2B5F8C),
   );
 
@@ -147,10 +149,12 @@ ThemeData buildTheme(Brightness brightness) {
       titleLarge: text.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.3),
       titleMedium: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
       bodyLarge: text.bodyLarge?.copyWith(fontSize: 15),
+      // A caption over a group or a field: sentence case, untracked, and
+      // 12.5 rather than 11 so it still reads outdoors at arm's length.
       labelSmall: text.labelSmall?.copyWith(
-        fontSize: 11,
+        fontSize: 12.5,
         fontWeight: FontWeight.w700,
-        letterSpacing: 0.6,
+        letterSpacing: 0,
         color: c.muted,
       ),
     ),
