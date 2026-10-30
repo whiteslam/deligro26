@@ -321,7 +321,7 @@ class _MapPickerPageState extends ConsumerState<_MapPickerPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('DELIVER TO THIS PIN', style: Theme.of(context).textTheme.labelSmall),
+                        Text('Deliver to this pin', style: Theme.of(context).textTheme.labelSmall),
                         const SizedBox(height: 8),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,

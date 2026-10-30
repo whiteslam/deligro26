@@ -163,7 +163,7 @@ class _AddAddressSheetState extends ConsumerState<_AddAddressSheet> {
             const SizedBox(height: 16),
             _PinButton(pin: _pin, onTap: _busy ? null : _pickPin),
             const SizedBox(height: 18),
-            Text('SAVE AS', style: Theme.of(context).textTheme.labelSmall),
+            Text('Save as', style: Theme.of(context).textTheme.labelSmall),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,

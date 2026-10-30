@@ -47,8 +47,7 @@ class AboutScreen extends StatelessWidget {
 
     Widget head(String t) => Padding(
           padding: const EdgeInsets.only(top: 26, bottom: 8, left: 2),
-          child: Text(t.toUpperCase(),
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, letterSpacing: .8, color: c.muted)),
+          child: GroupLabel(t),
         );
 
     Widget fact(String k, String v) => Padding(

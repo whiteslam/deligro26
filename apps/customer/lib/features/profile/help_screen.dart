@@ -138,8 +138,7 @@ class HelpScreen extends ConsumerWidget {
           ),
           Padding(
             padding: const EdgeInsets.only(top: 26, bottom: 8, left: 2),
-            child: Text('CONTACT DELIGRO SUPPORT',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, letterSpacing: .8, color: c.muted)),
+            child: const GroupLabel('Contact Deligro support'),
           ),
           for (final ch in channels)
             Padding(

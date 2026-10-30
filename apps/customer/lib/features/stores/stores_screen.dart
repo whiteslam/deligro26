@@ -100,9 +100,7 @@ class _StoresScreenState extends ConsumerState<StoresScreen> {
         ),
       ));
     } else if (restaurants.value == null) {
-      slivers.add(const SliverToBoxAdapter(
-        child: Padding(padding: EdgeInsets.all(48), child: Center(child: CircularProgressIndicator())),
-      ));
+      slivers.add(const SliverToBoxAdapter(child: CardListSkeleton()));
     } else {
       if (active?.id == 'groceries' && settings.supportWhatsapp.replaceAll(RegExp(r'\D'), '').isNotEmpty) {
         slivers.add(SliverToBoxAdapter(child: _GroceryListHero(whatsapp: settings.supportWhatsapp)));
@@ -246,7 +244,9 @@ class _StoreCategoryStrip extends StatelessWidget {
                   child: Column(
                     children: [
                       AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
+                        duration: (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
+                            ? Duration.zero
+                            : const Duration(milliseconds: 180),
                         width: 72,
                         height: 72,
                         padding: const EdgeInsets.all(3),
@@ -257,7 +257,7 @@ class _StoreCategoryStrip extends StatelessWidget {
                         child: NetImage(
                           url: cat.image,
                           radius: 36,
-                          fallback: Text(cat.emoji, style: const TextStyle(fontSize: 28)),
+                          fallback: Icon(Icons.storefront_rounded, size: 26, color: c.muted),
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -285,7 +285,8 @@ class _StoreCategoryStrip extends StatelessWidget {
   }
 }
 
-// The web's brand-orange hero for the two service categories.
+// The web's brand-orange hero for the two service categories. Text on it is
+// the accent's dark ink: white on this amber is about 2:1.
 const _heroTint = 'linear-gradient(150deg,#f2a71b,#e59a01,#d98600)';
 const _waGreen = Color(0xFF25D366);
 
@@ -343,12 +344,12 @@ class _GroceryListHeroState extends ConsumerState<_GroceryListHero> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _HeroBadge(icon: Icons.shopping_bag_outlined, label: 'GROCERIES'),
+            const _HeroBadge(icon: Icons.shopping_bag_outlined, label: 'Groceries'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Send your grocery list',
               style: TextStyle(
-                color: Colors.white,
+                color: c.onAccent,
                 fontSize: 23,
                 height: 1.15,
                 fontWeight: FontWeight.w800,
@@ -359,7 +360,7 @@ class _GroceryListHeroState extends ConsumerState<_GroceryListHero> {
             Text(
               'No time to browse? Send us your list and we shop it for you.',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: .92),
+                color: c.onAccent,
                 fontSize: 13.5,
                 fontWeight: FontWeight.w500,
                 height: 1.35,
@@ -398,7 +399,8 @@ class _GroceryListHeroState extends ConsumerState<_GroceryListHero> {
                     onPressed: empty ? null : _send,
                     style: FilledButton.styleFrom(
                       backgroundColor: _waGreen,
-                      foregroundColor: Colors.white,
+                      // Ink, not white: white on WhatsApp green is 2:1.
+                      foregroundColor: AppColors.light.ink,
                       minimumSize: const Size.fromHeight(48),
                       shape: const StadiumBorder(),
                     ),
@@ -420,7 +422,8 @@ class _PickDropHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const body = TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600);
+    final ink = context.colors.onAccent;
+    final body = TextStyle(color: ink, fontSize: 13, fontWeight: FontWeight.w600);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
       child: Column(
@@ -435,39 +438,39 @@ class _PickDropHero extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _HeroBadge(icon: Icons.inventory_2_outlined, label: 'ERRAND SERVICE · COMING SOON'),
+                const _HeroBadge(icon: Icons.inventory_2_outlined, label: 'Errand service, coming soon'),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Pick & Drop',
-                  style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.4),
+                  style: TextStyle(color: ink, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.4),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Need something moved across town? Our rider picks it up and drops it at the door — '
                   'parcels, documents, forgotten keys, all of it.',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: .92),
+                    color: ink,
                     fontSize: 13.5,
                     fontWeight: FontWeight.w500,
                     height: 1.35,
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Row(children: [
-                  Icon(Icons.location_on_outlined, size: 16, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text('Anywhere within Bemetara', style: body),
+                Row(children: [
+                  Icon(Icons.location_on_outlined, size: 16, color: ink),
+                  const SizedBox(width: 8),
+                  Flexible(child: Text('Anywhere within Bemetara', style: body)),
                 ]),
                 const SizedBox(height: 8),
-                const Row(children: [
-                  Icon(Icons.schedule_rounded, size: 16, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text('Same-hour door-to-door pickup', style: body),
+                Row(children: [
+                  Icon(Icons.schedule_rounded, size: 16, color: ink),
+                  const SizedBox(width: 8),
+                  Flexible(child: Text('Same-hour door-to-door pickup', style: body)),
                 ]),
                 const SizedBox(height: 10),
-                const Align(
+                Align(
                   alignment: Alignment.centerRight,
-                  child: Icon(Icons.delivery_dining_rounded, size: 84, color: Colors.white),
+                  child: ExcludeSemantics(child: Icon(Icons.delivery_dining_rounded, size: 84, color: ink)),
                 ),
               ],
             ),
@@ -490,29 +493,27 @@ class _HeroBadge extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .2),
-          borderRadius: BorderRadius.circular(99),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: Colors.white),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-              ),
+  Widget build(BuildContext context) {
+    final ink = context.colors.onAccent;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: ink.withValues(alpha: .1),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: ink),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(color: ink, fontSize: 12, fontWeight: FontWeight.w700),
             ),
-          ],
-        ),
-      );
+          ),
+        ],
+      ),
+    );
+  }
 }

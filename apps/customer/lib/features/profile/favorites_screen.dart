@@ -21,6 +21,7 @@ class FavoritesScreen extends ConsumerWidget {
         child: AsyncBody<List<Restaurant>>(
           value: async,
           onRetry: () => ref.invalidate(favoritesProvider),
+          loading: const CardListSkeleton(padding: EdgeInsets.fromLTRB(16, 4, 16, 32)),
           builder: (list) => list.isEmpty
               ? LayoutBuilder(
                   builder: (context, box) => SingleChildScrollView(

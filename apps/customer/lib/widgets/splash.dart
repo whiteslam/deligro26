@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 /// The website's cold-start splash (src/components/shared/splash-screen.tsx):
 /// amber fill, DELIGRO wordmark, company credit and the rider artwork. It sits
 /// over the app, then fades out, so the first screen loads underneath it.
@@ -104,8 +106,9 @@ class SplashArt extends StatelessWidget {
                             fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            letterSpacing: .48,
-                            color: Color(0xE6FFFFFF),
+                            // The accent's dark ink: white on this amber is
+                            // 2.3:1, under the 4.5:1 a 12px line needs.
+                            color: AppColors.light.onAccent,
                             decoration: TextDecoration.none,
                           ),
                         ),

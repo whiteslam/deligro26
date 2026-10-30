@@ -112,9 +112,9 @@ class _Body extends ConsumerWidget {
                 radius: 32,
                 tint: 'linear-gradient(135deg,#ff9a4d,#f2660c)',
                 fallback: _initials(name).isEmpty
-                    ? const Icon(Icons.person_rounded, color: Colors.white, size: 30)
+                    ? Icon(Icons.person_rounded, color: context.colors.onAccent, size: 30)
                     : Text(_initials(name),
-                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                        style: TextStyle(color: context.colors.onAccent, fontSize: 22, fontWeight: FontWeight.w800)),
               ),
             ),
             const SizedBox(width: 14),
@@ -377,9 +377,7 @@ class _Head extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(top: 26, bottom: 8, left: 2),
-        child: Text(text.toUpperCase(),
-            style: TextStyle(
-                fontSize: 12.5, fontWeight: FontWeight.w800, letterSpacing: .8, color: context.colors.muted)),
+        child: GroupLabel(text),
       );
 }
 
