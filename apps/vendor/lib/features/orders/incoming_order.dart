@@ -255,7 +255,7 @@ class _IncomingOrderDialogState extends ConsumerState<IncomingOrderDialog> {
                       child: FilledButton.icon(
                         style: FilledButton.styleFrom(
                           backgroundColor: c.green,
-                          foregroundColor: Colors.white,
+                          foregroundColor: c.onGreen,
                           minimumSize: const Size.fromHeight(48),
                         ),
                         onPressed: _busy ? null : () => _accept(o),

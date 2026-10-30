@@ -268,7 +268,11 @@ class _OfferEditorScreenState extends ConsumerState<OfferEditorScreen> {
               subtitle: Text(_starts == null ? 'Straight away' : fmt.format(_starts!)),
               trailing: _starts == null
                   ? const Icon(Icons.edit_calendar_outlined)
-                  : IconButton(onPressed: () => setState(() => _starts = null), icon: const Icon(Icons.close_rounded)),
+                  : IconButton(
+                      tooltip: 'Clear start date',
+                      onPressed: () => setState(() => _starts = null),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
               onTap: () => _pick(true),
             ),
             ListTile(
@@ -278,7 +282,11 @@ class _OfferEditorScreenState extends ConsumerState<OfferEditorScreen> {
               subtitle: Text(_ends == null ? 'No end date' : fmt.format(_ends!)),
               trailing: _ends == null
                   ? const Icon(Icons.edit_calendar_outlined)
-                  : IconButton(onPressed: () => setState(() => _ends = null), icon: const Icon(Icons.close_rounded)),
+                  : IconButton(
+                      tooltip: 'Clear end date',
+                      onPressed: () => setState(() => _ends = null),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
               onTap: () => _pick(false),
             ),
             SwitchListTile(

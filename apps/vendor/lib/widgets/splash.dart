@@ -40,7 +40,10 @@ class _SplashOverlayState extends State<SplashOverlay> {
         if (_visible)
           AnimatedOpacity(
             opacity: _hiding ? 0 : 1,
-            duration: const Duration(milliseconds: 550),
+            // Reduced motion: a near-instant cut, still long enough for onEnd.
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? const Duration(milliseconds: 1)
+                : const Duration(milliseconds: 550),
             curve: Curves.ease,
             onEnd: () => setState(() => _visible = false),
             child: IgnorePointer(ignoring: _hiding, child: const SplashArt()),

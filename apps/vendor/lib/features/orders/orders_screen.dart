@@ -152,7 +152,7 @@ class _LiveBoardState extends ConsumerState<_LiveBoard> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Can\'t refresh — showing the last orders we loaded.',
+                        'Can\'t refresh. Showing the last orders we loaded.',
                         style: TextStyle(color: c.deal, fontSize: 13, fontWeight: FontWeight.w600),
                       ),
                     ),

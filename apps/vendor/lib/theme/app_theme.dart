@@ -23,6 +23,11 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.pop,
     required this.popInk,
     required this.blue,
+    required this.onGreen,
+    required this.onDeal,
+    required this.star,
+    required this.veg,
+    required this.nonVeg,
   });
 
   final Color bg;
@@ -43,6 +48,19 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color popInk;
   final Color blue;
 
+  /// Text and icons on a solid [green] or [deal] fill. White on the dark
+  /// theme's bright green reads at about 2:1, so the dark theme swaps to ink.
+  final Color onGreen;
+  final Color onDeal;
+
+  /// Rating stars. The light value is darkened from the web's amber so the
+  /// glyph clears 3:1 on a white surface.
+  final Color star;
+
+  /// The veg / non-veg packaging marks. Fixed colours, the same in both themes.
+  final Color veg;
+  final Color nonVeg;
+
   static const light = AppColors(
     bg: Color(0xFFF4F3F0),
     surface: Color(0xFFFCFCFB),
@@ -61,6 +79,11 @@ class AppColors extends ThemeExtension<AppColors> {
     pop: Color(0xFFFFC531),
     popInk: Color(0xFF6B4700),
     blue: Color(0xFF2B5F8C),
+    onGreen: Color(0xFFFCFCFB),
+    onDeal: Color(0xFFFCFCFB),
+    star: Color(0xFFC27C00),
+    veg: Color(0xFF1E8E3E),
+    nonVeg: Color(0xFFC5221F),
   );
 
   static const dark = AppColors(
@@ -81,6 +104,11 @@ class AppColors extends ThemeExtension<AppColors> {
     pop: Color(0xFFFFCE5C),
     popInk: Color(0xFF4A3000),
     blue: Color(0xFF77B0E0),
+    onGreen: Color(0xFF0F1215),
+    onDeal: Color(0xFF0F1215),
+    star: Color(0xFFF2A413),
+    veg: Color(0xFF1E8E3E),
+    nonVeg: Color(0xFFC5221F),
   );
 
   @override
@@ -135,7 +163,7 @@ ThemeData buildTheme(Brightness brightness) {
       labelSmall: text.labelSmall?.copyWith(
         fontSize: 11,
         fontWeight: FontWeight.w700,
-        letterSpacing: 0.6,
+        letterSpacing: 0,
         color: c.muted,
       ),
     ),

@@ -185,7 +185,7 @@ class _RejectSheetState extends ConsumerState<_RejectSheet> {
               ),
             const SizedBox(height: 12),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: c.deal, foregroundColor: Colors.white),
+              style: FilledButton.styleFrom(backgroundColor: c.deal, foregroundColor: c.onDeal),
               onPressed: () => Navigator.pop(context, _reason),
               child: Text('Reject order'),
             ),

@@ -134,15 +134,28 @@ class _Photos extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               child: Image.memory(p, width: 72, height: 72, fit: BoxFit.cover),
             ),
+            // The visible mark stays 22px; the tap area is 44px so a thumb finds it.
             Positioned(
               right: 0,
               top: 0,
-              child: InkWell(
-                onTap: () => onRemove(i),
-                child: const CircleAvatar(
-                  radius: 11,
-                  backgroundColor: Colors.black54,
-                  child: Icon(Icons.close_rounded, size: 14, color: Colors.white),
+              child: Semantics(
+                button: true,
+                label: 'Remove photo',
+                excludeSemantics: true,
+                child: InkWell(
+                  onTap: () => onRemove(i),
+                  customBorder: const CircleBorder(),
+                  child: SizedBox.square(
+                    dimension: 44,
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: CircleAvatar(
+                        radius: 11,
+                        backgroundColor: context.colors.ink.withValues(alpha: .7),
+                        child: Icon(Icons.close_rounded, size: 14, color: context.colors.bg),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
