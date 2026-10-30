@@ -234,7 +234,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with SingleTickerPr
     } else if (shops == null && catalog.hasError) {
       body = ErrorRetry(error: catalog.error!, onRetry: () => ref.invalidate(searchCatalogProvider));
     } else if (shops == null) {
-      body = const Center(child: CircularProgressIndicator());
+      body = const RowListSkeleton();
     } else {
       final index = _indexOf(shops);
       final cat = foodCategories.where((x) => x.id == _category).firstOrNull;
@@ -520,7 +520,6 @@ class _IdleView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final history = ref.watch(searchHistoryProvider);
     final c = context.colors;
-    final label = TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.7, color: c.muted);
     return ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -528,7 +527,7 @@ class _IdleView extends ConsumerWidget {
         if (history.isNotEmpty) ...[
           Row(
             children: [
-              Expanded(child: Text('RECENT', style: label)),
+              const Expanded(child: GroupLabel('Recent')),
               TextButton(
                 onPressed: () => ref.read(searchHistoryProvider.notifier).clear(),
                 child: const Text('Clear'),
@@ -557,7 +556,7 @@ class _IdleView extends ConsumerWidget {
             ),
           const SizedBox(height: 16),
         ],
-        Text('TRY SEARCHING', style: label),
+        const GroupLabel('Try searching'),
         const SizedBox(height: 4),
         Wrap(
           spacing: 4,
@@ -572,7 +571,7 @@ class _IdleView extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 18),
-        Text('BROWSE BY CATEGORY', style: label),
+        const GroupLabel('Browse by category'),
         const SizedBox(height: 10),
         _CategoryChips(onPick: onCategory),
       ],
@@ -586,14 +585,12 @@ class _CategoryChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final emoji = {for (final t in homeCategories) t.id: t.emoji};
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
         for (final cat in foodCategories)
           ActionChip(
-            avatar: emoji[cat.id] == null ? null : Text(emoji[cat.id]!),
             label: Text(cat.label),
             onPressed: () => onPick(cat.id),
           ),

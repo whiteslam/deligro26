@@ -32,11 +32,28 @@ class RestaurantCard extends ConsumerWidget {
     final c = context.colors;
     final featuredId = ref.watch(livePlacementsProvider).value?.featuredFor(r.id);
     final km = distanceToShop(ref.watch(locationProvider), r);
-    final meta = [
-      etaBand(r.etaMin, r.etaMax),
-      if (km != null) distance(km),
-      if (r.cuisines.isNotEmpty) r.cuisines.take(2).join(', '),
-    ].join(' · ');
+    // Time and distance each carry their icon, as on the restaurant page,
+    // instead of a dot-joined run of three facts.
+    final metaStyle = TextStyle(color: c.muted, fontSize: 13);
+    Widget icon(IconData i) => Padding(
+          padding: const EdgeInsets.only(right: 3),
+          child: Icon(i, size: 14, color: c.muted),
+        );
+    final meta = Text.rich(
+      TextSpan(children: [
+        WidgetSpan(alignment: PlaceholderAlignment.middle, child: icon(Icons.schedule_rounded)),
+        TextSpan(text: etaBand(r.etaMin, r.etaMax)),
+        if (km != null) ...[
+          const TextSpan(text: '   '),
+          WidgetSpan(alignment: PlaceholderAlignment.middle, child: icon(Icons.place_outlined)),
+          TextSpan(text: distance(km)),
+        ],
+        if (r.cuisines.isNotEmpty) TextSpan(text: '   ${r.cuisines.take(2).join(', ')}'),
+      ]),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: metaStyle,
+    );
 
     final card = Semantics(
       button: true,
@@ -69,10 +86,7 @@ class RestaurantCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 2),
-            Text(meta,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: c.muted, fontSize: 13)),
+            meta,
           ],
         ),
       ),
@@ -116,7 +130,7 @@ class _CardMediaState extends ConsumerState<_CardMedia> {
     final hero = NetImage(
       url: r.image,
       tint: r.accentTint,
-      fallback: Icon(Icons.restaurant_rounded, size: 36, color: Colors.white.withValues(alpha: .8)),
+      fallback: Icon(Icons.restaurant_rounded, size: 36, color: c.onMedia.withValues(alpha: .8)),
     );
 
     return Stack(
@@ -135,10 +149,10 @@ class _CardMediaState extends ConsumerState<_CardMedia> {
           ClipRRect(
             borderRadius: BorderRadius.circular(radiusBlock),
             child: Container(
-              color: Colors.black.withValues(alpha: .55),
+              color: c.scrim.withValues(alpha: .55),
               alignment: Alignment.center,
-              child: const Text('Closed now',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+              child: Text('Closed now',
+                  style: TextStyle(color: c.onMedia, fontWeight: FontWeight.w800, fontSize: 15)),
             ),
           ),
         if (r.offer != null && r.open && onHero)
@@ -149,7 +163,7 @@ class _CardMediaState extends ConsumerState<_CardMedia> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(color: c.deal, borderRadius: BorderRadius.circular(8)),
               child: Text(r.offer!,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                  style: TextStyle(color: c.onDeal, fontWeight: FontWeight.w800, fontSize: 12)),
             ),
           ),
         // A paid placement says so (0160): honest labelling, always.
@@ -193,19 +207,20 @@ class _DishPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final price = item.variants.isNotEmpty ? item.fromPrice : item.effective;
+    final c = context.colors;
     return Semantics(
       label: '${item.name}, ${rupees(price)}',
       child: Stack(
         fit: StackFit.expand,
         children: [
           NetImage(url: item.image, tint: tint, fallback: const SizedBox.shrink()),
-          const DecoratedBox(
+          DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0x00000000), Color(0x99000000)],
-                stops: [.45, 1],
+                colors: [c.scrim.withValues(alpha: 0), c.scrim.withValues(alpha: .6)],
+                stops: const [.45, 1],
               ),
             ),
           ),
@@ -222,11 +237,11 @@ class _DishPage extends StatelessWidget {
                   child: Text(item.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+                      style: TextStyle(color: c.onMedia, fontWeight: FontWeight.w800, fontSize: 14)),
                 ),
                 const SizedBox(width: 8),
                 Text(item.variants.isNotEmpty ? 'from ${rupees(price)}' : rupees(price),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+                    style: TextStyle(color: c.onMedia, fontWeight: FontWeight.w700, fontSize: 13)),
               ],
             ),
           ),
@@ -243,21 +258,23 @@ class _Dots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     return ExcludeSemantics(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        decoration: BoxDecoration(color: Colors.black.withValues(alpha: .35), borderRadius: BorderRadius.circular(10)),
+        decoration: BoxDecoration(color: c.scrim.withValues(alpha: .35), borderRadius: BorderRadius.circular(10)),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             for (var i = 0; i < count; i++)
               AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
+                duration: still ? Duration.zero : const Duration(milliseconds: 150),
                 margin: const EdgeInsets.symmetric(horizontal: 2),
                 width: i == index ? 12 : 5,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: i == index ? 1 : .6),
+                  color: c.onMedia.withValues(alpha: i == index ? 1 : .6),
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),

@@ -200,11 +200,10 @@ class _HomeHeader extends ConsumerWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'DELIVER TO',
+                        'Deliver to',
                         style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.9,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                           color: c.muted,
                         ),
                       ),
@@ -229,7 +228,7 @@ class _HomeHeader extends ConsumerWidget {
                           if (loc.sublabel != null && loc.sublabel!.isNotEmpty)
                             Flexible(
                               child: Text(
-                                ' · ${loc.sublabel}',
+                                ', ${loc.sublabel}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -457,11 +456,11 @@ class _ActiveOrderStrip extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            const _PulseDot(),
+                            Icon(Icons.delivery_dining_rounded, size: 16, color: c.green),
                             const SizedBox(width: 6),
                             Flexible(
                               child: Text(
-                                'Ongoing order · ${order.status.label}',
+                                order.status.label,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -492,34 +491,6 @@ class _ActiveOrderStrip extends StatelessWidget {
       ),
     );
   }
-}
-
-class _PulseDot extends StatefulWidget {
-  const _PulseDot();
-
-  @override
-  State<_PulseDot> createState() => _PulseDotState();
-}
-
-class _PulseDotState extends State<_PulseDot> with SingleTickerProviderStateMixin {
-  late final _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))
-    ..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => FadeTransition(
-        opacity: Tween(begin: .35, end: 1.0).animate(_ctrl),
-        child: Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: context.colors.green, shape: BoxShape.circle),
-        ),
-      );
 }
 
 class _CategoryStrip extends ConsumerWidget {
@@ -558,7 +529,7 @@ class _CategoryStrip extends ConsumerWidget {
                         url: overrides[cat.id] ?? cat.image,
                         tint: cat.tint,
                         radius: 35,
-                        fallback: Text(cat.emoji, style: const TextStyle(fontSize: 30)),
+                        fallback: Icon(Icons.restaurant_menu_rounded, size: 28, color: context.colors.onMedia),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -660,6 +631,11 @@ class _BannerCarouselState extends State<_BannerCarousel> {
     _timer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (_held || !_pages.hasClients || !mounted) return;
       final next = (_index + 1) % widget.banners.length;
+      // Reduced motion: the slide still changes, it just doesn't glide.
+      if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+        _pages.jumpToPage(next);
+        return;
+      }
       _pages.animateToPage(
         next,
         duration: const Duration(milliseconds: 420),
@@ -678,6 +654,7 @@ class _BannerCarouselState extends State<_BannerCarousel> {
   @override
   Widget build(BuildContext context) {
     final banners = widget.banners;
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: SizedBox(
@@ -707,12 +684,12 @@ class _BannerCarouselState extends State<_BannerCarousel> {
                       children: [
                         for (var i = 0; i < banners.length; i++)
                           AnimatedContainer(
-                            duration: const Duration(milliseconds: 250),
+                            duration: still ? Duration.zero : const Duration(milliseconds: 250),
                             margin: const EdgeInsets.symmetric(horizontal: 3),
                             width: i == _index ? 20 : 6,
                             height: 6,
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: i == _index ? 1 : .6),
+                              color: context.colors.onMedia.withValues(alpha: i == _index ? 1 : .6),
                               borderRadius: BorderRadius.circular(3),
                             ),
                           ),
@@ -736,6 +713,7 @@ class _BannerSlide extends StatelessWidget {
   Widget build(BuildContext context) {
     final route = banner.route;
     final width = MediaQuery.sizeOf(context).width;
+    final c = context.colors;
     return Semantics(
       button: route != null,
       label: banner.headline,
@@ -747,11 +725,15 @@ class _BannerSlide extends StatelessWidget {
           children: [
             NetImage(url: banner.image, tint: banner.tint, radius: 0),
             // Scrim so the copy stays legible over any photo.
-            const DecoratedBox(
+            DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xD106080A), Color(0x8006080A), Color(0x1406080A)],
-                  stops: [0, .45, 1],
+                  colors: [
+                    c.scrim.withValues(alpha: .82),
+                    c.scrim.withValues(alpha: .5),
+                    c.scrim.withValues(alpha: .08),
+                  ],
+                  stops: const [0, .45, 1],
                 ),
               ),
             ),
@@ -767,8 +749,8 @@ class _BannerSlide extends StatelessWidget {
                       banner.headline,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: c.onMedia,
                         fontSize: 18,
                         height: 1.15,
                         fontWeight: FontWeight.w800,
@@ -782,7 +764,7 @@ class _BannerSlide extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: .82),
+                          color: c.onMedia.withValues(alpha: .86),
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
@@ -793,7 +775,7 @@ class _BannerSlide extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: c.onMedia,
                           borderRadius: BorderRadius.circular(99),
                         ),
                         child: Row(
@@ -801,14 +783,14 @@ class _BannerSlide extends StatelessWidget {
                           children: [
                             Text(
                               banner.ctaLabel!,
-                              style: const TextStyle(
-                                color: Color(0xFF0E1417),
+                              style: TextStyle(
+                                color: AppColors.light.ink,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13,
                               ),
                             ),
                             const SizedBox(width: 4),
-                            const Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF0E1417)),
+                            Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.light.ink),
                           ],
                         ),
                       ),

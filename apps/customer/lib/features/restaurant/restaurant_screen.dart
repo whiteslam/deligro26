@@ -327,7 +327,7 @@ class _HeroState extends ConsumerState<_Hero> {
           foregroundColor: c.ink,
           minimumSize: const Size(44, 44),
           elevation: 2,
-          shadowColor: Colors.black26,
+          shadowColor: c.scrim.withValues(alpha: .26),
         );
 
     return SliverAppBar(
@@ -376,14 +376,18 @@ class _HeroState extends ConsumerState<_Hero> {
                       url: r.image,
                       tint: r.accentTint,
                       radius: 0,
-                      fallback: Icon(Icons.restaurant_rounded, size: 52, color: Colors.white.withValues(alpha: .8)),
+                      fallback: Icon(Icons.restaurant_rounded, size: 52, color: c.onMedia.withValues(alpha: .8)),
                     ),
-                    const DecoratedBox(
+                    DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [Color(0x40000000), Color(0x00000000), Color(0x8C000000)],
+                          colors: [
+                            c.scrim.withValues(alpha: .25),
+                            c.scrim.withValues(alpha: 0),
+                            c.scrim.withValues(alpha: .55),
+                          ],
                         ),
                       ),
                     ),
@@ -395,8 +399,8 @@ class _HeroState extends ConsumerState<_Hero> {
                         r.name,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: c.onMedia,
                           fontSize: 25,
                           height: 1.1,
                           fontWeight: FontWeight.w800,
@@ -456,7 +460,7 @@ class _Info extends ConsumerWidget {
             Text(subtitle, style: TextStyle(color: c.muted, fontSize: 14.5, height: 1.35)),
           if (r.tagline.trim().isNotEmpty && r.cuisines.isNotEmpty) ...[
             const SizedBox(height: 2),
-            Text(r.cuisines.join(' · '), style: TextStyle(color: c.muted, fontSize: 13)),
+            Text(r.cuisines.join(', '), style: TextStyle(color: c.muted, fontSize: 13)),
           ],
           const SizedBox(height: 12),
           Wrap(
@@ -496,7 +500,7 @@ class _Info extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(color: c.pop, borderRadius: BorderRadius.circular(8)),
                   child: Text(
-                    'Busy · +${r.pace.addedMinutes} min',
+                    'Busy, +${r.pace.addedMinutes} min',
                     style: TextStyle(color: c.popInk, fontWeight: FontWeight.w800, fontSize: 12),
                   ),
                 ),
