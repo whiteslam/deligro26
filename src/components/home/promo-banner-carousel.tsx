@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import type { Banner } from "@/types";
 import { bannerHref, bannerIsExternal } from "@/lib/banner-href";
 import { PhotoTile } from "@/components/shared/photo-tile";
@@ -167,7 +166,7 @@ export function PromoBannerCarousel({
                 )}
                 onClick={() => goTo(i)}
                 className={cn(
-                  "pointer-events-auto h-1.5 rounded-full bg-white/60 transition-all duration-300",
+                  "tap-target pointer-events-auto h-1.5 rounded-full bg-white/60 transition-colors duration-300",
                   i === index ? "w-5 bg-white" : "w-1.5",
                 )}
               />
@@ -220,7 +219,7 @@ function BannerSlide({
         />
 
         {sponsored ? (
-          <span className="absolute right-3 top-3 rounded-full bg-black/45 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.06em] text-white/90 backdrop-blur-sm">
+          <span className="absolute right-3 top-3 rounded-full bg-black/45 px-2 py-0.5 text-[12px] font-semibold text-white/90 backdrop-blur-sm">
             {t("Sponsored", "प्रायोजित")}
             {banner.sponsorName ? ` · ${banner.sponsorName}` : ""}
           </span>
@@ -238,9 +237,8 @@ function BannerSlide({
           <p className="line-clamp-2 text-[13px] font-medium leading-snug text-white/80">
             {banner.description}
           </p>
-          <span className="press mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-white px-3.5 py-1.5 text-[13px] font-bold text-[#0e1417] shadow-sm">
+          <span className="press mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-white px-3.5 py-1.5 text-[13px] font-bold text-[var(--on-white)] shadow-sm">
             {banner.ctaLabel}
-            <ArrowRight className="size-3.5" />
           </span>
         </div>
       </Link>

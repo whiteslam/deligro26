@@ -228,7 +228,7 @@ export function MapPicker({
           onClick={useMyLocation}
           disabled={locating || status !== "ready"}
           locating={locating}
-          className="press absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-surface px-3 py-2 text-sm font-semibold text-accent shadow-[var(--shadow-md)] disabled:opacity-60"
+          className="press absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-surface px-3 py-2 text-sm font-semibold text-accent shadow-[var(--shadow-md)] disabled:cursor-not-allowed disabled:opacity-60"
           t={t}
         />
         {locateError ? (
@@ -282,7 +282,7 @@ export function MapPicker({
           onClick={useMyLocation}
           disabled={locating || status !== "ready"}
           locating={locating}
-          className="press absolute right-2 top-2 flex items-center gap-1.5 rounded-full bg-surface px-3 py-2 text-sm font-semibold text-accent shadow-[var(--shadow-md)] disabled:opacity-60"
+          className="press absolute right-2 top-2 flex items-center gap-1.5 rounded-full bg-surface px-3 py-2 text-sm font-semibold text-accent shadow-[var(--shadow-md)] disabled:cursor-not-allowed disabled:opacity-60"
           t={t}
         />
       </div>

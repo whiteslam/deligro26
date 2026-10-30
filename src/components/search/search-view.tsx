@@ -304,7 +304,7 @@ export function SearchView({
             <button
               onClick={() => setQuery("")}
               aria-label={t("Clear", "मिटाएं")}
-              className="press grid size-6 shrink-0 place-items-center rounded-full bg-surface text-muted"
+              className="press tap-target grid size-6 shrink-0 place-items-center rounded-full bg-surface text-muted"
             >
               <X className="size-4" />
             </button>
@@ -375,7 +375,7 @@ export function SearchView({
         {showSuggestions && history.length ? (
           <div>
             <div className="flex items-baseline justify-between gap-3">
-              <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
+              <p className="text-[15px] font-bold text-ink">
                 {t("Recent", "हाल की खोज")}
               </p>
               <button
@@ -403,7 +403,7 @@ export function SearchView({
                     type="button"
                     onClick={() => removeSearch(term)}
                     aria-label={t(`Forget ${term}`, `${term} हटाएं`)}
-                    className="press grid size-8 shrink-0 place-items-center rounded-full text-muted"
+                    className="press tap-target grid size-8 shrink-0 place-items-center rounded-full text-muted"
                   >
                     <X className="size-4" />
                   </button>
@@ -549,7 +549,7 @@ function SearchSuggestions({
   const t = useT();
   return (
     <div className={afterHistory ? "mt-4" : ""}>
-      <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
+      <p className="text-[15px] font-bold text-ink">
         {t("Try searching", "यह खोजें")}
       </p>
       <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1">

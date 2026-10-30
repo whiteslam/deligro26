@@ -143,7 +143,7 @@ function Sheet({
             type="button"
             onClick={onClose}
             aria-label={t("Close", "बंद करें")}
-            className="press grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
+            className="press tap-target grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
           >
             <X className="size-5" />
           </button>
@@ -205,7 +205,7 @@ export function SearchFilterSheet({
             type="button"
             onClick={onClearAll}
             disabled={active === 0}
-            className="press shrink-0 rounded-full border border-line bg-surface px-4 py-3 text-sm font-bold text-ink disabled:opacity-40"
+            className="press shrink-0 rounded-full border border-line bg-surface px-4 py-3 text-sm font-bold text-ink disabled:cursor-not-allowed disabled:opacity-40"
           >
             {t("Clear all", "सब हटाएं")}
           </button>
@@ -224,7 +224,7 @@ export function SearchFilterSheet({
     >
       {FILTER_GROUPS.map((group) => (
         <section key={group.heading.en} className="border-b border-line py-3.5">
-          <h3 className="text-[12px] font-bold uppercase tracking-[0.08em] text-muted">
+          <h3 className="text-[14px] font-bold text-ink">
             {pick(lang, group.heading)}
           </h3>
           <div className="mt-2.5 flex flex-wrap gap-2">
@@ -247,7 +247,7 @@ export function SearchFilterSheet({
       ))}
 
       <section className="py-3.5">
-        <h3 className="flex items-baseline gap-2 text-[12px] font-bold uppercase tracking-[0.08em] text-muted">
+        <h3 className="flex items-baseline gap-2 text-[14px] font-bold text-ink">
           {t("Category", "श्रेणी")}
           {/* Said out loud, because the shape does not say it: every other
               control in this sheet is a toggle and this one is a choice. */}

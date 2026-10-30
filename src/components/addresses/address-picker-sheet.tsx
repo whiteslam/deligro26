@@ -61,7 +61,7 @@ export function AddressPickerSheet({
             type="button"
             onClick={onClose}
             aria-label={t("Close", "बंद करें")}
-            className="press grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
+            className="press tap-target grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
           >
             <X className="size-5" />
           </button>
@@ -95,7 +95,7 @@ export function AddressPickerSheet({
                       <span className="flex items-center gap-2 text-[15px] font-bold">
                         {a.label}
                         {a.isDefault ? (
-                          <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-muted">
+                          <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[12px] font-semibold text-muted">
                             {t("Default", "डिफ़ॉल्ट")}
                           </span>
                         ) : null}

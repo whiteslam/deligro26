@@ -1,6 +1,15 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import {
+  ChefHat,
+  Coffee,
+  CookingPot,
+  Moon,
+  Pizza,
+  Soup,
+  type LucideIcon,
+} from "lucide-react";
 import { useLang } from "@/components/providers/lang-provider";
 import { pick, type Bi } from "@/lib/i18n/lang";
 
@@ -12,23 +21,26 @@ import { pick, type Bi } from "@/lib/i18n/lang";
  * lives in a useState initializer (stable across re-renders) and we only reveal
  * it once mounted on the client, so the server HTML and first client paint agree
  * and there's no hydration mismatch on the random index.
+ *
+ * The art is drawn from the app's one icon set. It was emoji, which render as a
+ * different picture on every phone vendor and read as a placeholder.
  */
-const VARIANTS: { art: string; badge: string; title: Bi; caption: Bi }[] = [
+const VARIANTS: { art: LucideIcon; badge: LucideIcon; title: Bi; caption: Bi }[] = [
   {
-    art: "🍲",
-    badge: "😴",
+    art: Soup,
+    badge: Moon,
     title: {
       en: "The kitchen's having a little nap",
       hi: "रसोई अभी थोड़ी झपकी ले रही है",
     },
     caption: {
-      en: "Our chefs are off recharging their spice levels. Swing by during opening hours for the good stuff! 🌶️",
-      hi: "हमारे शेफ़ अभी आराम कर रहे हैं। खुलने के समय पर आइए, तब बढ़िया खाना मिलेगा! 🌶️",
+      en: "Our chefs are off recharging their spice levels. Swing by during opening hours for the good stuff!",
+      hi: "हमारे शेफ़ अभी आराम कर रहे हैं। खुलने के समय पर आइए, तब बढ़िया खाना मिलेगा!",
     },
   },
   {
-    art: "👨‍🍳",
-    badge: "💤",
+    art: ChefHat,
+    badge: Moon,
     title: { en: "Chef has left the building", hi: "शेफ़ अभी घर गए हैं" },
     caption: {
       en: "The stoves are cold and the aprons are hung up. Come back during opening hours and we'll cook you something lovely.",
@@ -36,26 +48,26 @@ const VARIANTS: { art: string; badge: string; title: Bi; caption: Bi }[] = [
     },
   },
   {
-    art: "🥘",
-    badge: "🌙",
+    art: CookingPot,
+    badge: Moon,
     title: { en: "We're closed for now", hi: "अभी हम बंद हैं" },
     caption: {
-      en: "The pans are resting under the moonlight. We'll be back and sizzling before you know it! ✨",
-      hi: "कढ़ाई अभी आराम कर रही है। हम जल्दी ही फिर से खुलेंगे! ✨",
+      en: "The pans are resting under the moonlight. We'll be back and sizzling before you know it!",
+      hi: "कढ़ाई अभी आराम कर रही है। हम जल्दी ही फिर से खुलेंगे!",
     },
   },
   {
-    art: "🧑‍🍳",
-    badge: "☕",
+    art: ChefHat,
+    badge: Coffee,
     title: { en: "Gone for a chai break", hi: "चाय पीने गए हैं" },
     caption: {
-      en: "Our cooks are refueling on chai and gossip. Swing by later when the kadhai's hot again! ☕",
-      hi: "हमारे रसोइये चाय और गपशप में लगे हैं। जब कढ़ाई फिर गरम हो, तब आइए! ☕",
+      en: "Our cooks are refueling on chai and gossip. Swing by later when the kadhai's hot again!",
+      hi: "हमारे रसोइये चाय और गपशप में लगे हैं। जब कढ़ाई फिर गरम हो, तब आइए!",
     },
   },
   {
-    art: "🍕",
-    badge: "🛌",
+    art: Pizza,
+    badge: Moon,
     title: { en: "Out cold (like our ovens)", hi: "रसोई ठंडी पड़ी है" },
     caption: {
       en: "Even the best kitchens need their beauty sleep. Catch us during opening hours for something tasty!",
@@ -91,13 +103,13 @@ export function ClosedKitchen() {
     <div className="flex min-h-[220px] flex-col items-center justify-center px-8 py-16 text-center">
       {v ? (
         <>
-          <div className="relative mb-5 grid size-24 place-items-center rounded-[28px] bg-surface-2 text-[44px] leading-none">
-            <span aria-hidden>{v.art}</span>
+          <div className="relative mb-5 grid size-24 place-items-center rounded-[28px] bg-surface-2 text-accent">
+            <v.art aria-hidden className="size-11" strokeWidth={1.75} />
             <span
               aria-hidden
-              className="absolute -right-2 -top-2 grid size-9 place-items-center rounded-full bg-bg text-xl shadow-sm"
+              className="absolute -right-2 -top-2 grid size-9 place-items-center rounded-full bg-bg text-muted shadow-sm"
             >
-              {v.badge}
+              <v.badge className="size-[18px]" />
             </span>
           </div>
           <h3 className="text-heading">{pick(lang, v.title)}</h3>

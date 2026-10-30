@@ -18,7 +18,7 @@ export function ProfileSubpage({
         <Link
           href="/profile"
           aria-label={t("Back to profile", "प्रोफ़ाइल पर वापस")}
-          className="press grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
+          className="press tap-target grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
         >
           <ChevronLeft className="size-5" />
         </Link>

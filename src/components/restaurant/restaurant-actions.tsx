@@ -129,7 +129,7 @@ export function RestaurantActions({
                   `${name} को पसंदीदा में सेव करें`,
                 )
           }
-          className="press grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
+          className="press tap-target grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
         >
           {busy ? (
             <Loader2 className="size-5 animate-spin" />
@@ -144,7 +144,7 @@ export function RestaurantActions({
           type="button"
           onClick={share}
           aria-label={t(`Share ${name}`, `${name} शेयर करें`)}
-          className="press grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
+          className="press tap-target grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
         >
           {shared ? (
             <Check className="size-5 text-green" />
@@ -159,7 +159,7 @@ export function RestaurantActions({
           aria-pressed={searchOpen}
           aria-label={t("Search this menu", "इस मेन्यू में खोजें")}
           className={cn(
-            "press grid size-10 place-items-center rounded-full shadow-[var(--shadow-md)]",
+            "press tap-target grid size-10 place-items-center rounded-full shadow-[var(--shadow-md)]",
             searchOpen ? "bg-ink text-bg" : "bg-surface text-ink",
           )}
         >

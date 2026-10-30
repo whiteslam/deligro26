@@ -159,7 +159,7 @@ export function OrderCard({ order }: Readonly<{ order: UiOrder }>) {
             {owesRefund ? (
               <>
                 <span aria-hidden>·</span>
-                <span className="font-semibold text-pop">
+                <span className="font-semibold text-[color:var(--c-ink-amber)]">
                   {t("Refund not issued", "रिफ़ंड अभी नहीं हुआ")}
                 </span>
               </>
@@ -179,7 +179,7 @@ export function OrderCard({ order }: Readonly<{ order: UiOrder }>) {
       <button
         onClick={handleReorder}
         disabled={reordering}
-        className="press flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink disabled:opacity-60"
+        className="press tap-target flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink disabled:cursor-not-allowed disabled:opacity-60"
       >
         {reordering ? (
           <Loader2 className="size-4 animate-spin" />

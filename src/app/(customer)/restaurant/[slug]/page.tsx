@@ -140,7 +140,7 @@ export default async function RestaurantPage({
         <Link
           href="/"
           aria-label={t("Back", "वापस")}
-          className="press absolute left-4 top-[calc(var(--status-h)+1rem)] grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
+          className="press tap-target absolute left-4 top-[calc(var(--status-h)+1rem)] grid size-10 place-items-center rounded-full bg-surface text-ink shadow-[var(--shadow-md)]"
         >
           <ChevronLeft className="size-5" />
         </Link>

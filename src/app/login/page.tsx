@@ -77,7 +77,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="device">
-      <div className="app-shell">
+      <div className="app-shell customer-app">
         <StatusBar />
         <SplashScreen />
         {/* Below the status-bar strip, which is opaque and would otherwise

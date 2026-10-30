@@ -159,7 +159,7 @@ export function RiderRatingCard({
             onClick={() => setStars(n)}
             aria-pressed={n <= stars}
             aria-label={t(`Rate ${who} ${n} star${n > 1 ? "s" : ""}`, `${who} को ${n} स्टार दें`)}
-            className="press grid size-11 place-items-center rounded-full bg-surface disabled:opacity-100"
+            className="press grid size-11 place-items-center rounded-full bg-surface disabled:cursor-not-allowed disabled:opacity-100"
           >
             <Star className={cn("size-5", n <= stars ? "fill-pop text-pop" : "text-muted")} />
           </button>
@@ -181,7 +181,7 @@ export function RiderRatingCard({
             type="button"
             onClick={() => void submit()}
             disabled={busy}
-            className="press mt-2 w-full rounded-xl bg-accent px-4 py-3 text-[15px] font-bold text-[var(--on-accent)] disabled:opacity-60"
+            className="press mt-2 w-full rounded-xl bg-accent px-4 py-3 text-[15px] font-bold text-[var(--on-accent)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? t("Sending…", "भेज रहे हैं…") : t("Submit rating", "रेटिंग भेजें")}
           </button>

@@ -49,7 +49,7 @@ export function OrderReceipt({
             </h1>
           </div>
           <div className="text-right">
-            <p className="text-data text-[13px] font-extrabold tracking-[0.1em]">
+            <p className="text-data text-[13px] font-extrabold">
               {shortOrderId(order.id)}
             </p>
             <p className="mt-0.5 text-[12px] text-muted">{placedOn}</p>
@@ -80,12 +80,12 @@ export function OrderReceipt({
 
         <table className="mt-5 w-full text-[14px]">
           <thead>
-            <tr className="border-b border-line text-[11px] uppercase tracking-[0.06em] text-muted">
-              <th className="pb-2 text-left font-bold">{t("Item", "आइटम")}</th>
-              <th className="pb-2 text-right font-bold">
+            <tr className="border-b border-line text-[12px] text-muted">
+              <th className="pb-2 text-left font-semibold">{t("Item", "आइटम")}</th>
+              <th className="pb-2 text-right font-semibold">
                 {t("Qty", "मात्रा")}
               </th>
-              <th className="pb-2 text-right font-bold">
+              <th className="pb-2 text-right font-semibold">
                 {t("Amount", "रकम")}
               </th>
             </tr>

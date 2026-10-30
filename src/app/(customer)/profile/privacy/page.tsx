@@ -76,7 +76,7 @@ export default async function PrivacyPage() {
   return (
     <ProfileSubpage title={t("Privacy & security", "गोपनीयता और सुरक्षा")}>
       <section>
-        <h2 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
+        <h2 className="mb-2 px-1 text-[15px] font-bold text-ink">
           {t("How you sign in", "आप लॉग इन कैसे करते हैं")}
         </h2>
         <div className="card p-4">
@@ -96,7 +96,7 @@ export default async function PrivacyPage() {
       </section>
 
       <section className="mt-6">
-        <h2 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
+        <h2 className="mb-2 px-1 text-[15px] font-bold text-ink">
           {t("What we hold about you", "हमारे पास आपकी कौन-सी जानकारी है")}
         </h2>
         <div className="card divide-y divide-line">
@@ -128,7 +128,7 @@ export default async function PrivacyPage() {
       </section>
 
       <section className="mt-6">
-        <h2 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
+        <h2 className="mb-2 px-1 text-[15px] font-bold text-ink">
           {t("What you can do", "आप क्या कर सकते हैं")}
         </h2>
         <div className="card divide-y divide-line">
@@ -198,7 +198,7 @@ export default async function PrivacyPage() {
       </section>
 
       <section className="mt-6">
-        <h2 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
+        <h2 className="mb-2 px-1 text-[15px] font-bold text-ink">
           {t("Getting help", "मदद लें")}
         </h2>
         <Link

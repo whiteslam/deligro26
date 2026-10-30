@@ -164,7 +164,7 @@ export default function LocationPage() {
           type="button"
           onClick={() => router.back()}
           aria-label={t("Back", "वापस")}
-          className="press grid size-10 shrink-0 place-items-center rounded-full bg-surface-2 text-ink"
+          className="press tap-target grid size-10 shrink-0 place-items-center rounded-full bg-surface-2 text-ink"
         >
           <ChevronLeft className="size-5" />
         </button>
@@ -195,7 +195,7 @@ export default function LocationPage() {
             type="button"
             onClick={() => detect()}
             disabled={detecting}
-            className="press flex w-full items-center gap-3 py-3.5 text-left disabled:opacity-60"
+            className="press flex w-full items-center gap-3 py-3.5 text-left disabled:cursor-not-allowed disabled:opacity-60"
           >
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
               {detecting ? (
@@ -269,7 +269,7 @@ export default function LocationPage() {
                 <button
                   type="button"
                   onClick={() => window.location.reload()}
-                  className="press mt-3 w-full rounded-full border border-accent py-2 text-[14px] font-bold text-accent-ink"
+                  className="press mt-3 min-h-11 w-full rounded-full border border-accent py-2 text-[14px] font-bold text-accent-ink"
                 >
                   {t("Reload page", "पेज फिर से खोलें")}
                 </button>
@@ -290,15 +290,26 @@ export default function LocationPage() {
           />
         ) : null}
 
-        <h2 className="pb-1 pt-6 text-[13px] font-bold uppercase tracking-[0.08em] text-muted">
+        <h2 className="pb-1 pt-6 text-[15px] font-bold text-ink">
           {t("Saved addresses", "सेव पते")}
         </h2>
 
         {loading ? (
-          <p className="flex items-center gap-2 py-6 text-sm text-muted">
-            <LoaderCircle className="size-4 animate-spin" />{" "}
-            {t("Loading addresses…", "पते लोड हो रहे हैं…")}
-          </p>
+          // Rows in the shape of the saved addresses they become.
+          <div role="status" className="animate-pulse divide-y divide-line">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="flex items-start gap-3 py-3.5">
+                <div className="mt-0.5 size-10 shrink-0 rounded-xl bg-surface-2" />
+                <div className="min-w-0 flex-1 space-y-2 pt-1">
+                  <div className="h-4 w-1/4 rounded bg-surface-2" />
+                  <div className="h-3 w-3/4 rounded bg-surface-2" />
+                </div>
+              </div>
+            ))}
+            <span className="sr-only">
+              {t("Loading addresses…", "पते लोड हो रहे हैं…")}
+            </span>
+          </div>
         ) : null}
         {!loading && addresses.length === 0 ? (
           <p className="py-6 text-sm text-muted">
@@ -330,7 +341,7 @@ export default function LocationPage() {
                     <span className="flex items-center gap-2 text-[15px] font-bold">
                       {a.label}
                       {a.isDefault ? (
-                        <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-muted">
+                        <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[12px] font-semibold text-muted">
                           {t("Default", "डिफ़ॉल्ट")}
                         </span>
                       ) : null}
@@ -369,7 +380,7 @@ function CandidateCard({
 }>) {
   return (
     <div className="mt-3 rounded-xl border border-line bg-surface-2 p-3">
-      <p className="text-[13px] font-bold uppercase tracking-[0.08em] text-muted">
+      <p className="text-[13px] font-semibold text-muted">
         {t("Use this location?", "Use this location?")}
       </p>
       <p className="mt-1 text-[15px] font-extrabold">{label}</p>
@@ -395,7 +406,7 @@ function CandidateCard({
           type="button"
           onClick={onConfirm}
           disabled={confirming}
-          className="press flex-1 rounded-full bg-accent py-2.5 text-[14px] font-bold text-white disabled:opacity-60"
+          className="press min-h-11 flex-1 rounded-full bg-accent py-2.5 text-[14px] font-bold text-[var(--on-accent)] disabled:cursor-not-allowed disabled:opacity-55"
         >
           {confirming
             ? t("Saving…", "Saving…")
@@ -405,7 +416,7 @@ function CandidateCard({
           type="button"
           onClick={onDismiss}
           disabled={confirming}
-          className="press rounded-full border border-line px-4 py-2.5 text-[14px] font-bold"
+          className="press min-h-11 rounded-full border border-line px-4 py-2.5 text-[14px] font-bold disabled:cursor-not-allowed disabled:opacity-55"
         >
           {t("Not now", "Not now")}
         </button>

@@ -33,7 +33,7 @@ export function LanguageSwitch({ className }: Readonly<{ className?: string }>) 
             onClick={() => (active ? undefined : setLang(o.lang))}
             className={cn(
               "press min-w-[84px] rounded-full px-4 py-2 text-sm font-bold transition-colors",
-              active ? "bg-accent text-white" : "text-muted"
+              active ? "bg-accent text-[var(--on-accent)]" : "text-muted"
             )}
           >
             {o.label}

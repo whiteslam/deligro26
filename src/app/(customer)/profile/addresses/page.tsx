@@ -44,7 +44,7 @@ export default function ProfileAddressesPage() {
         <Link
           href="/profile"
           aria-label={t("Back to profile", "प्रोफ़ाइल पर वापस")}
-          className="press grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
+          className="press tap-target grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
         >
           <ChevronLeft className="size-5" />
         </Link>
@@ -55,7 +55,7 @@ export default function ProfileAddressesPage() {
           type="button"
           onClick={() => setShowAdd(true)}
           aria-label={t("Add address", "पता जोड़ें")}
-          className="press grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
+          className="press tap-target grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink"
         >
           <Plus className="size-5" />
         </button>
@@ -103,7 +103,7 @@ export default function ProfileAddressesPage() {
                     <p className="flex items-center gap-2 text-[15px] font-bold">
                       {a.label}
                       {a.isDefault ? (
-                        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-accent-ink">
+                        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[12px] font-semibold text-accent-ink">
                           {t("Default", "डिफ़ॉल्ट")}
                         </span>
                       ) : null}
@@ -139,7 +139,7 @@ export default function ProfileAddressesPage() {
                     type="button"
                     disabled={busyId === a.id}
                     onClick={() => setConfirming(a.id)}
-                    className="press inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-deal disabled:opacity-60"
+                    className="press inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-deal disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Trash2 className="size-3.5" /> {t("Remove", "हटाएं")}
                   </button>

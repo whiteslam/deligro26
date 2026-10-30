@@ -16,7 +16,7 @@ export default function NotFound() {
   return (
     <div className="device">
       <NotFoundReporter />
-      <div className="app-shell">
+      <div className="app-shell customer-app">
         <div className="app-scroll no-scrollbar grid place-items-center px-6 py-16 text-center">
           <div>
             <span className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-surface-2 text-muted">

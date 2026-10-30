@@ -10,8 +10,8 @@ export async function PickDropHero() {
   const t = await getT();
   return (
     <section className="px-4">
-      <div className="relative overflow-hidden rounded-3xl bg-[linear-gradient(150deg,#f2a71b_0%,#e59a01_55%,#d98600_100%)] p-5 pb-40 text-white">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-[11px] font-bold uppercase tracking-wide">
+      <div className="relative overflow-hidden rounded-3xl bg-[linear-gradient(150deg,var(--hero-amber-1)_0%,var(--hero-amber-2)_55%,var(--hero-amber-3)_100%)] p-5 pb-40 text-[var(--on-amber)]">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/35 px-3 py-1 text-[12px] font-semibold">
           <Package className="size-3.5" />{" "}
           {t(
             "Errand service · Coming soon",
@@ -21,7 +21,7 @@ export async function PickDropHero() {
         <h2 className="mt-3 text-[26px] font-extrabold leading-tight tracking-tight">
           {t("Pick & Drop", "पिक और ड्रॉप")}
         </h2>
-        <p className="mt-2 max-w-[62%] text-[13.5px] font-medium leading-snug text-white/90">
+        <p className="mt-2 max-w-[62%] text-[13.5px] font-medium leading-snug">
           {t(
             "Need something moved across town? Our rider picks it up and drops it at the door — parcels, documents, forgotten keys, all of it.",
             "शहर में कुछ भेजना है? हमारा राइडर सामान उठाकर दरवाज़े तक पहुंचाएगा — पार्सल, कागज़, भूली हुई चाबी, सब कुछ।",

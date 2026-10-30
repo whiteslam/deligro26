@@ -68,7 +68,7 @@ export default async function CustomerLayout({
         }}
       >
         <div className="device">
-          <div className="app-shell">
+          <div className="app-shell customer-app">
             <div className="app-scroll no-scrollbar pb-[80px]">
               {/* The content landmark screen readers jump to. */}
               <main>{children}</main>

@@ -175,7 +175,7 @@ export function ProfileEditSheet({
           <button
             type="button"
             onClick={onClose}
-            className="press grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
+            className="press tap-target grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
           >
             <X className="size-5" />
           </button>
@@ -193,7 +193,7 @@ export function ProfileEditSheet({
           }}
           placeholder={placeholder}
           disabled={otpSent}
-          className="w-full rounded-xl bg-surface-2 px-3.5 py-3 text-[15px] outline-none focus:ring-2 focus:ring-accent/30 disabled:opacity-60"
+          className="w-full rounded-xl bg-surface-2 px-3.5 py-3 text-[15px] outline-none focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
         />
 
         {otpSent ? (
@@ -222,7 +222,7 @@ export function ProfileEditSheet({
               type="button"
               onClick={requestCode}
               disabled={busy}
-              className="press text-xs font-bold text-accent disabled:opacity-50"
+              className="press text-xs font-bold text-accent disabled:cursor-not-allowed disabled:opacity-50"
             >
               {t("Resend code", "कोड फिर से भेजें")}
             </button>

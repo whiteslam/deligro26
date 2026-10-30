@@ -172,7 +172,7 @@ export function OrderHistory({
 
   return (
     <section>
-      <h2 className="mb-2 text-[13px] font-bold uppercase tracking-[0.06em] text-muted">
+      <h2 className="mb-2 text-[15px] font-bold text-ink">
         {t("Past orders", "पुराने ऑर्डर")}
       </h2>
 
@@ -232,7 +232,7 @@ export function OrderHistory({
       {groups.length ? (
         groups.map((g) => (
           <div key={g.key} className="mt-4">
-            <h3 className="mb-0.5 text-[12px] font-bold uppercase tracking-[0.08em] text-muted">
+            <h3 className="mb-0.5 text-[14px] font-bold text-ink">
               {g.key}
             </h3>
             <div className="divide-y divide-line">
@@ -290,7 +290,7 @@ export function OrderHistory({
             type="button"
             onClick={loadOlder}
             disabled={loading}
-            className="press inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2.5 text-[13px] font-bold disabled:opacity-60"
+            className="press inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2.5 text-[13px] font-bold disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? <Loader2 className="size-4 animate-spin" /> : null}
             {loading

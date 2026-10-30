@@ -88,6 +88,25 @@
   --qr-ground: #ffffff;
   --qr-ink: #0e1417;
 
+  /* Customer storefront tones that used to be literals at the call site.
+     --violet carries the Orders tab and the profile/role chips. It was a raw
+     `violet-500`, 4.3:1 as the 12px active tab label on --surface; violet-600
+     here clears AA, and the dark theme lifts it to violet-400. The amber hero is the
+     Groceries / Pick & Drop card: a fixed artwork colour, like the QR pair it
+     follows no theme, and --on-amber is what reads on it (white measured
+     2.2:1 on #e59a01; #2a1305 is 7.3:1 at the darkest stop). --whatsapp is the
+     brand green for the WhatsApp actions — too light to carry white text
+     (1.98:1), so its label is --on-whatsapp. --on-white is the ink for a
+     white pill laid over a photograph, which stays dark in either theme. */
+  --violet: oklch(54.1% 0.281 293.009);
+  --hero-amber-1: #f2a71b;
+  --hero-amber-2: #e59a01;
+  --hero-amber-3: #d98600;
+  --on-amber: #2a1305;
+  --whatsapp: #25d366;
+  --on-whatsapp: #06231a;
+  --on-white: #0e1417;
+
   /* Elevation — deliberately restrained */
   --shadow-sm: 0 1px 2px rgba(14, 20, 23, 0.05);
   --shadow-md: 0 8px 28px -12px rgba(14, 20, 23, 0.14);
@@ -140,6 +159,7 @@
   --pop: #ffce5c;
   --pop-ink: #4a3000; /* dark ink so gold pills (.pill-pop) stay readable in dark mode */
   --blue: #77b0e0; /* was #5b96c9 — 4.37:1 on --c-tint-blue, the ground .pill-blue puts it on */
+  --violet: oklch(70.2% 0.183 293.541);
   --line: #2a3036;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -181,6 +201,7 @@
   --color-pop: var(--pop);
   --color-pop-ink: var(--pop-ink);
   --color-blue: var(--blue);
+  --color-violet: var(--violet);
   --color-line: var(--line);
   --color-qr-ground: var(--qr-ground);
   --color-qr-ink: var(--qr-ink);
@@ -464,6 +485,36 @@ button.card:active {
 }
 .bolt-search input::placeholder {
   color: var(--muted);
+}
+
+/* ---------- Focus, in the customer app ----------
+   The storefront had no focus ring of its own: the UA default where a control
+   left it alone, nothing at all where a field said `outline-none` and drew a
+   30%-orange ring that measured well under 3:1. One ring for every control a
+   keyboard can reach, keyed to :focus-visible so a tap never draws it.
+   --accent-ink is 5.3:1 on --bg in light and 8.6:1 in dark.
+
+   Scoped to `.customer-app` (the customer, login, 404 and error shells) so the
+   operator portals, which share `.app-shell` and have their own ring, are not
+   touched. Unlayered, so it beats an `outline-none` utility on the same
+   element. A container focused from script (`tabIndex={-1}`, a sheet) is left
+   alone — it is not a control. Text fields take the ring inset, so it never
+   collides with the field beside it. */
+.customer-app :focus-visible:not([tabindex="-1"]) {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+.customer-app
+  :is(input:not([type="checkbox"], [type="radio"]), textarea, select):focus-visible:not([tabindex="-1"]) {
+  outline-offset: -2px;
+}
+/* The search pill draws the ring round the whole pill, not inside its input. */
+.customer-app .bolt-search:focus-within {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+.customer-app .bolt-search input:focus-visible {
+  outline: none;
 }
 
 .bolt-chip {

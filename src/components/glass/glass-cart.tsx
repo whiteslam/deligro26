@@ -111,7 +111,7 @@ export function GlassCart() {
               <button
                 onClick={closeCart}
                 aria-label={t("Close", "बंद करें")}
-                className="press grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
+                className="press tap-target grid size-9 place-items-center rounded-full bg-surface-2 text-muted"
               >
                 <X className="size-5" />
               </button>
@@ -122,10 +122,9 @@ export function GlassCart() {
                 <Link
                   href={`/restaurant/${restaurantSlug}`}
                   onClick={() => closeCart()}
-                  className="bolt-section-link"
+                  className="tap-target bolt-section-link"
                 >
-                  {t("Add more items", "और सामान जोड़ें")}{" "}
-                  <ChevronRight className="size-4" />
+                  {t("Add more items", "और सामान जोड़ें")}
                 </Link>
               </div>
             ) : null}

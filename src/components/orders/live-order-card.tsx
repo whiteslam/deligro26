@@ -103,7 +103,7 @@ export function LiveOrderCard({
           </h3>
           {/* The code support will ask for, on the screen they will be looking
               at when they ring. */}
-          <p className="text-data mt-0.5 truncate text-[11px] font-bold tracking-[0.1em] text-muted">
+          <p className="text-data mt-0.5 truncate text-[12px] font-semibold text-muted">
             {shortOrderId(order.id)} · {formatINR(order.total)}
           </p>
         </div>

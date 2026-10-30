@@ -29,7 +29,7 @@ export function QtyStepper({
     return (
       <div
         className={cn(
-          "grid place-items-center rounded-full border border-line bg-surface-2 px-4 text-label !text-muted",
+          "grid place-items-center rounded-full border border-line bg-surface-2 px-4 text-[12px] font-semibold text-muted",
           dims,
           className,
         )}
@@ -44,13 +44,13 @@ export function QtyStepper({
       <button
         onClick={onAdd}
         className={cn(
-          "press grid place-items-center rounded-full border-[1.5px] border-accent bg-surface font-bold uppercase tracking-wide text-accent-ink shadow-[var(--shadow-sm)]",
+          "press grid place-items-center rounded-full border-[1.5px] border-accent bg-surface font-bold text-accent-ink shadow-[var(--shadow-sm)]",
           dims,
           className,
         )}
       >
         <span className="flex items-center gap-1">
-          <Plus className="size-4" strokeWidth={2.75} /> {t("ADD", "जोड़ें")}
+          <Plus className="size-4" strokeWidth={2.75} /> {t("Add", "जोड़ें")}
         </span>
       </button>
     );

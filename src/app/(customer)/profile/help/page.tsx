@@ -110,7 +110,7 @@ export default async function HelpPage() {
 
       {channels.length ? (
         <div className="mt-6 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+          <p className="text-[13px] font-semibold text-muted">
             {t(
               `Contact ${s.businessName} support`,
               `${s.businessName} सहायता से संपर्क करें`,
