@@ -257,7 +257,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       );
     }
     if (!s.loaded) {
-      return const Center(child: CircularProgressIndicator());
+      return const ListSkeleton(key: Key('history-loading'), label: 'Loading your jobs', count: 5, lines: 2);
     }
     if (s.items.isEmpty && s.hasMore) {
       // "Not delivered" reads a few pages at a time and none of them had a

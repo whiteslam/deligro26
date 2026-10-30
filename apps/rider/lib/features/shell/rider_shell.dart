@@ -339,7 +339,7 @@ class OfflineBanner extends ConsumerWidget {
                   onPressed: () => ref.invalidate(meProvider),
                   style: TextButton.styleFrom(
                     foregroundColor: c.popInk,
-                    minimumSize: const Size(48, 40),
+                    minimumSize: const Size(48, 48),
                   ),
                   child: Text('Try again'),
                 ),

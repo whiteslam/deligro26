@@ -77,16 +77,26 @@ class PaymentBanner extends StatelessWidget {
       CashInstruction.prepaid => (c.greenSoft, c.green, Icons.check_circle_rounded, 'Paid online'),
       CashInstruction.unconfirmed => (c.surface2, c.muted, Icons.help_outline_rounded, 'Payment not confirmed'),
     };
+    // Cash to collect is the one figure read off at the door, often in
+    // sunlight: it is set larger and heavier than the two no-money cases.
+    final collect = payment.instruction == CashInstruction.collect;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: collect ? 12 : 10),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: fg),
+          Icon(icon, size: collect ? 24 : 20, color: fg),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(text, style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 16)),
+            child: Text(
+              text,
+              style: TextStyle(
+                color: fg,
+                fontWeight: collect ? FontWeight.w900 : FontWeight.w800,
+                fontSize: collect ? 18 : 16,
+              ),
+            ),
           ),
         ],
       ),
@@ -218,9 +228,9 @@ class OfferCard extends StatelessWidget {
           const SizedBox(height: 14),
           Text(offer.shop.name, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 14),
-          _StopLine(icon: Icons.storefront_rounded, label: 'PICKUP', line: offer.shop.line),
+          _StopLine(icon: Icons.storefront_rounded, label: 'Pickup', line: offer.shop.line),
           const SizedBox(height: 10),
-          _StopLine(icon: Icons.location_on_rounded, label: 'DROP', line: offer.drop.line),
+          _StopLine(icon: Icons.location_on_rounded, label: 'Drop', line: offer.drop.line),
           if (instructions.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
@@ -411,7 +421,7 @@ class UpcomingRow extends StatelessWidget {
               children: [
                 Text(o.shop.name, style: Theme.of(context).textTheme.titleMedium),
                 Text(
-                  ready == null ? 'Being prepared' : 'Cooking · ready in ~$ready min',
+                  ready == null ? 'Being prepared' : 'Cooking, ready in ~$ready min',
                   style: TextStyle(color: c.accentInk, fontWeight: FontWeight.w700),
                 ),
                 if (o.riderToShopKm != null || o.shopToDropKm != null)

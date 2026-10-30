@@ -223,3 +223,70 @@ class Panel extends StatelessWidget {
         child: child,
       );
 }
+
+/// A still, grey block standing in for text or a control while data loads.
+/// No shimmer: it says "something is coming here" without moving, so it
+/// needs no reduced-motion fallback and never keeps a test from settling.
+class SkeletonBlock extends StatelessWidget {
+  const SkeletonBlock({super.key, this.width, this.height = 14, this.radius = 6});
+
+  final double? width;
+  final double height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: context.colors.surface2,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+      );
+}
+
+/// A loading list in the shape of what is coming: [count] cards of grey
+/// lines, read out once to a screen reader as [label].
+class ListSkeleton extends StatelessWidget {
+  const ListSkeleton({super.key, required this.label, this.count = 3, this.lines = 3});
+
+  final String label;
+  final int count;
+  final int lines;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      label: label,
+      liveRegion: true,
+      excludeSemantics: true,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        children: [
+          for (var i = 0; i < count; i++)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: c.surface,
+                borderRadius: BorderRadius.circular(radiusBlock),
+                border: Border.all(color: c.line),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SkeletonBlock(width: 160, height: 18),
+                  for (var l = 1; l < lines; l++) ...[
+                    const SizedBox(height: 10),
+                    FractionallySizedBox(widthFactor: l.isOdd ? 0.9 : 0.6, child: const SkeletonBlock()),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

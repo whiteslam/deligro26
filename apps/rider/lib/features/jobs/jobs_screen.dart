@@ -191,7 +191,7 @@ class _JobsScreenState extends ConsumerState<JobsScreen> with WidgetsBindingObse
     final Widget body;
     if (board == null) {
       body = state.loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ListSkeleton(key: Key('jobs-loading'), label: 'Loading orders', count: 2, lines: 4)
           : ErrorRetry(error: state.error!, onRetry: () => _board.refresh());
     } else if (board.active != null || finished != null) {
       body = ActiveDeliveryScreen(
@@ -212,7 +212,7 @@ class _JobsScreenState extends ConsumerState<JobsScreen> with WidgetsBindingObse
             const EmptyState(
               icon: Icons.two_wheeler_rounded,
               title: 'No orders right now',
-              body: 'New orders show up here and ring your phone.',
+              body: 'Stay online. New orders show up here and ring your phone.',
             ),
           ],
         ),
@@ -349,7 +349,7 @@ class _Notice extends StatelessWidget {
                   if (actionLabel != null)
                     TextButton(
                       key: const Key('jobs-notice-action'),
-                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(48, 40), alignment: Alignment.centerLeft),
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(48, 48), alignment: Alignment.centerLeft),
                       onPressed: onAction,
                       child: Text(actionLabel!),
                     ),
