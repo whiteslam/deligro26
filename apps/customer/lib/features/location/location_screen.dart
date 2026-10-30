@@ -253,7 +253,7 @@ class _CurrentCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(loc.isFallback ? 'NO LOCATION SET YET' : 'DELIVERING TO',
+                Text(loc.isFallback ? 'No location set yet' : 'Delivering to',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(color: c.accentInk)),
                 const SizedBox(height: 2),
                 Text(
@@ -458,8 +458,8 @@ class _SavedTile extends StatelessWidget {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(a.label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                      if (a.isDefault) _Tag('Default', bg: c.surface2, fg: c.muted),
-                      if (!a.pinned) _Tag('Not on map', bg: c.dealSoft, fg: c.deal),
+                      if (a.isDefault) Tag('Default', bg: c.surface2, fg: c.muted),
+                      if (!a.pinned) Tag('Not on map', bg: c.dealSoft, fg: c.deal),
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -483,21 +483,6 @@ IconData _iconFor(String label) => switch (label.toLowerCase()) {
       'work' => Icons.work_rounded,
       _ => Icons.location_on_rounded,
     };
-
-class _Tag extends StatelessWidget {
-  const _Tag(this.text, {required this.bg, required this.fg});
-  final String text;
-  final Color bg;
-  final Color fg;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
-        child: Text(text.toUpperCase(),
-            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: .5, color: fg)),
-      );
-}
 
 class _ListSkeleton extends StatelessWidget {
   const _ListSkeleton();

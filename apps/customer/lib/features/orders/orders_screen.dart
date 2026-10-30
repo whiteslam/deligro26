@@ -542,7 +542,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
         current = k;
         out.add(Padding(
           padding: const EdgeInsets.only(top: 18, bottom: 2),
-          child: Text(k.toUpperCase(), style: Theme.of(context).textTheme.labelSmall),
+          child: GroupLabel(k),
         ));
       } else {
         out.add(const Divider(height: 1));
@@ -566,12 +566,10 @@ class _SectionLabel extends StatelessWidget {
       child: Row(
         children: [
           if (live) ...[
-            Container(width: 7, height: 7, decoration: BoxDecoration(color: c.green, shape: BoxShape.circle)),
-            const SizedBox(width: 7),
+            Icon(Icons.delivery_dining_rounded, size: 16, color: c.green),
+            const SizedBox(width: 6),
           ],
-          Text(text.toUpperCase(),
-              style: TextStyle(
-                  fontSize: 12.5, fontWeight: FontWeight.w800, letterSpacing: .8, color: c.muted)),
+          GroupLabel(text),
         ],
       ),
     );
@@ -641,9 +639,9 @@ class _LiveOrderCard extends ConsumerWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
                         const SizedBox(height: 2),
-                        Text('${order.shortId} · ${rupees(order.total)}',
-                            style: dataStyle(context, size: 11.5, weight: FontWeight.w700)
-                                .copyWith(color: c.muted, letterSpacing: 1)),
+                        Text('Order ${order.shortId}, ${rupees(order.total)}',
+                            style: dataStyle(context, size: 12, weight: FontWeight.w600)
+                                .copyWith(color: c.muted)),
                       ],
                     ),
                   ),

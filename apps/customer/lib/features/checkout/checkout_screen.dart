@@ -637,7 +637,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         appBar: AppBar(title: const Text('Checkout')),
         body: EmptyState(
           icon: Icons.shopping_bag_outlined,
-          title: 'Your cart is empty',
+          title: 'Your basket is empty',
           body: 'Add a few dishes and they\'ll show up here, ready to check out.',
           action: 'Browse restaurants',
           onAction: () => context.go('/'),
@@ -1367,9 +1367,8 @@ class _PayOption extends StatelessWidget {
                                   color: c.surface,
                                   borderRadius: BorderRadius.circular(999),
                                 ),
-                                child: Text(badge!.toUpperCase(),
-                                    style: TextStyle(
-                                        fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: .5, color: c.muted)),
+                                child: Text(badge!,
+                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: c.muted)),
                               ),
                           ],
                         ),
@@ -1581,13 +1580,8 @@ class _AddressPickerSheet extends StatelessWidget {
                                 children: [
                                   Text(a.label, style: const TextStyle(fontWeight: FontWeight.w800)),
                                   if (a.isDefault)
-                                    Text('DEFAULT',
-                                        style: TextStyle(
-                                            fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: .5, color: c.muted)),
-                                  if (!a.pinned)
-                                    Text('NOT ON MAP',
-                                        style: TextStyle(
-                                            fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: .5, color: c.deal)),
+                                    Tag('Default', bg: c.surface2, fg: c.muted),
+                                  if (!a.pinned) Tag('Not on map', bg: c.dealSoft, fg: c.deal),
                                 ],
                               ),
                               const SizedBox(height: 2),

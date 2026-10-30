@@ -80,9 +80,8 @@ class _Receipt extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('DELIGRO',
-                        style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 2.2, color: c.muted)),
+                    Text('Deligro',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: c.muted)),
                     const SizedBox(height: 4),
                     const Text('Receipt',
                         style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
@@ -93,7 +92,7 @@ class _Receipt extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(o.shortId,
-                      style: dataStyle(context, size: 13, weight: FontWeight.w800).copyWith(letterSpacing: 1.2)),
+                      style: dataStyle(context, size: 13, weight: FontWeight.w800)),
                   const SizedBox(height: 2),
                   Text(placedOn, style: TextStyle(fontSize: 12, color: c.muted)),
                 ],
@@ -108,14 +107,14 @@ class _Receipt extends StatelessWidget {
           const SizedBox(height: 18),
           Row(
             children: [
-              Expanded(child: Text('ITEM', style: Theme.of(context).textTheme.labelSmall)),
+              Expanded(child: Text('Item', style: Theme.of(context).textTheme.labelSmall)),
               SizedBox(
                 width: 40,
-                child: Text('QTY', textAlign: TextAlign.right, style: Theme.of(context).textTheme.labelSmall),
+                child: Text('Qty', textAlign: TextAlign.right, style: Theme.of(context).textTheme.labelSmall),
               ),
               SizedBox(
                 width: 84,
-                child: Text('AMOUNT', textAlign: TextAlign.right, style: Theme.of(context).textTheme.labelSmall),
+                child: Text('Amount', textAlign: TextAlign.right, style: Theme.of(context).textTheme.labelSmall),
               ),
             ],
           ),

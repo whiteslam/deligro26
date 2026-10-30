@@ -135,8 +135,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: ctx.colors.deal,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(48, 44),
+              foregroundColor: ctx.colors.onDeal,
+              minimumSize: const Size(48, 48),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Yes, cancel'),
@@ -480,7 +480,7 @@ class _TrackingMapState extends State<_TrackingMap> {
                         child: Text('approximate',
                             style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: c.muted)),
                       ),
-                    _Pin(icon: Icons.two_wheeler_rounded, color: c.green, fg: Colors.white, label: 'Rider'),
+                    _Pin(icon: Icons.two_wheeler_rounded, color: c.green, fg: c.onGreen, label: 'Rider'),
                   ],
                 ),
               ),
@@ -515,8 +515,10 @@ class _Pin extends StatelessWidget {
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2.5),
-            boxShadow: const [BoxShadow(color: Color(0x40000000), blurRadius: 6, offset: Offset(0, 2))],
+            border: Border.all(color: context.colors.onMedia, width: 2.5),
+            boxShadow: [
+              BoxShadow(color: context.colors.scrim.withValues(alpha: .25), blurRadius: 6, offset: const Offset(0, 2)),
+            ],
           ),
           child: Icon(icon, size: 18, color: fg),
         ),
@@ -535,12 +537,15 @@ class _TintHeader extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             NetImage(url: order.restaurantImage, tint: order.restaurantAccent, radius: 0),
-            const DecoratedBox(
+            DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0x10000000), Color(0x99000000)],
+                  colors: [
+                    context.colors.scrim.withValues(alpha: .06),
+                    context.colors.scrim.withValues(alpha: .6),
+                  ],
                 ),
               ),
             ),
@@ -551,7 +556,7 @@ class _TintHeader extends StatelessWidget {
               child: Text(order.restaurantName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                  style: TextStyle(color: context.colors.onMedia, fontSize: 20, fontWeight: FontWeight.w800)),
             ),
           ],
         ),
@@ -761,7 +766,7 @@ class _Stepper extends StatelessWidget {
                       ),
                       alignment: Alignment.center,
                       child: i < current
-                          ? const Icon(Icons.check_rounded, size: 15, color: Colors.white)
+                          ? Icon(Icons.check_rounded, size: 15, color: c.onGreen)
                           : i == current
                               ? Container(
                                   width: 10,
@@ -1296,18 +1301,14 @@ class _CourierCard extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: Text('DELIGRO RIDER',
-                      style: TextStyle(
-                          color: c.surface, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 2)),
+                  child: Text('Deligro rider',
+                      style: TextStyle(color: c.surface, fontSize: 12, fontWeight: FontWeight.w800)),
                 ),
-                Icon(Icons.verified_user_rounded, size: 12, color: c.surface.withValues(alpha: .7)),
+                Icon(Icons.verified_user_rounded, size: 13, color: c.surface.withValues(alpha: .8)),
                 const SizedBox(width: 4),
-                Text('VERIFIED',
+                Text('Verified',
                     style: TextStyle(
-                        color: c.surface.withValues(alpha: .7),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.4)),
+                        color: c.surface.withValues(alpha: .8), fontSize: 12, fontWeight: FontWeight.w700)),
               ],
             ),
           ),
@@ -1335,7 +1336,7 @@ class _CourierCard extends StatelessWidget {
                       if (rider.id != null && rider.id!.isNotEmpty)
                         Text('ID ${rider.id}',
                             style: dataStyle(context, size: 11.5, weight: FontWeight.w700)
-                                .copyWith(color: c.muted, letterSpacing: 1.2)),
+                                .copyWith(color: c.muted)),
                       const SizedBox(height: 2),
                       Text('Bringing your order to the door', style: TextStyle(fontSize: 12, color: c.muted)),
                     ],
@@ -1357,7 +1358,7 @@ class _CourierCard extends StatelessWidget {
                       children: [
                         Icon(Icons.call_rounded, size: 20),
                         SizedBox(height: 2),
-                        Text('CALL', style: TextStyle(fontSize: 11, letterSpacing: 1)),
+                        Text('Call', style: TextStyle(fontSize: 12)),
                       ],
                     ),
                   ),

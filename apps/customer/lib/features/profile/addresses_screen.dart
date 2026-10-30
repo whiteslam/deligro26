@@ -77,7 +77,7 @@ class _AddressesScreenState extends ConsumerState<AddressesScreen> {
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: c.deal, foregroundColor: Colors.white),
+              style: FilledButton.styleFrom(backgroundColor: c.deal, foregroundColor: c.onDeal),
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('Remove'),
             ),
@@ -234,7 +234,7 @@ class _AddressCard extends StatelessWidget {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(a.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                        if (a.isDefault) _Badge('Default', bg: c.accentSoft, fg: c.accentInk),
+                        if (a.isDefault) Tag('Default', bg: c.accentSoft, fg: c.accentInk),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -318,21 +318,6 @@ class _ActionChip extends StatelessWidget {
       ),
     );
   }
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge(this.text, {required this.bg, required this.fg});
-  final String text;
-  final Color bg;
-  final Color fg;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
-        child: Text(text.toUpperCase(),
-            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: .5, color: fg)),
-      );
 }
 
 class _Skeleton extends StatelessWidget {
