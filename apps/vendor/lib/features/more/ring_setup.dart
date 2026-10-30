@@ -64,7 +64,7 @@ class RingSetupSection extends ConsumerWidget {
           ListTile(
             leading: Icon(Icons.restart_alt_rounded, color: c.muted),
             title: Text('Autostart (${setup.manufacturer})', style: const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text('Your phone has its own switch — turn Autostart on for Deligro Partner.'),
+            subtitle: Text('Your phone has its own switch. Turn Autostart on for Deligro Partner.'),
             trailing: TextButton(onPressed: () => ch.openSettings('autostart'), child: Text('Open')),
           ),
         Padding(

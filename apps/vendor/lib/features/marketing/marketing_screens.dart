@@ -340,7 +340,11 @@ class _NewMarketingScreenState extends ConsumerState<NewMarketingScreen> {
               ),
               trailing: _range == null
                   ? const Icon(Icons.edit_calendar_outlined)
-                  : IconButton(onPressed: () => setState(() => _range = null), icon: const Icon(Icons.close_rounded)),
+                  : IconButton(
+                      tooltip: 'Clear dates',
+                      onPressed: () => setState(() => _range = null),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
               onTap: () async {
                 final now = DateTime.now();
                 final r = await showDateRangePicker(

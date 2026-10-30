@@ -11,6 +11,7 @@ import '../../state/orders.dart';
 import '../../state/session.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/stage.dart';
+import '../../widgets/states.dart';
 import 'order_actions.dart';
 
 /// Everything about one order (requirements §3) and the next step for it.
@@ -67,22 +68,31 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         actions: [if (o != null) OrderDocumentsButton(order: o)],
       ),
       body: detail.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(e is ApiException ? e.friendly() : 'Couldn\'t load this order.', textAlign: TextAlign.center),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: () => ref.invalidate(orderDetailProvider(widget.orderId)),
-                  child: Text('Retry'),
-                ),
+        // The header band and three sections, in the order the data fills them.
+        loading: () => Semantics(
+          label: 'Loading order',
+          child: ExcludeSemantics(
+            child: ListView(
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: const [
+                SkeletonBlock(height: 92, radius: radiusBlock),
+                SizedBox(height: 12),
+                SkeletonBlock(height: 108, radius: radiusBlock),
+                SizedBox(height: 12),
+                SkeletonBlock(height: 148, radius: radiusBlock),
+                SizedBox(height: 12),
+                SkeletonBlock(height: 132, radius: radiusBlock),
               ],
             ),
           ),
+        ),
+        error: (e, _) => StateMessage(
+          icon: Icons.cloud_off_rounded,
+          title: 'This order couldn\'t load',
+          body: e is ApiException ? e.friendly() : 'Check your internet.',
+          action: 'Retry',
+          onAction: () => ref.invalidate(orderDetailProvider(widget.orderId)),
         ),
         data: (o) => RefreshIndicator(
           onRefresh: () async => ref.invalidate(orderDetailProvider(widget.orderId)),
@@ -132,7 +142,7 @@ class _Section extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(color: c.muted, fontSize: 12.5, fontWeight: FontWeight.w800, letterSpacing: .3),
+                  style: TextStyle(color: c.muted, fontSize: 13, fontWeight: FontWeight.w700),
                 ),
               ),
               ?trailing,
@@ -221,7 +231,7 @@ class _Pickup extends ConsumerWidget {
         ? '${o.riderName} has picked it up'
         : '${o.riderName} is on the way to you';
     return _Section(
-      title: 'PICKUP',
+      title: 'Pickup',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -250,7 +260,7 @@ class _Customer extends ConsumerWidget {
     final o = order;
     final phone = o.customerPhone;
     return _Section(
-      title: 'DELIVER TO',
+      title: 'Deliver to',
       trailing: phone == null
           ? null
           : TextButton.icon(
@@ -284,7 +294,7 @@ class _Items extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     return _Section(
-      title: 'ITEMS (${order.itemCount})',
+      title: 'Items (${order.itemCount})',
       child: Column(
         children: [
           for (final l in order.lines)
@@ -356,7 +366,7 @@ class _Bill extends ConsumerWidget {
       _ => null,
     };
     return _Section(
-      title: 'BILL',
+      title: 'Bill',
       child: Column(
         children: [
           line('Items', o.itemsSubtotal),
@@ -376,7 +386,7 @@ class _Bill extends ConsumerWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              o.isCod ? 'Cash on delivery — the rider collects it.' : 'Paid online to Deligro.',
+              o.isCod ? 'Cash on delivery. The rider collects it.' : 'Paid online to Deligro.',
               style: TextStyle(color: c.muted, fontSize: 12.5),
             ),
           ),
@@ -394,7 +404,7 @@ class _Cancelled extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final reason = order.cancellationReason;
     return _Section(
-      title: 'CANCELLATION',
+      title: 'Cancellation',
       child: Text(
         reason == null || reason.isEmpty ? 'No reason was given.' : reason,
         style: TextStyle(color: context.colors.deal, fontWeight: FontWeight.w600),
@@ -432,7 +442,7 @@ class _Timeline extends ConsumerWidget {
     final events = order.events;
     if (events.isEmpty) return const SizedBox.shrink();
     return _Section(
-      title: 'HISTORY',
+      title: 'History',
       child: Column(
         children: [
           for (var i = 0; i < events.length; i++)

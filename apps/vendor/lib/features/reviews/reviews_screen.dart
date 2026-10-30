@@ -71,7 +71,7 @@ class _ReviewsScreenState extends ConsumerState<ReviewsScreen> {
                           Icon(
                             i <= (s.average ?? 0).round() ? Icons.star_rounded : Icons.star_outline_rounded,
                             size: 16,
-                            color: const Color(0xFFF2A413),
+                            color: c.star,
                           ),
                       ],
                     ),
@@ -105,7 +105,7 @@ class _ReviewsScreenState extends ConsumerState<ReviewsScreen> {
                                       value: maxCount == 0 ? 0 : (s.stars[star] ?? 0) / maxCount,
                                       minHeight: 7,
                                       backgroundColor: c.surface2,
-                                      color: _stars == null || _stars == star ? const Color(0xFFF2A413) : c.line,
+                                      color: _stars == null || _stars == star ? c.star : c.line,
                                     ),
                                   ),
                                 ),
@@ -328,7 +328,7 @@ class _ReviewTile extends ConsumerWidget {
                   Icon(
                     i <= r.rating ? Icons.star_rounded : Icons.star_outline_rounded,
                     size: 18,
-                    color: const Color(0xFFF2A413),
+                    color: c.star,
                   ),
                 const SizedBox(width: 8),
                 Text(

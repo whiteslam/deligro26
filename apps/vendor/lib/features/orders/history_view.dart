@@ -9,6 +9,7 @@ import '../../core/format.dart';
 import '../../state/orders.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/form_bits.dart';
+import '../../widgets/states.dart';
 import 'order_card.dart';
 
 /// Past orders: completed or cancelled, by period, with search.
@@ -128,19 +129,18 @@ class _HistoryViewState extends ConsumerState<HistoryView> {
             ),
           ),
           ...result.when(
-            loading: () => [const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))],
+            loading: () => [
+              const SliverToBoxAdapter(child: OrderListSkeleton(label: 'Loading past orders')),
+            ],
             error: (e, _) => [
               SliverFillRemaining(
                 hasScrollBody: false,
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Text(
-                      e is ApiException ? e.friendly() : 'Couldn\'t load past orders.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: c.muted),
-                    ),
-                  ),
+                child: StateMessage(
+                  icon: Icons.cloud_off_rounded,
+                  title: 'Past orders couldn\'t load',
+                  body: e is ApiException ? e.friendly() : 'Check your internet.',
+                  action: 'Retry',
+                  onAction: () => ref.invalidate(archiveProvider(_query)),
                 ),
               ),
             ],
@@ -148,13 +148,12 @@ class _HistoryViewState extends ConsumerState<HistoryView> {
                 ? [
                     SliverFillRemaining(
                       hasScrollBody: false,
-                      child: Center(
-                        child: Text(
-                          _kind == 'cancelled'
-                              ? 'No cancelled orders in this period.'
-                              : 'No completed orders in this period.',
-                          style: TextStyle(color: c.muted),
-                        ),
+                      child: StateMessage(
+                        icon: Icons.receipt_long_outlined,
+                        title: _kind == 'cancelled'
+                            ? 'No cancelled orders in this period.'
+                            : 'No completed orders in this period.',
+                        body: 'Try another period or search.',
                       ),
                     ),
                   ]

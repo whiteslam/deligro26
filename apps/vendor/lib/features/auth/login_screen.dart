@@ -125,7 +125,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       });
       _startTicker();
     } catch (_) {
-      if (mounted) setState(() => _error = 'Network error — please try again.');
+      if (mounted) setState(() => _error = 'Network error. Please try again.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -254,7 +254,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         const SizedBox(height: 22),
                       ],
                       AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 220),
+                        duration: MediaQuery.disableAnimationsOf(context)
+                            ? Duration.zero
+                            : const Duration(milliseconds: 220),
                         child: switch ((_method, _codeStep)) {
                           (_Method.password, _) => _buildPasswordStep(context),
                           (_Method.otp, false) => _buildPhoneStep(context),
@@ -539,7 +541,9 @@ class _CodeBoxes extends StatelessWidget {
                     final active = i == code.length || (i == _codeLen - 1 && code.length == _codeLen);
                     final filled = i < code.length;
                     return AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 120),
                       height: 54,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(

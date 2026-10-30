@@ -72,7 +72,7 @@ class _Body extends ConsumerWidget {
         if (live.isEmpty)
           Panel(
             child: Text(
-              'No live offers. Create one — customers see it on your shop card.',
+              'No live offers. Create one and customers see it on your shop card.',
               style: TextStyle(color: c.muted),
             ),
           ),

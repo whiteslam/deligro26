@@ -149,11 +149,12 @@ class _IncomingOrderDialogState extends ConsumerState<IncomingOrderDialog> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                 child: Row(
                   children: [
-                    Icon(Icons.notifications_active_rounded, color: c.onAccent, size: 20),
+                    ExcludeSemantics(child: Icon(Icons.notifications_active_rounded, color: c.onAccent, size: 20)),
                     const SizedBox(width: 8),
+                    // A live alert's title, set at 16 and untracked so it is not a caps label.
                     Text(
                       'NEW ORDER',
-                      style: TextStyle(color: c.onAccent, fontWeight: FontWeight.w800, letterSpacing: .6, fontSize: 14),
+                      style: TextStyle(color: c.onAccent, fontWeight: FontWeight.w800, fontSize: 16),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -162,7 +163,13 @@ class _IncomingOrderDialogState extends ConsumerState<IncomingOrderDialog> {
                         textAlign: TextAlign.end,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: c.onAccent, fontWeight: FontWeight.w700, fontSize: 13),
+                        // Tabular figures, so the ticking clock does not jitter.
+                        style: TextStyle(
+                          color: c.onAccent,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
                     ),
                   ],
@@ -255,12 +262,15 @@ class _IncomingOrderDialogState extends ConsumerState<IncomingOrderDialog> {
                       child: FilledButton.icon(
                         style: FilledButton.styleFrom(
                           backgroundColor: c.green,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(48),
+                          foregroundColor: c.onGreen,
+                          minimumSize: const Size.fromHeight(52),
                         ),
                         onPressed: _busy ? null : () => _accept(o),
                         icon: _busy
-                            ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            ? SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: c.muted),
+                              )
                             : const Icon(Icons.check_rounded),
                         label: const FittedBox(
                           child: Text('Accept', style: TextStyle(fontWeight: FontWeight.w800)),
@@ -273,7 +283,7 @@ class _IncomingOrderDialogState extends ConsumerState<IncomingOrderDialog> {
                         style: FilledButton.styleFrom(
                           backgroundColor: c.dealSoft,
                           foregroundColor: c.deal,
-                          minimumSize: const Size.fromHeight(48),
+                          minimumSize: const Size.fromHeight(52),
                         ),
                         onPressed: _busy ? null : () => _reject(o),
                         icon: const Icon(Icons.close_rounded),

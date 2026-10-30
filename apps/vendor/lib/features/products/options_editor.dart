@@ -197,11 +197,13 @@ class OptionsEditor extends ConsumerWidget {
                       children: [
                         Expanded(child: Text('Most they can pick')),
                         IconButton(
+                          tooltip: 'One fewer',
                           onPressed: max > 1 ? () => set(() => max--) : null,
                           icon: const Icon(Icons.remove_rounded),
                         ),
                         Text('$max', style: const TextStyle(fontWeight: FontWeight.w800)),
                         IconButton(
+                          tooltip: 'One more',
                           onPressed: max < 30 ? () => set(() => max++) : null,
                           icon: const Icon(Icons.add_rounded),
                         ),
@@ -341,9 +343,9 @@ class _OptionRow extends StatelessWidget {
             ),
             Text('${plus ? '+' : ''}${rupees(option.price)}', style: const TextStyle(fontWeight: FontWeight.w700)),
             IconButton(
+              tooltip: 'Remove ${option.name}',
               icon: const Icon(Icons.close_rounded, size: 18),
               onPressed: onDelete,
-              visualDensity: VisualDensity.compact,
             ),
           ],
         ),

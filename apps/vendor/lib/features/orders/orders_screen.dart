@@ -6,6 +6,7 @@ import '../../models/order.dart';
 import '../../state/orders.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/stage.dart';
+import '../../widgets/states.dart';
 import '../more/ring_setup.dart';
 import 'history_view.dart';
 import 'order_card.dart';
@@ -103,7 +104,7 @@ class _LiveBoardState extends ConsumerState<_LiveBoard> {
     if (state == null) {
       if (board.hasError) {
         final e = board.error;
-        return _Message(
+        return StateMessage(
           icon: Icons.cloud_off_rounded,
           title: 'Orders couldn\'t load',
           body: e is ApiException ? e.friendly() : 'Check your internet.',
@@ -111,7 +112,11 @@ class _LiveBoardState extends ConsumerState<_LiveBoard> {
           onAction: () => ref.invalidate(boardProvider),
         );
       }
-      return const Center(child: CircularProgressIndicator());
+      return ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(top: 12),
+        children: const [OrderListSkeleton()],
+      );
     }
 
     final counts = {
@@ -142,21 +147,24 @@ class _LiveBoardState extends ConsumerState<_LiveBoard> {
           ),
           if (state.stale)
             SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(color: c.dealSoft, borderRadius: BorderRadius.circular(12)),
-                child: Row(
-                  children: [
-                    Icon(Icons.wifi_off_rounded, color: c.deal, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Can\'t refresh — showing the last orders we loaded.',
-                        style: TextStyle(color: c.deal, fontSize: 13, fontWeight: FontWeight.w600),
+              child: Semantics(
+                liveRegion: true,
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(color: c.dealSoft, borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      Icon(Icons.wifi_off_rounded, color: c.deal, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Can\'t refresh. Showing the last orders we loaded.',
+                          style: TextStyle(color: c.deal, fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -209,7 +217,7 @@ class _LiveBoardState extends ConsumerState<_LiveBoard> {
           if (shown.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
-              child: _Message(
+              child: StateMessage(
                 icon: Icons.receipt_long_outlined,
                 title: state.orders.isEmpty ? 'No live orders right now' : 'Nothing matches',
                 body: state.orders.isEmpty
@@ -224,43 +232,6 @@ class _LiveBoardState extends ConsumerState<_LiveBoard> {
             ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
-      ),
-    );
-  }
-}
-
-class _Message extends StatelessWidget {
-  const _Message({required this.icon, required this.title, required this.body, this.action, this.onAction});
-  final IconData icon;
-  final String title;
-  final String body;
-  final String? action;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 42, color: c.muted),
-            const SizedBox(height: 12),
-            Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              body,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: c.muted),
-            ),
-            if (action != null) ...[
-              const SizedBox(height: 16),
-              FilledButton(onPressed: onAction, child: Text(action!)),
-            ],
-          ],
-        ),
       ),
     );
   }
