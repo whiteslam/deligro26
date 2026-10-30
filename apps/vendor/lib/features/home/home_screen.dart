@@ -11,6 +11,7 @@ import '../../state/growth.dart';
 import '../../state/session.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/stage.dart';
+import '../../widgets/states.dart';
 import '../shell/shop_switcher.dart';
 
 /// The dashboard (requirements §1), laid out as the client's mockup: the shop,
@@ -41,17 +42,37 @@ class HomeScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () => ref.read(dashboardProvider.notifier).refresh(),
         child: dash.when(
-          loading: () => ListView(
-            children: const [SizedBox(height: 240, child: Center(child: CircularProgressIndicator()))],
+          // The shop card and the figure grid, in the shape they load into.
+          loading: () => Semantics(
+            label: 'Loading the dashboard',
+            child: ExcludeSemantics(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                children: [
+                  const SkeletonBlock(height: 68, radius: radiusBlock),
+                  const SizedBox(height: 12),
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 1.45,
+                    children: [for (var i = 0; i < 8; i++) const SkeletonBlock(radius: radiusBlock)],
+                  ),
+                ],
+              ),
+            ),
           ),
           error: (e, _) => ListView(
-            padding: const EdgeInsets.all(32),
             children: [
-              const SizedBox(height: 80),
-              Text(e is ApiException ? e.friendly() : 'The dashboard couldn\'t load.', textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              Center(
-                child: FilledButton(onPressed: () => ref.invalidate(dashboardProvider), child: Text('Retry')),
+              const SizedBox(height: 48),
+              StateMessage(
+                icon: Icons.cloud_off_rounded,
+                title: 'The dashboard couldn\'t load',
+                body: e is ApiException ? e.friendly() : 'Check your internet.',
+                action: 'Retry',
+                onAction: () => ref.invalidate(dashboardProvider),
               ),
             ],
           ),
@@ -79,7 +100,7 @@ class _Body extends ConsumerWidget {
     final tiles = <Widget>[
       _Tile(
         icon: Icons.today_rounded,
-        tint: c.accent,
+        tint: c.muted,
         label: 'Today\'s sale',
         value: rupees(d.todaySale),
         change: d.todayChange,
@@ -88,7 +109,7 @@ class _Body extends ConsumerWidget {
       ),
       _Tile(
         icon: Icons.storefront_rounded,
-        tint: c.accent,
+        tint: c.muted,
         label: 'Total sale',
         value: rupees(d.totalSale),
         change: d.monthChange,
@@ -460,8 +481,8 @@ class _MarketingRow extends ConsumerWidget {
         leading: Container(
           width: 40,
           height: 40,
-          decoration: BoxDecoration(color: c.dealSoft, borderRadius: BorderRadius.circular(12)),
-          child: Icon(Icons.campaign_rounded, color: c.deal),
+          decoration: BoxDecoration(color: c.surface2, borderRadius: BorderRadius.circular(12)),
+          child: Icon(Icons.campaign_rounded, color: c.muted),
         ),
         title: Text('Marketing requests', style: const TextStyle(fontWeight: FontWeight.w700)),
         subtitle: Text(summary, maxLines: 2, overflow: TextOverflow.ellipsis),
