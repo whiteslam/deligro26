@@ -332,7 +332,7 @@ class _IssueSheetState extends State<_IssueSheet> {
           const SizedBox(height: 6),
           Text(kind.blurb, style: TextStyle(color: c.muted, fontSize: 15)),
           const SizedBox(height: 16),
-          Text('WHAT HAPPENED', style: Theme.of(context).textTheme.labelSmall),
+          Text('What happened', style: Theme.of(context).textTheme.labelSmall),
           const SizedBox(height: 8),
           if (kind.reasons.isEmpty)
             TextField(

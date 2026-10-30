@@ -86,7 +86,7 @@ class CurrentDeliveryCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'CURRENT DELIVERY',
+                        'Current delivery',
                         style: Theme.of(
                           context,
                         ).textTheme.labelSmall?.copyWith(color: c.accentInk),

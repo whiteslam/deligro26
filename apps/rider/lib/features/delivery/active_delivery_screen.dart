@@ -615,7 +615,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
               ],
               _StopCard(
                 next: live,
-                label: toShop ? 'PICK UP FROM' : 'DELIVER TO',
+                label: toShop ? 'Pick up from' : 'Deliver to',
                 stop: target,
                 person: toShop ? null : a.drop.customerName,
                 instructions: toShop ? null : a.instructions,
@@ -630,7 +630,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
               const SizedBox(height: 10),
               _StopCard(
                 next: false,
-                label: toShop ? 'THEN DELIVER TO' : 'PICKED UP FROM',
+                label: toShop ? 'Then deliver to' : 'Picked up from',
                 stop: toShop ? a.drop : a.shop,
                 person: toShop ? a.drop.customerName : null,
                 instructions: toShop ? a.instructions : null,
@@ -830,8 +830,21 @@ class _Pulse extends StatefulWidget {
 }
 
 class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
-    ..repeat(reverse: true);
+  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+
+  /// With "remove animations" on, the glow holds at full strength instead of
+  /// breathing: the button is still marked, it just does not move.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c
+        ..stop()
+        ..value = 1;
+    } else if (!_c.isAnimating) {
+      _c.repeat(reverse: true);
+    }
+  }
 
   @override
   void dispose() {
@@ -1339,7 +1352,7 @@ class _Items extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('ITEMS · $count', style: Theme.of(context).textTheme.labelSmall),
+          Text(count == 1 ? '1 item' : '$count items', style: Theme.of(context).textTheme.labelSmall),
           const SizedBox(height: 6),
           for (final i in items)
             Padding(
@@ -1371,7 +1384,7 @@ class _Requests extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('YOUR REQUESTS TO DELIGRO OPS', style: Theme.of(context).textTheme.labelSmall),
+          Text('Your requests to Deligro ops', style: Theme.of(context).textTheme.labelSmall),
           for (final e in list)
             Padding(
               padding: const EdgeInsets.only(top: 10),

@@ -365,7 +365,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             label: Text('Change number'),
             style: TextButton.styleFrom(
               foregroundColor: c.ink,
-              minimumSize: const Size(44, 44),
+              minimumSize: const Size(48, 48),
               padding: const EdgeInsets.only(right: 12),
             ),
           ),

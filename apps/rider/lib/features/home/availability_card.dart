@@ -403,8 +403,8 @@ class AvailabilitySwitch extends StatelessWidget {
     final track = online ? c.green : c.surface2;
     final onTrack = online ? c.onGreen : c.ink;
     final label = online
-        ? 'ONLINE'
-        : 'GO ONLINE';
+        ? 'Online'
+        : 'Go online';
     final semantic = online
         ? 'Go offline'
         : 'Go online';
@@ -444,13 +444,14 @@ class AvailabilitySwitch extends StatelessWidget {
                       color: onTrack,
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 0.4,
                     ),
                   ),
                 ),
                 Positioned.fill(
                   child: AnimatedAlign(
-                    duration: const Duration(milliseconds: 180),
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 180),
                     curve: Curves.easeOut,
                     alignment: online
                         ? AlignmentDirectional.centerEnd

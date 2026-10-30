@@ -71,9 +71,9 @@ class SosButton extends StatelessWidget {
         style: FilledButton.styleFrom(
           backgroundColor: c.deal,
           foregroundColor: c.onDeal,
-          minimumSize: const Size(52, 44),
+          minimumSize: const Size(52, 48),
           padding: const EdgeInsets.symmetric(horizontal: 14),
-          textStyle: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.6, fontSize: 15),
+          textStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
         ),
         child: const Text('SOS'),
       ),
