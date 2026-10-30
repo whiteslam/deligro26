@@ -23,6 +23,10 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.pop,
     required this.popInk,
     required this.blue,
+    required this.onGreen,
+    required this.onDeal,
+    required this.onMedia,
+    required this.scrim,
   });
 
   final Color bg;
@@ -43,6 +47,27 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color popInk;
   final Color blue;
 
+  /// Text and icons on a solid [green] or [deal] fill. White reads on the
+  /// light palette's deep green and red; the dark palette's brighter ones need
+  /// ink (white on #2ED47F is 1.9:1).
+  final Color onGreen;
+  final Color onDeal;
+
+  /// Text over a photo, always behind [scrim] or a darkened gradient. Not
+  /// theme-dependent: the photo is the background in both modes.
+  final Color onMedia;
+
+  /// The dark end of a photo scrim.
+  final Color scrim;
+
+  /// FSSAI veg and non-veg marks. Regulatory colours, the same in both
+  /// palettes.
+  static const vegMark = Color(0xFF0F7A48);
+  static const nonVegMark = Color(0xFFB3261E);
+
+  /// Fallback tint for a photo tile with no gradient of its own.
+  static const tintFallback = [Color(0xFFF6C453), Color(0xFFE8552D)];
+
   static const light = AppColors(
     bg: Color(0xFFF4F3F0),
     surface: Color(0xFFFCFCFB),
@@ -61,6 +86,10 @@ class AppColors extends ThemeExtension<AppColors> {
     pop: Color(0xFFFFC531),
     popInk: Color(0xFF6B4700),
     blue: Color(0xFF2B5F8C),
+    onGreen: Color(0xFFFFFFFF),
+    onDeal: Color(0xFFFFFFFF),
+    onMedia: Color(0xFFFFFFFF),
+    scrim: Color(0xFF06080A),
   );
 
   static const dark = AppColors(
@@ -81,6 +110,10 @@ class AppColors extends ThemeExtension<AppColors> {
     pop: Color(0xFFFFCE5C),
     popInk: Color(0xFF4A3000),
     blue: Color(0xFF77B0E0),
+    onGreen: Color(0xFF0F1215),
+    onDeal: Color(0xFF0F1215),
+    onMedia: Color(0xFFFFFFFF),
+    scrim: Color(0xFF06080A),
   );
 
   @override
@@ -135,10 +168,12 @@ ThemeData buildTheme(Brightness brightness) {
       titleLarge: text.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.3),
       titleMedium: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
       bodyLarge: text.bodyLarge?.copyWith(fontSize: 15),
+      // Group labels and column heads: sentence case, untracked, a step
+      // below body. Never set in capitals.
       labelSmall: text.labelSmall?.copyWith(
-        fontSize: 11,
+        fontSize: 12.5,
         fontWeight: FontWeight.w700,
-        letterSpacing: 0.6,
+        letterSpacing: 0,
         color: c.muted,
       ),
     ),

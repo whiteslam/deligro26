@@ -14,7 +14,7 @@ Gradient tintGradient(String? css) {
       );
   final colors = hexes.length >= 2
       ? hexes.toList()
-      : const [Color(0xFFF6C453), Color(0xFFE8552D)];
+      : AppColors.tintFallback;
   return LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
@@ -44,6 +44,7 @@ class NetImage extends StatelessWidget {
       decoration: BoxDecoration(gradient: tintGradient(tint)),
       child: Center(child: fallback),
     );
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: url == null || url!.isEmpty
@@ -55,7 +56,7 @@ class NetImage extends StatelessWidget {
                 CachedNetworkImage(
                   imageUrl: url!,
                   fit: BoxFit.cover,
-                  fadeInDuration: const Duration(milliseconds: 180),
+                  fadeInDuration: still ? Duration.zero : const Duration(milliseconds: 180),
                   errorWidget: (_, _, _) => const SizedBox.shrink(),
                   placeholder: (_, _) => const SizedBox.shrink(),
                 ),
@@ -75,8 +76,10 @@ class VegMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (veg == null) return const SizedBox.shrink();
-    final color = veg! ? const Color(0xFF0F7A48) : const Color(0xFFB3261E);
-    return Container(
+    final color = veg! ? AppColors.vegMark : AppColors.nonVegMark;
+    return Semantics(
+      label: veg! ? 'Vegetarian' : 'Non-vegetarian',
+      child: Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
@@ -88,6 +91,7 @@ class VegMark extends StatelessWidget {
         width: size * 0.45,
         height: size * 0.45,
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
       ),
     );
   }
@@ -122,7 +126,7 @@ class PriceText extends StatelessWidget {
   }
 }
 
-/// "ADD" that turns into a − n + stepper.
+/// "Add" that turns into a − n + stepper.
 class QtyStepper extends StatelessWidget {
   const QtyStepper({
     super.key,
@@ -156,8 +160,8 @@ class QtyStepper extends StatelessWidget {
             side: BorderSide(color: enabled ? c.accent : c.line, width: 1.4),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          child: Text(enabled ? 'ADD' : 'Sold out',
-              style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.4)),
+          child: Text(enabled ? 'Add' : 'Sold out',
+              style: const TextStyle(fontWeight: FontWeight.w800)),
         ),
       );
     }
@@ -260,15 +264,19 @@ class ErrorRetry extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) => EmptyState(
-        icon: Icons.wifi_off_rounded,
-        title: 'Couldn\'t load this',
-        body: error is ApiException
-            ? (error as ApiException).friendly
-            : 'Check your connection and try again.',
-        action: 'Try again',
-        onAction: onRetry,
-      );
+  Widget build(BuildContext context) {
+    final api = error is ApiException ? error as ApiException : null;
+    // A server that answered with an error is not a connection problem: no
+    // wifi glyph there, or people go and check their router for nothing.
+    final serverSaid = api != null && api.code != 'network';
+    return EmptyState(
+      icon: serverSaid ? Icons.error_outline_rounded : Icons.wifi_off_rounded,
+      title: api?.code == 'network' ? 'You\'re offline' : 'Couldn\'t load this',
+      body: api?.friendly ?? 'Check your connection and try again.',
+      action: 'Try again',
+      onAction: onRetry,
+    );
+  }
 }
 
 /// AsyncValue → loading spinner / [ErrorRetry] / content.
@@ -339,10 +347,10 @@ class RatingPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.star_rounded, size: 13, color: Colors.white),
+          Icon(Icons.star_rounded, size: 13, color: c.onGreen),
           const SizedBox(width: 2),
           Text(rating.toStringAsFixed(1),
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: c.onGreen)),
         ],
       ),
     );
@@ -381,4 +389,143 @@ Future<void> refreshAll(WidgetRef ref, List<ProviderOrFamily> providers) async {
     ref.invalidate(p);
   }
   await Future<void>.delayed(const Duration(milliseconds: 350));
+}
+
+/// The small label over a group of rows ("Recent", "Contact Deligro
+/// support"). Sentence case and untracked: the words carry the label, not
+/// capitals. Marked as a header for screen readers.
+class GroupLabel extends StatelessWidget {
+  const GroupLabel(this.text, {super.key, this.padding, this.color, this.leading});
+  final String text;
+  final EdgeInsets? padding;
+  final Color? color;
+
+  /// Optional mark before the words, for a state the label names ("Happening
+  /// now" beside a live icon).
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(color: color);
+    final label = Semantics(header: true, child: Text(text, style: style));
+    return Padding(
+      padding: padding ?? EdgeInsets.zero,
+      child: leading == null
+          ? label
+          : Row(children: [leading!, const SizedBox(width: 6), Flexible(child: label)]),
+    );
+  }
+}
+
+/// A short status word on a soft fill ("Default", "Not on map"). Sentence
+/// case; colour is never the only signal because the word is there.
+class Tag extends StatelessWidget {
+  const Tag(this.text, {super.key, required this.bg, required this.fg});
+  final String text;
+  final Color bg;
+  final Color fg;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+        child: Text(text, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: fg)),
+      );
+}
+
+/// A grey block standing in for content that is loading. Static on purpose:
+/// no shimmer, so there is nothing to switch off for reduced motion.
+class SkeletonBox extends StatelessWidget {
+  const SkeletonBox({super.key, this.width, this.height, this.radius = 6});
+  final double? width;
+  final double? height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: context.colors.surface2,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+      );
+}
+
+/// Loading placeholder for a list of restaurant cards: a photo and two lines
+/// of text per card, the shape of what is coming.
+class CardListSkeleton extends StatelessWidget {
+  const CardListSkeleton({
+    super.key,
+    this.count = 3,
+    this.padding = const EdgeInsets.fromLTRB(16, 8, 16, 24),
+  });
+  final int count;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: 'Loading',
+        excludeSemantics: true,
+        child: Padding(
+          padding: padding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < count; i++) ...[
+                if (i > 0) const SizedBox(height: 20),
+                const AspectRatio(aspectRatio: 2.1, child: SkeletonBox(radius: radiusBlock)),
+                const SizedBox(height: 10),
+                const SkeletonBox(width: 180, height: 14),
+                const SizedBox(height: 6),
+                const SkeletonBox(width: 120, height: 12),
+              ],
+            ],
+          ),
+        ),
+      );
+}
+
+/// Loading placeholder for a list of rows: a thumbnail and two lines each.
+class RowListSkeleton extends StatelessWidget {
+  const RowListSkeleton({
+    super.key,
+    this.count = 6,
+    this.padding = const EdgeInsets.fromLTRB(16, 8, 16, 24),
+  });
+  final int count;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: 'Loading',
+        excludeSemantics: true,
+        child: Padding(
+          padding: padding,
+          child: Column(
+            children: [
+              for (var i = 0; i < count; i++)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                    children: [
+                      SkeletonBox(width: 64, height: 64, radius: 12),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            FractionallySizedBox(widthFactor: .7, alignment: Alignment.centerLeft, child: SkeletonBox(height: 14)),
+                            SizedBox(height: 8),
+                            FractionallySizedBox(widthFactor: .45, alignment: Alignment.centerLeft, child: SkeletonBox(height: 12)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
 }
