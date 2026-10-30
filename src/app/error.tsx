@@ -37,10 +37,10 @@ export default function RouteError({
 
   return (
     <div className="device">
-      <div className="app-shell">
+      <div className="app-shell customer-app">
         <div className="app-scroll no-scrollbar grid place-items-center px-6 py-16 text-center">
           <div>
-            <span className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-red-500/10 text-red-600">
+            <span className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-deal-soft text-deal">
               <TriangleAlert className="size-7" />
             </span>
             <h1 className="text-xl font-extrabold tracking-tight">
