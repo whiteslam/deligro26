@@ -33,12 +33,21 @@ import {
 // stays coarse and DB-free so it's cheap.
 
 /**
- * Auth pages — always reachable without a session.
+ * Auth pages, plus the public landing page — always reachable without a session.
+ *
+ * `/welcome` is the web landing page. It reads only what the guest feed reads,
+ * through the RLS-scoped server client, so opening it to anon widens nothing:
+ * every action on it leads to `/login` or to a route this proxy still gates.
  *
  * The offline fallback is NOT here — it is `public/offline.html`, a static file
  * excluded in the matcher below alongside the service-worker scripts.
  */
-const PUBLIC_PATHS = [CUSTOMER_LOGIN, "/portals", ...PORTAL_LOGIN_PATHS];
+const PUBLIC_PATHS = [
+  CUSTOMER_LOGIN,
+  "/portals",
+  "/welcome",
+  ...PORTAL_LOGIN_PATHS,
+];
 
 /** Entry page a signed-in user should be bounced away from (already onboarded). */
 const ENTRY_PATHS = [CUSTOMER_LOGIN];
@@ -178,7 +187,10 @@ export const config = {
   // credentials — could not see the script at all. Both files are static
   // `public/` assets containing no user data.
   // manifests/ — the portal apps' manifests (role-manifest.ts); public, no user data.
+  // .mp4/.webm — static video in public/ (the landing hero). Same bug class as
+  // the images: without the exclusion an anon browser asking for the clip got
+  // a 307 to /login and a broken <video>.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|manifests/|OneSignalSDKWorker\\.js|sw-core\\.js|offline\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|manifests/|OneSignalSDKWorker\\.js|sw-core\\.js|offline\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp4|webm)$).*)",
   ],
 };
